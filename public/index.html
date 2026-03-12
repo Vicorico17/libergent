@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>libergent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">romanian second-hand search</p>
+        <h1>libergent</h1>
+        <p class="lede">Type a product and compare the lowest visible offer on OLX, Vinted, Lajumate, and Okazii, with direct links and an average RON price.</p>
+      </section>
+
+      <section class="search-panel">
+        <form id="searchForm" class="search-form">
+          <label class="field grow">
+            <span>Product</span>
+            <input id="queryInput" name="q" type="search" placeholder="iphone 15 pro, playstation 5, scaun herman miller..." required />
+          </label>
+
+          <label class="field">
+            <span>Marketplace</span>
+            <select id="siteInput" name="site">
+              <option value="all">All marketplaces</option>
+              <option value="olx.ro">OLX</option>
+              <option value="vinted.ro">Vinted</option>
+              <option value="lajumate.ro">Lajumate</option>
+              <option value="okazii.ro">Okazii</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Provider</span>
+            <select id="providerInput" name="provider">
+              <option value="auto">Auto</option>
+              <option value="firecrawl">Firecrawl</option>
+              <option value="cloudflare">Cloudflare</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Listings Target</span>
+            <input id="limitInput" name="limit" type="number" min="5" max="300" step="5" value="50" />
+          </label>
+
+          <label class="field">
+            <span>Pages</span>
+            <input id="pagesInput" name="pages" type="number" min="1" max="8" step="1" value="2" />
+          </label>
+
+          <button id="searchButton" type="submit">Search</button>
+        </form>
+      </section>
+
+      <section id="summary" class="summary hidden"></section>
+      <section id="status" class="status"></section>
+      <section id="marketplaces" class="grid"></section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

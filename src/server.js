@@ -1,0 +1,72 @@
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { URL } from "node:url";
+import { loadEnv } from "./env.js";
+import { searchAcrossSites } from "./app.js";
+
+const PORT = Number.parseInt(process.env.PORT || "8787", 10);
+const HOST = process.env.HOST || "127.0.0.1";
+const ROOT = process.cwd();
+const PUBLIC_DIR = path.join(ROOT, "public");
+
+loadEnv(ROOT);
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(payload, null, 2));
+}
+
+function sendFile(res, filePath) {
+  const ext = path.extname(filePath);
+  const typeMap = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8"
+  };
+
+  try {
+    const data = fs.readFileSync(filePath);
+    res.writeHead(200, { "Content-Type": typeMap[ext] || "application/octet-stream" });
+    res.end(data);
+  } catch {
+    res.writeHead(404);
+    res.end("Not found");
+  }
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
+
+  if (url.pathname === "/api/search") {
+    const query = url.searchParams.get("q")?.trim();
+    const provider = url.searchParams.get("provider") || "auto";
+    const site = url.searchParams.get("site") || "all";
+    const limit = Number.parseInt(url.searchParams.get("limit") || "20", 10);
+    const maxPages = Number.parseInt(url.searchParams.get("pages") || "1", 10);
+
+    if (!query) {
+      sendJson(res, 400, { error: "Missing q parameter" });
+      return;
+    }
+
+    try {
+      const siteKeys = site === "all" ? undefined : [site];
+      const payload = await searchAcrossSites({ query, provider, limit, maxPages, siteKeys });
+      sendJson(res, 200, payload);
+    } catch (error) {
+      sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
+    }
+    return;
+  }
+
+  const filePath = url.pathname === "/"
+    ? path.join(PUBLIC_DIR, "index.html")
+    : path.join(PUBLIC_DIR, url.pathname);
+
+  sendFile(res, filePath);
+});
+
+server.listen(PORT, HOST, () => {
+  console.log(`libergent server running at http://${HOST}:${PORT}`);
+});

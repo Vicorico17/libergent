@@ -1,0 +1,15 @@
+{
+  "name": "libergent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CLI scraper for Romanian second-hand marketplaces using Firecrawl or Cloudflare Browser Rendering.",
+  "scripts": {
+    "search": "node src/cli.js search",
+    "check": "node src/cli.js --help",
+    "dev": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
