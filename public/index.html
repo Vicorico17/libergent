@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ro">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,49 +12,28 @@
   <body>
     <main class="shell">
       <section class="hero">
-        <p class="eyebrow">romanian second-hand search</p>
+        <p class="eyebrow">căutare second-hand în românia</p>
         <h1>libergent</h1>
-        <p class="lede">Type a product and compare the lowest visible offer on OLX, Vinted, Lajumate, and Okazii, with direct links and an average RON price.</p>
+        <p class="lede">Spune produsul dorit, iar agentul caută pe piața liberă cele mai bune oferte.</p>
       </section>
 
       <section class="search-panel">
         <form id="searchForm" class="search-form">
           <label class="field grow">
-            <span>Product</span>
+            <span>Produs</span>
             <input id="queryInput" name="q" type="search" placeholder="iphone 15 pro, playstation 5, scaun herman miller..." required />
           </label>
 
           <label class="field">
-            <span>Marketplace</span>
-            <select id="siteInput" name="site">
-              <option value="all">All marketplaces</option>
-              <option value="olx.ro">OLX</option>
-              <option value="vinted.ro">Vinted</option>
-              <option value="lajumate.ro">Lajumate</option>
-              <option value="okazii.ro">Okazii</option>
+            <span>Stare</span>
+            <select id="conditionInput" name="condition">
+              <option value="any">Oricare</option>
+              <option value="new">Nou</option>
+              <option value="used">Folosit</option>
             </select>
           </label>
 
-          <label class="field">
-            <span>Provider</span>
-            <select id="providerInput" name="provider">
-              <option value="auto">Auto</option>
-              <option value="firecrawl">Firecrawl</option>
-              <option value="cloudflare">Cloudflare</option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span>Listings Target</span>
-            <input id="limitInput" name="limit" type="number" min="5" max="300" step="5" value="50" />
-          </label>
-
-          <label class="field">
-            <span>Pages</span>
-            <input id="pagesInput" name="pages" type="number" min="1" max="8" step="1" value="2" />
-          </label>
-
-          <button id="searchButton" type="submit">Search</button>
+          <button id="searchButton" type="submit">Caută</button>
         </form>
       </section>
 
@@ -62,6 +41,21 @@
       <section id="status" class="status"></section>
       <section id="marketplaces" class="grid"></section>
     </main>
+
+    <div id="loadingOverlay" class="loading-overlay hidden" aria-hidden="true">
+      <div class="loading-card">
+        <div class="loading-ring" aria-hidden="true"></div>
+        <p class="loading-eyebrow">libergent lucrează</p>
+        <h2 id="loadingTitle">Caut oferte relevante...</h2>
+        <p id="loadingText" class="loading-text">Verific OLX, Vinted, Lajumate și Okazii și ordonez rezultatele.</p>
+        <div class="loading-marketplaces" aria-hidden="true">
+          <span>OLX</span>
+          <span>Vinted</span>
+          <span>Lajumate</span>
+          <span>Okazii</span>
+        </div>
+      </div>
+    </div>
 
     <script src="/app.js" type="module"></script>
   </body>

@@ -1,6 +1,7 @@
 import { buildListingSchema } from "./schema.js";
 import { crawlWithCloudflare, scrapeWithCloudflare } from "./providers/cloudflare.js";
-import { scrapeWithFirecrawl } from "./providers/firecrawl.js";
+import { scrapeMarkdownWithFirecrawl, scrapeWithFirecrawl } from "./providers/firecrawl.js";
+import { parseOlxMarkdown } from "./parsers/olx.js";
 
 function dedupeItems(items) {
   const seen = new Set();
@@ -43,6 +44,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
 
   let raw;
   let items;
+  let totalResults = null;
 
   if (resolvedProvider === "cloudflare" && site.strategy === "crawl-seed") {
     raw = await crawlWithCloudflare({
@@ -54,6 +56,15 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
   } else if (resolvedProvider === "cloudflare") {
     raw = await scrapeWithCloudflare({ url, prompt, schema, timeoutMs: site.timeoutMs });
     items = Array.isArray(raw?.items) ? raw.items : [];
+  } else if (site.strategy === "firecrawl-markdown-local") {
+    raw = await scrapeMarkdownWithFirecrawl({
+      url,
+      waitForMs: site.waitForMs,
+      timeoutMs: site.timeoutMs
+    });
+    const parsed = parseOlxMarkdown(raw?.markdown || "", limit);
+    items = parsed.items;
+    totalResults = parsed.totalResults;
   } else {
     raw = await scrapeWithFirecrawl({
       url,
@@ -72,41 +83,77 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
     url,
     query,
     itemCount: items.length,
-    items
+    items,
+    totalResults
   };
 }
 
 export async function runSearch({ provider, site, query, limit, maxPages }) {
   if (site.strategy === "crawl-seed") {
-    return runSinglePageSearch({ provider, site, query, limit, page: 1 });
+    const result = await runSinglePageSearch({ provider, site, query, limit, page: 1 });
+    return {
+      ...result,
+      pagesUsed: 1,
+      creditsUsed: site.estimatedCreditsPerPage || 0
+    };
   }
 
-  const pageSize = site.pageSize || Math.max(10, Math.min(limit, 50));
-  const cappedMaxPages = Math.min(maxPages ?? site.maxPages ?? 1, site.maxPages ?? 1);
-  const targetPages = Math.max(1, Math.min(cappedMaxPages, Math.ceil(limit / pageSize)));
-  const pageNumbers = Array.from({ length: targetPages }, (_, index) => index + 1);
+  const effectiveLimit = limit ?? site.defaultLimit ?? 120;
+  const pageSize = site.pageSize || Math.max(10, Math.min(effectiveLimit, 50));
+  const cappedMaxPages = Math.min(maxPages ?? site.defaultMaxPages ?? site.maxPages ?? 1, site.maxPages ?? 1);
 
-  const pageResults = await Promise.all(
-    pageNumbers.map((page) =>
-      runSinglePageSearch({
-        provider,
-        site,
-        query,
-        limit: Math.min(pageSize, limit),
-        page
-      })
-    )
-  );
+  const firstPage = await runSinglePageSearch({
+    provider,
+    site,
+    query,
+    limit: Math.min(pageSize, effectiveLimit),
+    page: 1
+  });
 
-  const items = dedupeItems(pageResults.flatMap((result) => result.items)).slice(0, limit);
+  const results = [firstPage];
+  let items = dedupeItems(firstPage.items);
+  const estimatedTotalPages = firstPage.totalResults
+    ? Math.ceil(firstPage.totalResults / Math.max(firstPage.itemCount || 1, 1))
+    : Math.ceil(effectiveLimit / pageSize);
+  const targetPages = Math.max(1, Math.min(cappedMaxPages, estimatedTotalPages));
+
+  for (let page = 2; page <= targetPages; page += 1) {
+    if (items.length >= effectiveLimit) {
+      break;
+    }
+
+    const pageResult = await runSinglePageSearch({
+      provider,
+      site,
+      query,
+      limit: Math.min(pageSize, effectiveLimit),
+      page
+    });
+
+    results.push(pageResult);
+    const nextItems = dedupeItems([...items, ...pageResult.items]);
+    if (nextItems.length === items.length) {
+      break;
+    }
+    items = nextItems;
+
+    if (pageResult.itemCount < Math.max(5, Math.floor(pageSize / 3))) {
+      break;
+    }
+  }
+
+  items = items.slice(0, effectiveLimit);
 
   return {
-    provider: pageResults[0]?.provider ?? (provider === "auto" ? site.provider : provider),
-    strategy: `${site.strategy}:${targetPages}-pages`,
+    provider: results[0]?.provider ?? (provider === "auto" ? site.provider : provider),
+    strategy: `${site.strategy}:${results.length}-pages`,
     site: site.key,
     url: site.searchUrl(query),
     query,
     itemCount: items.length,
-    items
+    items,
+    totalResults: results[0]?.totalResults ?? null,
+    pagesUsed: results.length,
+    creditsUsed: results.length * (site.estimatedCreditsPerPage || 0)
   };
 }

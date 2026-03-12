@@ -26,18 +26,23 @@ export const SITES = {
   "olx.ro": {
     key: "olx.ro",
     label: "OLX Romania",
+    priority: 1,
+    defaultEnabled: true,
     provider: "firecrawl",
-    strategy: "search-page",
+    strategy: "firecrawl-markdown-local",
+    estimatedCreditsPerPage: 1,
     waitForMs: 5000,
     timeoutMs: 90000,
     pageSize: 40,
-    maxPages: 8,
+    maxPages: 12,
+    defaultLimit: 320,
+    defaultMaxPages: 8,
     searchUrl(query) {
-      return `https://www.olx.ro/oferte/q-${slugifySpacesWithDash(query)}/`;
+      return `https://www.olx.ro/oferte/q-${slugifySpacesWithDash(query)}/?search%5Border%5D=created_at%3Adesc`;
     },
     pagedSearchUrl(query, page) {
       const base = this.searchUrl(query);
-      return page <= 1 ? base : `${base}?page=${page}`;
+      return page <= 1 ? base : `${base}&page=${page}`;
     },
     prompt(query, limit) {
       return buildBasePrompt(
@@ -51,14 +56,19 @@ export const SITES = {
   "vinted.ro": {
     key: "vinted.ro",
     label: "Vinted Romania",
+    priority: 3,
+    defaultEnabled: false,
     provider: "cloudflare",
     strategy: "search-page",
+    estimatedCreditsPerPage: 0,
     waitForMs: 5000,
     timeoutMs: 90000,
     pageSize: 48,
     maxPages: 6,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
     searchUrl(query) {
-      return `https://www.vinted.ro/catalog?search_text=${encodeSearchText(query)}`;
+      return `https://www.vinted.ro/catalog?search_text=${encodeSearchText(query)}&order=newest_first`;
     },
     pagedSearchUrl(query, page) {
       const base = this.searchUrl(query);
@@ -76,18 +86,23 @@ export const SITES = {
   "lajumate.ro": {
     key: "lajumate.ro",
     label: "Lajumate",
+    priority: 2,
+    defaultEnabled: true,
     provider: "firecrawl",
     strategy: "search-page",
+    estimatedCreditsPerPage: 5,
     waitForMs: 4000,
     timeoutMs: 90000,
     pageSize: 40,
     maxPages: 6,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
     searchUrl(query) {
-      return `https://lajumate.ro/cauta_${encodeSearchText(query)}.html`;
+      return `https://lajumate.ro/cauta_${encodeSearchText(query)}.html?sort=date-desc`;
     },
     pagedSearchUrl(query, page) {
       const base = this.searchUrl(query);
-      return page <= 1 ? base : `${base}?page=${page}`;
+      return page <= 1 ? base : `${base}&page=${page}`;
     },
     prompt(query, limit) {
       return buildBasePrompt(
@@ -101,18 +116,23 @@ export const SITES = {
   "okazii.ro": {
     key: "okazii.ro",
     label: "Okazii",
+    priority: 4,
+    defaultEnabled: false,
     provider: "cloudflare",
     strategy: "crawl-seed",
+    estimatedCreditsPerPage: 0,
     waitForMs: 4000,
     timeoutMs: 90000,
     pageSize: 36,
     maxPages: 6,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
     searchUrl(query) {
-      return `https://www.okazii.ro/cauta/${encodeSearchText(query)}/`;
+      return `https://www.okazii.ro/cauta/${encodeSearchText(query)}/?sort=date_desc`;
     },
     pagedSearchUrl(query, page) {
       const base = this.searchUrl(query);
-      return page <= 1 ? base : `${base}?page=${page}`;
+      return page <= 1 ? base : `${base}&page=${page}`;
     },
     prompt(query, limit) {
       return buildBasePrompt(
@@ -149,4 +169,11 @@ export function getSite(siteKey) {
     throw new Error(`Unsupported site "${siteKey}". Supported sites: ${Object.keys(SITES).join(", ")}`);
   }
   return site;
+}
+
+export function getDefaultSiteKeys() {
+  return Object.values(SITES)
+    .filter((site) => site.defaultEnabled)
+    .sort((a, b) => a.priority - b.priority)
+    .map((site) => site.key);
 }

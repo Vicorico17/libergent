@@ -11,8 +11,8 @@ function printHelp() {
   console.log(`libergent
 
 Usage:
-  node src/cli.js search --site <site> --query "<text>" [--provider auto|firecrawl|cloudflare] [--limit 20] [--pages 1] [--out results/file.json]
-  node src/cli.js search --site all --query "<text>" [--provider auto|firecrawl|cloudflare] [--limit 20] [--pages 1] [--out results/file.json]
+  node src/cli.js search --site <site> --query "<text>" [--provider auto|firecrawl|cloudflare] [--limit 120] [--pages 3] [--out results/file.json]
+  node src/cli.js search --site all --query "<text>" [--provider auto|firecrawl|cloudflare] [--limit 120] [--pages 3] [--out results/file.json]
 
 Supported sites:
   ${Object.keys(SITES).join(", ")}
@@ -62,8 +62,8 @@ async function main() {
   const siteArg = args.site;
   const query = args.query;
   const provider = args.provider || "auto";
-  const limit = Number.parseInt(args.limit || "20", 10);
-  const maxPages = Number.parseInt(args.pages || "1", 10);
+  const limit = Number.parseInt(args.limit || "120", 10);
+  const maxPages = Number.parseInt(args.pages || "3", 10);
 
   if (!siteArg) {
     throw new Error("Missing --site");

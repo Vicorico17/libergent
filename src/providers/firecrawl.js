@@ -42,3 +42,33 @@ export async function scrapeWithFirecrawl({ url, prompt, schema, waitForMs, time
 
   return payload?.data?.json ?? payload?.json ?? payload?.data ?? payload;
 }
+
+export async function scrapeMarkdownWithFirecrawl({ url, waitForMs, timeoutMs = 45000 }) {
+  requireEnv(["FIRECRAWL_API_KEY"]);
+
+  const response = await fetch(API_URL, {
+    method: "POST",
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: {
+      Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      url,
+      formats: ["markdown", "links"],
+      onlyMainContent: false,
+      maxAge: 0,
+      timeout: timeoutMs,
+      waitFor: waitForMs,
+      proxy: "basic",
+      blockAds: true
+    })
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(`Firecrawl markdown request failed (${response.status}): ${JSON.stringify(payload)}`);
+  }
+
+  return payload?.data ?? payload;
+}

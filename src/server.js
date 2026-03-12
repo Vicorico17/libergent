@@ -40,10 +40,13 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/search") {
     const query = url.searchParams.get("q")?.trim();
+    const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
     const site = url.searchParams.get("site") || "all";
-    const limit = Number.parseInt(url.searchParams.get("limit") || "20", 10);
-    const maxPages = Number.parseInt(url.searchParams.get("pages") || "1", 10);
+    const limitParam = url.searchParams.get("limit");
+    const pagesParam = url.searchParams.get("pages");
+    const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
+    const maxPages = pagesParam ? Number.parseInt(pagesParam, 10) : undefined;
 
     if (!query) {
       sendJson(res, 400, { error: "Missing q parameter" });
@@ -52,7 +55,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const siteKeys = site === "all" ? undefined : [site];
-      const payload = await searchAcrossSites({ query, provider, limit, maxPages, siteKeys });
+      const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys });
       sendJson(res, 200, payload);
     } catch (error) {
       sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });

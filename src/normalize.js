@@ -40,7 +40,8 @@ function parseNumberFromPrice(priceText = "") {
 
 export function normalizeListing(item) {
   const priceText = typeof item.price === "string" ? item.price.trim() : "";
-  const currency = item.currency ? String(item.currency).toUpperCase() : detectCurrency(priceText);
+  const rawCurrency = item.currency ? String(item.currency).toUpperCase() : detectCurrency(priceText);
+  const currency = rawCurrency === "LEI" || rawCurrency === "LEU" ? "RON" : rawCurrency;
   const numericPrice = parseNumberFromPrice(priceText);
   const priceRon = currency === "RON" ? numericPrice : null;
 
