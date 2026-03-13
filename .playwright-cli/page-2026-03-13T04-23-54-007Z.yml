@@ -1,0 +1,27 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - paragraph [ref=e4]: căutare second-hand în românia
+      - heading "libergent" [level=1] [ref=e5]
+      - paragraph [ref=e6]: Spune produsul dorit, iar agentul caută pe piața liberă cele mai bune oferte.
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e10]: Produs
+        - searchbox "Produs" [active] [ref=e11]: iphone 15
+      - generic [ref=e12]:
+        - generic [ref=e13]: Stare
+        - combobox "Stare" [ref=e14]:
+          - option "Oricare" [selected]
+          - option "Nou"
+          - option "Folosit"
+      - button "Caută" [disabled] [ref=e15]
+    - generic [ref=e16]: Căutarea a pornit...
+  - generic [ref=e18]:
+    - paragraph [ref=e20]: libergent lucrează
+    - heading "Caut oferte relevante pentru „carucio”" [level=2] [ref=e21]
+    - paragraph [ref=e22]: Verific OLX, Vinted, Lajumate și Okazii, ordonez anunțurile și calculez cea mai bună ofertă.
+    - generic [ref=e23]:
+      - generic [ref=e24]: OLX
+      - generic [ref=e25]: Vinted
+      - generic [ref=e26]: Lajumate
+      - generic [ref=e27]: Okazii

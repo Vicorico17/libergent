@@ -2,3 +2,4 @@
 .env.local
 results/
 .firecrawl/
+data/

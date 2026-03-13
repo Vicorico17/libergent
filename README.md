@@ -205,6 +205,20 @@ All marketplaces:
 node src/cli.js search --site all --query "iphone 15 pro" --provider auto --limit 120 --pages 3 --out results/iphone-15-pro.json
 ```
 
+Readable live report across all marketplaces:
+
+```bash
+npm run search:live -- --query "riftbound"
+```
+
+The `search:live` command:
+
+- disables mock mode for that run
+- searches all marketplaces
+- uses one page per marketplace with site-specific default limits
+- prints a readable report with offers from each marketplace
+- prints one recommended `bestOffer` across all marketplaces
+
 Cloudflare:
 
 ```bash
@@ -238,6 +252,12 @@ node src/cli.js search --site vinted.ro --query "nike dunk" --provider cloudflar
 ```
 
 For `--site all`, the response also includes a `summary` section with `averagePriceRon`, `pricedListingsRon`, and `totalListings`.
+
+If you want human-readable terminal output instead of JSON, add `--pretty`:
+
+```bash
+node src/cli.js search --site all --query "riftbound" --provider auto --limit 5 --pages 1 --pretty
+```
 
 ## Notes
 

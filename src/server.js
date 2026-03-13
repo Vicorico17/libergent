@@ -4,6 +4,9 @@ import path from "node:path";
 import { URL } from "node:url";
 import { loadEnv } from "./env.js";
 import { searchAcrossSites } from "./app.js";
+import { buildBudgetPayload } from "./budget.js";
+import { buildHistoryPayload, logSearchEvent } from "./history.js";
+import { getDefaultSiteKeys, getSite, SITES } from "./sites.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -42,7 +45,7 @@ const server = http.createServer(async (req, res) => {
     const query = url.searchParams.get("q")?.trim();
     const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
-    const site = url.searchParams.get("site") || "all";
+    const site = url.searchParams.get("site") || "default";
     const limitParam = url.searchParams.get("limit");
     const pagesParam = url.searchParams.get("pages");
     const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
@@ -54,8 +57,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      const siteKeys = site === "all" ? undefined : [site];
+      const siteKeys = site === "all"
+        ? Object.keys(SITES)
+        : site === "default"
+          ? getDefaultSiteKeys()
+          : [getSite(site).key];
       const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys });
+      logSearchEvent({ query, condition, provider, siteKeys, payload });
       sendJson(res, 200, payload);
     } catch (error) {
       sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
@@ -63,9 +71,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/api/budget") {
+    sendJson(res, 200, buildBudgetPayload());
+    return;
+  }
+
+  if (url.pathname === "/api/history") {
+    sendJson(res, 200, buildHistoryPayload());
+    return;
+  }
+
   const filePath = url.pathname === "/"
     ? path.join(PUBLIC_DIR, "index.html")
-    : path.join(PUBLIC_DIR, url.pathname);
+    : url.pathname === "/budget"
+      ? path.join(PUBLIC_DIR, "budget.html")
+      : url.pathname === "/trends"
+        ? path.join(PUBLIC_DIR, "trends.html")
+      : path.join(PUBLIC_DIR, url.pathname);
 
   sendFile(res, filePath);
 });

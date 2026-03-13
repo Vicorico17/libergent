@@ -33,16 +33,16 @@ export const SITES = {
     estimatedCreditsPerPage: 1,
     waitForMs: 5000,
     timeoutMs: 90000,
-    pageSize: 40,
+    pageSize: 50,
     maxPages: 12,
-    defaultLimit: 320,
-    defaultMaxPages: 8,
+    defaultLimit: 50,
+    defaultMaxPages: 1,
     searchUrl(query) {
       return `https://www.olx.ro/oferte/q-${slugifySpacesWithDash(query)}/?search%5Border%5D=created_at%3Adesc`;
     },
     pagedSearchUrl(query, page) {
       const base = this.searchUrl(query);
-      return page <= 1 ? base : `${base}&page=${page}`;
+      return page <= 1 ? base : `${base}?page=${page}`;
     },
     prompt(query, limit) {
       return buildBasePrompt(
@@ -57,22 +57,22 @@ export const SITES = {
     key: "vinted.ro",
     label: "Vinted Romania",
     priority: 3,
-    defaultEnabled: false,
-    provider: "cloudflare",
-    strategy: "search-page",
-    estimatedCreditsPerPage: 0,
+    defaultEnabled: true,
+    provider: "firecrawl",
+    strategy: "firecrawl-markdown-local",
+    estimatedCreditsPerPage: 1,
     waitForMs: 5000,
     timeoutMs: 90000,
-    pageSize: 48,
+    pageSize: 95,
     maxPages: 6,
-    defaultLimit: 24,
+    defaultLimit: 95,
     defaultMaxPages: 1,
     searchUrl(query) {
       return `https://www.vinted.ro/catalog?search_text=${encodeSearchText(query)}&order=newest_first`;
     },
     pagedSearchUrl(query, page) {
       const base = this.searchUrl(query);
-      return page <= 1 ? base : `${base}&page=${page}`;
+      return page <= 1 ? base : `${base}?page=${page}`;
     },
     prompt(query, limit) {
       return buildBasePrompt(
@@ -88,21 +88,21 @@ export const SITES = {
     label: "Lajumate",
     priority: 2,
     defaultEnabled: true,
-    provider: "firecrawl",
-    strategy: "search-page",
-    estimatedCreditsPerPage: 5,
-    waitForMs: 4000,
-    timeoutMs: 90000,
-    pageSize: 40,
+    provider: "direct",
+    strategy: "direct-html-local",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 12000,
+    pageSize: 26,
     maxPages: 6,
-    defaultLimit: 24,
+    defaultLimit: 26,
     defaultMaxPages: 1,
     searchUrl(query) {
-      return `https://lajumate.ro/cauta_${encodeSearchText(query)}.html?sort=date-desc`;
+      return `https://lajumate.ro/anunturi/c/${encodeSearchText(query)}`;
     },
     pagedSearchUrl(query, page) {
       const base = this.searchUrl(query);
-      return page <= 1 ? base : `${base}&page=${page}`;
+      return page <= 1 ? base : `${base}?page=${page}`;
     },
     prompt(query, limit) {
       return buildBasePrompt(
@@ -117,22 +117,23 @@ export const SITES = {
     key: "okazii.ro",
     label: "Okazii",
     priority: 4,
-    defaultEnabled: false,
-    provider: "cloudflare",
-    strategy: "crawl-seed",
+    defaultEnabled: true,
+    provider: "direct",
+    strategy: "direct-html-local",
     estimatedCreditsPerPage: 0,
-    waitForMs: 4000,
-    timeoutMs: 90000,
+    waitForMs: 0,
+    timeoutMs: 12000,
     pageSize: 36,
     maxPages: 6,
-    defaultLimit: 24,
+    defaultLimit: 36,
     defaultMaxPages: 1,
+    disableQueryFilter: true,
     searchUrl(query) {
-      return `https://www.okazii.ro/cauta/${encodeSearchText(query)}/?sort=date_desc`;
+      return `https://www.okazii.ro/cautare/${encodeSearchText(query).replace(/%20/g, "+")}.html`;
     },
     pagedSearchUrl(query, page) {
       const base = this.searchUrl(query);
-      return page <= 1 ? base : `${base}&page=${page}`;
+      return page <= 1 ? base : `${base}?page=${page}`;
     },
     prompt(query, limit) {
       return buildBasePrompt(
@@ -141,24 +142,6 @@ export const SITES = {
         limit,
         "Results can include marketplace catalog items. Keep only visible result cards related to the query."
       );
-    },
-    crawlConfig(query) {
-      const seed = `https://www.okazii.ro/cauta/${encodeSearchText(query)}/`;
-      return {
-        url: seed,
-        limit: 10,
-        depth: 1,
-        formats: ["json"],
-        jsonOptions: {
-          prompt: this.prompt(query, 10)
-        },
-        options: {
-          includePatterns: [
-            "https://www.okazii.ro/cauta/**",
-            "https://www.okazii.ro/**"
-          ]
-        }
-      };
     }
   }
 };

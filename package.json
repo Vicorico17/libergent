@@ -6,6 +6,7 @@
   "description": "CLI scraper for Romanian second-hand marketplaces using Firecrawl or Cloudflare Browser Rendering.",
   "scripts": {
     "search": "node src/cli.js search",
+    "search:live": "LIBERGENT_MOCK_SEARCH=0 LIBERGENT_MOCK_PROVIDER=0 node src/cli.js search --site all --provider auto --pages 1 --pretty",
     "check": "node src/cli.js --help",
     "dev": "node src/server.js"
   },

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>libergent trends</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">keywords and trends</p>
+          <h1>libergent trends</h1>
+          <p class="lede">Vezi ce caută oamenii, ce termeni cresc și cum se mișcă interesul în timp pe baza căutărilor făcute în aplicație.</p>
+        </div>
+        <div class="hero-aside">
+          <div class="hero-card">
+            <p class="metric-label">Main App</p>
+            <p class="metric-value"><a class="hero-link" href="/">Open Search</a></p>
+            <p class="muted">Revino la căutarea principală pentru a genera trafic nou în istoric.</p>
+          </div>
+          <div class="hero-card">
+            <p class="metric-label">Budget</p>
+            <p class="metric-value"><a class="hero-link" href="/budget">Open Budget</a></p>
+            <p class="muted">Combină interesul din căutări cu costul efectiv de scraping.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="workflow-panel">
+        <div class="workflow-panel__header">
+          <div>
+            <p class="eyebrow">tracking</p>
+            <h2>Ce caută oamenii acum</h2>
+          </div>
+          <p id="historyStatus" class="status budget-status">Încarc trendurile...</p>
+        </div>
+        <div class="pricing-topline">
+          <article class="workflow-card">
+            <p class="metric-label">Total Searches</p>
+            <p id="totalSearches" class="metric-value">0</p>
+          </article>
+          <article class="workflow-card">
+            <p class="metric-label">Unique Queries</p>
+            <p id="uniqueQueries" class="metric-value">0</p>
+          </article>
+          <article class="workflow-card">
+            <p class="metric-label">Unique Keywords</p>
+            <p id="uniqueKeywords" class="metric-value">0</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="budget-panel">
+        <div class="budget-panel__header">
+          <div>
+            <p class="eyebrow">keyword tracking</p>
+            <h2>Top queries și top keywords</h2>
+          </div>
+          <p class="muted">Cele mai repetate căutări și cele mai recurente cuvinte-cheie din istoric.</p>
+        </div>
+        <div class="strategy-grid">
+          <article class="strategy-card">
+            <p class="metric-label">Top Queries</p>
+            <div id="topQueries" class="trend-list"></div>
+          </article>
+          <article class="strategy-card">
+            <p class="metric-label">Top Keywords</p>
+            <div id="topKeywords" class="keyword-cloud"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="pricing-panel">
+        <div class="pricing-panel__header">
+          <div>
+            <p class="eyebrow">momentum</p>
+            <h2>Trend zilnic și istoric recent</h2>
+          </div>
+          <p class="muted">Poți vedea volumul pe zile și ultimele căutări care au intrat în sistem.</p>
+        </div>
+        <div class="pricing-grid">
+          <article class="pricing-card">
+            <p class="metric-label">Daily Search Volume</p>
+            <div id="dailyTrend" class="trend-bars"></div>
+          </article>
+          <article class="pricing-card">
+            <p class="metric-label">Recent Searches</p>
+            <div id="recentSearches" class="recent-searches"></div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="/trends-page.js" type="module"></script>
+  </body>
+</html>

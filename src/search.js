@@ -2,6 +2,47 @@ import { buildListingSchema } from "./schema.js";
 import { crawlWithCloudflare, scrapeWithCloudflare } from "./providers/cloudflare.js";
 import { scrapeMarkdownWithFirecrawl, scrapeWithFirecrawl } from "./providers/firecrawl.js";
 import { parseOlxMarkdown } from "./parsers/olx.js";
+import { parseLajumateHtml } from "./parsers/lajumate.js";
+import { parseOkaziiHtml } from "./parsers/okazii.js";
+import { parseVintedMarkdown } from "./parsers/vinted.js";
+
+function tokenize(value = "") {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function filterRelevantItems(items, query) {
+  const queryTokens = tokenize(query);
+  if (!queryTokens.length) {
+    return items;
+  }
+
+  return items.filter((item) => {
+    const titleTokens = new Set(tokenize(item.title || ""));
+    return queryTokens.some((token) => titleTokens.has(token));
+  });
+}
+
+async function fetchHtmlDirect({ url, timeoutMs = 15000 }) {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(timeoutMs),
+    headers: {
+      "user-agent": "Mozilla/5.0 (compatible; libergent/0.1; +https://localhost)",
+      accept: "text/html,application/xhtml+xml"
+    },
+    redirect: "follow"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Direct fetch failed (${response.status}) for ${url}`);
+  }
+
+  return response.text();
+}
 
 function dedupeItems(items) {
   const seen = new Set();
@@ -53,6 +94,20 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
       timeoutMs: site.timeoutMs
     });
     items = extractCloudflareCrawlItems(raw);
+  } else if (site.strategy === "direct-html-local") {
+    raw = await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs });
+
+    if (site.key === "lajumate.ro") {
+      const parsed = parseLajumateHtml(raw, limit);
+      items = parsed.items;
+      totalResults = parsed.totalResults;
+    } else if (site.key === "okazii.ro") {
+      const parsed = parseOkaziiHtml(raw, limit);
+      items = parsed.items;
+      totalResults = parsed.totalResults;
+    } else {
+      throw new Error(`No direct HTML parser configured for ${site.key}`);
+    }
   } else if (resolvedProvider === "cloudflare") {
     raw = await scrapeWithCloudflare({ url, prompt, schema, timeoutMs: site.timeoutMs });
     items = Array.isArray(raw?.items) ? raw.items : [];
@@ -62,7 +117,8 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
       waitForMs: site.waitForMs,
       timeoutMs: site.timeoutMs
     });
-    const parsed = parseOlxMarkdown(raw?.markdown || "", limit);
+    const parser = site.key === "vinted.ro" ? parseVintedMarkdown : parseOlxMarkdown;
+    const parsed = parser(raw?.markdown || "", limit);
     items = parsed.items;
     totalResults = parsed.totalResults;
   } else {
@@ -75,6 +131,8 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
     });
     items = Array.isArray(raw?.items) ? raw.items : [];
   }
+
+  items = site.disableQueryFilter ? items : filterRelevantItems(items, query);
 
   return {
     provider: resolvedProvider,
