@@ -243,6 +243,19 @@ function setLoadingState(isLoading, query = "", condition = "any") {
   loadingText.textContent = "Verific OLX, Vinted, Lajumate și Okazii, ordonez anunțurile și calculez cea mai bună ofertă.";
 }
 
+async function parseApiResponse(response) {
+  const text = await response.text();
+  if (!text) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Serverul a răspuns cu un payload invalid (${response.status}).`);
+  }
+}
+
 async function handleSubmit(event) {
   event.preventDefault();
 
@@ -268,10 +281,14 @@ async function handleSubmit(event) {
     const response = await fetch(
       `/api/search?${params.toString()}`
     );
-    const payload = await response.json();
+    const payload = await parseApiResponse(response);
 
     if (!response.ok) {
-      throw new Error(payload.error || "Căutarea a eșuat");
+      throw new Error(payload?.error || `Căutarea a eșuat (${response.status}).`);
+    }
+
+    if (!payload) {
+      throw new Error("Serverul nu a trimis niciun răspuns pentru căutare.");
     }
 
     renderResults(payload);
