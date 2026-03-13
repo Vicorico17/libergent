@@ -8,9 +8,14 @@
     "search": "node src/cli.js search",
     "search:live": "LIBERGENT_MOCK_SEARCH=0 LIBERGENT_MOCK_PROVIDER=0 node src/cli.js search --site all --provider auto --pages 1 --pretty",
     "check": "node src/cli.js --help",
-    "dev": "node src/server.js"
+    "dev": "node src/server.js",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "wrangler": "^4.73.0"
   }
 }
