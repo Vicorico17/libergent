@@ -1023,6 +1023,10 @@ code {
     align-items: stretch;
   }
 
+  #searchButton {
+    order: -1;
+  }
+
   .field,
   .field.grow {
     min-width: 100%;
