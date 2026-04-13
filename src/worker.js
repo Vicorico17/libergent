@@ -87,7 +87,10 @@ async function handleApi(request, env) {
 
   if (url.pathname === "/api/history") {
     if (!isSupabaseConfigured(env)) {
-      return json(buildEmptyHistoryPayload(), 200);
+      return json({
+        ...buildEmptyHistoryPayload(),
+        error: "Supabase is not configured for this Worker. Add SUPABASE_URL and SUPABASE_SECRET_KEY as Cloudflare Worker secrets."
+      }, 200);
     }
 
     try {

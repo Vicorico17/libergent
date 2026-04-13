@@ -6,6 +6,7 @@ const topQueriesEl = document.getElementById("topQueries");
 const topKeywordsEl = document.getElementById("topKeywords");
 const dailyTrendEl = document.getElementById("dailyTrend");
 const recentSearchesEl = document.getElementById("recentSearches");
+const HISTORY_STORAGE_KEY = "libergent-search-history-v1";
 
 function escapeHtml(value = "") {
   return String(value)
@@ -97,6 +98,88 @@ function renderRecentSearches(entries) {
     .join("");
 }
 
+function tokenizeQuery(query = "") {
+  return query
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token && token.length >= 3);
+}
+
+function buildCountList(values, limit) {
+  return [...values.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([value, count]) => ({ value, count }));
+}
+
+function buildHistoryPayloadFromEntries(entries) {
+  const queryCounts = new Map();
+  const keywordCounts = new Map();
+  const dailyCounts = new Map();
+
+  for (const entry of entries) {
+    const normalizedQuery = entry.query?.trim();
+    if (normalizedQuery) {
+      queryCounts.set(normalizedQuery, (queryCounts.get(normalizedQuery) || 0) + 1);
+    }
+
+    for (const token of tokenizeQuery(normalizedQuery)) {
+      keywordCounts.set(token, (keywordCounts.get(token) || 0) + 1);
+    }
+
+    const day = String(entry.searchedAt || "").slice(0, 10);
+    if (day) {
+      dailyCounts.set(day, (dailyCounts.get(day) || 0) + 1);
+    }
+  }
+
+  return {
+    updatedAt: new Date().toISOString(),
+    totals: {
+      searches: entries.length,
+      uniqueQueries: queryCounts.size,
+      uniqueKeywords: keywordCounts.size
+    },
+    topQueries: buildCountList(queryCounts, 12),
+    topKeywords: buildCountList(keywordCounts, 20),
+    dailyTrend: [...dailyCounts.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-14)
+      .map(([date, count]) => ({ date, count })),
+    recentSearches: entries.slice(0, 30)
+  };
+}
+
+function loadBrowserHistoryPayload() {
+  const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const entries = JSON.parse(raw);
+    return Array.isArray(entries) && entries.length
+      ? buildHistoryPayloadFromEntries(entries)
+      : null;
+  } catch {
+    localStorage.removeItem(HISTORY_STORAGE_KEY);
+    return null;
+  }
+}
+
+function renderHistory(payload, sourceLabel = "server") {
+  totalSearchesEl.textContent = payload.totals.searches;
+  uniqueQueriesEl.textContent = payload.totals.uniqueQueries;
+  uniqueKeywordsEl.textContent = payload.totals.uniqueKeywords;
+  topQueriesEl.innerHTML = renderCountList(payload.topQueries);
+  topKeywordsEl.innerHTML = renderKeywordCloud(payload.topKeywords);
+  dailyTrendEl.innerHTML = renderDailyTrend(payload.dailyTrend);
+  recentSearchesEl.innerHTML = renderRecentSearches(payload.recentSearches);
+  historyStatus.textContent = `Actualizat ${new Date(payload.updatedAt).toLocaleString("ro-RO")} (${sourceLabel}).`;
+}
+
 async function loadHistory() {
   historyStatus.textContent = "Încarc trendurile...";
 
@@ -108,15 +191,28 @@ async function loadHistory() {
       throw new Error(payload.error || "Nu am putut încărca istoricul.");
     }
 
-    totalSearchesEl.textContent = payload.totals.searches;
-    uniqueQueriesEl.textContent = payload.totals.uniqueQueries;
-    uniqueKeywordsEl.textContent = payload.totals.uniqueKeywords;
-    topQueriesEl.innerHTML = renderCountList(payload.topQueries);
-    topKeywordsEl.innerHTML = renderKeywordCloud(payload.topKeywords);
-    dailyTrendEl.innerHTML = renderDailyTrend(payload.dailyTrend);
-    recentSearchesEl.innerHTML = renderRecentSearches(payload.recentSearches);
-    historyStatus.textContent = `Actualizat ${new Date(payload.updatedAt).toLocaleString("ro-RO")}.`;
+    if (payload.totals?.searches > 0) {
+      renderHistory(payload, "server");
+      return;
+    }
+
+    const browserPayload = loadBrowserHistoryPayload();
+    if (browserPayload) {
+      renderHistory(browserPayload, "browser local");
+      return;
+    }
+
+    renderHistory(payload, "server");
+    if (payload.error) {
+      historyStatus.textContent = `Istoricul serverului nu este disponibil: ${payload.error}`;
+    }
   } catch (error) {
+    const browserPayload = loadBrowserHistoryPayload();
+    if (browserPayload) {
+      renderHistory(browserPayload, "browser local");
+      return;
+    }
+
     historyStatus.textContent = error instanceof Error ? error.message : String(error);
   }
 }

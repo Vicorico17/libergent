@@ -12,7 +12,9 @@ const loadingProgressFill = document.getElementById("loadingProgressFill");
 const loadingProgressLabel = document.getElementById("loadingProgressLabel");
 const loadingProgressBar = document.querySelector(".loading-progress");
 const STORAGE_KEY = "libergent-last-search-v2";
+const HISTORY_STORAGE_KEY = "libergent-search-history-v1";
 const DEFAULT_SEARCH_LIMIT = 500;
+const MAX_BROWSER_HISTORY_ENTRIES = 200;
 const MARKETPLACE_PAGE_PLAN = [
   { label: "OLX", pageSize: 50, maxPages: 12 },
   { label: "Lajumate", pageSize: 26, maxPages: 6 },
@@ -151,6 +153,42 @@ function saveLastSearch({ query, condition, payload }) {
       savedAt: Date.now()
     })
   );
+}
+
+function saveBrowserHistoryEntry({ query, condition, provider = "auto", siteKeys = [], payload }) {
+  const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+  let entries = [];
+
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      entries = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      entries = [];
+    }
+  }
+
+  entries.unshift({
+    query,
+    condition,
+    provider,
+    siteKeys,
+    searchedAt: payload?.summary?.searchedAt || new Date().toISOString(),
+    successfulMarketplaces: payload?.summary?.successfulMarketplaces ?? 0,
+    marketplaces: payload?.summary?.marketplaces ?? 0,
+    totalListings: payload?.summary?.totalListings ?? 0,
+    creditsUsed: payload?.summary?.creditsUsed ?? 0,
+    bestOffer: payload?.summary?.bestOffer
+      ? {
+          title: payload.summary.bestOffer.title || "",
+          site: payload.summary.bestOffer.site || "",
+          priceRon: payload.summary.bestOffer.priceRon ?? null,
+          url: payload.summary.bestOffer.url || ""
+        }
+      : null
+  });
+
+  localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(entries.slice(0, MAX_BROWSER_HISTORY_ENTRIES)));
 }
 
 function loadLastSearch() {
@@ -379,6 +417,12 @@ async function handleSubmit(event) {
     saveLastSearch({
       query: q,
       condition: conditionInput.value,
+      payload
+    });
+    saveBrowserHistoryEntry({
+      query: q,
+      condition: conditionInput.value,
+      siteKeys: payload.results?.map((result) => result.site).filter(Boolean) || [],
       payload
     });
     statusEl.textContent = `Căutarea pentru „${q}” s-a terminat.`;
