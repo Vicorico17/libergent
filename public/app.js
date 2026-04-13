@@ -183,7 +183,9 @@ function renderSite(result) {
   const bestOffer = result.bestOffer;
   const lowest = result.lowest;
   const highest = pickExtremeOffer(result.items, "highest", result.site);
-  const listingCount = Number.isFinite(result.totalResults) ? `${result.itemCount} / ${result.totalResults}` : String(result.itemCount);
+  const listingCountLabel = Number.isFinite(result.totalResults)
+    ? `${result.itemCount} shown from ${result.totalResults} found`
+    : `${result.itemCount} shown`;
 
   const itemMarkup = result.items
     .map((item, index) => `
@@ -207,7 +209,10 @@ function renderSite(result) {
         <div class="market-highlights">
           <div class="market-highlight">
             <span class="report-key">Best offer</span>
-            <span class="report-value">${escapeHtml(formatOfferLine(bestOffer, result.site))}</span>
+            <span class="report-value market-best-offer">
+              ${escapeHtml(formatOfferLine(bestOffer, result.site))}
+              ${bestOffer?.url ? `<a class="listing-link listing-link--inline" href="${escapeHtml(bestOffer.url)}" target="_blank" rel="noreferrer">Open listing</a>` : ""}
+            </span>
           </div>
           <div class="market-highlight">
             <span class="report-key">Lowest</span>
@@ -220,15 +225,9 @@ function renderSite(result) {
         </div>
       </summary>
       <div class="market-expand">
-        <div class="market-report">
-          <div class="report-row">
-            <span class="report-key">Best offer link</span>
-            <span class="report-value">${bestOffer?.url ? `<a class="listing-link" href="${escapeHtml(bestOffer.url)}" target="_blank" rel="noreferrer">Open listing</a>` : "No direct listing URL"}</span>
-          </div>
-          <div class="report-row">
-            <span class="report-key">Listings returned</span>
-            <span class="report-value">${escapeHtml(listingCount)}</span>
-          </div>
+        <div class="market-total">
+          <span class="market-total__label">Listings</span>
+          <span class="market-total__value">${escapeHtml(listingCountLabel)}</span>
         </div>
         <div class="items">
           ${itemMarkup || '<p class="muted">Nu au fost returnate anunțuri.</p>'}

@@ -914,6 +914,13 @@ code {
   padding: 0 20px 20px;
 }
 
+.market-best-offer {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .market-status {
   display: inline-flex;
   align-items: center;
@@ -951,21 +958,6 @@ code {
   border-color: rgba(166, 49, 24, 0.18);
 }
 
-.market-report {
-  display: grid;
-  gap: 10px;
-  padding: 16px;
-  border-radius: 20px;
-  background: rgba(22, 24, 24, 0.04);
-}
-
-.report-row {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-}
-
 .report-key {
   color: var(--muted);
   font-size: 13px;
@@ -976,6 +968,24 @@ code {
 .report-value {
   line-height: 1.5;
   word-break: break-word;
+}
+
+.market-total {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(40, 89, 79, 0.1);
+  color: var(--sage);
+  font-weight: 700;
+}
+
+.market-total__label {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .price {
@@ -989,6 +999,11 @@ code {
   color: var(--accent-deep);
   font-weight: 700;
   text-decoration: none;
+}
+
+.listing-link--inline {
+  margin-top: 0;
+  white-space: nowrap;
 }
 
 .listing-link:hover {
@@ -1073,10 +1088,6 @@ code {
   .market-summary__top {
     flex-direction: column;
     align-items: start;
-  }
-
-  .report-row {
-    grid-template-columns: 1fr;
   }
 
   .report-banner__metrics {
