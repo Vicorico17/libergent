@@ -75,17 +75,6 @@ function formatOfferLine(item, fallbackSite = "") {
   return bits.join(" | ");
 }
 
-function formatQualityMeta(item) {
-  const bits = [];
-  if (Number.isFinite(item?.relevanceScore)) {
-    bits.push(`relevance ${item.relevanceScore}/100`);
-  }
-  if (item?.intentType) {
-    bits.push(item.intentType);
-  }
-  return bits.join(" | ");
-}
-
 function pickExtremeOffer(items, mode, fallbackSite = "") {
   const pricedItems = (items || [])
     .filter((item) => Number.isFinite(item?.priceRon))
@@ -200,7 +189,6 @@ function renderSite(result) {
     .map((item, index) => `
       <div class="item">
         <p class="item-title">${index + 1}. ${escapeHtml(formatOfferLine(item, result.site))}</p>
-        ${formatQualityMeta(item) ? `<p class="item-meta">${escapeHtml(formatQualityMeta(item))}</p>` : ""}
         ${item.url ? `<a class="listing-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>` : ""}
       </div>
     `)

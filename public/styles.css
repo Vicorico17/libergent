@@ -560,8 +560,7 @@ code {
 }
 
 .budget-highlight-copy,
-.loading-text,
-.item-meta {
+.loading-text {
   line-height: 1.55;
 }
 
