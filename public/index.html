@@ -36,6 +36,40 @@
         </div>
       </section>
 
+      <section class="account-panel">
+        <div class="account-panel__copy">
+          <p class="eyebrow">mock account</p>
+          <h2>Cont demo și wallet</h2>
+          <p class="muted panel-copy">Creează un cont local, primești 10 RON demo, iar fiecare căutare reușită consumă 1 RON.</p>
+        </div>
+        <form id="accountForm" class="account-form">
+          <label class="field grow">
+            <span>Email</span>
+            <input id="accountEmail" name="email" type="email" placeholder="you@example.com" autocomplete="email" required />
+          </label>
+          <label class="field">
+            <span>Parolă</span>
+            <input id="accountPassword" name="password" type="password" placeholder="demo password" autocomplete="current-password" required />
+          </label>
+          <div class="account-actions">
+            <button id="createAccountButton" type="button">Create account</button>
+            <button id="loginButton" type="submit" class="button-secondary">Log in</button>
+          </div>
+        </form>
+        <div id="accountWallet" class="account-wallet" hidden>
+          <div>
+            <p class="metric-label">Logged in as</p>
+            <p id="accountName" class="account-name">-</p>
+          </div>
+          <div>
+            <p class="metric-label">Wallet</p>
+            <p id="walletBalance" class="wallet-balance">0 RON</p>
+          </div>
+          <button id="logoutButton" type="button" class="button-secondary">Log out</button>
+        </div>
+        <p id="accountStatus" class="account-status muted">Conectează-te ca să poți porni căutări demo.</p>
+      </section>
+
       <section class="search-panel">
         <div class="panel-heading">
           <div>

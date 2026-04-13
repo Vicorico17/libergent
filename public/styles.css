@@ -21,6 +21,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -65,6 +69,7 @@ body::before {
 
 .hero-copy,
 .hero-aside,
+.account-panel,
 .search-panel,
 .workflow-panel,
 .budget-panel,
@@ -162,6 +167,7 @@ h2 {
 }
 
 .search-panel,
+.account-panel,
 .workflow-panel,
 .budget-panel,
 .pricing-panel,
@@ -171,6 +177,7 @@ h2 {
 }
 
 .search-panel,
+.account-panel,
 .budget-panel,
 .pricing-panel,
 .workflow-panel {
@@ -277,7 +284,70 @@ button:hover:not(:disabled) {
 
 button:disabled {
   opacity: 0.65;
-  cursor: wait;
+  cursor: not-allowed;
+}
+
+.button-secondary {
+  background: rgba(255, 255, 255, 0.64);
+  color: var(--accent-deep);
+  border: 1px solid rgba(121, 51, 27, 0.18);
+  box-shadow: none;
+}
+
+.account-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.2fr);
+  gap: 18px;
+  align-items: end;
+  background:
+    radial-gradient(circle at top left, rgba(40, 89, 79, 0.15), transparent 28%),
+    linear-gradient(160deg, rgba(255, 249, 241, 0.92), rgba(255, 255, 255, 0.68));
+}
+
+.account-panel__copy {
+  min-width: 0;
+}
+
+.account-form {
+  display: flex;
+  gap: 14px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.account-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.account-wallet {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(22, 24, 24, 0.08);
+}
+
+.account-name,
+.wallet-balance {
+  margin: 0;
+  font-weight: 700;
+}
+
+.wallet-balance {
+  font-family: "Fraunces", serif;
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 0.95;
+  color: var(--sage);
+}
+
+.account-status {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .workflow-grid,
@@ -1038,6 +1108,14 @@ code {
 
 @media (max-width: 920px) {
   .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .account-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .account-wallet {
     grid-template-columns: 1fr;
   }
 

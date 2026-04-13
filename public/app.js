@@ -5,6 +5,16 @@ const searchButton = document.getElementById("searchButton");
 const summaryEl = document.getElementById("summary");
 const statusEl = document.getElementById("status");
 const marketplacesEl = document.getElementById("marketplaces");
+const accountForm = document.getElementById("accountForm");
+const accountEmail = document.getElementById("accountEmail");
+const accountPassword = document.getElementById("accountPassword");
+const createAccountButton = document.getElementById("createAccountButton");
+const loginButton = document.getElementById("loginButton");
+const logoutButton = document.getElementById("logoutButton");
+const accountWallet = document.getElementById("accountWallet");
+const accountName = document.getElementById("accountName");
+const walletBalance = document.getElementById("walletBalance");
+const accountStatus = document.getElementById("accountStatus");
 const loadingOverlay = document.getElementById("loadingOverlay");
 const loadingTitle = document.getElementById("loadingTitle");
 const loadingText = document.getElementById("loadingText");
@@ -13,8 +23,12 @@ const loadingProgressLabel = document.getElementById("loadingProgressLabel");
 const loadingProgressBar = document.querySelector(".loading-progress");
 const STORAGE_KEY = "libergent-last-search-v2";
 const HISTORY_STORAGE_KEY = "libergent-search-history-v1";
+const ACCOUNT_STORAGE_KEY = "libergent-mock-accounts-v1";
+const SESSION_STORAGE_KEY = "libergent-mock-session-v1";
 const DEFAULT_SEARCH_LIMIT = 500;
 const MAX_BROWSER_HISTORY_ENTRIES = 200;
+const STARTING_WALLET_RON = 10;
+const SEARCH_COST_RON = 1;
 const MARKETPLACE_PAGE_PLAN = [
   { label: "OLX", pageSize: 50, maxPages: 12 },
   { label: "Lajumate", pageSize: 26, maxPages: 6 },
@@ -24,6 +38,7 @@ const MARKETPLACE_PAGE_PLAN = [
 ];
 
 let loadingProgressTimer = null;
+let currentAccountEmail = null;
 
 function formatRon(value) {
   if (!Number.isFinite(value)) {
@@ -35,6 +50,147 @@ function formatRon(value) {
     currency: "RON",
     maximumFractionDigits: 0
   }).format(value);
+}
+
+function formatWallet(value) {
+  return `${Number(value || 0).toFixed(2)} RON`;
+}
+
+function normalizeEmail(value = "") {
+  return String(value).trim().toLowerCase();
+}
+
+function loadAccounts() {
+  const raw = localStorage.getItem(ACCOUNT_STORAGE_KEY);
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    localStorage.removeItem(ACCOUNT_STORAGE_KEY);
+    return {};
+  }
+}
+
+function saveAccounts(accounts) {
+  localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(accounts));
+}
+
+function getCurrentAccount() {
+  if (!currentAccountEmail) {
+    return null;
+  }
+
+  return loadAccounts()[currentAccountEmail] || null;
+}
+
+function setCurrentAccount(email) {
+  currentAccountEmail = email;
+  if (email) {
+    localStorage.setItem(SESSION_STORAGE_KEY, email);
+  } else {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  }
+  renderAccount();
+}
+
+function updateSearchAvailability() {
+  const account = getCurrentAccount();
+  const canSearch = Boolean(account) && Number(account.walletRon || 0) >= SEARCH_COST_RON;
+  searchButton.disabled = !canSearch;
+  searchButton.textContent = account
+    ? canSearch
+      ? `Caută (${SEARCH_COST_RON} RON)`
+      : "Wallet gol"
+    : "Log in ca să cauți";
+}
+
+function renderAccount(message = "") {
+  const account = getCurrentAccount();
+  const isLoggedIn = Boolean(account);
+
+  accountForm.hidden = isLoggedIn;
+  accountWallet.hidden = !isLoggedIn;
+
+  if (account) {
+    accountName.textContent = account.email;
+    walletBalance.textContent = formatWallet(account.walletRon);
+    accountStatus.textContent = message || `Fiecare căutare reușită consumă ${SEARCH_COST_RON} RON din wallet.`;
+  } else {
+    accountName.textContent = "-";
+    walletBalance.textContent = formatWallet(0);
+    accountStatus.textContent = message || "Conectează-te ca să poți porni căutări demo.";
+  }
+
+  updateSearchAvailability();
+}
+
+function createAccount() {
+  const email = normalizeEmail(accountEmail.value);
+  const password = accountPassword.value;
+
+  if (!email || !password) {
+    renderAccount("Completează emailul și parola pentru contul demo.");
+    return;
+  }
+
+  const accounts = loadAccounts();
+  if (accounts[email]) {
+    renderAccount("Contul demo există deja. Folosește Log in.");
+    return;
+  }
+
+  accounts[email] = {
+    email,
+    password,
+    walletRon: STARTING_WALLET_RON,
+    createdAt: new Date().toISOString()
+  };
+  saveAccounts(accounts);
+  setCurrentAccount(email);
+  renderAccount(`Cont demo creat. Ai primit ${STARTING_WALLET_RON} RON.`);
+}
+
+function loginAccount(event) {
+  event.preventDefault();
+
+  const email = normalizeEmail(accountEmail.value);
+  const password = accountPassword.value;
+  const account = loadAccounts()[email];
+
+  if (!account || account.password !== password) {
+    renderAccount("Emailul sau parola demo nu se potrivesc.");
+    return;
+  }
+
+  setCurrentAccount(email);
+  renderAccount("Ai intrat în contul demo.");
+}
+
+function logoutAccount() {
+  setCurrentAccount(null);
+  renderAccount("Ai ieșit din contul demo.");
+}
+
+function chargeSearch() {
+  const account = getCurrentAccount();
+  if (!account) {
+    throw new Error("Conectează-te sau creează un cont demo înainte de căutare.");
+  }
+  if (Number(account.walletRon || 0) < SEARCH_COST_RON) {
+    throw new Error("Nu mai ai suficient sold demo pentru căutare.");
+  }
+
+  const accounts = loadAccounts();
+  accounts[account.email] = {
+    ...account,
+    walletRon: Math.max(0, Number(account.walletRon || 0) - SEARCH_COST_RON)
+  };
+  saveAccounts(accounts);
+  renderAccount(`Căutare taxată: -${SEARCH_COST_RON} RON.`);
 }
 
 function escapeHtml(value = "") {
@@ -388,6 +544,18 @@ async function handleSubmit(event) {
     return;
   }
 
+  const account = getCurrentAccount();
+  if (!account) {
+    statusEl.textContent = "Conectează-te sau creează un cont demo înainte de căutare.";
+    renderAccount("Conectează-te ca să poți porni căutări demo.");
+    return;
+  }
+  if (Number(account.walletRon || 0) < SEARCH_COST_RON) {
+    statusEl.textContent = "Nu mai ai suficient sold demo pentru căutare.";
+    renderAccount("Wallet-ul demo este gol.");
+    return;
+  }
+
   searchButton.disabled = true;
   statusEl.textContent = "Căutarea a pornit...";
   marketplacesEl.innerHTML = "";
@@ -417,6 +585,7 @@ async function handleSubmit(event) {
 
     finishLoadingProgress(payload);
     await wait(250);
+    chargeSearch();
     renderResults(payload);
     saveLastSearch({
       query: q,
@@ -434,11 +603,17 @@ async function handleSubmit(event) {
     statusEl.textContent = error instanceof Error ? error.message : String(error);
   } finally {
     searchButton.disabled = false;
+    updateSearchAvailability();
     setLoadingState(false);
   }
 }
 
+createAccountButton.addEventListener("click", createAccount);
+accountForm.addEventListener("submit", loginAccount);
+logoutButton.addEventListener("click", logoutAccount);
 form.addEventListener("submit", handleSubmit);
+
+setCurrentAccount(localStorage.getItem(SESSION_STORAGE_KEY));
 
 const savedSearch = loadLastSearch();
 if (savedSearch?.payload) {
