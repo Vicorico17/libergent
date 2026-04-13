@@ -307,7 +307,7 @@ function startLoadingProgress({ limit = DEFAULT_SEARCH_LIMIT } = {}) {
   const totalPages = Math.max(1, plan.length);
   let completedPages = 0;
 
-  setLoadingProgress(3, `0/${totalPages} pagini estimate. Pregătesc marketplace-urile...`);
+  setLoadingProgress(3, "Pregătesc marketplace-urile...");
 
   loadingProgressTimer = window.setInterval(() => {
     const nextStep = plan[Math.min(completedPages, plan.length - 1)];
@@ -316,7 +316,7 @@ function startLoadingProgress({ limit = DEFAULT_SEARCH_LIMIT } = {}) {
 
     setLoadingProgress(
       percent,
-      `${cappedCompletedPages}/${totalPages} pagini estimate. Verific ${nextStep.label}, pagina ${nextStep.page}/${nextStep.pages}...`
+      `Verific ${nextStep.label}, pagina ${nextStep.page}/${nextStep.pages}...`
     );
     completedPages = cappedCompletedPages;
 
@@ -333,9 +333,13 @@ function finishLoadingProgress(payload) {
     (sum, result) => sum + (Number.isFinite(result.pagesUsed) ? result.pagesUsed : 0),
     0
   );
-  const totalPages = actualPages || getExpectedPagePlan(DEFAULT_SEARCH_LIMIT).length;
 
-  setLoadingProgress(100, `${totalPages}/${totalPages} pagini verificate. Rezultatele sunt gata.`);
+  setLoadingProgress(
+    100,
+    actualPages
+      ? `${actualPages} pagini verificate. Rezultatele sunt gata.`
+      : "Pagini verificate. Rezultatele sunt gata."
+  );
 }
 
 function wait(ms) {
