@@ -5,7 +5,6 @@ import { URL } from "node:url";
 import { loadEnv } from "./env.js";
 import { searchAcrossSites } from "./app.js";
 import { buildHistoryPayload, logSearchEvent } from "./history.js";
-import { getFirecrawlCreditUsage } from "./providers/firecrawl.js";
 import { getDefaultSiteKeys, getSite, SITES } from "./sites.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
@@ -76,27 +75,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === "/api/dashboard") {
-    try {
-      const firecrawl = await getFirecrawlCreditUsage();
-      sendJson(res, 200, {
-        provider: "firecrawl",
-        live: true,
-        updatedAt: new Date().toISOString(),
-        firecrawl
-      });
-    } catch (error) {
-      sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
-    }
-    return;
-  }
-
   const filePath = url.pathname === "/"
     ? path.join(PUBLIC_DIR, "index.html")
     : url.pathname === "/trends"
         ? path.join(PUBLIC_DIR, "trends.html")
-      : url.pathname === "/dashboard"
-        ? path.join(PUBLIC_DIR, "dashboard.html")
       : url.pathname === "/todo"
         ? path.join(PUBLIC_DIR, "todo.html")
       : path.join(PUBLIC_DIR, url.pathname);

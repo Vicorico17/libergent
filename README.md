@@ -118,7 +118,7 @@ cd /Users/alex/libergent
 cp .env.example .env
 ```
 
-Normal search now uses direct scraping and does not require Firecrawl credits. Add provider keys only if you want the live Firecrawl credits dashboard or explicit fallback providers:
+Normal search now uses direct scraping and does not require Firecrawl. Add provider keys only if you want to run explicit fallback providers:
 
 ```bash
 FIRECRAWL_API_KEY=fc-your-key

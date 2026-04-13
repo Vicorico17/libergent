@@ -1,6 +1,5 @@
 import { searchAcrossSites } from "../src/app.js";
 import { buildHistoryPayload, logSearchEvent } from "../src/history.js";
-import { getFirecrawlCreditUsage } from "../src/providers/firecrawl.js";
 import { getDefaultSiteKeys, getSite, SITES } from "../src/sites.js";
 
 function sendJson(res, statusCode, payload) {
@@ -44,21 +43,6 @@ export default async function handler(req, res) {
 
   if (url.pathname === "/api/history") {
     sendJson(res, 200, await buildHistoryPayload());
-    return;
-  }
-
-  if (url.pathname === "/api/dashboard") {
-    try {
-      const firecrawl = await getFirecrawlCreditUsage();
-      sendJson(res, 200, {
-        provider: "firecrawl",
-        live: true,
-        updatedAt: new Date().toISOString(),
-        firecrawl
-      });
-    } catch (error) {
-      sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
-    }
     return;
   }
 
