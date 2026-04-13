@@ -9,7 +9,7 @@ const loadingOverlay = document.getElementById("loadingOverlay");
 const loadingTitle = document.getElementById("loadingTitle");
 const loadingText = document.getElementById("loadingText");
 const STORAGE_KEY = "libergent-last-search-v2";
-const DEFAULT_SEARCH_LIMIT = 150;
+const DEFAULT_SEARCH_LIMIT = 500;
 
 function formatRon(value) {
   if (!Number.isFinite(value)) {
@@ -60,6 +60,17 @@ function formatOfferLine(item, fallbackSite = "") {
     cleanDisplayText(item.location || "")
   ].filter(Boolean);
 
+  return bits.join(" | ");
+}
+
+function formatQualityMeta(item) {
+  const bits = [];
+  if (Number.isFinite(item?.relevanceScore)) {
+    bits.push(`relevance ${item.relevanceScore}/100`);
+  }
+  if (item?.intentType) {
+    bits.push(item.intentType);
+  }
   return bits.join(" | ");
 }
 
@@ -177,6 +188,7 @@ function renderSite(result) {
     .map((item, index) => `
       <div class="item">
         <p class="item-title">${index + 1}. ${escapeHtml(formatOfferLine(item, result.site))}</p>
+        ${formatQualityMeta(item) ? `<p class="item-meta">${escapeHtml(formatQualityMeta(item))}</p>` : ""}
         ${item.url ? `<a class="listing-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>` : ""}
       </div>
     `)
@@ -240,7 +252,7 @@ function setLoadingState(isLoading, query = "", condition = "any") {
     "relevante";
 
   loadingTitle.textContent = `Caut oferte ${conditionLabel} pentru „${query}”`;
-  loadingText.textContent = "Verific OLX, Vinted, Lajumate și Okazii, ordonez anunțurile și calculez cea mai bună ofertă.";
+  loadingText.textContent = "Verific OLX, Vinted, Lajumate, Okazii și Publi24, ordonez anunțurile și calculez cea mai bună ofertă.";
 }
 
 async function parseApiResponse(response) {

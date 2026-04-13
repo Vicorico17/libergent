@@ -11,12 +11,14 @@ function isMockSearchEnabled() {
 }
 
 function withTimeout(promise, timeoutMs, message) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(message)), timeoutMs);
-    })
-  ]);
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    clearTimeout(timeoutId);
+  });
 }
 
 function getCreditsPerPage(site, provider) {
@@ -55,8 +57,16 @@ function getSiteTimeoutMs(site, pages) {
   const configuredTimeout = site.timeoutMs ?? DEFAULT_SITE_TIMEOUT_MS;
   return Math.max(
     DEFAULT_SITE_TIMEOUT_MS,
-    Math.min(configuredTimeout, DEFAULT_SITE_TIMEOUT_MS * Math.max(1, pages))
+    Math.min(configuredTimeout * Math.max(1, pages), DEFAULT_SITE_TIMEOUT_MS * Math.max(1, pages))
   );
+}
+
+function getDefaultLimit(site, pages, provider) {
+  if (getCreditsPerPage(site, provider) <= 0) {
+    return (site.pageSize || site.defaultLimit || 20) * Math.max(1, pages);
+  }
+
+  return site.defaultLimit ?? site.pageSize ?? 20;
 }
 
 export async function searchAcrossSites({
@@ -89,8 +99,8 @@ export async function searchAcrossSites({
     const resolvedProvider = provider === "auto" ? site.provider : provider;
     const affordablePages = getMaxAffordablePages(site, provider);
     const desiredPages = Math.min(maxPages ?? affordablePages, affordablePages);
-    const desiredLimit = limit ?? site.defaultLimit ?? site.pageSize ?? 20;
-    const affordableLimit = Math.min(desiredLimit, (site.pageSize || desiredLimit) * affordablePages);
+    const desiredLimit = limit ?? getDefaultLimit(site, desiredPages, provider);
+    const affordableLimit = Math.min(desiredLimit, (site.pageSize || desiredLimit) * desiredPages);
 
     try {
       const result = await withTimeout(
@@ -99,9 +109,9 @@ export async function searchAcrossSites({
           site,
           query,
           limit: affordableLimit,
-          maxPages: affordablePages
+          maxPages: desiredPages
         }),
-        getSiteTimeoutMs(site, affordablePages),
+        getSiteTimeoutMs(site, desiredPages),
         `${site.label} a depășit timpul maxim de răspuns.`
       );
       rawResults.push({ ok: true, ...result });

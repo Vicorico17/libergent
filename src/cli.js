@@ -153,6 +153,9 @@ function formatResultBlock(result) {
 
   for (const [index, item] of result.items.entries()) {
     lines.push(`  ${index + 1}. ${formatOfferLine(item, result.site)}`);
+    if (Number.isFinite(item.relevanceScore) || item.intentType) {
+      lines.push(`     Quality: ${item.intentType || "unknown"}${Number.isFinite(item.relevanceScore) ? `, relevance ${item.relevanceScore}/100` : ""}`);
+    }
     if (item.url) {
       lines.push(`     ${item.url}`);
     }

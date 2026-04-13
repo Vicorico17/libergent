@@ -1,4 +1,5 @@
 import { normalizeListing } from "./normalize.js";
+import { classifyListingIntent, tokenize } from "./relevance.js";
 
 function median(values) {
   if (!values.length) {
@@ -10,26 +11,6 @@ function median(values) {
   return sorted.length % 2 === 0
     ? (sorted[middle - 1] + sorted[middle]) / 2
     : sorted[middle];
-}
-
-function tokenize(value = "") {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
-}
-
-function isRelevantListing(item, query) {
-  const queryTokens = tokenize(query);
-  if (!queryTokens.length) {
-    return true;
-  }
-
-  const titleTokens = new Set(tokenize(item.title || ""));
-  const matches = queryTokens.filter((token) => titleTokens.has(token)).length;
-  return matches > 0;
 }
 
 function matchesCondition(item, condition) {
@@ -139,7 +120,8 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     const items = sortItemsByFreshness(
       result.items
         .map(normalizeListing)
-        .filter((item) => isRelevantListing(item, result.query))
+        .map((item) => classifyListingIntent(item, result.query))
+        .filter((item) => item.isRecommendedCandidate)
         .filter((item) => matchesCondition(item, condition))
     );
     const pricedItems = items.filter((item) => Number.isFinite(item.priceRon));
@@ -165,6 +147,8 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
 
     return {
       ...result,
+      rawItemCount: result.itemCount,
+      itemCount: items.length,
       items,
       lowest,
       bestOffer
@@ -189,7 +173,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const globalMedianPriceRon = median(allScoredItems.map((item) => item.priceRon));
   const allBestCandidates = allScoredItems.map((item) => ({
     ...item,
-    offerScore: scoreOffer(item, "", globalMedianPriceRon, condition)
+    offerScore: Math.round((scoreOffer(item, "", globalMedianPriceRon, condition) * 0.65) + (item.relevanceScore * 0.35))
   }));
   const bestOffer = allBestCandidates.length
     ? allBestCandidates.reduce((best, item) => {

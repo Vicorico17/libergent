@@ -4,8 +4,8 @@ import path from "node:path";
 import { URL } from "node:url";
 import { loadEnv } from "./env.js";
 import { searchAcrossSites } from "./app.js";
-import { buildBudgetPayload } from "./budget.js";
 import { buildHistoryPayload, logSearchEvent } from "./history.js";
+import { getFirecrawlCreditUsage } from "./providers/firecrawl.js";
 import { getDefaultSiteKeys, getSite, SITES } from "./sites.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
@@ -63,7 +63,7 @@ const server = http.createServer(async (req, res) => {
           ? getDefaultSiteKeys()
           : [getSite(site).key];
       const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys });
-      logSearchEvent({ query, condition, provider, siteKeys, payload });
+      await logSearchEvent({ query, condition, provider, siteKeys, payload });
       sendJson(res, 200, payload);
     } catch (error) {
       sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
@@ -71,22 +71,34 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === "/api/budget") {
-    sendJson(res, 200, buildBudgetPayload());
+  if (url.pathname === "/api/history") {
+    sendJson(res, 200, await buildHistoryPayload());
     return;
   }
 
-  if (url.pathname === "/api/history") {
-    sendJson(res, 200, buildHistoryPayload());
+  if (url.pathname === "/api/dashboard") {
+    try {
+      const firecrawl = await getFirecrawlCreditUsage();
+      sendJson(res, 200, {
+        provider: "firecrawl",
+        live: true,
+        updatedAt: new Date().toISOString(),
+        firecrawl
+      });
+    } catch (error) {
+      sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
+    }
     return;
   }
 
   const filePath = url.pathname === "/"
     ? path.join(PUBLIC_DIR, "index.html")
-    : url.pathname === "/budget"
-      ? path.join(PUBLIC_DIR, "budget.html")
-      : url.pathname === "/trends"
+    : url.pathname === "/trends"
         ? path.join(PUBLIC_DIR, "trends.html")
+      : url.pathname === "/dashboard"
+        ? path.join(PUBLIC_DIR, "dashboard.html")
+      : url.pathname === "/todo"
+        ? path.join(PUBLIC_DIR, "todo.html")
       : path.join(PUBLIC_DIR, url.pathname);
 
   sendFile(res, filePath);

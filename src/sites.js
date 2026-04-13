@@ -28,11 +28,11 @@ export const SITES = {
     label: "OLX Romania",
     priority: 1,
     defaultEnabled: true,
-    provider: "firecrawl",
-    strategy: "firecrawl-markdown-local",
-    estimatedCreditsPerPage: 1,
-    waitForMs: 5000,
-    timeoutMs: 90000,
+    provider: "direct",
+    strategy: "direct-html-local",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 20000,
     pageSize: 50,
     maxPages: 12,
     defaultLimit: 50,
@@ -42,7 +42,7 @@ export const SITES = {
     },
     pagedSearchUrl(query, page) {
       const base = this.searchUrl(query);
-      return page <= 1 ? base : `${base}?page=${page}`;
+      return page <= 1 ? base : `${base}&page=${page}`;
     },
     prompt(query, limit) {
       return buildBasePrompt(
@@ -58,11 +58,11 @@ export const SITES = {
     label: "Vinted Romania",
     priority: 3,
     defaultEnabled: true,
-    provider: "firecrawl",
-    strategy: "firecrawl-markdown-local",
-    estimatedCreditsPerPage: 1,
-    waitForMs: 5000,
-    timeoutMs: 90000,
+    provider: "direct",
+    strategy: "direct-html-local",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 25000,
     pageSize: 95,
     maxPages: 6,
     defaultLimit: 95,
@@ -72,7 +72,7 @@ export const SITES = {
     },
     pagedSearchUrl(query, page) {
       const base = this.searchUrl(query);
-      return page <= 1 ? base : `${base}?page=${page}`;
+      return page <= 1 ? base : `${base}&page=${page}`;
     },
     prompt(query, limit) {
       return buildBasePrompt(
@@ -141,6 +141,36 @@ export const SITES = {
         query,
         limit,
         "Results can include marketplace catalog items. Keep only visible result cards related to the query."
+      );
+    }
+  },
+  "publi24.ro": {
+    key: "publi24.ro",
+    label: "Publi24",
+    priority: 5,
+    defaultEnabled: true,
+    provider: "direct",
+    strategy: "direct-html-local",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 12000,
+    pageSize: 30,
+    maxPages: 11,
+    defaultLimit: 330,
+    defaultMaxPages: 11,
+    searchUrl(query) {
+      return `https://www.publi24.ro/anunturi/?q=${encodeSearchText(query).replace(/%20/g, "+")}`;
+    },
+    pagedSearchUrl(query, page) {
+      const base = this.searchUrl(query);
+      return page <= 1 ? base : `${base}&pag=${page}`;
+    },
+    prompt(query, limit) {
+      return buildBasePrompt(
+        "Publi24",
+        query,
+        limit,
+        "Results appear as article-item classified cards. Keep only product or service listings that match the query."
       );
     }
   }

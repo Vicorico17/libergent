@@ -28,11 +28,20 @@ function parseNumberFromPrice(priceText = "") {
     return null;
   }
 
-  const normalized = candidate.includes(",") && candidate.includes(".")
-    ? candidate.replace(/\./g, "").replace(",", ".")
-    : candidate.includes(",")
-      ? candidate.replace(/\./g, "").replace(",", ".")
-      : candidate.replace(/[.\s]/g, "");
+  const compact = candidate.replace(/\s/g, "");
+  const lastCommaIndex = compact.lastIndexOf(",");
+  const lastDotIndex = compact.lastIndexOf(".");
+  const decimalSeparator =
+    lastCommaIndex >= 0 && lastDotIndex >= 0
+      ? lastCommaIndex > lastDotIndex ? "," : "."
+      : /[,.]\d{2}$/.test(compact)
+        ? compact.at(-3)
+        : null;
+  const normalized = decimalSeparator
+    ? compact
+        .replace(new RegExp(`[^\\d\\${decimalSeparator}]`, "g"), "")
+        .replace(decimalSeparator, ".")
+    : compact.replace(/[^\d]/g, "");
 
   const value = Number.parseFloat(normalized);
   return Number.isFinite(value) ? value : null;

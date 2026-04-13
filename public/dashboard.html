@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>libergent dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">live credit monitor</p>
+          <h1>libergent dashboard</h1>
+          <p class="lede">Monitorizare live pentru creditele Firecrawl, cu refresh automat și informații despre perioada curentă de billing.</p>
+        </div>
+        <div class="hero-aside">
+          <div class="hero-card">
+            <p class="metric-label">Main App</p>
+            <p class="metric-value"><a class="hero-link" href="/">Open Search</a></p>
+            <p class="muted">Revino la căutarea principală și generează trafic nou în aplicație.</p>
+          </div>
+          <div class="hero-card">
+            <p class="metric-label">Refresh</p>
+            <p class="metric-value">30s</p>
+            <p class="muted">Pagina se reîmprospătează automat și poate fi actualizată manual.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="workflow-panel">
+        <div class="workflow-panel__header">
+          <div>
+            <p class="eyebrow">firecrawl credits</p>
+            <h2>Credite rămase și consum curent</h2>
+          </div>
+          <p id="dashboardStatus" class="status budget-status">Încarc datele live din Firecrawl...</p>
+        </div>
+        <div class="workflow-panel__footer">
+          <div>
+            <p class="metric-label">Provider</p>
+            <code>GET /api/dashboard</code>
+          </div>
+          <div>
+            <p class="metric-label">Source</p>
+            <code>Firecrawl /v2/team/credit-usage</code>
+          </div>
+          <div>
+            <p class="metric-label">Manual Refresh</p>
+            <button id="refreshDashboardButton" type="button">Refresh now</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="budget-panel">
+        <div class="budget-panel__header">
+          <div>
+            <p class="eyebrow">live metrics</p>
+            <h2>Snapshot curent</h2>
+          </div>
+          <p class="muted">Datele sunt proxied prin backend, deci cheia Firecrawl rămâne pe server.</p>
+        </div>
+        <div id="dashboardMetrics" class="dashboard-metrics"></div>
+        <div id="dashboardProgress" class="dashboard-note"></div>
+      </section>
+
+      <section class="pricing-panel">
+        <div class="pricing-panel__header">
+          <div>
+            <p class="eyebrow">billing period</p>
+            <h2>Detalii utile pentru operare</h2>
+          </div>
+          <p class="muted">Perioada de billing și valorile brute ajută când vrei să compari consumul din produs cu contul Firecrawl.</p>
+        </div>
+        <div id="dashboardFacts" class="dashboard-grid"></div>
+      </section>
+    </main>
+
+    <script src="/dashboard-page.js" type="module"></script>
+  </body>
+</html>

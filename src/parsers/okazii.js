@@ -128,6 +128,10 @@ function parseSearchTotalResults(html) {
   return null;
 }
 
+function hasSearchNextPage(html) {
+  return /rel="next"/i.test(html) || /[?&]page=\d+/i.test(html);
+}
+
 function parseJsonLdOffers(html, limit) {
   const jsonLdObjects = parseJsonLdScripts(html);
   const product = jsonLdObjects
@@ -158,9 +162,16 @@ export function parseOkaziiHtml(html, limit) {
   if (searchItems.length) {
     return {
       items: searchItems,
-      totalResults: parseSearchTotalResults(html)
+      totalResults: parseSearchTotalResults(html),
+      rawItemCount: splitListingBlocks(html).length,
+      hasNextPage: hasSearchNextPage(html)
     };
   }
 
-  return parseJsonLdOffers(html, limit);
+  const parsed = parseJsonLdOffers(html, limit);
+  return {
+    ...parsed,
+    rawItemCount: parsed.items.length,
+    hasNextPage: parsed.totalResults ? parsed.totalResults > parsed.items.length : null
+  };
 }

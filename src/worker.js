@@ -1,5 +1,6 @@
 import { searchAcrossSites } from "./app.js";
-import { buildBudgetPayload } from "./budget.js";
+import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
+import { insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, SITES } from "./sites.js";
 
 function applyEnv(env = {}) {
@@ -27,18 +28,19 @@ function json(payload, status = 200) {
 }
 
 function buildEmptyHistoryPayload() {
-  return {
-    updatedAt: new Date().toISOString(),
-    totals: {
-      searches: 0,
-      uniqueQueries: 0,
-      uniqueKeywords: 0
-    },
-    topQueries: [],
-    topKeywords: [],
-    dailyTrend: [],
-    recentSearches: []
-  };
+  return buildHistoryPayloadFromEntries([]);
+}
+
+async function persistSearchEvent(entry, env) {
+  if (!isSupabaseConfigured(env)) {
+    return;
+  }
+
+  try {
+    await insertSearchEventToSupabase(entry, env);
+  } catch (error) {
+    console.warn("Failed to persist search event to Supabase:", error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function handleApi(request, env) {
@@ -76,18 +78,26 @@ async function handleApi(request, env) {
         siteKeys
       });
 
+      await persistSearchEvent(buildHistoryEntry({ query, condition, provider, siteKeys, payload }), env);
       return json(payload, 200);
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : String(error) }, 500);
     }
   }
 
-  if (url.pathname === "/api/budget") {
-    return json(buildBudgetPayload(), 200);
-  }
-
   if (url.pathname === "/api/history") {
-    return json(buildEmptyHistoryPayload(), 200);
+    if (!isSupabaseConfigured(env)) {
+      return json(buildEmptyHistoryPayload(), 200);
+    }
+
+    try {
+      return json(await readSupabaseHistoryPayload(env), 200);
+    } catch (error) {
+      return json({
+        ...buildEmptyHistoryPayload(),
+        error: error instanceof Error ? error.message : String(error)
+      }, 200);
+    }
   }
 
   return json({ error: "Not found" }, 404);

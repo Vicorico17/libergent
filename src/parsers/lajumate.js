@@ -34,6 +34,8 @@ export function parseLajumateHtml(html, limit) {
     throw new Error("Lajumate page did not contain adsServer listings.");
   }
 
+  const totalResults = Number.parseInt(data?.props?.pageProps?.paginationServer?.total, 10) || ads.length;
+
   const items = ads.slice(0, limit).map((ad) => ({
     title: cleanText(ad.title || ""),
     price: ad.price ? `${cleanText(String(ad.price))} ${ad.currency || ""}`.trim() : "",
@@ -48,6 +50,8 @@ export function parseLajumateHtml(html, limit) {
 
   return {
     items,
-    totalResults: Number.parseInt(data?.props?.pageProps?.paginationServer?.total, 10) || items.length
+    totalResults,
+    rawItemCount: ads.length,
+    hasNextPage: totalResults > ads.length
   };
 }

@@ -1,6 +1,6 @@
 # libergent
 
-Node app for searching Romanian second-hand marketplaces through a remote rendering/scraping provider.
+Node app for searching Romanian second-hand marketplaces with direct HTML parsing by default and optional remote rendering fallbacks.
 
 Supported marketplaces:
 
@@ -8,10 +8,12 @@ Supported marketplaces:
 - `vinted.ro`
 - `lajumate.ro`
 - `okazii.ro`
+- `publi24.ro`
 
 Supported providers:
 
 - `auto`
+- `direct`
 - `firecrawl`
 - `cloudflare`
 
@@ -65,10 +67,11 @@ That means libergent should optimize for:
 
 Current strategy:
 
-- `olx.ro`: marketplace-specific search-page extraction
-- `lajumate.ro`: marketplace-specific search-page extraction
-- `vinted.ro`: likely needs Browser Rendering or another JS-aware strategy
-- `okazii.ro`: may benefit from Cloudflare `/crawl` or a paginated search-page strategy
+- `olx.ro`: direct HTML fetch + local parser
+- `vinted.ro`: direct HTML fetch + local parser
+- `lajumate.ro`: direct HTML fetch + local parser
+- `okazii.ro`: direct HTML fetch + local parser
+- `publi24.ro`: direct HTML fetch + local parser
 
 Target strategy:
 
@@ -101,7 +104,7 @@ Implication:
 - `500 listings` from twenty processed pages is not cheap
 - the biggest savings come from reducing processed pages, not from trimming a few listing objects from the output
 
-Because of that, libergent should not default to AI JSON extraction on every page for every marketplace. The long-term cheaper design is:
+Because of that, libergent does not default to AI JSON extraction on every page for every marketplace. The cheaper design is:
 
 1. direct fetch or the cheapest render possible
 2. local HTML parsing when feasible
@@ -115,7 +118,7 @@ cd /Users/alex/libergent
 cp .env.example .env
 ```
 
-Fill one provider:
+Normal search now uses direct scraping and does not require Firecrawl credits. Add provider keys only if you want the live Firecrawl credits dashboard or explicit fallback providers:
 
 ```bash
 FIRECRAWL_API_KEY=fc-your-key
@@ -261,12 +264,13 @@ node src/cli.js search --site all --query "riftbound" --provider auto --limit 5 
 
 ## Notes
 
-- `olx.ro`: Firecrawl search-page extraction
-- `vinted.ro`: Cloudflare JSON extraction by default
-- `lajumate.ro`: Firecrawl search-page extraction
-- `okazii.ro`: Cloudflare crawl-seed strategy by default
+- `olx.ro`: direct search-page extraction
+- `vinted.ro`: direct search-page extraction
+- `lajumate.ro`: direct search-page extraction
+- `okazii.ro`: direct search-page extraction
+- `publi24.ro`: direct search-page extraction
 
-These are working assumptions, not final architecture. The main optimization task is to reduce cost per marketplace while increasing listing coverage.
+These are direct parsers, not final architecture. The main optimization task is to keep Firecrawl/Browser Rendering as explicit fallbacks while increasing listing coverage through local parsing.
 
 ## Cloudflare `/crawl`
 

@@ -30,6 +30,7 @@ export function loadEnv(cwd = process.cwd()) {
 }
 
 export function requireEnv(keys) {
+  loadEnv(process.cwd());
   const missing = keys.filter((key) => !process.env[key]);
   if (missing.length) {
     throw new Error(`Missing environment variables: ${missing.join(", ")}`);
