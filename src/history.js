@@ -3,7 +3,8 @@ import path from "node:path";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries, MAX_HISTORY_ENTRIES } from "./history-base.js";
 import { insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_ROOT = process.env.VERCEL ? "/tmp/libergent" : process.cwd();
+const DATA_DIR = path.join(DATA_ROOT, "data");
 const HISTORY_FILE = path.join(DATA_DIR, "search-history.json");
 
 function ensureHistoryFile() {
