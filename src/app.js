@@ -5,6 +5,13 @@ import { buildMockSearchResult } from "./mock.js";
 
 const MAX_CREDITS_PER_SITE = 3;
 const DEFAULT_SITE_TIMEOUT_MS = 20000;
+const SERVERLESS_MAX_PAGES = 2;
+const SERVERLESS_MAX_RESULTS_PER_SITE = 120;
+const SERVERLESS_SITE_TIMEOUT_MS = 4000;
+
+function isServerlessRuntime() {
+  return Boolean(process.env.VERCEL);
+}
 
 function isMockSearchEnabled() {
   return process.env.LIBERGENT_MOCK_SEARCH === "1";
@@ -54,6 +61,10 @@ function getCreditBudget(siteKeys, provider) {
 }
 
 function getSiteTimeoutMs(site, pages) {
+  if (isServerlessRuntime()) {
+    return SERVERLESS_SITE_TIMEOUT_MS;
+  }
+
   const configuredTimeout = site.timeoutMs ?? DEFAULT_SITE_TIMEOUT_MS;
   return Math.max(
     DEFAULT_SITE_TIMEOUT_MS,
@@ -98,8 +109,14 @@ export async function searchAcrossSites({
     const site = getSite(siteKey);
     const resolvedProvider = provider === "auto" ? site.provider : provider;
     const affordablePages = getMaxAffordablePages(site, provider);
-    const desiredPages = Math.min(maxPages ?? affordablePages, affordablePages);
-    const desiredLimit = limit ?? getDefaultLimit(site, desiredPages, provider);
+    const runtimeMaxPages = isServerlessRuntime()
+      ? Math.min(affordablePages, SERVERLESS_MAX_PAGES)
+      : affordablePages;
+    const desiredPages = Math.min(maxPages ?? runtimeMaxPages, runtimeMaxPages);
+    const runtimeMaxResults = isServerlessRuntime()
+      ? Math.min((site.pageSize || SERVERLESS_MAX_RESULTS_PER_SITE) * desiredPages, SERVERLESS_MAX_RESULTS_PER_SITE)
+      : Number.POSITIVE_INFINITY;
+    const desiredLimit = Math.min(limit ?? getDefaultLimit(site, desiredPages, provider), runtimeMaxResults);
     const affordableLimit = Math.min(desiredLimit, (site.pageSize || desiredLimit) * desiredPages);
 
     try {
