@@ -35,13 +35,7 @@ const DEFAULT_SEARCH_LIMIT = 500;
 const MAX_BROWSER_HISTORY_ENTRIES = 200;
 const STARTING_WALLET_RON = 10;
 const SEARCH_COST_RON = 1;
-const MARKETPLACE_PAGE_PLAN = [
-  { label: "OLX", pageSize: 50, maxPages: 12 },
-  { label: "Lajumate", pageSize: 26, maxPages: 6 },
-  { label: "Vinted", pageSize: 95, maxPages: 6 },
-  { label: "Okazii", pageSize: 36, maxPages: 6 },
-  { label: "Publi24", pageSize: 30, maxPages: 11 }
-];
+const MARKETPLACE_PROGRESS_STEPS = ["OLX", "Lajumate", "Vinted", "Okazii", "Publi24"];
 
 let loadingProgressTimer = null;
 let currentAccountEmail = null;
@@ -480,17 +474,6 @@ function renderSite(result) {
   `;
 }
 
-function getExpectedPagePlan(limit = DEFAULT_SEARCH_LIMIT) {
-  return MARKETPLACE_PAGE_PLAN.flatMap((site) => {
-    const pages = Math.max(1, Math.min(site.maxPages, Math.ceil(limit / site.pageSize)));
-    return Array.from({ length: pages }, (_, index) => ({
-      label: site.label,
-      page: index + 1,
-      pages
-    }));
-  });
-}
-
 function setLoadingProgress(percent, label) {
   const safePercent = Math.max(0, Math.min(100, percent));
   loadingProgressFill.style.width = `${safePercent.toFixed(1)}%`;
@@ -505,30 +488,29 @@ function stopLoadingProgress() {
   }
 }
 
-function startLoadingProgress({ limit = DEFAULT_SEARCH_LIMIT } = {}) {
+function startLoadingProgress() {
   stopLoadingProgress();
 
-  const plan = getExpectedPagePlan(limit);
-  const totalPages = Math.max(1, plan.length);
-  let completedPages = 0;
+  const totalSteps = MARKETPLACE_PROGRESS_STEPS.length;
+  let completedSteps = 0;
 
   setLoadingProgress(3, "Pregătesc marketplace-urile...");
 
   loadingProgressTimer = window.setInterval(() => {
-    const nextStep = plan[Math.min(completedPages, plan.length - 1)];
-    const cappedCompletedPages = Math.min(completedPages + 1, Math.max(1, Math.floor(totalPages * 0.92)));
-    const percent = (cappedCompletedPages / totalPages) * 100;
+    const marketplace = MARKETPLACE_PROGRESS_STEPS[Math.min(completedSteps, totalSteps - 1)];
+    const cappedCompletedSteps = Math.min(completedSteps + 1, Math.max(1, Math.floor(totalSteps * 0.92)));
+    const percent = (cappedCompletedSteps / totalSteps) * 92;
 
     setLoadingProgress(
       percent,
-      `Verific ${nextStep.label}, pagina ${nextStep.page}/${nextStep.pages}...`
+      `Caut pe ${marketplace}...`
     );
-    completedPages = cappedCompletedPages;
+    completedSteps = cappedCompletedSteps;
 
-    if (completedPages >= Math.floor(totalPages * 0.92)) {
+    if (completedSteps >= Math.floor(totalSteps * 0.92)) {
       stopLoadingProgress();
     }
-  }, 850);
+  }, 900);
 }
 
 function finishLoadingProgress(payload) {
@@ -569,7 +551,7 @@ function setLoadingState(isLoading, query = "", condition = "any") {
 
   loadingTitle.textContent = `Caut oferte ${conditionLabel} pentru „${query}”`;
   loadingText.textContent = "Verific OLX, Vinted, Lajumate, Okazii și Publi24, ordonez anunțurile și calculez cea mai bună ofertă.";
-  startLoadingProgress({ limit: DEFAULT_SEARCH_LIMIT });
+  startLoadingProgress();
 }
 
 async function parseApiResponse(response) {

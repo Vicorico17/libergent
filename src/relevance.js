@@ -118,6 +118,11 @@ const QUERY_ALIASES = [
     category: "console",
     patterns: ["playstation", "ps5", "ps4"],
     tokens: ["playstation", "ps5", "ps4", "sony"]
+  },
+  {
+    category: "protein",
+    patterns: ["proteine", "proteina", "protein", "whey"],
+    tokens: ["proteine", "proteina", "protein", "whey"]
   }
 ];
 
@@ -159,13 +164,25 @@ const CATEGORY_EXCLUSIONS = {
     "joc",
     "jocuri",
     "maneta"
+  ],
+  protein: [
+    "blender",
+    "lame",
+    "mixer",
+    "pahar",
+    "portabil",
+    "shaker",
+    "smoothie",
+    "sticla",
+    "usb"
   ]
 };
 
 const CATEGORY_PRICE_FLOORS_RON = {
   washing_machine: 120,
   phone: 600,
-  console: 700
+  console: 700,
+  protein: 60
 };
 
 export function normalizeText(value = "") {
