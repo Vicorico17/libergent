@@ -8,8 +8,20 @@ const marketplacesEl = document.getElementById("marketplaces");
 const loadingOverlay = document.getElementById("loadingOverlay");
 const loadingTitle = document.getElementById("loadingTitle");
 const loadingText = document.getElementById("loadingText");
+const loadingProgressFill = document.getElementById("loadingProgressFill");
+const loadingProgressLabel = document.getElementById("loadingProgressLabel");
+const loadingProgressBar = document.querySelector(".loading-progress");
 const STORAGE_KEY = "libergent-last-search-v2";
 const DEFAULT_SEARCH_LIMIT = 500;
+const MARKETPLACE_PAGE_PLAN = [
+  { label: "OLX", pageSize: 50, maxPages: 12 },
+  { label: "Lajumate", pageSize: 26, maxPages: 6 },
+  { label: "Vinted", pageSize: 95, maxPages: 6 },
+  { label: "Okazii", pageSize: 36, maxPages: 6 },
+  { label: "Publi24", pageSize: 30, maxPages: 11 }
+];
+
+let loadingProgressTimer = null;
 
 function formatRon(value) {
   if (!Number.isFinite(value)) {
@@ -238,11 +250,81 @@ function renderSite(result) {
   `;
 }
 
+function getExpectedPagePlan(limit = DEFAULT_SEARCH_LIMIT) {
+  return MARKETPLACE_PAGE_PLAN.flatMap((site) => {
+    const pages = Math.max(1, Math.min(site.maxPages, Math.ceil(limit / site.pageSize)));
+    return Array.from({ length: pages }, (_, index) => ({
+      label: site.label,
+      page: index + 1,
+      pages
+    }));
+  });
+}
+
+function setLoadingProgress(percent, label) {
+  const safePercent = Math.max(0, Math.min(100, percent));
+  loadingProgressFill.style.width = `${safePercent.toFixed(1)}%`;
+  loadingProgressBar.setAttribute("aria-valuenow", String(Math.round(safePercent)));
+  loadingProgressLabel.textContent = label;
+}
+
+function stopLoadingProgress() {
+  if (loadingProgressTimer) {
+    window.clearInterval(loadingProgressTimer);
+    loadingProgressTimer = null;
+  }
+}
+
+function startLoadingProgress({ limit = DEFAULT_SEARCH_LIMIT } = {}) {
+  stopLoadingProgress();
+
+  const plan = getExpectedPagePlan(limit);
+  const totalPages = Math.max(1, plan.length);
+  let completedPages = 0;
+
+  setLoadingProgress(3, `0/${totalPages} pagini estimate. Pregătesc marketplace-urile...`);
+
+  loadingProgressTimer = window.setInterval(() => {
+    const nextStep = plan[Math.min(completedPages, plan.length - 1)];
+    const cappedCompletedPages = Math.min(completedPages + 1, Math.max(1, Math.floor(totalPages * 0.92)));
+    const percent = (cappedCompletedPages / totalPages) * 100;
+
+    setLoadingProgress(
+      percent,
+      `${cappedCompletedPages}/${totalPages} pagini estimate. Verific ${nextStep.label}, pagina ${nextStep.page}/${nextStep.pages}...`
+    );
+    completedPages = cappedCompletedPages;
+
+    if (completedPages >= Math.floor(totalPages * 0.92)) {
+      stopLoadingProgress();
+    }
+  }, 850);
+}
+
+function finishLoadingProgress(payload) {
+  stopLoadingProgress();
+
+  const actualPages = (payload?.results || []).reduce(
+    (sum, result) => sum + (Number.isFinite(result.pagesUsed) ? result.pagesUsed : 0),
+    0
+  );
+  const totalPages = actualPages || getExpectedPagePlan(DEFAULT_SEARCH_LIMIT).length;
+
+  setLoadingProgress(100, `${totalPages}/${totalPages} pagini verificate. Rezultatele sunt gata.`);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 function setLoadingState(isLoading, query = "", condition = "any") {
   loadingOverlay.classList.toggle("hidden", !isLoading);
   loadingOverlay.setAttribute("aria-hidden", String(!isLoading));
 
   if (!isLoading) {
+    stopLoadingProgress();
     return;
   }
 
@@ -253,6 +335,7 @@ function setLoadingState(isLoading, query = "", condition = "any") {
 
   loadingTitle.textContent = `Caut oferte ${conditionLabel} pentru „${query}”`;
   loadingText.textContent = "Verific OLX, Vinted, Lajumate, Okazii și Publi24, ordonez anunțurile și calculez cea mai bună ofertă.";
+  startLoadingProgress({ limit: DEFAULT_SEARCH_LIMIT });
 }
 
 async function parseApiResponse(response) {
@@ -303,6 +386,8 @@ async function handleSubmit(event) {
       throw new Error("Serverul nu a trimis niciun răspuns pentru căutare.");
     }
 
+    finishLoadingProgress(payload);
+    await wait(250);
     renderResults(payload);
     saveLastSearch({
       query: q,

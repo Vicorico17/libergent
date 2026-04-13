@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "CLI scraper for Romanian second-hand marketplaces using Firecrawl or Cloudflare Browser Rendering.",
+  "description": "Cloudflare Worker app for searching Romanian second-hand marketplaces with direct parsers.",
   "scripts": {
     "search": "node src/cli.js search",
     "search:live": "LIBERGENT_MOCK_SEARCH=0 LIBERGENT_MOCK_PROVIDER=0 node src/cli.js search --site all --provider auto --pages 1 --pretty",
     "check": "node src/cli.js --help",
-    "dev": "node src/server.js"
+    "dev": "node src/server.js",
+    "dev:worker": "npx wrangler dev",
+    "deploy": "npx wrangler deploy"
   },
   "engines": {
     "node": ">=20"

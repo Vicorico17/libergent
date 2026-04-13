@@ -1,6 +1,6 @@
 # libergent
 
-Node app for searching Romanian second-hand marketplaces with direct HTML parsing by default and optional remote rendering fallbacks.
+Cloudflare Worker app for searching Romanian second-hand marketplaces with direct HTML parsing by default and optional remote rendering fallbacks.
 
 Supported marketplaces:
 
@@ -137,47 +137,27 @@ If you already authenticated the Firecrawl CLI, you can usually pull the key loc
 firecrawl env
 ```
 
-## Cloudflare requirements
+## Cloudflare deployment
 
-There are two separate Cloudflare paths and they should not be mixed up.
+The app is wired for Cloudflare Workers through `wrangler.toml`.
 
-### 1. Browser Rendering for scraping
-
-This is the Cloudflare feature libergent needs for scraping. According to Cloudflare's Browser Rendering docs, the REST API requires:
-
-- a Cloudflare account
-- your `CLOUDFLARE_ACCOUNT_ID`
-- an API token with `Browser Rendering - Edit`
-
-Those values go in `.env`:
+Local Worker dev:
 
 ```bash
-CLOUDFLARE_ACCOUNT_ID=...
-CLOUDFLARE_API_TOKEN=...
+npm run dev:worker
 ```
 
-### 2. Cloudflare One / `cloudflared` CLI
+Deploy:
 
-The page you linked, `https://developers.cloudflare.com/cloudflare-one/tutorials/cli/`, is about using `cloudflared` to access applications protected by Cloudflare Access from a CLI. That is useful for protected apps, but it is not the same thing as Browser Rendering.
+```bash
+npm run deploy
+```
 
-libergent does not need that tutorial just to call Browser Rendering.
-
-If you want Cloudflare deployment as well, then the useful extra pieces from you would be:
-
-- whether you want a Worker deployment or just REST API usage
-- your Cloudflare account ID
-- an API token with Browser Rendering permissions
-- if deploying publicly through Cloudflare, the target domain or subdomain you want to use
-
-If you want me to wire a Cloudflare Worker next, I will also need to know whether you want:
-
-- a Worker-only app
-- a Worker API in front of the current local app
-- or a Tunnel/Access setup for private preview
+Direct scraping does not require provider secrets. If you later use Cloudflare Browser Rendering as an explicit scraping fallback, configure `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in Wrangler secrets.
 
 ## Usage
 
-Web app:
+Local Node web app:
 
 ```bash
 cd /Users/alex/libergent
