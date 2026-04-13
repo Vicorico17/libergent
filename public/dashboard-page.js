@@ -121,7 +121,11 @@ function renderDashboard(payload) {
     renderFactCard("Billing Start", formatDateOnly(usage.billingPeriodStart), "Data de început a perioadei curente de credit usage."),
     renderFactCard("Billing End", formatDateOnly(usage.billingPeriodEnd), "Data la care Firecrawl resetează perioada curentă."),
     renderFactCard("Last Sync", formatDateTime(payload.updatedAt), "Timestamp-ul ultimei sincronizări făcute de backend."),
-    renderFactCard("Provider", payload.provider || "firecrawl", "Dashboard-ul citește date live din backend și nu expune cheia în browser.")
+    renderFactCard(
+      "Provider",
+      payload.configured === false ? "firecrawl not configured" : payload.provider || "firecrawl",
+      payload.message || "Dashboard-ul citește date live din backend și nu expune cheia în browser."
+    )
   ].join("");
 }
 
