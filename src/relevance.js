@@ -64,6 +64,8 @@ const NEGATIVE_INTENTS = {
     "rulment",
     "piciorus",
     "picioruse",
+    "steag",
+    "steaguri",
     "suport",
     "telecomanda",
     "tok",
@@ -94,6 +96,7 @@ const NEGATIVE_PHRASES = {
     "pentru piese"
   ],
   commercial: [
+    "format din",
     "orice model",
     "toate marcile",
     "toate modelele"
