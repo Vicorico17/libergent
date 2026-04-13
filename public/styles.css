@@ -69,7 +69,6 @@ body::before {
 
 .hero-copy,
 .hero-aside,
-.account-panel,
 .search-panel,
 .workflow-panel,
 .budget-panel,
@@ -167,7 +166,6 @@ h2 {
 }
 
 .search-panel,
-.account-panel,
 .workflow-panel,
 .budget-panel,
 .pricing-panel,
@@ -177,7 +175,6 @@ h2 {
 }
 
 .search-panel,
-.account-panel,
 .budget-panel,
 .pricing-panel,
 .workflow-panel {
@@ -295,24 +292,58 @@ button:disabled {
 }
 
 .account-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.2fr);
-  gap: 18px;
-  align-items: end;
-  background:
-    radial-gradient(circle at top left, rgba(40, 89, 79, 0.15), transparent 28%),
-    linear-gradient(160deg, rgba(255, 249, 241, 0.92), rgba(255, 255, 255, 0.68));
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 30;
+  width: min(360px, calc(100vw - 32px));
+  padding: 10px;
+  border-radius: 24px;
+  background: rgba(255, 249, 241, 0.9);
+  border: 1px solid rgba(22, 24, 24, 0.1);
+  box-shadow: 0 18px 60px rgba(56, 39, 23, 0.18);
+  backdrop-filter: blur(18px);
 }
 
-.account-panel__copy {
-  min-width: 0;
+.account-auth-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.account-button {
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  box-shadow: none;
+}
+
+.account-button--secondary {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(250, 246, 240, 0.58));
+  color: var(--accent-deep);
+  border: 1px solid rgba(121, 51, 27, 0.18);
+}
+
+.account-form__title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--accent-deep);
 }
 
 .account-form {
-  display: flex;
-  gap: 14px;
-  align-items: end;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 10px;
+}
+
+.account-form .field {
+  min-width: 0;
+}
+
+.account-form input {
+  height: 46px;
+  border-radius: 14px;
 }
 
 .account-actions {
@@ -322,14 +353,10 @@ button:disabled {
 }
 
 .account-wallet {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 16px;
+  display: flex;
+  gap: 12px;
   align-items: center;
-  padding: 18px;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.58);
-  border: 1px solid rgba(22, 24, 24, 0.08);
+  justify-content: space-between;
 }
 
 .account-name,
@@ -338,16 +365,18 @@ button:disabled {
   font-weight: 700;
 }
 
+.account-name,
+.account-status {
+  font-size: 12px;
+}
+
 .wallet-balance {
-  font-family: "Fraunces", serif;
-  font-size: clamp(32px, 4vw, 48px);
-  line-height: 0.95;
+  font-size: 16px;
   color: var(--sage);
 }
 
 .account-status {
-  grid-column: 1 / -1;
-  margin: 0;
+  margin: 2px 0 0;
 }
 
 .workflow-grid,
@@ -1112,11 +1141,12 @@ code {
   }
 
   .account-panel {
-    grid-template-columns: 1fr;
+    top: 10px;
+    right: 10px;
   }
 
   .account-wallet {
-    grid-template-columns: 1fr;
+    align-items: flex-start;
   }
 
   .report-banner {
