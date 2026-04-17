@@ -59,13 +59,16 @@ const CAR_MODELS = [
 ];
 
 function slugifyCarPath(query) {
-  return query
+  const tokens = query
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .filter((token) => !["auto", "autoturism", "autoturisme", "masina", "masini", "suv"].includes(token));
+
+  return tokens.join("-");
 }
 
 export function isCarQuery(query = "") {

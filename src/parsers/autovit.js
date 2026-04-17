@@ -83,7 +83,12 @@ function parseListingBlock(block) {
   const title = parseTitle(block);
   const url = toAbsoluteUrl(urlMatch?.[1] || "");
 
-  if (!title || !url || /\/autoturisme\/(?:jeep|[^/]+)\/?$/i.test(url)) {
+  if (
+    !title ||
+    !url ||
+    /^[\d\s.,]+$/.test(title) ||
+    /\/autoturisme\/(?:jeep|[^/]+)\/?$/i.test(url)
+  ) {
     return null;
   }
 
@@ -124,15 +129,60 @@ function parseTotalResults(html) {
   return Number.isFinite(value) ? value : null;
 }
 
+function parseJsonLdOffers(html) {
+  const scripts = [...html.matchAll(/<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi)];
+  const offers = [];
+
+  for (const script of scripts) {
+    try {
+      const parsed = JSON.parse(decodeHtmlEntities(script[1]));
+      const itemList = parsed?.mainEntity?.itemListElement;
+      if (Array.isArray(itemList)) {
+        offers.push(...itemList);
+      }
+    } catch {
+      // Ignore unrelated JSON-LD blocks.
+    }
+  }
+
+  return offers.map((offer) => {
+    const price = offer?.priceSpecification?.price;
+    const currency = offer?.priceSpecification?.priceCurrency || "";
+    const title = offer?.itemOffered?.name || "";
+    return {
+      title: cleanText(title),
+      price: price ? `${price} ${currency}`.trim() : "",
+      currency: cleanText(currency)
+    };
+  });
+}
+
 function hasNextPage(html) {
   return /\/autoturisme\/[^"]+\/\?page=\d+/i.test(html) || /aria-label="Next"/i.test(html);
 }
 
 export function parseAutovitHtml(html, limit) {
   const blocks = splitListingBlocks(html);
+  const jsonLdOffers = parseJsonLdOffers(html);
   const items = blocks
     .map(parseListingBlock)
     .filter(Boolean)
+    .map((item, index) => {
+      if (item.price) {
+        return item;
+      }
+
+      const offer = jsonLdOffers[index];
+      if (!offer?.price) {
+        return item;
+      }
+
+      return {
+        ...item,
+        price: offer.price,
+        currency: offer.currency || item.currency
+      };
+    })
     .slice(0, limit);
 
   return {
