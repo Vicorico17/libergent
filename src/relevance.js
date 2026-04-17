@@ -231,6 +231,12 @@ const PRODUCT_TAXONOMY = {
     tokens: ["money", "tree", "pachira", "arborele", "banilor", "copacul"],
     accessories: ["seminte"],
     exclusions: MEDIA_OR_TOY_HEADS
+  },
+  air_fryer: {
+    category: "kitchen",
+    aliases: ["airfryer", "air fryer", "friteuza cu aer", "friteuza cu aer cald", "friteuza aer cald"],
+    tokens: ["airfryer", "air", "fryer", "friteuza", "aer", "cald"],
+    accessories: ["cos", "filtre", "forme", "hartie", "liners", "paper", "silicon", "tava"]
   }
 };
 
@@ -279,6 +285,11 @@ const QUERY_ALIASES = [
     category: "plant",
     patterns: PRODUCT_TAXONOMY.money_tree.aliases,
     tokens: PRODUCT_TAXONOMY.money_tree.tokens
+  },
+  {
+    category: "kitchen",
+    patterns: PRODUCT_TAXONOMY.air_fryer.aliases,
+    tokens: PRODUCT_TAXONOMY.air_fryer.tokens
   }
 ];
 
@@ -346,6 +357,9 @@ const CATEGORY_EXCLUSIONS = {
   plant: [
     ...PRODUCT_TAXONOMY.money_tree.accessories,
     ...PRODUCT_TAXONOMY.money_tree.exclusions
+  ],
+  kitchen: [
+    ...PRODUCT_TAXONOMY.air_fryer.accessories
   ]
 };
 
@@ -356,7 +370,8 @@ const CATEGORY_PRICE_FLOORS_RON = {
   protein: 60,
   vehicle: 7000,
   sport: 120,
-  plant: 20
+  plant: 20,
+  kitchen: 80
 };
 
 export function normalizeText(value = "") {

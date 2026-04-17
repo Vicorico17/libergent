@@ -69,17 +69,22 @@ function slugifyCarPath(query) {
 }
 
 export function isCarQuery(query = "") {
-  const tokens = query
+  const normalized = query
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (/\bmasin[ai]\s+de\s+spalat\b/.test(normalized) || /\bspalat\s+rufe\b/.test(normalized)) {
+    return false;
+  }
+
+  const tokens = normalized
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
   const tokenSet = new Set(tokens);
 
   return CAR_MAKES.some((make) => tokenSet.has(make)) ||
     tokens.some((token) => CAR_MODELS.includes(token)) ||
-    /\b(auto|autoturism|masina|masini|suv)\b/i.test(query);
+    /\b(auto|autoturism|autoturisme|suv)\b/.test(normalized);
 }
 
 export const SITES = {
