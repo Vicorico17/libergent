@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadEnv } from "./env.js";
 import { searchAcrossSites } from "./app.js";
-import { getSite, SITES } from "./sites.js";
+import { getSite, getSiteKeysForAllSearch, SITES } from "./sites.js";
 import { runSearch } from "./search.js";
 import { formatRon } from "./normalize.js";
 
@@ -12,8 +12,8 @@ function printHelp() {
   console.log(`libergent
 
 Usage:
-  node src/cli.js search --site <site> --query "<text>" [--provider auto|firecrawl|cloudflare|direct] [--limit 150] [--pages 3] [--out results/file.json]
-  node src/cli.js search --site all --query "<text>" [--provider auto|firecrawl|cloudflare|direct] [--limit 150] [--pages 3] [--out results/file.json]
+  node src/cli.js search --site <site> --query "<text>" [--provider auto|direct] [--limit 150] [--pages 3] [--out results/file.json]
+  node src/cli.js search --site all --query "<text>" [--provider auto|direct] [--limit 150] [--pages 3] [--out results/file.json]
   npm run search:live -- --query "<text>"
 
 Supported sites:
@@ -48,6 +48,9 @@ function ensureDirForFile(filePath) {
 }
 
 function formatPrice(item) {
+  if (item?.currency === "EUR" && item?.price) {
+    return item.price;
+  }
   if (Number.isFinite(item?.priceRon)) {
     return formatRon(item.priceRon);
   }
@@ -263,7 +266,7 @@ async function main() {
   if (!query) {
     throw new Error("Missing --query");
   }
-  if (!["auto", "firecrawl", "cloudflare", "direct"].includes(provider)) {
+  if (!["auto", "direct"].includes(provider)) {
     throw new Error(`Unsupported provider "${provider}"`);
   }
   if (!Number.isFinite(limit) || limit <= 0) {
@@ -273,7 +276,7 @@ async function main() {
     throw new Error("Expected --pages to be a positive integer");
   }
 
-  const siteKeys = siteArg === "all" ? Object.keys(SITES) : [siteArg];
+  const siteKeys = siteArg === "all" ? getSiteKeysForAllSearch(query) : [siteArg];
   const payload =
     siteArg === "all"
       ? await searchAcrossSites({ query, provider, limit, maxPages, siteKeys })

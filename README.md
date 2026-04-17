@@ -5,6 +5,7 @@ Cloudflare Worker app for searching Romanian second-hand marketplaces with direc
 Supported marketplaces:
 
 - `olx.ro`
+- `autovit.ro` for car searches
 - `vinted.ro`
 - `lajumate.ro`
 - `okazii.ro`
@@ -68,6 +69,7 @@ That means libergent should optimize for:
 Current strategy:
 
 - `olx.ro`: direct HTML fetch + local parser
+- `autovit.ro`: direct HTML fetch + local parser, enabled only for car-like queries
 - `vinted.ro`: direct HTML fetch + local parser
 - `lajumate.ro`: direct HTML fetch + local parser
 - `okazii.ro`: direct HTML fetch + local parser

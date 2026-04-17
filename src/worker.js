@@ -1,7 +1,7 @@
 import { searchAcrossSites } from "./app.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
-import { insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
-import { getDefaultSiteKeys, getSite, SITES } from "./sites.js";
+import { insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
+import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 
 function applyEnv(env = {}) {
   if (!globalThis.process) {
@@ -9,6 +9,8 @@ function applyEnv(env = {}) {
   } else if (!globalThis.process.env) {
     globalThis.process.env = {};
   }
+
+  globalThis.process.env.LIBERGENT_RUNTIME = "cloudflare-worker";
 
   for (const [key, value] of Object.entries(env)) {
     if (typeof value === "string") {
@@ -43,6 +45,14 @@ async function persistSearchEvent(entry, env) {
   }
 }
 
+async function parseJsonRequest(request) {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
 async function handleApi(request, env) {
   applyEnv(env);
 
@@ -64,7 +74,7 @@ async function handleApi(request, env) {
 
     try {
       const siteKeys = site === "all"
-        ? Object.keys(SITES)
+        ? getSiteKeysForAllSearch(query)
         : site === "default"
           ? getDefaultSiteKeys()
           : [getSite(site).key];
@@ -100,6 +110,33 @@ async function handleApi(request, env) {
         ...buildEmptyHistoryPayload(),
         error: error instanceof Error ? error.message : String(error)
       }, 200);
+    }
+  }
+
+  if (url.pathname === "/api/feedback") {
+    if (request.method !== "POST") {
+      return json({ error: "Method not allowed" }, 405);
+    }
+
+    const body = await parseJsonRequest(request);
+    const feedback = body?.feedback;
+    if (feedback !== "like" && feedback !== "dislike") {
+      return json({ error: "Expected feedback to be like or dislike" }, 400);
+    }
+
+    if (!isSupabaseConfigured(env)) {
+      return json({ ok: false, error: "Supabase is not configured." }, 200);
+    }
+
+    try {
+      await insertOfferFeedbackToSupabase({
+        query: body.query,
+        feedback,
+        offer: body.offer
+      }, env);
+      return json({ ok: true }, 200);
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
     }
   }
 

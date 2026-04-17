@@ -32,6 +32,17 @@ create table if not exists public.keyword_stats (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.offer_feedback (
+  id uuid primary key default gen_random_uuid(),
+  query text not null default '',
+  feedback text not null check (feedback in ('like', 'dislike')),
+  offer jsonb,
+  offer_title text not null default '',
+  offer_site text not null default '',
+  offer_url text not null default '',
+  created_at timestamptz not null default now()
+);
+
 create index if not exists search_events_searched_at_idx
   on public.search_events (searched_at desc);
 
@@ -43,6 +54,15 @@ create index if not exists search_query_stats_count_idx
 
 create index if not exists keyword_stats_count_idx
   on public.keyword_stats (search_count desc, last_searched_at desc);
+
+create index if not exists offer_feedback_created_at_idx
+  on public.offer_feedback (created_at desc);
+
+create index if not exists offer_feedback_query_idx
+  on public.offer_feedback (query);
+
+create index if not exists offer_feedback_site_idx
+  on public.offer_feedback (offer_site);
 
 create or replace function public.log_search_event(
   query_value text,
@@ -122,6 +142,7 @@ grant usage on schema public to anon, authenticated, service_role;
 grant all on table public.search_events to service_role;
 grant all on table public.search_query_stats to service_role;
 grant all on table public.keyword_stats to service_role;
+grant all on table public.offer_feedback to service_role;
 grant execute on function public.log_search_event(
   text,
   text,

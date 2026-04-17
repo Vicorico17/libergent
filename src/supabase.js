@@ -3,6 +3,7 @@ import { MAX_HISTORY_ENTRIES } from "./history-base.js";
 const DEFAULT_TABLE = "search_events";
 const DEFAULT_QUERY_STATS_TABLE = "search_query_stats";
 const DEFAULT_KEYWORD_STATS_TABLE = "keyword_stats";
+const DEFAULT_FEEDBACK_TABLE = "offer_feedback";
 
 function trimTrailingSlash(value = "") {
   return value.replace(/\/+$/, "");
@@ -14,12 +15,13 @@ function getSupabaseConfig(env = process.env) {
   const table = env.SUPABASE_SEARCH_EVENTS_TABLE || DEFAULT_TABLE;
   const queryStatsTable = env.SUPABASE_QUERY_STATS_TABLE || DEFAULT_QUERY_STATS_TABLE;
   const keywordStatsTable = env.SUPABASE_KEYWORD_STATS_TABLE || DEFAULT_KEYWORD_STATS_TABLE;
+  const feedbackTable = env.SUPABASE_FEEDBACK_TABLE || DEFAULT_FEEDBACK_TABLE;
 
   if (!url || !apiKey) {
     return null;
   }
 
-  return { url, apiKey, table, queryStatsTable, keywordStatsTable };
+  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable };
 }
 
 function getRequestHeaders(apiKey) {
@@ -147,6 +149,31 @@ export async function insertSearchEventToSupabase(entry, env = process.env) {
       Prefer: "return=minimal"
     },
     body: JSON.stringify(mapEntryToRpcPayload(entry))
+  }, env);
+
+  return true;
+}
+
+export async function insertOfferFeedbackToSupabase(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) {
+    return false;
+  }
+
+  await requestSupabase(config.feedbackTable, {
+    method: "POST",
+    headers: {
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify({
+      query: entry.query || "",
+      feedback: entry.feedback,
+      offer: entry.offer || null,
+      offer_title: entry.offer?.title || "",
+      offer_site: entry.offer?.site || "",
+      offer_url: entry.offer?.url || "",
+      created_at: entry.createdAt || new Date().toISOString()
+    })
   }, env);
 
   return true;

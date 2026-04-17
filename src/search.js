@@ -6,6 +6,7 @@ import { parseLajumateHtml } from "./parsers/lajumate.js";
 import { parseOkaziiHtml } from "./parsers/okazii.js";
 import { parsePubli24Html } from "./parsers/publi24.js";
 import { parseVintedHtml, parseVintedMarkdown } from "./parsers/vinted.js";
+import { parseAutovitHtml } from "./parsers/autovit.js";
 
 function tokenize(value = "") {
   return value
@@ -22,9 +23,19 @@ function filterRelevantItems(items, query) {
     return items;
   }
 
+  if (queryTokens.length === 1) {
+    return items.filter((item) => String(item.title || "").trim());
+  }
+
+  const requiredNumberTokens = queryTokens.filter((token) => /^\d+$/.test(token));
   return items.filter((item) => {
     const titleTokens = new Set(tokenize(item.title || ""));
-    return queryTokens.some((token) => titleTokens.has(token));
+    if (requiredNumberTokens.some((token) => !titleTokens.has(token))) {
+      return false;
+    }
+
+    const matchedTokens = queryTokens.filter((token) => titleTokens.has(token)).length;
+    return matchedTokens / queryTokens.length >= 0.5;
   });
 }
 
@@ -130,6 +141,12 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
       hasNextPage = parsed.hasNextPage ?? null;
     } else if (site.key === "publi24.ro") {
       const parsed = parsePubli24Html(raw, limit);
+      items = parsed.items;
+      totalResults = parsed.totalResults;
+      rawItemCount = getRawItemCount(parsed, items);
+      hasNextPage = parsed.hasNextPage ?? null;
+    } else if (site.key === "autovit.ro") {
+      const parsed = parseAutovitHtml(raw, limit);
       items = parsed.items;
       totalResults = parsed.totalResults;
       rawItemCount = getRawItemCount(parsed, items);

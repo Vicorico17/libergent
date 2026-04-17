@@ -22,7 +22,104 @@ function buildBasePrompt(siteLabel, query, limit, extra = "") {
     .join(" ");
 }
 
+const CAR_MAKES = [
+  "audi",
+  "bmw",
+  "chevrolet",
+  "citroen",
+  "dacia",
+  "fiat",
+  "ford",
+  "honda",
+  "hyundai",
+  "jeep",
+  "kia",
+  "mazda",
+  "mercedes",
+  "mitsubishi",
+  "nissan",
+  "opel",
+  "peugeot",
+  "renault",
+  "seat",
+  "skoda",
+  "suzuki",
+  "toyota",
+  "volkswagen",
+  "volvo"
+];
+
+const CAR_MODELS = [
+  "compass",
+  "golf",
+  "logan",
+  "octavia",
+  "passat",
+  "x5"
+];
+
+function slugifyCarPath(query) {
+  return query
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export function isCarQuery(query = "") {
+  const tokens = query
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  const tokenSet = new Set(tokens);
+
+  return CAR_MAKES.some((make) => tokenSet.has(make)) ||
+    tokens.some((token) => CAR_MODELS.includes(token)) ||
+    /\b(auto|autoturism|masina|masini|suv)\b/i.test(query);
+}
+
 export const SITES = {
+  "autovit.ro": {
+    key: "autovit.ro",
+    label: "Autovit",
+    priority: 0,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-local",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 32,
+    maxPages: 6,
+    defaultLimit: 32,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      const parts = slugifyCarPath(query).split("-").filter(Boolean);
+      if (parts.length >= 2) {
+        return `https://www.autovit.ro/autoturisme/${parts[0]}/${parts.slice(1).join("-")}/`;
+      }
+      if (parts.length === 1) {
+        return `https://www.autovit.ro/autoturisme/${parts[0]}/`;
+      }
+      return "https://www.autovit.ro/autoturisme/";
+    },
+    pagedSearchUrl(query, page) {
+      const base = this.searchUrl(query);
+      return page <= 1 ? base : `${base}${base.includes("?") ? "&" : "?"}page=${page}`;
+    },
+    prompt(query, limit) {
+      return buildBasePrompt(
+        "Autovit",
+        query,
+        limit,
+        "This page contains car listings. Keep only full vehicles, not parts, tires, accessories, services, or wanted ads."
+      );
+    }
+  },
   "olx.ro": {
     key: "olx.ro",
     label: "OLX Romania",
@@ -185,6 +282,17 @@ export function getSite(siteKey) {
 }
 
 export function getDefaultSiteKeys() {
+  return Object.values(SITES)
+    .filter((site) => site.defaultEnabled)
+    .sort((a, b) => a.priority - b.priority)
+    .map((site) => site.key);
+}
+
+export function getSiteKeysForAllSearch(query) {
+  if (isCarQuery(query)) {
+    return ["autovit.ro"];
+  }
+
   return Object.values(SITES)
     .filter((site) => site.defaultEnabled)
     .sort((a, b) => a.priority - b.priority)

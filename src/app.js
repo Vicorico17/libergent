@@ -10,11 +10,19 @@ const SERVERLESS_MAX_RESULTS_PER_SITE = 120;
 const SERVERLESS_SITE_TIMEOUT_MS = 6000;
 
 function isServerlessRuntime() {
-  return Boolean(process.env.VERCEL);
+  return Boolean(
+    process.env.VERCEL ||
+    process.env.CF_PAGES ||
+    process.env.LIBERGENT_RUNTIME === "cloudflare-worker"
+  );
 }
 
 function isMockSearchEnabled() {
   return process.env.LIBERGENT_MOCK_SEARCH === "1";
+}
+
+function normalizeProvider(provider) {
+  return provider === "auto" ? "auto" : "direct";
 }
 
 function withTimeout(promise, timeoutMs, message) {
@@ -82,8 +90,9 @@ function getDefaultLimit(site, pages, provider) {
 
 async function searchSite({ siteKey, query, condition, provider, limit, maxPages }) {
   const site = getSite(siteKey);
-  const resolvedProvider = provider === "auto" ? site.provider : provider;
-  const affordablePages = getMaxAffordablePages(site, provider);
+  const searchProvider = normalizeProvider(provider);
+  const resolvedProvider = searchProvider === "auto" ? site.provider : searchProvider;
+  const affordablePages = getMaxAffordablePages(site, searchProvider);
   const runtimeMaxPages = isServerlessRuntime()
     ? Math.min(affordablePages, SERVERLESS_MAX_PAGES)
     : affordablePages;
@@ -91,13 +100,13 @@ async function searchSite({ siteKey, query, condition, provider, limit, maxPages
   const runtimeMaxResults = isServerlessRuntime()
     ? Math.min((site.pageSize || SERVERLESS_MAX_RESULTS_PER_SITE) * desiredPages, SERVERLESS_MAX_RESULTS_PER_SITE)
     : Number.POSITIVE_INFINITY;
-  const desiredLimit = Math.min(limit ?? getDefaultLimit(site, desiredPages, provider), runtimeMaxResults);
+  const desiredLimit = Math.min(limit ?? getDefaultLimit(site, desiredPages, searchProvider), runtimeMaxResults);
   const affordableLimit = Math.min(desiredLimit, (site.pageSize || desiredLimit) * desiredPages);
 
   try {
     const result = await withTimeout(
       runSearch({
-        provider,
+        provider: searchProvider,
         site,
         query,
         limit: affordableLimit,

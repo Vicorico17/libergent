@@ -35,11 +35,13 @@ const DEFAULT_SEARCH_LIMIT = 500;
 const MAX_BROWSER_HISTORY_ENTRIES = 200;
 const STARTING_WALLET_RON = 10;
 const SEARCH_COST_RON = 1;
-const MARKETPLACE_PROGRESS_STEPS = ["OLX", "Lajumate", "Vinted", "Okazii", "Publi24"];
+const MARKETPLACE_PROGRESS_STEPS = ["Autovit", "OLX", "Lajumate", "Vinted", "Okazii", "Publi24"];
 
 let loadingProgressTimer = null;
 let currentAccountEmail = null;
 let accountMode = "closed";
+let currentPayload = null;
+let offerFeedback = {};
 
 function formatRon(value) {
   if (!Number.isFinite(value)) {
@@ -253,6 +255,9 @@ function cleanDisplayText(value = "") {
 }
 
 function formatPrice(item) {
+  if (item?.currency === "EUR" && item?.price) {
+    return item.price;
+  }
   if (Number.isFinite(item?.priceRon)) {
     return formatRon(item.priceRon);
   }
@@ -298,18 +303,176 @@ function pickExtremeOffer(items, mode, fallbackSite = "") {
   }, null);
 }
 
+function loadOfferFeedback() {
+  return offerFeedback;
+}
+
+function getOfferFeedbackKey(offer) {
+  if (!offer) {
+    return "";
+  }
+  return [
+    cleanDisplayText(offer.site || ""),
+    cleanDisplayText(offer.url || ""),
+    cleanDisplayText(offer.title || "").toLowerCase()
+  ].join("::");
+}
+
+function getOfferFeedback(offer) {
+  return loadOfferFeedback()[getOfferFeedbackKey(offer)]?.value || "";
+}
+
+async function saveOfferFeedback(offer, value) {
+  const key = getOfferFeedbackKey(offer);
+  if (!key) {
+    return;
+  }
+
+  const feedbackEntry = {
+    value,
+    title: offer.title || "",
+    site: offer.site || "",
+    url: offer.url || "",
+    query: queryInput.value.trim(),
+    savedAt: new Date().toISOString()
+  };
+
+  const response = await fetch("/api/feedback", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      query: queryInput.value.trim(),
+      feedback: value,
+      offer: {
+        title: offer.title || "",
+        site: offer.site || "",
+        url: offer.url || "",
+        price: offer.price || "",
+        currency: offer.currency || "",
+        priceRon: offer.priceRon ?? null,
+        recommendationScore: offer.recommendationScore ?? null,
+        listingType: offer.listingType || "",
+        rejectionReasons: offer.rejectionReasons || []
+      }
+    })
+  });
+  const payload = await parseApiResponse(response);
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(payload?.error || "Feedback-ul nu a putut fi salvat.");
+  }
+  offerFeedback = {
+    ...offerFeedback,
+    [key]: feedbackEntry
+  };
+}
+
+function scoreOfferWithFeedback(offer) {
+  const baseScore =
+    Number.isFinite(offer?.recommendationScore) ? offer.recommendationScore :
+    Number.isFinite(offer?.offerScore) ? offer.offerScore :
+    Number.isFinite(offer?.relevanceScore) ? offer.relevanceScore :
+    50;
+  const feedback = getOfferFeedback(offer);
+  if (feedback === "like") {
+    return baseScore + 10;
+  }
+  if (feedback === "dislike") {
+    return baseScore - 45;
+  }
+  return baseScore;
+}
+
+function applyLocalFeedback(payload) {
+  if (!payload?.summary || !Array.isArray(payload.results)) {
+    return payload;
+  }
+
+  const candidates = payload.results
+    .filter((result) => result.ok)
+    .flatMap((result) =>
+      (result.items || [])
+        .filter((item) => Number.isFinite(item.priceRon))
+        .map((item) => ({
+          ...item,
+          site: result.site,
+          recommendationScore: Math.round(scoreOfferWithFeedback({ ...item, site: result.site }))
+        }))
+    )
+    .sort((a, b) => {
+      if (b.recommendationScore !== a.recommendationScore) {
+        return b.recommendationScore - a.recommendationScore;
+      }
+      return a.priceRon - b.priceRon;
+    });
+
+  if (!candidates.length) {
+    return payload;
+  }
+
+  const bestOffer = candidates[0];
+  const recommendedOffers = [];
+  const seenSites = new Set();
+  for (const candidate of candidates) {
+    if (seenSites.has(candidate.site)) {
+      continue;
+    }
+    seenSites.add(candidate.site);
+    recommendedOffers.push(candidate);
+    if (recommendedOffers.length >= 4) {
+      break;
+    }
+  }
+
+  return {
+    ...payload,
+    summary: {
+      ...payload.summary,
+      bestOffer,
+      recommendedOffers
+    }
+  };
+}
+
 function renderSummary(summary) {
   summaryEl.classList.remove("hidden");
   const bestOffer = summary.bestOffer;
+  const feedbackValue = getOfferFeedback(bestOffer);
+  const recommendedOffers = Array.isArray(summary.recommendedOffers)
+    ? summary.recommendedOffers.filter((offer) => offer?.url !== bestOffer?.url).slice(0, 3)
+    : [];
   const recommendationLine = bestOffer ? formatOfferLine(bestOffer) : "Nu am găsit încă o ofertă validă";
+  const alternativesMarkup = recommendedOffers.length
+    ? `
+      <div class="recommended-list">
+        <p class="recommended-list__title">Alte recomandări bune</p>
+        ${recommendedOffers.map((offer) => `
+          <a class="recommended-list__item" href="${escapeHtml(offer.url || "#")}" target="_blank" rel="noreferrer">
+            <span>${escapeHtml(formatOfferLine(offer))}</span>
+            ${Number.isFinite(offer.recommendationScore) ? `<strong>${offer.recommendationScore}/100</strong>` : ""}
+          </a>
+        `).join("")}
+      </div>
+    `
+    : "";
   summaryEl.innerHTML = `
     <article class="report-banner ${bestOffer ? "report-banner--winner" : ""}">
       <div class="report-banner__copy">
         ${bestOffer ? '<div class="winner-mark" aria-hidden="true">♛</div>' : ""}
         <p class="eyebrow">libergent recommends</p>
-        <h3>${bestOffer ? formatRon(bestOffer.priceRon) : "N/A"}</h3>
+        <h3>${bestOffer ? formatPrice(bestOffer) : "N/A"}</h3>
         <p class="report-banner__line">${escapeHtml(recommendationLine)}</p>
+        ${Number.isFinite(bestOffer?.recommendationScore) ? `<p class="recommendation-score">Scor recomandare: ${bestOffer.recommendationScore}/100</p>` : ""}
         ${bestOffer?.url ? `<a class="listing-link" href="${escapeHtml(bestOffer.url)}" target="_blank" rel="noreferrer">Deschide anunțul recomandat</a>` : ""}
+        ${bestOffer ? `
+          <div class="feedback-controls" aria-label="Feedback recomandare">
+            <span class="feedback-label">Este recomandarea bună?</span>
+            <button class="feedback-button ${feedbackValue === "like" ? "is-active" : ""}" type="button" data-feedback="like">Like</button>
+            <button class="feedback-button ${feedbackValue === "dislike" ? "is-active" : ""}" type="button" data-feedback="dislike">Dislike</button>
+          </div>
+        ` : ""}
+        ${alternativesMarkup}
       </div>
       <div class="report-banner__metrics">
         <div>
@@ -324,10 +487,6 @@ function renderSummary(summary) {
           <p class="metric-label">Listings</p>
           <p class="metric-value">${summary.totalListings}</p>
         </div>
-        <div>
-          <p class="metric-label">Credite</p>
-          <p class="metric-value">${summary.creditsUsed ?? 0}/${summary.creditBudget ?? 0}</p>
-        </div>
       </div>
       <div class="report-banner__footer">
         <span>${summary.pricedListingsRon} anunțuri cu preț</span>
@@ -338,8 +497,9 @@ function renderSummary(summary) {
 }
 
 function renderResults(payload) {
-  renderSummary(payload.summary);
-  marketplacesEl.innerHTML = payload.results.map(renderSite).join("");
+  currentPayload = applyLocalFeedback(payload);
+  renderSummary(currentPayload.summary);
+  marketplacesEl.innerHTML = currentPayload.results.map(renderSite).join("");
 }
 
 function saveLastSearch({ query, condition, payload }) {
@@ -432,6 +592,23 @@ function renderSite(result) {
       </div>
     `)
     .join("");
+  const relatedAccessoriesMarkup = (result.relatedAccessories || [])
+    .slice(0, 6)
+    .map((item, index) => `
+      <div class="item item--secondary">
+        <p class="item-title">${index + 1}. ${escapeHtml(formatOfferLine(item, result.site))}</p>
+        ${item.url ? `<a class="listing-link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>` : ""}
+      </div>
+    `)
+    .join("");
+  const secondaryMarkup = relatedAccessoriesMarkup
+    ? `
+      <div class="secondary-results">
+        <h3>Accesorii găsite separat</h3>
+        <div class="items">${relatedAccessoriesMarkup}</div>
+      </div>
+    `
+    : "";
 
   return `
     <details class="market-card market-card--collapsible">
@@ -469,6 +646,7 @@ function renderSite(result) {
         <div class="items">
           ${itemMarkup || '<p class="muted">Nu au fost returnate anunțuri.</p>'}
         </div>
+        ${secondaryMarkup}
       </div>
     </details>
   `;
@@ -563,6 +741,9 @@ async function parseApiResponse(response) {
   try {
     return JSON.parse(text);
   } catch {
+    if (!response.ok) {
+      throw new Error(`Căutarea nu a putut fi finalizată (${response.status}). Serverul a întors un răspuns temporar invalid; încearcă din nou cu mai puține rezultate sau peste câteva momente.`);
+    }
     throw new Error(`Serverul a răspuns cu un payload invalid (${response.status}).`);
   }
 }
@@ -655,6 +836,26 @@ cancelAccountButton.addEventListener("click", () => {
 });
 logoutButton.addEventListener("click", logoutAccount);
 form.addEventListener("submit", handleSubmit);
+summaryEl.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-feedback]");
+  if (!button || !currentPayload?.summary?.bestOffer) {
+    return;
+  }
+
+  button.disabled = true;
+  try {
+    await saveOfferFeedback(currentPayload.summary.bestOffer, button.dataset.feedback);
+    currentPayload = applyLocalFeedback(currentPayload);
+    renderSummary(currentPayload.summary);
+    statusEl.textContent = button.dataset.feedback === "dislike"
+      ? "Feedback salvat în Supabase. Recomandarea a fost recalculată local când există alternative."
+      : "Feedback salvat în Supabase.";
+  } catch (error) {
+    statusEl.textContent = error instanceof Error ? error.message : String(error);
+  } finally {
+    button.disabled = false;
+  }
+});
 
 setCurrentAccount(localStorage.getItem(SESSION_STORAGE_KEY));
 

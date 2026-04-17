@@ -1,3 +1,5 @@
+const ESTIMATED_EUR_TO_RON = 5;
+
 function detectCurrency(priceText = "") {
   const value = priceText.toLowerCase();
   if (value.includes("lei") || value.includes("ron") || value.includes("leu")) {
@@ -52,7 +54,10 @@ export function normalizeListing(item) {
   const rawCurrency = item.currency ? String(item.currency).toUpperCase() : detectCurrency(priceText);
   const currency = rawCurrency === "LEI" || rawCurrency === "LEU" ? "RON" : rawCurrency;
   const numericPrice = parseNumberFromPrice(priceText);
-  const priceRon = currency === "RON" ? numericPrice : null;
+  const priceRon =
+    currency === "RON" ? numericPrice :
+    currency === "EUR" && Number.isFinite(numericPrice) ? numericPrice * ESTIMATED_EUR_TO_RON :
+    null;
 
   return {
     ...item,

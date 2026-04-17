@@ -51,6 +51,36 @@ function sortItemsByFreshness(items) {
   return [...items].sort((a, b) => recencyScore(b.postedAt) - recencyScore(a.postedAt));
 }
 
+function priceValueScore(priceRon, medianPriceRon) {
+  if (!Number.isFinite(priceRon) || !Number.isFinite(medianPriceRon) || medianPriceRon <= 0) {
+    return 45;
+  }
+
+  const ratio = priceRon / medianPriceRon;
+  if (ratio < 0.2) {
+    return 5;
+  }
+  if (ratio < 0.35) {
+    return 24;
+  }
+  if (ratio < 0.55) {
+    return 58;
+  }
+  if (ratio <= 0.85) {
+    return 100;
+  }
+  if (ratio <= 1) {
+    return 88;
+  }
+  if (ratio <= 1.15) {
+    return 72;
+  }
+  if (ratio <= 1.35) {
+    return 48;
+  }
+  return 25;
+}
+
 function scoreOffer(item, query, medianPriceRon, condition) {
   const text = `${item.title || ""} ${item.condition || ""}`.toLowerCase();
   const queryTokens = tokenize(query);
@@ -111,19 +141,113 @@ function scoreOffer(item, query, medianPriceRon, condition) {
   return Math.max(0, Math.min(100, score));
 }
 
+function scoreGlobalRecommendation(item, medianPriceRon, condition) {
+  const relevance = Number.isFinite(item.relevanceScore) ? item.relevanceScore : 50;
+  const value = priceValueScore(item.priceRon, medianPriceRon);
+  const freshness = Math.min(100, recencyScore(item.postedAt) * 5);
+  const conditionScore =
+    condition === "any" ? 70 :
+    matchesCondition(item, condition) ? 100 :
+    25;
+
+  let score = Math.round(
+    (relevance * 0.46) +
+    (value * 0.34) +
+    (freshness * 0.12) +
+    (conditionScore * 0.08)
+  );
+
+  if (Number.isFinite(item.priceRon) && Number.isFinite(medianPriceRon) && medianPriceRon > 0) {
+    const ratio = item.priceRon / medianPriceRon;
+    if (ratio < 0.25) {
+      score -= 28;
+    } else if (ratio < 0.4) {
+      score -= 12;
+    }
+  }
+
+  if ((item.rejectionReasons || []).length) {
+    score -= Math.min(30, item.rejectionReasons.length * 8);
+  }
+
+  return Math.max(0, Math.min(100, score));
+}
+
+function pickTopRecommendationsByMarketplace(items, limit = 4) {
+  const bestBySite = new Map();
+
+  for (const item of items) {
+    const site = item.site || "";
+    const current = bestBySite.get(site);
+    if (
+      !current ||
+      item.recommendationScore > current.recommendationScore ||
+      (item.recommendationScore === current.recommendationScore && item.priceRon < current.priceRon)
+    ) {
+      bestBySite.set(site, item);
+    }
+  }
+
+  return [...bestBySite.values()]
+    .sort((a, b) => {
+      if (b.recommendationScore !== a.recommendationScore) {
+        return b.recommendationScore - a.recommendationScore;
+      }
+      return a.priceRon - b.priceRon;
+    })
+    .slice(0, limit);
+}
+
+function splitClassifiedItems(items) {
+  const productMatches = [];
+  const relatedAccessories = [];
+  const partsAndRepair = [];
+  const wantedAds = [];
+  const secondaryMatches = [];
+
+  for (const item of items) {
+    if (item.isRecommendedCandidate) {
+      productMatches.push(item);
+    } else if (item.listingType === "accessory") {
+      relatedAccessories.push(item);
+    } else if (item.listingType === "spare_part" || item.listingType === "service" || item.listingType === "broken_or_for_parts") {
+      partsAndRepair.push(item);
+    } else if (item.listingType === "wanted") {
+      wantedAds.push(item);
+    } else {
+      secondaryMatches.push(item);
+    }
+  }
+
+  return {
+    productMatches,
+    relatedAccessories,
+    partsAndRepair,
+    wantedAds,
+    secondaryMatches
+  };
+}
+
 export function aggregateMarketplaceResults(results, { condition = "any", creditBudget = null, creditsUsed = null } = {}) {
   const normalizedResults = results.map((result) => {
     if (!result.ok) {
       return result;
     }
 
-    const items = sortItemsByFreshness(
+    const classifiedItems = sortItemsByFreshness(
       result.items
         .map(normalizeListing)
         .map((item) => classifyListingIntent(item, result.query))
-        .filter((item) => item.isRecommendedCandidate)
         .filter((item) => matchesCondition(item, condition))
     );
+    const {
+      productMatches,
+      relatedAccessories,
+      partsAndRepair,
+      wantedAds,
+      secondaryMatches
+    } = splitClassifiedItems(classifiedItems);
+    const items = productMatches;
     const pricedItems = items.filter((item) => Number.isFinite(item.priceRon));
     const medianPriceRon = median(pricedItems.map((item) => item.priceRon));
     const lowest = pricedItems.length
@@ -150,6 +274,11 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       rawItemCount: result.itemCount,
       itemCount: items.length,
       items,
+      relatedAccessories,
+      partsAndRepair,
+      wantedAds,
+      secondaryMatches,
+      excludedItemCount: relatedAccessories.length + partsAndRepair.length + wantedAds.length + secondaryMatches.length,
       lowest,
       bestOffer
     };
@@ -173,19 +302,20 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const globalMedianPriceRon = median(allScoredItems.map((item) => item.priceRon));
   const allBestCandidates = allScoredItems.map((item) => ({
     ...item,
-    offerScore: Math.round((scoreOffer(item, "", globalMedianPriceRon, condition) * 0.65) + (item.relevanceScore * 0.35))
+    recommendationScore: scoreGlobalRecommendation(item, globalMedianPriceRon, condition)
   }));
   const bestOffer = allBestCandidates.length
     ? allBestCandidates.reduce((best, item) => {
         if (!best) {
           return item;
         }
-        if (item.offerScore !== best.offerScore) {
-          return item.offerScore > best.offerScore ? item : best;
+        if (item.recommendationScore !== best.recommendationScore) {
+          return item.recommendationScore > best.recommendationScore ? item : best;
         }
         return item.priceRon < best.priceRon ? item : best;
       }, null)
     : null;
+  const recommendedOffers = pickTopRecommendationsByMarketplace(allBestCandidates);
 
   return {
     results: normalizedResults,
@@ -202,7 +332,8 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
         .reduce((sum, result) => sum + result.items.length, 0),
       pricedListingsRon: allPricedItems.length,
       averagePriceRon,
-      bestOffer
+      bestOffer,
+      recommendedOffers
     }
   };
 }

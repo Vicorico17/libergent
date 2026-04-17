@@ -5,7 +5,8 @@ import { URL } from "node:url";
 import { loadEnv } from "./env.js";
 import { searchAcrossSites } from "./app.js";
 import { buildHistoryPayload, logSearchEvent } from "./history.js";
-import { getDefaultSiteKeys, getSite, SITES } from "./sites.js";
+import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { insertOfferFeedbackToSupabase, isSupabaseConfigured } from "./supabase.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -37,6 +38,23 @@ function sendFile(res, filePath) {
   }
 }
 
+function readJsonBody(req) {
+  return new Promise((resolve) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+    req.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : null);
+      } catch {
+        resolve(null);
+      }
+    });
+    req.on("error", () => resolve(null));
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
 
@@ -57,7 +75,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const siteKeys = site === "all"
-        ? Object.keys(SITES)
+        ? getSiteKeysForAllSearch(query)
         : site === "default"
           ? getDefaultSiteKeys()
           : [getSite(site).key];
@@ -72,6 +90,37 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/history") {
     sendJson(res, 200, await buildHistoryPayload());
+    return;
+  }
+
+  if (url.pathname === "/api/feedback") {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+
+    const body = await readJsonBody(req);
+    const feedback = body?.feedback;
+    if (feedback !== "like" && feedback !== "dislike") {
+      sendJson(res, 400, { error: "Expected feedback to be like or dislike" });
+      return;
+    }
+
+    if (!isSupabaseConfigured()) {
+      sendJson(res, 200, { ok: false, error: "Supabase is not configured." });
+      return;
+    }
+
+    try {
+      await insertOfferFeedbackToSupabase({
+        query: body.query,
+        feedback,
+        offer: body.offer
+      });
+      sendJson(res, 200, { ok: true });
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
     return;
   }
 
