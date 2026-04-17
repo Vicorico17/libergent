@@ -160,21 +160,55 @@ export async function insertOfferFeedbackToSupabase(entry, env = process.env) {
     return false;
   }
 
-  await requestSupabase(config.feedbackTable, {
-    method: "POST",
-    headers: {
-      Prefer: "return=minimal"
-    },
-    body: JSON.stringify({
-      query: entry.query || "",
-      feedback: entry.feedback,
-      offer: entry.offer || null,
-      offer_title: entry.offer?.title || "",
-      offer_site: entry.offer?.site || "",
-      offer_url: entry.offer?.url || "",
-      created_at: entry.createdAt || new Date().toISOString()
-    })
-  }, env);
+  const createdAt = entry.createdAt || new Date().toISOString();
+  const feedbackRow = {
+    query: entry.query || "",
+    feedback: entry.feedback,
+    offer: entry.offer || null,
+    offer_title: entry.offer?.title || "",
+    offer_site: entry.offer?.site || "",
+    offer_url: entry.offer?.url || "",
+    created_at: createdAt
+  };
+
+  try {
+    await requestSupabase(config.feedbackTable, {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify(feedbackRow)
+    }, env);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("offer_feedback") && !message.includes("schema cache")) {
+      throw error;
+    }
+
+    await requestSupabase("rpc/log_search_event", {
+      method: "POST",
+      headers: {
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify(mapEntryToRpcPayload({
+        query: `feedback:${entry.query || ""}`,
+        condition: entry.feedback,
+        provider: "feedback",
+        siteKeys: entry.offer?.site ? [entry.offer.site] : [],
+        searchedAt: createdAt,
+        successfulMarketplaces: 0,
+        marketplaces: 0,
+        totalListings: 0,
+        creditsUsed: 0,
+        bestOffer: {
+          feedback: entry.feedback,
+          query: entry.query || "",
+          offer: entry.offer || null,
+          storageFallback: "search_events"
+        }
+      }))
+    }, env);
+  }
 
   return true;
 }
