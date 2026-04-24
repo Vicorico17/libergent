@@ -105,6 +105,7 @@ function parseGridItem(card) {
 
   return {
     title: parseTitle(rawLabel),
+    description: rawLabel,
     price,
     currency: /\blei\b/i.test(price) ? "Lei" : price.match(/\b(RON|EUR|€)\b/i)?.[1] || "",
     location: "",
@@ -151,6 +152,7 @@ export function parseVintedMarkdown(markdown, limit) {
 
     items.push({
       title: parseTitle(rawLabel),
+      description: rawLabel,
       price: cleanText(price),
       currency: "RON",
       location: "",

@@ -240,6 +240,48 @@ const PRODUCT_TAXONOMY = {
   }
 };
 
+const BRAND_ALIASES = [
+  { brand: "acer", aliases: ["acer"] },
+  { brand: "adidas", aliases: ["adidas"] },
+  { brand: "aeg", aliases: ["aeg"] },
+  { brand: "apple", aliases: ["apple", "iphone", "ipad", "macbook"] },
+  { brand: "ariston", aliases: ["ariston"] },
+  { brand: "asus", aliases: ["asus"] },
+  { brand: "beko", aliases: ["beko"] },
+  { brand: "bosch", aliases: ["bosch"] },
+  { brand: "canon", aliases: ["canon"] },
+  { brand: "decathlon", aliases: ["decathlon"] },
+  { brand: "dell", aliases: ["dell"] },
+  { brand: "dyson", aliases: ["dyson"] },
+  { brand: "electrolux", aliases: ["electrolux"] },
+  { brand: "garmin", aliases: ["garmin"] },
+  { brand: "harman kardon", aliases: ["harman kardon", "harman"] },
+  { brand: "huawei", aliases: ["huawei"] },
+  { brand: "hp", aliases: ["hp", "hewlett packard"] },
+  { brand: "ikea", aliases: ["ikea"] },
+  { brand: "indesit", aliases: ["indesit"] },
+  { brand: "jbl", aliases: ["jbl"] },
+  { brand: "jeep", aliases: ["jeep"] },
+  { brand: "lenovo", aliases: ["lenovo"] },
+  { brand: "lg", aliases: ["lg"] },
+  { brand: "miele", aliases: ["miele"] },
+  { brand: "microsoft", aliases: ["microsoft", "xbox"] },
+  { brand: "new balance", aliases: ["new balance", "nb"] },
+  { brand: "nike", aliases: ["nike", "jordan", "air jordan"] },
+  { brand: "nintendo", aliases: ["nintendo", "switch"] },
+  { brand: "nvidia", aliases: ["nvidia", "geforce", "rtx"] },
+  { brand: "philips", aliases: ["philips"] },
+  { brand: "puma", aliases: ["puma"] },
+  { brand: "reebok", aliases: ["reebok"] },
+  { brand: "samsung", aliases: ["samsung", "galaxy"] },
+  { brand: "siemens", aliases: ["siemens"] },
+  { brand: "sony", aliases: ["sony", "playstation", "ps5", "ps4"] },
+  { brand: "whirlpool", aliases: ["whirlpool"] },
+  { brand: "xiaomi", aliases: ["xiaomi", "redmi", "poco"] },
+  { brand: "yamaha", aliases: ["yamaha"] },
+  { brand: "zanussi", aliases: ["zanussi"] }
+];
+
 const QUERY_ALIASES = [
   {
     category: "washing_machine",
@@ -404,6 +446,37 @@ function getProductTaxonomy(normalizedQuery) {
   )?.[1] || null;
 }
 
+export function getQueryBrandTerms(query) {
+  const normalizedQuery = normalizeText(query);
+  const tokenSet = new Set(tokenize(query));
+  const brandTerms = new Set();
+
+  for (const brandConfig of BRAND_ALIASES) {
+    const matchedAliases = brandConfig.aliases.filter((alias) => {
+      const normalizedAlias = normalizeText(alias);
+      const aliasTokens = tokenize(alias);
+      return aliasTokens.length > 1
+        ? normalizedQuery.includes(normalizedAlias)
+        : tokenSet.has(normalizedAlias);
+    });
+
+    if (!matchedAliases.length) {
+      continue;
+    }
+
+    for (const token of tokenize(brandConfig.brand)) {
+      brandTerms.add(token);
+    }
+    for (const alias of matchedAliases) {
+      for (const token of tokenize(alias)) {
+        brandTerms.add(token);
+      }
+    }
+  }
+
+  return [...brandTerms];
+}
+
 function parseQueryType({ normalized, tokens, taxonomy }) {
   const tokenSet = new Set(tokens);
   const accessoryHeads = new Set([
@@ -433,6 +506,7 @@ function getQueryProfile(query) {
   const normalized = normalizeText(query);
   const baseTokens = tokenize(query);
   const expandedTokens = new Set(baseTokens);
+  const brandTerms = getQueryBrandTerms(query);
   const categories = new Set();
   const taxonomy = getProductTaxonomy(normalized);
 
@@ -446,11 +520,15 @@ function getQueryProfile(query) {
       }
     }
   }
+  for (const token of brandTerms) {
+    expandedTokens.add(token);
+  }
 
   return {
     normalized,
     tokens: baseTokens,
     expandedTokens: [...expandedTokens],
+    brandTerms,
     categories: [...categories],
     taxonomy,
     queryType: parseQueryType({ normalized, tokens: baseTokens, taxonomy }),
@@ -516,10 +594,13 @@ function getMatchStats(title, text, queryProfile) {
   const titleTokens = new Set(tokenize(title));
   const textTokens = new Set(tokenize(text));
   const requiredTokens = queryProfile.tokens;
+  const brandTerms = queryProfile.brandTerms || [];
   const requiredNumberTokens = requiredTokens.filter((token) => /^\d+$/.test(token));
   const expandedTokens = queryProfile.expandedTokens;
   const titleMatches = requiredTokens.filter((token) => titleTokens.has(token));
   const textMatches = requiredTokens.filter((token) => textTokens.has(token));
+  const brandTitleMatches = brandTerms.filter((token) => titleTokens.has(token));
+  const brandTextMatches = brandTerms.filter((token) => textTokens.has(token));
   const numberMatches = requiredNumberTokens.filter((token) => textTokens.has(token));
   const expandedMatches = expandedTokens.filter((token) => textTokens.has(token));
 
@@ -527,6 +608,9 @@ function getMatchStats(title, text, queryProfile) {
     exactPhrase: Boolean(queryProfile.normalized && titleText.includes(queryProfile.normalized)),
     titleMatches,
     textMatches,
+    brandTitleMatches,
+    brandTextMatches,
+    brandCount: brandTerms.length ? 1 : 0,
     numberMatches,
     expandedMatches,
     requiredCount: requiredTokens.length,
@@ -669,6 +753,15 @@ function scoreRelevance({ item, queryProfile, negativeMatches, matchStats, typeC
     score += Math.round((matchStats.titleMatches.length / matchStats.requiredCount) * 35);
     score += Math.round((matchStats.textMatches.length / matchStats.requiredCount) * 15);
   }
+  if (matchStats.brandCount) {
+    const brandTitleRatio = Math.min(1, matchStats.brandTitleMatches.length / matchStats.brandCount);
+    const brandTextRatio = Math.min(1, matchStats.brandTextMatches.length / matchStats.brandCount);
+    score += Math.round(brandTitleRatio * 24);
+    score += Math.round(brandTextRatio * 10);
+    if (!matchStats.brandTextMatches.length) {
+      score -= 18;
+    }
+  }
 
   score += Math.min(matchStats.expandedMatches.length * 3, 12);
   if (
@@ -709,6 +802,9 @@ function scoreRelevance({ item, queryProfile, negativeMatches, matchStats, typeC
   }
   if (matchStats.requiredNumberCount && matchStats.numberMatches.length < matchStats.requiredNumberCount) {
     score -= 50;
+  }
+  if (matchStats.brandCount && !matchStats.brandTitleMatches.length && matchStats.titleMatches.length < matchStats.requiredCount) {
+    score -= 12;
   }
   score += Math.round((typeCompatibilityScore - 0.5) * 40);
 
@@ -763,6 +859,9 @@ export function classifyListingIntent(item, query) {
   if (matchStats.requiredNumberCount && matchStats.numberMatches.length < matchStats.requiredNumberCount) {
     rejectionReasons.push("missing_model_number");
   }
+  if (matchStats.brandCount && matchStats.brandTextMatches.length === 0) {
+    rejectionReasons.push("missing_brand");
+  }
   for (const match of negativeMatches) {
     rejectionReasons.push(`${match.intent}:${match.term}`);
   }
@@ -776,6 +875,7 @@ export function classifyListingIntent(item, query) {
     listingType,
     productHead: queryProfile.productHead,
     anchorTerms: queryProfile.expandedTokens,
+    brandTerms: queryProfile.brandTerms,
     typeCompatibilityScore,
     intentType,
     relevanceScore,

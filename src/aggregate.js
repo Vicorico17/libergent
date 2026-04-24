@@ -1,5 +1,5 @@
 import { normalizeListing } from "./normalize.js";
-import { classifyListingIntent, tokenize } from "./relevance.js";
+import { classifyListingIntent, getQueryBrandTerms, tokenize } from "./relevance.js";
 
 function median(values) {
   if (!values.length) {
@@ -86,6 +86,8 @@ function scoreOffer(item, query, medianPriceRon, condition) {
   const queryTokens = tokenize(query);
   const titleTokens = new Set(tokenize(item.title || ""));
   const matches = queryTokens.filter((token) => titleTokens.has(token)).length;
+  const brandTokens = getQueryBrandTerms(query);
+  const brandMatches = brandTokens.filter((token) => titleTokens.has(token)).length;
 
   const badKeywords = [
     "piese",
@@ -103,6 +105,12 @@ function scoreOffer(item, query, medianPriceRon, condition) {
 
   let score = 60;
   score += Math.min(matches * 8, 24);
+  if (brandTokens.length) {
+    score += brandMatches ? 18 : 0;
+    if (!brandMatches) {
+      score -= 16;
+    }
+  }
 
   if (item.condition?.toLowerCase() === "nou") {
     score += 10;

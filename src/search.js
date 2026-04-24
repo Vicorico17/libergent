@@ -7,6 +7,7 @@ import { parseOkaziiHtml } from "./parsers/okazii.js";
 import { parsePubli24Html } from "./parsers/publi24.js";
 import { parseVintedHtml, parseVintedMarkdown } from "./parsers/vinted.js";
 import { parseAutovitHtml } from "./parsers/autovit.js";
+import { getQueryBrandTerms } from "./relevance.js";
 
 function tokenize(value = "") {
   return value
@@ -19,6 +20,7 @@ function tokenize(value = "") {
 
 function filterRelevantItems(items, query) {
   const queryTokens = tokenize(query);
+  const brandTokens = getQueryBrandTerms(query);
   if (!queryTokens.length) {
     return items;
   }
@@ -35,7 +37,10 @@ function filterRelevantItems(items, query) {
     }
 
     const matchedTokens = queryTokens.filter((token) => titleTokens.has(token)).length;
-    return matchedTokens / queryTokens.length >= 0.5;
+    const matchedBrands = brandTokens.filter((token) => titleTokens.has(token)).length;
+    const weightedMatches = matchedTokens + (matchedBrands ? 1.5 : 0);
+    const weightedRequired = queryTokens.length + (brandTokens.length ? 1.5 : 0);
+    return weightedMatches / weightedRequired >= 0.5;
   });
 }
 
