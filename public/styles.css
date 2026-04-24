@@ -296,13 +296,8 @@ button:disabled {
   top: 18px;
   right: 18px;
   z-index: 30;
-  width: min(360px, calc(100vw - 32px));
-  padding: 10px;
-  border-radius: 24px;
-  background: rgba(255, 249, 241, 0.9);
-  border: 1px solid rgba(22, 24, 24, 0.1);
-  box-shadow: 0 18px 60px rgba(56, 39, 23, 0.18);
-  backdrop-filter: blur(18px);
+  width: max-content;
+  max-width: calc(100vw - 32px);
 }
 
 .account-auth-actions {
@@ -335,6 +330,13 @@ button:disabled {
 .account-form {
   display: grid;
   gap: 10px;
+  width: min(340px, calc(100vw - 32px));
+  padding: 12px;
+  border-radius: 20px;
+  background: rgba(255, 249, 241, 0.9);
+  border: 1px solid rgba(22, 24, 24, 0.1);
+  box-shadow: 0 18px 60px rgba(56, 39, 23, 0.18);
+  backdrop-filter: blur(18px);
 }
 
 .account-form .field {
@@ -357,6 +359,13 @@ button:disabled {
   gap: 12px;
   align-items: center;
   justify-content: space-between;
+  width: min(340px, calc(100vw - 32px));
+  padding: 12px;
+  border-radius: 20px;
+  background: rgba(255, 249, 241, 0.9);
+  border: 1px solid rgba(22, 24, 24, 0.1);
+  box-shadow: 0 18px 60px rgba(56, 39, 23, 0.18);
+  backdrop-filter: blur(18px);
 }
 
 .account-name,
