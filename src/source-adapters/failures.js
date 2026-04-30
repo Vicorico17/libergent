@@ -8,6 +8,12 @@ export const SOURCE_FAILURE_CODE = Object.freeze({
   UNKNOWN: "unknown"
 });
 
+export const ORCHESTRATION_ACTION = Object.freeze({
+  RETRY: "retry",
+  DEAD_LETTER: "dead-letter",
+  IGNORE: "ignore"
+});
+
 export class SourceAdapterError extends Error {
   constructor(message, { code = SOURCE_FAILURE_CODE.UNKNOWN, retryable = false, details = null, cause } = {}) {
     super(message, cause ? { cause } : undefined);
@@ -16,6 +22,26 @@ export class SourceAdapterError extends Error {
     this.retryable = retryable;
     this.details = details;
   }
+}
+
+export function mapFailureCodeToOrchestrationAction(code) {
+  if (
+    code === SOURCE_FAILURE_CODE.TIMEOUT ||
+    code === SOURCE_FAILURE_CODE.RATE_LIMITED ||
+    code === SOURCE_FAILURE_CODE.UPSTREAM_UNAVAILABLE ||
+    code === SOURCE_FAILURE_CODE.NETWORK
+  ) {
+    return ORCHESTRATION_ACTION.RETRY;
+  }
+
+  if (
+    code === SOURCE_FAILURE_CODE.ADAPTER_NOT_SUPPORTED ||
+    code === SOURCE_FAILURE_CODE.BAD_SOURCE_RESPONSE
+  ) {
+    return ORCHESTRATION_ACTION.DEAD_LETTER;
+  }
+
+  return ORCHESTRATION_ACTION.IGNORE;
 }
 
 function inferStatusCode(message = "") {
@@ -34,9 +60,11 @@ function toMessage(error) {
 
 export function classifySourceAdapterFailure(error, context = {}) {
   if (error instanceof SourceAdapterError) {
+    const action = mapFailureCodeToOrchestrationAction(error.code);
     return {
       code: error.code,
       retryable: error.retryable,
+      action,
       message: error.message,
       details: error.details,
       context
@@ -51,6 +79,7 @@ export function classifySourceAdapterFailure(error, context = {}) {
     return {
       code: SOURCE_FAILURE_CODE.TIMEOUT,
       retryable: true,
+      action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.TIMEOUT),
       message,
       details: status ? { status } : null,
       context
@@ -61,6 +90,7 @@ export function classifySourceAdapterFailure(error, context = {}) {
     return {
       code: SOURCE_FAILURE_CODE.ADAPTER_NOT_SUPPORTED,
       retryable: false,
+      action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.ADAPTER_NOT_SUPPORTED),
       message,
       details: null,
       context
@@ -71,6 +101,7 @@ export function classifySourceAdapterFailure(error, context = {}) {
     return {
       code: SOURCE_FAILURE_CODE.RATE_LIMITED,
       retryable: true,
+      action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.RATE_LIMITED),
       message,
       details: { status },
       context
@@ -81,6 +112,7 @@ export function classifySourceAdapterFailure(error, context = {}) {
     return {
       code: SOURCE_FAILURE_CODE.UPSTREAM_UNAVAILABLE,
       retryable: true,
+      action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.UPSTREAM_UNAVAILABLE),
       message,
       details: { status },
       context
@@ -91,6 +123,7 @@ export function classifySourceAdapterFailure(error, context = {}) {
     return {
       code: SOURCE_FAILURE_CODE.BAD_SOURCE_RESPONSE,
       retryable: false,
+      action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.BAD_SOURCE_RESPONSE),
       message,
       details: { status },
       context
@@ -101,6 +134,7 @@ export function classifySourceAdapterFailure(error, context = {}) {
     return {
       code: SOURCE_FAILURE_CODE.NETWORK,
       retryable: true,
+      action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.NETWORK),
       message,
       details: null,
       context
@@ -110,6 +144,7 @@ export function classifySourceAdapterFailure(error, context = {}) {
   return {
     code: SOURCE_FAILURE_CODE.UNKNOWN,
     retryable: false,
+    action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.UNKNOWN),
     message,
     details: null,
     context

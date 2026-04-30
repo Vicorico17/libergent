@@ -53,6 +53,12 @@ test("buildSearchIndex transforms all valid canonical listings and upserts them"
   assert.equal(upserted[0].priceAmount, 2500);
   assert.equal(upserted[1].condition, "new");
   assert.match(upserted[0].searchableText, /iphone 13/i);
+  assert.equal(upserted[0].listingId, "listing-1");
+  assert.equal(upserted[0].sourceUpdatedAt, "2026-04-30T10:00:00.000Z");
+  assert.match(upserted[0].indexedAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(upserted[0].title, "iPhone 13");
+  assert.equal(upserted[0].description, "Stare foarte buna");
+  assert.equal(upserted[0].location, "Bucuresti");
 });
 
 test("buildSearchIndex records transform failures and continues", async () => {
@@ -93,4 +99,3 @@ test("buildSearchIndex records transform failures and continues", async () => {
   assert.equal(upserted.length, 1);
   assert.equal(errors.length, 1);
 });
-
