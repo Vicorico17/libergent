@@ -7,6 +7,8 @@ import { searchAcrossSites } from "./app.js";
 import { getSite, getSiteKeysForAllSearch, SITES } from "./sites.js";
 import { runSearch } from "./search.js";
 import { formatRon } from "./normalize.js";
+import { buildSearchIndex } from "./indexing/pipeline.js";
+import { createSupabaseIndexingSource, createSupabaseIndexingStore } from "./indexing/supabase-store.js";
 
 function printHelp() {
   console.log(`libergent
@@ -14,6 +16,7 @@ function printHelp() {
 Usage:
   node src/cli.js search --site <site> --query "<text>" [--provider auto|direct] [--limit 150] [--pages 3] [--out results/file.json]
   node src/cli.js search --site all --query "<text>" [--provider auto|direct] [--limit 150] [--pages 3] [--out results/file.json]
+  node src/cli.js index [--mode incremental|full]
   npm run search:live -- --query "<text>"
 
 Supported sites:
@@ -250,8 +253,24 @@ async function main() {
     return;
   }
 
-  if (command !== "search") {
+  if (!["search", "index"].includes(command)) {
     throw new Error(`Unsupported command "${command}"`);
+  }
+
+  if (command === "index") {
+    const mode = args.mode || "incremental";
+    if (!["incremental", "full"].includes(mode)) {
+      throw new Error(`Unsupported --mode "${mode}"`);
+    }
+
+    const source = createSupabaseIndexingSource(process.env);
+    const store = createSupabaseIndexingStore(process.env);
+    const result = await buildSearchIndex({ source, store, mode, logger: console });
+    console.log(JSON.stringify(result, null, 2));
+    if (result.failureCount > 0) {
+      process.exitCode = 1;
+    }
+    return;
   }
 
   const siteArg = args.site;

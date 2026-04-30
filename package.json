@@ -6,6 +6,7 @@
   "description": "Cloudflare Worker app for searching Romanian second-hand marketplaces with direct parsers.",
   "scripts": {
     "search": "node src/cli.js search",
+    "index": "node src/cli.js index",
     "search:live": "LIBERGENT_MOCK_SEARCH=0 LIBERGENT_MOCK_PROVIDER=0 node src/cli.js search --site all --provider auto --pages 1 --pretty",
     "check": "node src/cli.js --help",
     "dev": "node src/server.js",
