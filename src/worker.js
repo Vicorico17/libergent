@@ -2,6 +2,7 @@ import { searchAcrossSites, searchAcrossSitesScored } from "./app.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
 import { insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { createSearchTelemetry } from "./search-telemetry.js";
 
 function applyEnv(env = {}) {
   if (!globalThis.process) {
@@ -67,6 +68,13 @@ async function handleApi(request, env) {
     const pagesParam = url.searchParams.get("pages");
     const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
     const maxPages = pagesParam ? Number.parseInt(pagesParam, 10) : undefined;
+    const telemetry = createSearchTelemetry({
+      route: "/api/search",
+      query,
+      condition,
+      provider,
+      site
+    });
 
     if (!query) {
       return json({ error: "Missing q parameter" }, 400);
@@ -89,8 +97,14 @@ async function handleApi(request, env) {
       });
 
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider, siteKeys, payload }), env);
+      telemetry.logSuccess({
+        siteKeys,
+        marketplaces: payload.summary?.marketplaces ?? 0,
+        successfulMarketplaces: payload.summary?.successfulMarketplaces ?? 0
+      });
       return json(payload, 200);
     } catch (error) {
+      telemetry.logError(error);
       return json({ error: error instanceof Error ? error.message : String(error) }, 500);
     }
   }
@@ -106,6 +120,13 @@ async function handleApi(request, env) {
     const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
     const maxPages = pagesParam ? Number.parseInt(pagesParam, 10) : undefined;
     const rankingLimit = rankLimitParam ? Number.parseInt(rankLimitParam, 10) : undefined;
+    const telemetry = createSearchTelemetry({
+      route: "/api/search/scored",
+      query,
+      condition,
+      provider,
+      site
+    });
 
     if (!query) {
       return json({ error: "Missing q parameter" }, 400);
@@ -129,8 +150,15 @@ async function handleApi(request, env) {
       });
 
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider, siteKeys, payload }), env);
+      telemetry.logSuccess({
+        siteKeys,
+        marketplaces: payload.summary?.marketplaces ?? 0,
+        successfulMarketplaces: payload.summary?.successfulMarketplaces ?? 0,
+        rankedResults: payload.rankedResults?.length ?? 0
+      });
       return json(payload, 200);
     } catch (error) {
+      telemetry.logError(error);
       return json({ error: error instanceof Error ? error.message : String(error) }, 500);
     }
   }
