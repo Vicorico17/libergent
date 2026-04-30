@@ -4,6 +4,7 @@ import path from "node:path";
 import { URL } from "node:url";
 import { loadEnv } from "./env.js";
 import { searchAcrossSites, searchAcrossSitesScored } from "./app.js";
+import { assertRankingApiContract, assertRankingScoredApiContract } from "./ranking-api-contract.js";
 import { buildHistoryPayload, logSearchEvent } from "./history.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { insertOfferFeedbackToSupabase, isSupabaseConfigured } from "./supabase.js";
@@ -87,7 +88,9 @@ const server = http.createServer(async (req, res) => {
         : site === "default"
           ? getDefaultSiteKeys()
           : [getSite(site).key];
-      const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys });
+      const payload = assertRankingApiContract(
+        await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys })
+      );
       await logSearchEvent({ query, condition, provider, siteKeys, payload });
       telemetry.logSuccess({
         siteKeys,
@@ -132,15 +135,17 @@ const server = http.createServer(async (req, res) => {
         : site === "default"
           ? getDefaultSiteKeys()
           : [getSite(site).key];
-      const payload = await searchAcrossSitesScored({
-        query,
-        condition,
-        provider,
-        limit,
-        maxPages,
-        siteKeys,
-        rankingLimit
-      });
+      const payload = assertRankingScoredApiContract(
+        await searchAcrossSitesScored({
+          query,
+          condition,
+          provider,
+          limit,
+          maxPages,
+          siteKeys,
+          rankingLimit
+        })
+      );
       await logSearchEvent({ query, condition, provider, siteKeys, payload });
       telemetry.logSuccess({
         siteKeys,

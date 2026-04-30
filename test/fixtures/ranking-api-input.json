@@ -1,0 +1,82 @@
+{
+  "results": [
+    {
+      "ok": true,
+      "provider": "direct",
+      "strategy": "html-parser",
+      "site": "olx.ro",
+      "url": "https://olx.ro/d/oferta/search",
+      "query": "iphone 15 pro",
+      "itemCount": 3,
+      "items": [
+        {
+          "title": "iPhone 15 Pro 128GB",
+          "price": "3 900 lei",
+          "currency": "lei",
+          "location": "Bucuresti",
+          "postedAt": "azi",
+          "condition": "Utilizat",
+          "url": "https://olx.ro/d/oferta/iphone-15-pro-1"
+        },
+        {
+          "title": "iPhone 15 Pro Max 256GB",
+          "price": "4 350 lei",
+          "currency": "lei",
+          "location": "Cluj-Napoca",
+          "postedAt": "ieri",
+          "condition": "Utilizat",
+          "url": "https://olx.ro/d/oferta/iphone-15-pro-2"
+        },
+        {
+          "title": "Husa iPhone 15 Pro",
+          "price": "120 lei",
+          "currency": "lei",
+          "location": "Brasov",
+          "postedAt": "azi",
+          "condition": "Nou",
+          "url": "https://olx.ro/d/oferta/husa-iphone-15-pro"
+        }
+      ],
+      "totalResults": 3,
+      "pagesUsed": 1,
+      "creditsUsed": 0
+    },
+    {
+      "ok": true,
+      "provider": "direct",
+      "strategy": "html-parser",
+      "site": "vinted.ro",
+      "url": "https://vinted.ro/catalog?search_text=iphone+15+pro",
+      "query": "iphone 15 pro",
+      "itemCount": 2,
+      "items": [
+        {
+          "title": "Apple iPhone 15 Pro 256 GB",
+          "price": "4 050 lei",
+          "currency": "lei",
+          "location": "Iasi",
+          "postedAt": "azi",
+          "condition": "Foarte bun",
+          "url": "https://vinted.ro/items/iphone-15-pro-1"
+        },
+        {
+          "title": "iPhone 15 Pro defect",
+          "price": "2 600 lei",
+          "currency": "lei",
+          "location": "Constanta",
+          "postedAt": "reactualizat",
+          "condition": "Utilizat",
+          "url": "https://vinted.ro/items/iphone-15-pro-defect"
+        }
+      ],
+      "totalResults": 2,
+      "pagesUsed": 1,
+      "creditsUsed": 0
+    }
+  ],
+  "options": {
+    "condition": "any",
+    "creditBudget": 12,
+    "creditsUsed": 2
+  }
+}
