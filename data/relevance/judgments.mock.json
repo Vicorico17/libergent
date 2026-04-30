@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "description": "Rule-based relevance judgments for deterministic mock harness runs.",
+  "default": {
+    "allowedListingTypes": ["main_product"],
+    "disallowRejectedItems": true
+  },
+  "byQueryId": {
+    "q5": {
+      "allowedListingTypes": ["main_product"],
+      "disallowRejectedItems": true,
+      "minCoverageSites": 1
+    }
+  }
+}

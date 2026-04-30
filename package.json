@@ -10,7 +10,8 @@
     "check": "node src/cli.js --help",
     "dev": "node src/server.js",
     "dev:worker": "npx wrangler dev",
-    "deploy": "npx wrangler deploy"
+    "deploy": "npx wrangler deploy",
+    "eval:relevance": "node src/eval/relevance-harness.js --mode mock"
   },
   "engines": {
     "node": ">=20"
