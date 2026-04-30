@@ -58,17 +58,32 @@ function toMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function withMetadataEnvelope(failure) {
+  return {
+    ...failure,
+    metadataEnvelope: {
+      kind: "source-adapter-failure",
+      version: 1,
+      code: failure.code,
+      retryable: failure.retryable,
+      action: failure.action,
+      details: failure.details,
+      context: failure.context
+    }
+  };
+}
+
 export function classifySourceAdapterFailure(error, context = {}) {
   if (error instanceof SourceAdapterError) {
     const action = mapFailureCodeToOrchestrationAction(error.code);
-    return {
+    return withMetadataEnvelope({
       code: error.code,
       retryable: error.retryable,
       action,
       message: error.message,
       details: error.details,
       context
-    };
+    });
   }
 
   const message = toMessage(error);
@@ -76,77 +91,77 @@ export function classifySourceAdapterFailure(error, context = {}) {
   const status = inferStatusCode(message);
 
   if (error?.name === "AbortError" || lowered.includes("timed out") || lowered.includes("timeout") || lowered.includes("depășit")) {
-    return {
+    return withMetadataEnvelope({
       code: SOURCE_FAILURE_CODE.TIMEOUT,
       retryable: true,
       action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.TIMEOUT),
       message,
       details: status ? { status } : null,
       context
-    };
+    });
   }
 
   if (lowered.includes("no direct html parser configured")) {
-    return {
+    return withMetadataEnvelope({
       code: SOURCE_FAILURE_CODE.ADAPTER_NOT_SUPPORTED,
       retryable: false,
       action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.ADAPTER_NOT_SUPPORTED),
       message,
       details: null,
       context
-    };
+    });
   }
 
   if (status === 429) {
-    return {
+    return withMetadataEnvelope({
       code: SOURCE_FAILURE_CODE.RATE_LIMITED,
       retryable: true,
       action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.RATE_LIMITED),
       message,
       details: { status },
       context
-    };
+    });
   }
 
   if (status && status >= 500) {
-    return {
+    return withMetadataEnvelope({
       code: SOURCE_FAILURE_CODE.UPSTREAM_UNAVAILABLE,
       retryable: true,
       action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.UPSTREAM_UNAVAILABLE),
       message,
       details: { status },
       context
-    };
+    });
   }
 
   if (status && status >= 400) {
-    return {
+    return withMetadataEnvelope({
       code: SOURCE_FAILURE_CODE.BAD_SOURCE_RESPONSE,
       retryable: false,
       action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.BAD_SOURCE_RESPONSE),
       message,
       details: { status },
       context
-    };
+    });
   }
 
   if (lowered.includes("fetch") || lowered.includes("network") || lowered.includes("socket")) {
-    return {
+    return withMetadataEnvelope({
       code: SOURCE_FAILURE_CODE.NETWORK,
       retryable: true,
       action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.NETWORK),
       message,
       details: null,
       context
-    };
+    });
   }
 
-  return {
+  return withMetadataEnvelope({
     code: SOURCE_FAILURE_CODE.UNKNOWN,
     retryable: false,
     action: mapFailureCodeToOrchestrationAction(SOURCE_FAILURE_CODE.UNKNOWN),
     message,
     details: null,
     context
-  };
+  });
 }
