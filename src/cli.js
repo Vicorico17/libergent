@@ -7,6 +7,7 @@ import { searchAcrossSites } from "./app.js";
 import { getSite, getSiteKeysForAllSearch, SITES } from "./sites.js";
 import { runSearch } from "./search.js";
 import { formatRon } from "./normalize.js";
+import { InMemorySearchIndexStore, runListingsToSearchIndexing } from "./indexing/pipeline.js";
 
 function printHelp() {
   console.log(`libergent
@@ -14,6 +15,7 @@ function printHelp() {
 Usage:
   node src/cli.js search --site <site> --query "<text>" [--provider auto|direct] [--limit 150] [--pages 3] [--out results/file.json]
   node src/cli.js search --site all --query "<text>" [--provider auto|direct] [--limit 150] [--pages 3] [--out results/file.json]
+  node src/cli.js index [--mode incremental|full] [--since 2026-04-01T00:00:00.000Z] [--limit 500]
   npm run search:live -- --query "<text>"
 
 Supported sites:
@@ -247,6 +249,31 @@ async function main() {
 
   if (!command || command === "--help" || args.help) {
     printHelp();
+    return;
+  }
+
+  if (command === "index") {
+    const mode = args.mode || "incremental";
+    const since = args.since || null;
+    const limit = Number.parseInt(args.limit || "500", 10);
+
+    if (!["incremental", "full"].includes(mode)) {
+      throw new Error(`Unsupported mode "${mode}"`);
+    }
+    if (!Number.isFinite(limit) || limit <= 0) {
+      throw new Error("Expected --limit to be a positive integer");
+    }
+
+    const seed = JSON.parse(args.seed || "[]");
+    const store = new InMemorySearchIndexStore(seed);
+    const result = await runListingsToSearchIndexing({
+      store,
+      mode,
+      since,
+      limit,
+      logger: console
+    });
+    console.log(JSON.stringify({ ok: true, ...result }, null, 2));
     return;
   }
 
