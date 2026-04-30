@@ -1,4 +1,4 @@
-import { searchAcrossSites } from "./app.js";
+import { searchAcrossSites, searchAcrossSitesScored } from "./app.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
 import { insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
@@ -86,6 +86,46 @@ async function handleApi(request, env) {
         limit,
         maxPages,
         siteKeys
+      });
+
+      await persistSearchEvent(buildHistoryEntry({ query, condition, provider, siteKeys, payload }), env);
+      return json(payload, 200);
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
+
+  if (url.pathname === "/api/search/scored") {
+    const query = url.searchParams.get("q")?.trim();
+    const condition = url.searchParams.get("condition") || "any";
+    const provider = url.searchParams.get("provider") || "auto";
+    const site = url.searchParams.get("site") || "default";
+    const limitParam = url.searchParams.get("limit");
+    const pagesParam = url.searchParams.get("pages");
+    const rankLimitParam = url.searchParams.get("rankLimit");
+    const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
+    const maxPages = pagesParam ? Number.parseInt(pagesParam, 10) : undefined;
+    const rankingLimit = rankLimitParam ? Number.parseInt(rankLimitParam, 10) : undefined;
+
+    if (!query) {
+      return json({ error: "Missing q parameter" }, 400);
+    }
+
+    try {
+      const siteKeys = site === "all"
+        ? getSiteKeysForAllSearch(query)
+        : site === "default"
+          ? getDefaultSiteKeys()
+          : [getSite(site).key];
+
+      const payload = await searchAcrossSitesScored({
+        query,
+        condition,
+        provider,
+        limit,
+        maxPages,
+        siteKeys,
+        rankingLimit
       });
 
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider, siteKeys, payload }), env);

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { URL } from "node:url";
 import { loadEnv } from "./env.js";
-import { searchAcrossSites } from "./app.js";
+import { searchAcrossSites, searchAcrossSitesScored } from "./app.js";
 import { buildHistoryPayload, logSearchEvent } from "./history.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { insertOfferFeedbackToSupabase, isSupabaseConfigured } from "./supabase.js";
@@ -80,6 +80,46 @@ const server = http.createServer(async (req, res) => {
           ? getDefaultSiteKeys()
           : [getSite(site).key];
       const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys });
+      await logSearchEvent({ query, condition, provider, siteKeys, payload });
+      sendJson(res, 200, payload);
+    } catch (error) {
+      sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/search/scored") {
+    const query = url.searchParams.get("q")?.trim();
+    const condition = url.searchParams.get("condition") || "any";
+    const provider = url.searchParams.get("provider") || "auto";
+    const site = url.searchParams.get("site") || "default";
+    const limitParam = url.searchParams.get("limit");
+    const pagesParam = url.searchParams.get("pages");
+    const rankLimitParam = url.searchParams.get("rankLimit");
+    const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
+    const maxPages = pagesParam ? Number.parseInt(pagesParam, 10) : undefined;
+    const rankingLimit = rankLimitParam ? Number.parseInt(rankLimitParam, 10) : undefined;
+
+    if (!query) {
+      sendJson(res, 400, { error: "Missing q parameter" });
+      return;
+    }
+
+    try {
+      const siteKeys = site === "all"
+        ? getSiteKeysForAllSearch(query)
+        : site === "default"
+          ? getDefaultSiteKeys()
+          : [getSite(site).key];
+      const payload = await searchAcrossSitesScored({
+        query,
+        condition,
+        provider,
+        limit,
+        maxPages,
+        siteKeys,
+        rankingLimit
+      });
       await logSearchEvent({ query, condition, provider, siteKeys, payload });
       sendJson(res, 200, payload);
     } catch (error) {

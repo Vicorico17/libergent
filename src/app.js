@@ -2,6 +2,7 @@ import { getDefaultSiteKeys, getSite } from "./sites.js";
 import { runSearch } from "./search.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildMockSearchResult } from "./mock.js";
+import { DEFAULT_RANKING_WEIGHTS, rankListings } from "./ranking.js";
 
 const MAX_CREDITS_PER_SITE = 3;
 const DEFAULT_SITE_TIMEOUT_MS = 20000;
@@ -169,4 +170,45 @@ export async function searchAcrossSites({
     creditBudget,
     creditsUsed: rawResults.reduce((sum, result) => sum + (result.ok ? result.creditsUsed || 0 : 0), 0)
   });
+}
+
+export async function searchAcrossSitesScored({
+  query,
+  condition = "any",
+  provider = "auto",
+  limit,
+  maxPages,
+  siteKeys = getDefaultSiteKeys(),
+  rankingLimit,
+  rankingWeights = DEFAULT_RANKING_WEIGHTS
+}) {
+  const payload = await searchAcrossSites({
+    query,
+    condition,
+    provider,
+    limit,
+    maxPages,
+    siteKeys
+  });
+
+  const listingPool = payload.results
+    .filter((result) => result.ok)
+    .flatMap((result) => result.items.map((item) => ({ ...item, site: result.site })));
+
+  const rankedItems = rankListings({
+    listings: listingPool,
+    query,
+    condition,
+    limit: rankingLimit ?? Math.min(30, Math.max(1, listingPool.length)),
+    weights: rankingWeights
+  });
+
+  return {
+    ...payload,
+    summary: {
+      ...payload.summary,
+      rankingWeights
+    },
+    rankedResults: rankedItems
+  };
 }
