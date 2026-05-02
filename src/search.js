@@ -8,6 +8,8 @@ import { parsePubli24Html } from "./parsers/publi24.js";
 import { parseVintedHtml, parseVintedMarkdown } from "./parsers/vinted.js";
 import { parseAutovitHtml } from "./parsers/autovit.js";
 import { getQueryBrandTerms } from "./relevance.js";
+import { createSourceAdapter } from "./source-adapters/contract.js";
+import { SourceAdapterError, SOURCE_FAILURE_CODE } from "./source-adapters/failures.js";
 
 function tokenize(value = "") {
   return value
@@ -98,92 +100,135 @@ function extractCloudflareCrawlItems(raw) {
   });
 }
 
+const DIRECT_HTML_PARSERS = {
+  "lajumate.ro": parseLajumateHtml,
+  "okazii.ro": parseOkaziiHtml,
+  "olx.ro": parseOlxHtml,
+  "vinted.ro": parseVintedHtml,
+  "publi24.ro": parsePubli24Html,
+  "autovit.ro": parseAutovitHtml
+};
+
+const sourceAdapters = [
+  createSourceAdapter({
+    adapterId: "cloudflare-crawl-seed",
+    supports: ({ resolvedProvider, site }) => resolvedProvider === "cloudflare" && site.strategy === "crawl-seed",
+    async execute({ site, query, limit }) {
+      const raw = await crawlWithCloudflare({
+        crawlConfig: site.crawlConfig(query),
+        schema: buildListingSchema(limit),
+        timeoutMs: site.timeoutMs
+      });
+
+      return { raw, items: extractCloudflareCrawlItems(raw) };
+    }
+  }),
+  createSourceAdapter({
+    adapterId: "direct-html-local",
+    supports: ({ site }) => site.strategy === "direct-html-local",
+    async execute({ site, url, limit }) {
+      const raw = await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs });
+      const parser = DIRECT_HTML_PARSERS[site.key];
+      if (!parser) {
+        throw new SourceAdapterError(`No direct HTML parser configured for ${site.key}`, {
+          code: SOURCE_FAILURE_CODE.ADAPTER_NOT_SUPPORTED,
+          retryable: false
+        });
+      }
+
+      const parsed = parser(raw, limit);
+      return {
+        raw,
+        items: parsed.items,
+        totalResults: parsed.totalResults,
+        rawItemCount: getRawItemCount(parsed, parsed.items),
+        hasNextPage: parsed.hasNextPage ?? null
+      };
+    }
+  }),
+  createSourceAdapter({
+    adapterId: "cloudflare-json",
+    supports: ({ resolvedProvider, site }) => resolvedProvider === "cloudflare" && site.strategy !== "crawl-seed",
+    async execute({ site, url, prompt, limit }) {
+      const raw = await scrapeWithCloudflare({
+        url,
+        prompt,
+        schema: buildListingSchema(limit),
+        timeoutMs: site.timeoutMs
+      });
+      return { raw, items: Array.isArray(raw?.items) ? raw.items : [] };
+    }
+  }),
+  createSourceAdapter({
+    adapterId: "firecrawl-markdown-local",
+    supports: ({ site }) => site.strategy === "firecrawl-markdown-local",
+    async execute({ site, url, limit }) {
+      const raw = await scrapeMarkdownWithFirecrawl({
+        url,
+        waitForMs: site.waitForMs,
+        timeoutMs: site.timeoutMs
+      });
+      const parser = site.key === "vinted.ro" ? parseVintedMarkdown : parseOlxMarkdown;
+      const parsed = parser(raw?.markdown || "", limit);
+      return {
+        raw,
+        items: parsed.items,
+        totalResults: parsed.totalResults,
+        rawItemCount: getRawItemCount(parsed, parsed.items),
+        hasNextPage: parsed.hasNextPage ?? null
+      };
+    }
+  }),
+  createSourceAdapter({
+    adapterId: "firecrawl-json",
+    supports: ({ resolvedProvider, site }) => resolvedProvider !== "cloudflare" && site.strategy !== "firecrawl-markdown-local",
+    async execute({ site, url, prompt, limit }) {
+      const raw = await scrapeWithFirecrawl({
+        url,
+        prompt,
+        schema: buildListingSchema(limit),
+        waitForMs: site.waitForMs,
+        timeoutMs: site.timeoutMs
+      });
+      return { raw, items: Array.isArray(raw?.items) ? raw.items : [] };
+    }
+  })
+];
+
+function resolveSourceAdapter(context) {
+  const adapter = sourceAdapters.find((candidate) => candidate.supports(context));
+  if (!adapter) {
+    throw new SourceAdapterError("No source adapter matches the search context.", {
+      code: SOURCE_FAILURE_CODE.ADAPTER_NOT_SUPPORTED,
+      retryable: false,
+      details: {
+        site: context?.site?.key || null,
+        strategy: context?.site?.strategy || null,
+        provider: context?.resolvedProvider || null
+      }
+    });
+  }
+
+  return adapter;
+}
+
 async function runSinglePageSearch({ provider, site, query, limit, page }) {
   const url = typeof site.pagedSearchUrl === "function" ? site.pagedSearchUrl(query, page) : site.searchUrl(query);
-  const schema = buildListingSchema(limit);
   const prompt = site.prompt(query, limit);
   const resolvedProvider = provider === "auto" ? site.provider : provider;
+  const context = { provider, resolvedProvider, site, query, limit, page, url, prompt };
 
-  let raw;
-  let items;
+  let items = [];
   let totalResults = null;
   let rawItemCount = 0;
   let hasNextPage = null;
 
-  if (resolvedProvider === "cloudflare" && site.strategy === "crawl-seed") {
-    raw = await crawlWithCloudflare({
-      crawlConfig: site.crawlConfig(query),
-      schema,
-      timeoutMs: site.timeoutMs
-    });
-    items = extractCloudflareCrawlItems(raw);
-  } else if (site.strategy === "direct-html-local") {
-    raw = await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs });
-
-    if (site.key === "lajumate.ro") {
-      const parsed = parseLajumateHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "okazii.ro") {
-      const parsed = parseOkaziiHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "olx.ro") {
-      const parsed = parseOlxHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "vinted.ro") {
-      const parsed = parseVintedHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "publi24.ro") {
-      const parsed = parsePubli24Html(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "autovit.ro") {
-      const parsed = parseAutovitHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else {
-      throw new Error(`No direct HTML parser configured for ${site.key}`);
-    }
-  } else if (resolvedProvider === "cloudflare") {
-    raw = await scrapeWithCloudflare({ url, prompt, schema, timeoutMs: site.timeoutMs });
-    items = Array.isArray(raw?.items) ? raw.items : [];
-  } else if (site.strategy === "firecrawl-markdown-local") {
-    raw = await scrapeMarkdownWithFirecrawl({
-      url,
-      waitForMs: site.waitForMs,
-      timeoutMs: site.timeoutMs
-    });
-    const parser = site.key === "vinted.ro" ? parseVintedMarkdown : parseOlxMarkdown;
-    const parsed = parser(raw?.markdown || "", limit);
-    items = parsed.items;
-    totalResults = parsed.totalResults;
-    rawItemCount = getRawItemCount(parsed, items);
-    hasNextPage = parsed.hasNextPage ?? null;
-  } else {
-    raw = await scrapeWithFirecrawl({
-      url,
-      prompt,
-      schema,
-      waitForMs: site.waitForMs,
-      timeoutMs: site.timeoutMs
-    });
-    items = Array.isArray(raw?.items) ? raw.items : [];
-  }
+  const adapter = resolveSourceAdapter(context);
+  const response = await adapter.execute(context);
+  items = response.items;
+  totalResults = response.totalResults ?? null;
+  rawItemCount = response.rawItemCount || 0;
+  hasNextPage = response.hasNextPage ?? null;
 
   items = site.disableQueryFilter ? items : filterRelevantItems(items, query);
   rawItemCount = rawItemCount || items.length;

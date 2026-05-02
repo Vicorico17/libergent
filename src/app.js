@@ -3,6 +3,7 @@ import { runSearch } from "./search.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildMockSearchResult } from "./mock.js";
 import { DEFAULT_RANKING_WEIGHTS, rankListings } from "./ranking.js";
+import { classifySourceAdapterFailure } from "./source-adapters/failures.js";
 
 const MAX_CREDITS_PER_SITE = 3;
 const DEFAULT_SITE_TIMEOUT_MS = 20000;
@@ -118,13 +119,19 @@ async function searchSite({ siteKey, query, condition, provider, limit, maxPages
     );
     return { ok: true, ...result };
   } catch (error) {
+    const failure = classifySourceAdapterFailure(error, {
+      site: site.key,
+      strategy: site.strategy,
+      provider: resolvedProvider
+    });
     return {
       ok: false,
       site: siteKey,
       query,
       condition,
       provider: resolvedProvider,
-      error: error instanceof Error ? error.message : String(error)
+      error: failure.message,
+      failure
     };
   }
 }

@@ -1,6 +1,15 @@
 .env
 .env.local
-results/
+
+results/*
+!results/relevance/
+!results/relevance/*.json
+!results/relevance/*.md
+
 .firecrawl/
-data/
+
+data/*
+!data/relevance/
+!data/relevance/*.json
+
 .wrangler/

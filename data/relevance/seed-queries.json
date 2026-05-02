@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "description": "Seed queries for ranking-v1 relevance evaluation.",
+  "topK": 3,
+  "targets": {
+    "minAveragePrecisionAtK": 0.85,
+    "maxUnsafePromotions": 0,
+    "minCoverageSites": 4
+  },
+  "queries": [
+    { "id": "q1", "text": "iphone 15 pro", "condition": "any" },
+    { "id": "q2", "text": "macbook air m1", "condition": "any" },
+    { "id": "q3", "text": "masa ping pong", "condition": "any" },
+    { "id": "q4", "text": "trumpeta bach", "condition": "any" },
+    { "id": "q5", "text": "jeep compass", "condition": "any" }
+  ]
+}

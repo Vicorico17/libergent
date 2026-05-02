@@ -1,0 +1,693 @@
+{
+  "generatedAt": "2026-04-30T12:40:05.867Z",
+  "mode": "mock",
+  "topK": 3,
+  "queryCount": 5,
+  "evaluatedSiteCount": 25,
+  "averagePrecisionAtK": 0.6,
+  "averageSiteCoverage": 5,
+  "unsafePromotions": 10,
+  "targets": {
+    "minAveragePrecisionAtK": 0.85,
+    "maxUnsafePromotions": 0,
+    "minCoverageSites": 4
+  },
+  "passFail": {
+    "averagePrecision": "FAIL",
+    "unsafePromotions": "FAIL",
+    "coverage": "PASS",
+    "overall": "FAIL"
+  },
+  "perQuery": [
+    {
+      "queryId": "q1",
+      "query": "iphone 15 pro",
+      "siteCoverage": 5,
+      "averagePrecisionAtK": 0.667,
+      "unsafePromotions": 5,
+      "sites": [
+        {
+          "site": "olx.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 1,
+          "topItems": [
+            {
+              "title": "iphone 15 pro 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "iphone 15 pro impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "iphone 15 pro complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 100,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "lajumate.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 1,
+          "topItems": [
+            {
+              "title": "iphone 15 pro 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "iphone 15 pro impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "iphone 15 pro complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 100,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "vinted.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 1,
+          "topItems": [
+            {
+              "title": "iphone 15 pro 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "iphone 15 pro impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "iphone 15 pro complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 100,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "okazii.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 1,
+          "topItems": [
+            {
+              "title": "iphone 15 pro 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "iphone 15 pro impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "iphone 15 pro complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 100,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "publi24.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 1,
+          "topItems": [
+            {
+              "title": "iphone 15 pro 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "iphone 15 pro impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "iphone 15 pro complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 100,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "queryId": "q2",
+      "query": "macbook air m1",
+      "siteCoverage": 5,
+      "averagePrecisionAtK": 0.667,
+      "unsafePromotions": 5,
+      "sites": [
+        {
+          "site": "olx.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 1,
+          "topItems": [
+            {
+              "title": "macbook air m1 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "macbook air m1 impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "macbook air m1 complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 100,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "lajumate.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 1,
+          "topItems": [
+            {
+              "title": "macbook air m1 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "macbook air m1 impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "macbook air m1 complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 100,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "vinted.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 1,
+          "topItems": [
+            {
+              "title": "macbook air m1 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "macbook air m1 impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "macbook air m1 complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 100,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "okazii.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 1,
+          "topItems": [
+            {
+              "title": "macbook air m1 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "macbook air m1 impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "macbook air m1 complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 100,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "publi24.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 1,
+          "topItems": [
+            {
+              "title": "macbook air m1 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "macbook air m1 impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "macbook air m1 complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 100,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "queryId": "q3",
+      "query": "masa ping pong",
+      "siteCoverage": 5,
+      "averagePrecisionAtK": 0.667,
+      "unsafePromotions": 0,
+      "sites": [
+        {
+          "site": "olx.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "masa ping pong 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "masa ping pong impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "masa ping pong complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 83,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "lajumate.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "masa ping pong 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "masa ping pong impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "masa ping pong complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 83,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "vinted.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "masa ping pong 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "masa ping pong impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "masa ping pong complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 83,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "okazii.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "masa ping pong 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "masa ping pong impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "masa ping pong complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 83,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "publi24.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "masa ping pong 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "masa ping pong impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "masa ping pong complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 83,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "queryId": "q4",
+      "query": "trumpeta bach",
+      "siteCoverage": 5,
+      "averagePrecisionAtK": 0.667,
+      "unsafePromotions": 0,
+      "sites": [
+        {
+          "site": "olx.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "trumpeta bach 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "trumpeta bach impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "trumpeta bach complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 80,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "lajumate.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "trumpeta bach 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "trumpeta bach impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "trumpeta bach complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 80,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "vinted.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "trumpeta bach 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "trumpeta bach impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "trumpeta bach complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 80,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "okazii.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "trumpeta bach 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "trumpeta bach impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "trumpeta bach complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 80,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        },
+        {
+          "site": "publi24.ro",
+          "precisionAtK": 0.667,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "trumpeta bach 128GB",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "trumpeta bach impecabil",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            },
+            {
+              "title": "trumpeta bach complet cu accesorii",
+              "listingType": "bundle",
+              "relevanceScore": 80,
+              "rejectionReasons": [
+                "part",
+                "part:accesorii"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "queryId": "q5",
+      "query": "jeep compass",
+      "siteCoverage": 5,
+      "averagePrecisionAtK": 0.333,
+      "unsafePromotions": 0,
+      "sites": [
+        {
+          "site": "olx.ro",
+          "precisionAtK": 0.333,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "Jeep Compass 2.0 M-Jet 4x4 Limited",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            }
+          ]
+        },
+        {
+          "site": "lajumate.ro",
+          "precisionAtK": 0.333,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "Jeep Compass 2.0 M-Jet 4x4 Limited",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            }
+          ]
+        },
+        {
+          "site": "vinted.ro",
+          "precisionAtK": 0.333,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "Jeep Compass 2.0 M-Jet 4x4 Limited",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            }
+          ]
+        },
+        {
+          "site": "okazii.ro",
+          "precisionAtK": 0.333,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "Jeep Compass 2.0 M-Jet 4x4 Limited",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            }
+          ]
+        },
+        {
+          "site": "publi24.ro",
+          "precisionAtK": 0.333,
+          "unsafePromotions": 0,
+          "topItems": [
+            {
+              "title": "Jeep Compass 2.0 M-Jet 4x4 Limited",
+              "listingType": "main_product",
+              "relevanceScore": 100,
+              "rejectionReasons": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
