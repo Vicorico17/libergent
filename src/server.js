@@ -9,6 +9,17 @@ import { buildHistoryPayload, logSearchEvent } from "./history.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { insertOfferFeedbackToSupabase, isSupabaseConfigured } from "./supabase.js";
 import { createSearchTelemetry } from "./search-telemetry.js";
+import { buildBudgetPayload } from "./budget.js";
+import {
+  AUTH_COOKIE_NAME,
+  FREE_SEARCH_COOKIE_NAME,
+  buildFreeSearchCookie,
+  buildNoMoreCreditsPayload,
+  buildSessionPayload,
+  buildSignInCookies,
+  canSearchForFree,
+  parseCookieHeader
+} from "./session.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -17,8 +28,12 @@ const PUBLIC_DIR = path.join(ROOT, "public");
 
 loadEnv(ROOT);
 
-function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
+function sendJson(res, statusCode, payload, extraHeaders = {}) {
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    ...extraHeaders
+  });
   res.end(JSON.stringify(payload, null, 2));
 }
 
@@ -57,8 +72,31 @@ function readJsonBody(req) {
   });
 }
 
+function getSearchCookieHeaders(cookies, query) {
+  return cookies[AUTH_COOKIE_NAME] === "member" || cookies[FREE_SEARCH_COOKIE_NAME]
+    ? {}
+    : { "Set-Cookie": buildFreeSearchCookie(query) };
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
+  const cookies = parseCookieHeader(req.headers.cookie || "");
+
+  if (url.pathname === "/api/session") {
+    sendJson(res, 200, buildSessionPayload(cookies));
+    return;
+  }
+
+  if (url.pathname === "/api/session/signin" && req.method === "POST") {
+    sendJson(res, 200, buildSessionPayload({
+      ...cookies,
+      [AUTH_COOKIE_NAME]: "member",
+      [FREE_SEARCH_COOKIE_NAME]: ""
+    }), {
+      "Set-Cookie": buildSignInCookies()
+    });
+    return;
+  }
 
   if (url.pathname === "/api/search") {
     const query = url.searchParams.get("q")?.trim();
@@ -82,6 +120,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (!canSearchForFree(cookies, query)) {
+      sendJson(res, 402, buildNoMoreCreditsPayload(cookies));
+      return;
+    }
+
     try {
       const siteKeys = site === "all"
         ? getSiteKeysForAllSearch(query)
@@ -97,7 +140,7 @@ const server = http.createServer(async (req, res) => {
         marketplaces: payload.summary?.marketplaces ?? 0,
         successfulMarketplaces: payload.summary?.successfulMarketplaces ?? 0
       });
-      sendJson(res, 200, payload);
+      sendJson(res, 200, payload, getSearchCookieHeaders(cookies, query));
     } catch (error) {
       telemetry.logError(error);
       sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
@@ -166,6 +209,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/api/budget") {
+    sendJson(res, 200, buildBudgetPayload());
+    return;
+  }
+
   if (url.pathname === "/api/feedback") {
     if (req.method !== "POST") {
       sendJson(res, 405, { error: "Method not allowed" });
@@ -199,11 +247,17 @@ const server = http.createServer(async (req, res) => {
 
   const filePath = url.pathname === "/"
     ? path.join(PUBLIC_DIR, "index.html")
-    : url.pathname === "/trends"
-        ? path.join(PUBLIC_DIR, "trends.html")
-      : url.pathname === "/todo"
-        ? path.join(PUBLIC_DIR, "todo.html")
-      : path.join(PUBLIC_DIR, url.pathname);
+    : url.pathname === "/search"
+      ? path.join(PUBLIC_DIR, "search.html")
+      : url.pathname === "/budget"
+        ? path.join(PUBLIC_DIR, "budget.html")
+        : url.pathname === "/investments"
+          ? path.join(PUBLIC_DIR, "investments.html")
+          : url.pathname === "/trends"
+            ? path.join(PUBLIC_DIR, "trends.html")
+            : url.pathname === "/todo"
+              ? path.join(PUBLIC_DIR, "todo.html")
+              : path.join(PUBLIC_DIR, url.pathname);
 
   sendFile(res, filePath);
 });

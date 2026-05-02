@@ -3,6 +3,17 @@ import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-bas
 import { insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { createSearchTelemetry } from "./search-telemetry.js";
+import { buildBudgetPayload } from "./budget.js";
+import {
+  AUTH_COOKIE_NAME,
+  FREE_SEARCH_COOKIE_NAME,
+  buildFreeSearchCookie,
+  buildNoMoreCreditsPayload,
+  buildSessionPayload,
+  buildSignInCookies,
+  canSearchForFree,
+  parseCookieHeader
+} from "./session.js";
 
 function applyEnv(env = {}) {
   if (!globalThis.process) {
@@ -20,18 +31,37 @@ function applyEnv(env = {}) {
   }
 }
 
-function json(payload, status = 200) {
+function json(payload, status = 200, extraHeaders = {}) {
+  const headers = new Headers({
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+  });
+
+  for (const [key, value] of Object.entries(extraHeaders)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        headers.append(key, item);
+      }
+      continue;
+    }
+
+    headers.set(key, value);
+  }
+
   return new Response(JSON.stringify(payload, null, 2), {
     status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store"
-    }
+    headers
   });
 }
 
 function buildEmptyHistoryPayload() {
   return buildHistoryPayloadFromEntries([]);
+}
+
+function getSearchCookieHeaders(cookies, query) {
+  return cookies[AUTH_COOKIE_NAME] === "member" || cookies[FREE_SEARCH_COOKIE_NAME]
+    ? {}
+    : { "set-cookie": buildFreeSearchCookie(query) };
 }
 
 async function persistSearchEvent(entry, env) {
@@ -58,6 +88,21 @@ async function handleApi(request, env) {
   applyEnv(env);
 
   const url = new URL(request.url);
+  const cookies = parseCookieHeader(request.headers.get("cookie") || "");
+
+  if (url.pathname === "/api/session") {
+    return json(buildSessionPayload(cookies), 200);
+  }
+
+  if (url.pathname === "/api/session/signin" && request.method === "POST") {
+    return json(buildSessionPayload({
+      ...cookies,
+      [AUTH_COOKIE_NAME]: "member",
+      [FREE_SEARCH_COOKIE_NAME]: ""
+    }), 200, {
+      "set-cookie": buildSignInCookies()
+    });
+  }
 
   if (url.pathname === "/api/search") {
     const query = url.searchParams.get("q")?.trim();
@@ -78,6 +123,10 @@ async function handleApi(request, env) {
 
     if (!query) {
       return json({ error: "Missing q parameter" }, 400);
+    }
+
+    if (!canSearchForFree(cookies, query)) {
+      return json(buildNoMoreCreditsPayload(cookies), 402);
     }
 
     try {
@@ -102,7 +151,7 @@ async function handleApi(request, env) {
         marketplaces: payload.summary?.marketplaces ?? 0,
         successfulMarketplaces: payload.summary?.successfulMarketplaces ?? 0
       });
-      return json(payload, 200);
+      return json(payload, 200, getSearchCookieHeaders(cookies, query));
     } catch (error) {
       telemetry.logError(error);
       return json({ error: error instanceof Error ? error.message : String(error) }, 500);
@@ -181,6 +230,10 @@ async function handleApi(request, env) {
     }
   }
 
+  if (url.pathname === "/api/budget") {
+    return json(buildBudgetPayload(), 200);
+  }
+
   if (url.pathname === "/api/feedback") {
     if (request.method !== "POST") {
       return json({ error: "Method not allowed" }, 405);
@@ -217,6 +270,18 @@ export default {
 
     if (url.pathname.startsWith("/api/")) {
       return handleApi(request, env);
+    }
+
+    if (url.pathname === "/search") {
+      return env.ASSETS.fetch(new Request(new URL("/search.html", request.url), request));
+    }
+
+    if (url.pathname === "/budget") {
+      return env.ASSETS.fetch(new Request(new URL("/budget.html", request.url), request));
+    }
+
+    if (url.pathname === "/investments") {
+      return env.ASSETS.fetch(new Request(new URL("/investments.html", request.url), request));
     }
 
     return env.ASSETS.fetch(request);

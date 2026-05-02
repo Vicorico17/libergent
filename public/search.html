@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>libergent search</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="site-nav">
+        <a class="site-nav__brand" href="/search">libergent</a>
+        <nav class="site-nav__links" aria-label="Primary">
+          <a class="site-nav__link site-nav__link--active" href="/search">Search</a>
+          <a class="site-nav__link" href="/budget">Budget</a>
+          <a class="site-nav__link" href="/trends">Trends</a>
+        </nav>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">căutare second-hand în românia</p>
+          <h1>Search with one free shot.</h1>
+          <p class="lede">Caută primul produs fără cont, compară rezultatele pe marketplace-uri, apoi cere utilizatorului autentificare înainte de o căutare nouă.</p>
+        </div>
+        <div class="hero-aside">
+          <div class="hero-card">
+            <p class="metric-label">Guest Access</p>
+            <p class="metric-value">1 search free</p>
+            <p class="muted">Primul produs merge fără cont. Dacă schimbi produsul, aplicația blochează căutarea și cere sign in.</p>
+          </div>
+          <div class="hero-card">
+            <p class="metric-label">Unlock</p>
+            <p class="metric-value">10 lei credits</p>
+            <p class="muted">Popup-ul oferă imediat mesajul „No more credits” și CTA-ul pentru autentificare.</p>
+          </div>
+          <div class="hero-card">
+            <p class="metric-label">Other Pages</p>
+            <p class="metric-value"><a class="hero-link" href="/budget">Budget & Trends</a></p>
+            <p class="muted">Păstrezi restul paginilor separate și legate direct din experiența de search.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="search-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">search</p>
+            <h2>Caută produsul și compară rezultatele</h2>
+          </div>
+          <p class="muted panel-copy">O căutare anonimă gratuită, apoi acces cu popup și sign in bonus.</p>
+        </div>
+
+        <div id="creditBanner" class="credit-banner" aria-live="polite"></div>
+
+        <form id="searchForm" class="search-form">
+          <label class="field grow">
+            <span>Produs</span>
+            <input id="queryInput" name="q" type="search" placeholder="iphone 15 pro, playstation 5, scaun herman miller..." required />
+          </label>
+
+          <label class="field">
+            <span>Stare</span>
+            <select id="conditionInput" name="condition">
+              <option value="any">Oricare</option>
+              <option value="new">Nou</option>
+              <option value="used">Folosit</option>
+            </select>
+          </label>
+
+          <button id="searchButton" type="submit">Caută</button>
+        </form>
+
+        <p class="search-help">Guest users pot căuta un singur produs gratuit. Pentru un produs nou, apare popup-ul de credit.</p>
+      </section>
+
+      <section id="summary" class="summary hidden"></section>
+      <section id="status" class="status"></section>
+      <section id="marketplaces" class="grid"></section>
+    </main>
+
+    <div id="loadingOverlay" class="loading-overlay hidden" aria-hidden="true">
+      <div class="loading-card">
+        <div class="loading-ring" aria-hidden="true"></div>
+        <p class="loading-eyebrow">libergent lucrează</p>
+        <h2 id="loadingTitle">Caut oferte relevante...</h2>
+        <p id="loadingText" class="loading-text">Verific OLX, Vinted, Lajumate, Okazii, Facebook Marketplace, Publi24 și Autovit și ordonez rezultatele.</p>
+        <div class="loading-marketplaces" aria-hidden="true">
+          <span>OLX</span>
+          <span>Vinted</span>
+          <span>Lajumate</span>
+          <span>Okazii</span>
+          <span>Facebook Marketplace</span>
+          <span>Publi24</span>
+          <span>Autovit</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="creditModal" class="modal-overlay hidden" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="creditModalTitle">
+        <p class="eyebrow">credit wall</p>
+        <h2 id="creditModalTitle">No more credits</h2>
+        <p id="creditModalText" class="loading-text">Ai folosit deja căutarea gratuită. Sign in ca să primești 10 lei în credits.</p>
+        <div class="modal-actions">
+          <button id="modalSignInButton" type="button">Sign in for 10 lei</button>
+          <button id="modalCloseButton" type="button" class="secondary-button">Rămâi pe produsul actual</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
