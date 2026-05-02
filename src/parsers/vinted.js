@@ -69,6 +69,34 @@ function parsePriceFromLabel(label = "") {
   return match ? `${match[1].trim()} ${match[2]}` : "";
 }
 
+function extractPostedAtFromText(...values) {
+  const merged = cleanText(values.filter(Boolean).join(" · "));
+  if (!merged) {
+    return "";
+  }
+
+  const parts = merged
+    .split(/[·|\n]/)
+    .map((part) => cleanText(part))
+    .filter(Boolean);
+
+  const freshnessPatterns = [
+    /\b(azi|ieri|astăzi|astazi|reactualizat(?:ă)?|actualizat(?:ă)?)\b/i,
+    /\bacum\s+\d+\s*(min(?:ut(?:e)?)?|h|or[ăae]?|ore|zi(?:le)?|s[ăa]pt(?:[ăa]m[âa]n[ăa]?)?|lun[ăi])\b/i,
+    /\b\d+\s*(min(?:ut(?:e)?)?|h|or[ăae]?|ore|zi(?:le)?|s[ăa]pt(?:[ăa]m[âa]n[ăa]?)?|lun[ăi])\s+în\s+urm[ăa]\b/i,
+    /\b\d{1,2}\s+(ian(?:uarie)?|feb(?:ruarie)?|mar(?:tie)?|apr(?:ilie)?|mai|iun(?:ie)?|iul(?:ie)?|aug(?:ust)?|sep(?:tembrie)?|oct(?:ombrie)?|nov(?:embrie)?|dec(?:embrie)?)\b/i
+  ];
+
+  for (const part of parts) {
+    if (freshnessPatterns.some((pattern) => pattern.test(part))) {
+      return part;
+    }
+  }
+
+  const inlineMatch = merged.match(/(azi|ieri|astăzi|astazi|reactualizat(?:ă)?|actualizat(?:ă)?|acum\s+\d+\s*(?:min(?:ut(?:e)?)?|h|or[ăae]?|ore|zi(?:le)?|s[ăa]pt(?:[ăa]m[âa]n[ăa]?)?|lun[ăi]))/i);
+  return inlineMatch ? cleanText(inlineMatch[0]) : "";
+}
+
 function parseTotalResults(text = "") {
   const value = Number.parseInt(text.match(/([\d.+]+)\s+de rezultate/i)?.[1]?.replace(/[^\d]/g, ""), 10);
   return Number.isFinite(value) ? value : null;
@@ -109,7 +137,7 @@ function parseGridItem(card) {
     price,
     currency: /\blei\b/i.test(price) ? "Lei" : price.match(/\b(RON|EUR|€)\b/i)?.[1] || "",
     location: "",
-    postedAt: "",
+    postedAt: extractPostedAtFromText(stripTags(card)),
     condition: parseCondition(rawLabel),
     sellerType: "",
     url,
@@ -156,7 +184,7 @@ export function parseVintedMarkdown(markdown, limit) {
       price: cleanText(price),
       currency: "RON",
       location: "",
-      postedAt: "",
+      postedAt: extractPostedAtFromText(...metadata),
       condition: parseCondition(rawLabel, metadata[1] || metadata[0] || ""),
       sellerType: "",
       url,

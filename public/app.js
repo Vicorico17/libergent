@@ -463,6 +463,7 @@ function renderSummary(summary) {
         <p class="eyebrow">libergent recommends</p>
         <h3>${bestOffer ? formatPrice(bestOffer) : "N/A"}</h3>
         <p class="report-banner__line">${escapeHtml(recommendationLine)}</p>
+        <p class="ranking-rationale">Clasare: scor de relevanță + feedback local, apoi preț.</p>
         ${Number.isFinite(bestOffer?.recommendationScore) ? `<p class="recommendation-score">Scor recomandare: ${bestOffer.recommendationScore}/100</p>` : ""}
         ${bestOffer?.url ? `<a class="listing-link" href="${escapeHtml(bestOffer.url)}" target="_blank" rel="noreferrer">Deschide anunțul recomandat</a>` : ""}
         ${bestOffer ? `
@@ -496,8 +497,36 @@ function renderSummary(summary) {
   `;
 }
 
+function renderEmptyResultsState(payload) {
+  const successfulMarketplaces = Number(payload?.summary?.successfulMarketplaces || 0);
+  const marketplaces = Number(payload?.summary?.marketplaces || 0);
+  marketplacesEl.innerHTML = `
+    <article class="market-card market-card--empty">
+      <h2>Nu am găsit rezultate utile pentru această căutare</h2>
+      <p class="muted">Am verificat ${successfulMarketplaces}/${marketplaces} marketplace-uri, dar nu există anunțuri potrivite acum.</p>
+      <ul class="empty-state-list">
+        <li>Încearcă o formulare mai scurtă (ex: doar modelul produsului).</li>
+        <li>Schimbă filtrul de stare între „Oricare”, „Nou” și „Folosit”.</li>
+        <li>Repornește căutarea peste câteva minute pentru rezultate noi.</li>
+      </ul>
+    </article>
+  `;
+}
+
 function renderResults(payload) {
   currentPayload = applyLocalFeedback(payload);
+  const totalVisibleListings = (currentPayload.results || [])
+    .filter((result) => result?.ok)
+    .reduce((sum, result) => sum + Number(result?.itemCount || 0), 0);
+
+  if (totalVisibleListings === 0) {
+    summaryEl.classList.add("hidden");
+    summaryEl.innerHTML = "";
+    renderEmptyResultsState(currentPayload);
+    statusEl.textContent = "Nu am găsit rezultate suficiente. Ajustează căutarea și încearcă din nou.";
+    return;
+  }
+
   renderSummary(currentPayload.summary);
   marketplacesEl.innerHTML = currentPayload.results.map(renderSite).join("");
 }
@@ -583,6 +612,7 @@ function renderSite(result) {
   const listingCountLabel = Number.isFinite(result.totalResults)
     ? `${result.itemCount} shown from ${result.totalResults} found`
     : `${result.itemCount} shown`;
+  const hasItems = Array.isArray(result.items) && result.items.length > 0;
 
   const itemMarkup = result.items
     .map((item, index) => `
@@ -611,7 +641,7 @@ function renderSite(result) {
     : "";
 
   return `
-    <details class="market-card market-card--collapsible">
+    <details class="market-card market-card--collapsible" ${hasItems ? "" : "open"}>
       <summary class="market-summary">
         <div class="market-summary__top">
           <div class="market-card__header">
@@ -637,6 +667,7 @@ function renderSite(result) {
             <span class="report-value">${escapeHtml(formatOfferLine(highest, result.site))}</span>
           </div>
         </div>
+        ${hasItems ? '<p class="market-rationale">Ordine: relevanță + feedback local, apoi preț.</p>' : '<p class="market-empty-hint">Nu există anunțuri în acest marketplace pentru filtrul curent.</p>'}
       </summary>
       <div class="market-expand">
         <div class="market-total">
