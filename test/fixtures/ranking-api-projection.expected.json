@@ -1,0 +1,71 @@
+{
+  "summaryKeys": [
+    "averagePriceRon",
+    "bestOffer",
+    "condition",
+    "conditionLabel",
+    "creditBudget",
+    "creditsUsed",
+    "marketplaces",
+    "pricedListingsRon",
+    "recommendedOffers",
+    "searchedAt",
+    "successfulMarketplaces",
+    "totalListings"
+  ],
+  "resultKeys": [
+    "bestOffer",
+    "creditsUsed",
+    "excludedItemCount",
+    "itemCount",
+    "items",
+    "lowest",
+    "ok",
+    "pagesUsed",
+    "partsAndRepair",
+    "provider",
+    "query",
+    "rawItemCount",
+    "relatedAccessories",
+    "secondaryMatches",
+    "site",
+    "strategy",
+    "totalResults",
+    "url",
+    "wantedAds"
+  ],
+  "summaryView": {
+    "condition": "any",
+    "conditionLabel": "Oricare",
+    "marketplaces": 2,
+    "successfulMarketplaces": 2,
+    "totalListings": 3,
+    "pricedListingsRon": 3,
+    "bestOfferSite": "olx.ro",
+    "bestOfferTitle": "iPhone 15 Pro 128GB",
+    "recommendedSites": [
+      "olx.ro",
+      "vinted.ro"
+    ]
+  },
+  "resultView": [
+    {
+      "site": "olx.ro",
+      "itemCount": 2,
+      "rawItemCount": 3,
+      "excludedItemCount": 1,
+      "bestOfferTitle": "iPhone 15 Pro 128GB",
+      "bestOfferScore": 100,
+      "lowestTitle": "iPhone 15 Pro 128GB"
+    },
+    {
+      "site": "vinted.ro",
+      "itemCount": 1,
+      "rawItemCount": 2,
+      "excludedItemCount": 1,
+      "bestOfferTitle": "Apple iPhone 15 Pro 256 GB",
+      "bestOfferScore": 100,
+      "lowestTitle": "Apple iPhone 15 Pro 256 GB"
+    }
+  ]
+}

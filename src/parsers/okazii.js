@@ -79,7 +79,7 @@ function parseListingCard(block) {
   const titleMatch =
     block.match(/<div class="item-title"[\s\S]*?<a[^>]+href="([^"]+)"[^>]*title="([^"]*)"[^>]*>/i) ||
     block.match(/<div class="item-title"[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
-  const imageMatch = block.match(/<img[^>]+src="([^"]+)"/i);
+  const imageMatch = block.match(/<img[^>]+(?:src|data-src)="([^"]+)"/i);
   const priceMatches = [...cleanText(block).matchAll(/\d[\d.\s]*,\s*\d{2}\s*Lei/gi)];
   const title = cleanText(titleMatch?.[2] || "");
   const url = toAbsoluteUrl(titleMatch?.[1] || "");
@@ -104,12 +104,35 @@ function parseListingCard(block) {
   };
 }
 
+function parseListingCardsFromItemTitles(html, limit) {
+  const cards = [];
+  const matches = [...html.matchAll(/<div class="item-title"[\s\S]*?<\/div>/gi)];
+
+  for (const match of matches) {
+    if (cards.length >= limit) {
+      break;
+    }
+    const blockStart = Math.max(0, match.index - 600);
+    const blockEnd = Math.min(html.length, match.index + match[0].length + 1200);
+    const block = html.slice(blockStart, blockEnd);
+    const parsed = parseListingCard(block);
+    if (parsed) {
+      cards.push(parsed);
+    }
+  }
+
+  return cards;
+}
+
 function parseSearchListingItems(html, limit) {
-  const items = splitListingBlocks(html)
+  const splitItems = splitListingBlocks(html)
     .map(parseListingCard)
     .filter(Boolean);
+  if (splitItems.length) {
+    return splitItems.slice(0, limit);
+  }
 
-  return items.slice(0, limit);
+  return parseListingCardsFromItemTitles(html, limit);
 }
 
 function parseSearchTotalResults(html) {

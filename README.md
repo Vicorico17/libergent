@@ -113,6 +113,38 @@ Because of that, libergent does not default to AI JSON extraction on every page 
 3. AI extraction only where markup is too dynamic or brittle
 4. browser/crawl tools only for the marketplaces that truly require them
 
+## Canonical listing schema (Supabase/Postgres)
+
+`supabase/marketplace_canonical.sql` adds the canonical marketplace domain model with forward-safe `if not exists` guards and conflict-safe example writes.
+
+Tables and field semantics:
+
+- `marketplace_sources`: one row per marketplace (`source_key`, display name, base URL).
+- `marketplace_sellers`: seller identity per source (`external_seller_id` unique per source), profile metadata, first/last seen timestamps.
+- `marketplace_listings`: canonical listing identity (`source_id + external_listing_id`), stable URL, status lifecycle (`active`, `delisted`, `sold`, `expired`, `unknown`), and optional idempotency key from ingestion.
+- `listing_item_snapshots`: immutable content snapshots at `observed_at` (title/description, normalized condition enum, attributes/images JSON).
+- `listing_price_snapshots`: immutable price snapshots at `observed_at`, amount in minor units, ISO currency, optional normalized amount/currency, and normalization strategy enum.
+- `listing_trust_signals`: per-observation scoring signals with confidence and reason text for explainability.
+- `ingest_runs`: ingestion run envelope (query/strategy/status/counters) with retention defaults (`retention_days` default `365`, `retain_until` generated).
+- `ingest_events`: append-only event log for lifecycle transitions and ingestion events with strict idempotency (`idempotency_key` unique) and uniqueness guard on `(source_id, external_listing_id, observed_at)`.
+
+Enumerations:
+
+- `listing_condition`: `unknown`, `new`, `like_new`, `used_good`, `used_fair`, `for_parts`, `refurbished`.
+- `currency_strategy`: `as_listed`, `fx_spot`, `fx_daily_fix`, `manual_override`.
+- `listing_status`: `active`, `delisted`, `sold`, `expired`, `unknown`.
+
+Lifecycle example:
+
+- The migration includes an idempotent demo flow for one listing lifecycle:
+  new listing (`2026-04-01`) -> updated listing with new price (`2026-04-03`) -> delisted listing (`2026-04-10`).
+- Inserts use `on conflict` guards so the script remains safe when re-applied on existing dev databases.
+
+Rollback/data retention notes:
+
+- The migration includes explicit rollback order notes (drop child tables first, then parents, then enums).
+- Snapshot/event history retention defaults are encoded in `ingest_runs.retention_days` and generated `retain_until`.
+
 ## Setup
 
 ```bash
