@@ -1,26 +1,91 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-brand-black: #111111;
+  --color-brand-blue: #4F7CFF;
+  --color-brand-purple: #A259FF;
+  --color-brand-yellow: #FFC857;
+  --color-brand-coral: #FF6B6B;
+  --color-brand-dgray: #6B6B6B;
+  --color-brand-lgray: #D9D9D9;
+  --color-brand-offwhite: #F8F9FA;
+
+  /* shadcn tokens */
+  --color-primary: #4F7CFF;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #F8F9FA;
+  --color-secondary-foreground: #111111;
+  --color-background: #ffffff;
+  --color-foreground: #111111;
+  --color-muted: #F8F9FA;
+  --color-muted-foreground: #6B6B6B;
+  --color-accent: #F8F9FA;
+  --color-accent-foreground: #111111;
+  --color-border: #D9D9D9;
+  --color-input: #D9D9D9;
+  --color-ring: #4F7CFF;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-pixel: var(--font-pixel-var);
+  --font-sans: var(--font-sans-var);
+  --font-handwritten: var(--font-handwritten-var);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: #ffffff;
+  --foreground: #111111;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #ffffff;
+  color: #111111;
+  font-family: var(--font-sans-var), Inter, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-pixel {
+  font-family: var(--font-pixel-var), 'Press Start 2P', monospace;
+  image-rendering: pixelated;
+}
+
+.font-handwritten {
+  font-family: var(--font-handwritten-var), 'Caveat', cursive;
+}
+
+/* Hero gradient */
+.hero-gradient {
+  background:
+    radial-gradient(ellipse 55% 60% at 15% 50%, rgba(167, 139, 250, 0.22) 0%, transparent 70%),
+    radial-gradient(ellipse 55% 60% at 85% 50%, rgba(255, 200, 87, 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(79, 124, 255, 0.1) 0%, transparent 65%),
+    #f6f6ff;
+}
+
+/* Plus scatter animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(5deg); }
+}
+
+.plus-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Pixel border accent */
+.pixel-border-blue  { border-top: 4px solid #4F7CFF; }
+.pixel-border-purple { border-top: 4px solid #A259FF; }
+.pixel-border-yellow { border-top: 4px solid #FFC857; }
+
+/* Smooth accordion */
+.accordion-content {
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
 }
