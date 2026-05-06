@@ -282,13 +282,18 @@ export async function readTopKeywordsFromSupabase({ limit = 20 } = {}, env = pro
 }
 
 export async function readSupabaseHistoryPayload(env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) {
+    throw new Error("Supabase is not configured.");
+  }
+
   const [recentSearches, topQueries, topKeywords, totalSearches, uniqueQueries, uniqueKeywords] = await Promise.all([
     readSearchEventsFromSupabase({}, env),
     readTopQueriesFromSupabase({}, env),
     readTopKeywordsFromSupabase({}, env),
-    requestSupabaseCount(`${DEFAULT_TABLE}?select=id`, env),
-    requestSupabaseCount(`${DEFAULT_QUERY_STATS_TABLE}?select=query`, env),
-    requestSupabaseCount(`${DEFAULT_KEYWORD_STATS_TABLE}?select=keyword`, env)
+    requestSupabaseCount(`${config.table}?select=id`, env),
+    requestSupabaseCount(`${config.queryStatsTable}?select=query`, env),
+    requestSupabaseCount(`${config.keywordStatsTable}?select=keyword`, env)
   ]);
 
   const dailyCounts = new Map();

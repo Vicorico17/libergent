@@ -170,14 +170,20 @@ function loadBrowserHistoryPayload() {
 }
 
 function renderHistory(payload, sourceLabel = "server") {
-  totalSearchesEl.textContent = payload.totals.searches;
-  uniqueQueriesEl.textContent = payload.totals.uniqueQueries;
-  uniqueKeywordsEl.textContent = payload.totals.uniqueKeywords;
-  topQueriesEl.innerHTML = renderCountList(payload.topQueries);
-  topKeywordsEl.innerHTML = renderKeywordCloud(payload.topKeywords);
-  dailyTrendEl.innerHTML = renderDailyTrend(payload.dailyTrend);
-  recentSearchesEl.innerHTML = renderRecentSearches(payload.recentSearches);
-  historyStatus.textContent = `Actualizat ${new Date(payload.updatedAt).toLocaleString("ro-RO")} (${sourceLabel}).`;
+  const totals = payload?.totals || {};
+  const topQueries = Array.isArray(payload?.topQueries) ? payload.topQueries : [];
+  const topKeywords = Array.isArray(payload?.topKeywords) ? payload.topKeywords : [];
+  const dailyTrend = Array.isArray(payload?.dailyTrend) ? payload.dailyTrend : [];
+  const recentSearches = Array.isArray(payload?.recentSearches) ? payload.recentSearches : [];
+
+  totalSearchesEl.textContent = totals.searches ?? 0;
+  uniqueQueriesEl.textContent = totals.uniqueQueries ?? 0;
+  uniqueKeywordsEl.textContent = totals.uniqueKeywords ?? 0;
+  topQueriesEl.innerHTML = renderCountList(topQueries);
+  topKeywordsEl.innerHTML = renderKeywordCloud(topKeywords);
+  dailyTrendEl.innerHTML = renderDailyTrend(dailyTrend);
+  recentSearchesEl.innerHTML = renderRecentSearches(recentSearches);
+  historyStatus.textContent = `Actualizat ${new Date(payload?.updatedAt || Date.now()).toLocaleString("ro-RO")} (${sourceLabel}).`;
 }
 
 async function loadHistory() {
