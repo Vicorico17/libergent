@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bucharest Lead Finder</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Bucharest web services pipeline</p>
+        <h1>Lead Finder</h1>
+      </div>
+      <div class="top-actions">
+        <button id="exportCsv" class="button primary" type="button">Export CSV</button>
+        <button id="resetDemo" class="button ghost" type="button">Reset</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel sidebar" aria-label="Filters">
+        <div class="field">
+          <label for="query">Search</label>
+          <input id="query" type="search" placeholder="Name, area, category">
+        </div>
+
+        <div class="field">
+          <label for="area">Area</label>
+          <select id="area">
+            <option value="all">All areas</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="category">Category</label>
+          <select id="category">
+            <option value="all">All categories</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="status">Pipeline</label>
+          <select id="status">
+            <option value="all">All stages</option>
+            <option value="New">New</option>
+            <option value="Researching">Researching</option>
+            <option value="Qualified">Qualified</option>
+            <option value="Contacted">Contacted</option>
+            <option value="Won">Won</option>
+            <option value="Parked">Parked</option>
+          </select>
+        </div>
+
+        <div class="score-box">
+          <span>Visible leads</span>
+          <strong id="visibleCount">0</strong>
+        </div>
+        <div class="score-box">
+          <span>High priority</span>
+          <strong id="hotCount">0</strong>
+        </div>
+      </aside>
+
+      <section class="content">
+        <section class="panel search-pack">
+          <div class="section-heading">
+            <div>
+              <h2>Search Packs</h2>
+              <p>Open a search, inspect the business, then capture it below.</p>
+            </div>
+            <button id="copyChecklist" class="button" type="button">Copy checklist</button>
+          </div>
+          <div id="searchPacks" class="pack-grid"></div>
+        </section>
+
+        <section class="panel capture">
+          <div class="section-heading">
+            <div>
+              <h2>Capture Lead</h2>
+              <p>Scores update automatically from the opportunity signals.</p>
+            </div>
+          </div>
+          <form id="leadForm" class="lead-form">
+            <label>
+              Business name
+              <input name="name" required placeholder="e.g. Atelier on Calea Victoriei">
+            </label>
+            <label>
+              Area
+              <select name="area" required></select>
+            </label>
+            <label>
+              Category
+              <select name="category" required></select>
+            </label>
+            <label>
+              Source URL
+              <input name="sourceUrl" type="url" placeholder="Google Maps, Instagram, existing site">
+            </label>
+            <label>
+              Contact
+              <input name="contact" placeholder="Email, phone, Instagram handle">
+            </label>
+            <fieldset>
+              <legend>Opportunity signals</legend>
+              <label><input name="signals" value="No website" type="checkbox"> No website</label>
+              <label><input name="signals" value="Outdated website" type="checkbox"> Outdated website</label>
+              <label><input name="signals" value="Weak mobile UX" type="checkbox"> Weak mobile UX</label>
+              <label><input name="signals" value="No booking/order flow" type="checkbox"> No booking/order flow</label>
+              <label><input name="signals" value="Active social media" type="checkbox"> Active social media</label>
+              <label><input name="signals" value="Good reviews" type="checkbox"> Good reviews</label>
+            </fieldset>
+            <label class="wide">
+              Notes
+              <textarea name="notes" rows="3" placeholder="What to build: one-page site, booking page, menu, SEO, landing page"></textarea>
+            </label>
+            <button class="button primary" type="submit">Add Lead</button>
+          </form>
+        </section>
+
+        <section class="section-heading list-heading">
+          <div>
+            <h2>Lead Queue</h2>
+            <p id="summaryText">No leads yet.</p>
+          </div>
+          <div class="sort-control">
+            <label for="sortBy">Sort</label>
+            <select id="sortBy">
+              <option value="score">Score</option>
+              <option value="createdAt">Newest</option>
+              <option value="name">Name</option>
+            </select>
+          </div>
+        </section>
+        <div id="leadList" class="lead-list"></div>
+      </section>
+    </main>
+
+    <template id="leadCardTemplate">
+      <article class="lead-card">
+        <div class="lead-main">
+          <div>
+            <p class="meta"></p>
+            <h3></h3>
+          </div>
+          <strong class="score"></strong>
+        </div>
+        <p class="notes"></p>
+        <div class="tags"></div>
+        <div class="card-actions">
+          <select class="stage-select" aria-label="Pipeline stage"></select>
+          <a class="button small research" target="_blank" rel="noreferrer">Research</a>
+          <button class="button small copy" type="button">Copy pitch</button>
+          <button class="button small danger delete" type="button">Delete</button>
+        </div>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
