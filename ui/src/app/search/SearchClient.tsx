@@ -1,55 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MascotSVG } from "@/components/MascotSVG";
 import { SearchBar } from "@/components/SearchBar";
 import { ProductCard, type Product } from "@/components/search/ProductCard";
 import { SearchFilters, type Filters } from "@/components/search/SearchFilters";
-
-export type ApiListing = {
-  title?: string;
-  priceRon?: number | null;
-  site?: string;
-  condition?: string;
-  location?: string;
-  postedAt?: string;
-  imageUrl?: string;
-  url?: string;
-};
-
-export type ApiResult = {
-  ok: boolean;
-  site?: string;
-  items?: ApiListing[];
-};
-
-export type SearchPayload = {
-  results?: ApiResult[];
-  summary?: {
-    totalListings?: number;
-    searchedAt?: string;
-  };
-  error?: string;
-};
-
-const platformColors: Record<string, string> = {
-  Autovit: "#E44911",
-  Lajumate: "#EF7D00",
-  Okazii: "#6D28D9",
-  OLX: "#0047AB",
-  Publi24: "#E84C0C",
-  Vinted: "#09B1BA",
-};
-
-const platformLabels: Record<string, string> = {
-  "autovit.ro": "Autovit",
-  "lajumate.ro": "Lajumate",
-  "okazii.ro": "Okazii",
-  "olx.ro": "OLX",
-  "publi24.ro": "Publi24",
-  "vinted.ro": "Vinted",
-};
+import { mapProducts, type SearchPayload } from "./search-data";
 
 const defaultFilters: Filters = {
   platforms: [],
@@ -61,7 +18,7 @@ const defaultFilters: Filters = {
 
 type SearchClientProps = {
   query: string;
-  initialProducts: Product[];
+  initialProducts?: Product[];
   initialError?: string;
   searchedAt?: string;
 };
@@ -73,8 +30,63 @@ export function SearchClient({
   searchedAt = "",
 }: SearchClientProps) {
   const [filters, setFilters] = useState<Filters>(defaultFilters);
-  const products = initialProducts;
-  const error = initialError;
+  const [products, setProducts] = useState<Product[]>(initialProducts || []);
+  const [error, setError] = useState(initialError);
+  const [updatedAt, setUpdatedAt] = useState(searchedAt);
+  const [isLoading, setIsLoading] = useState(Boolean(query));
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function runSearch() {
+      if (!query) {
+        setProducts([]);
+        setError("");
+        setUpdatedAt("");
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError("");
+
+      try {
+        const params = new URLSearchParams({
+          q: query,
+          site: "default",
+          provider: "auto",
+          limit: "500",
+        });
+        const response = await fetch(`/api/search?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as SearchPayload;
+
+        if (!response.ok || payload.error) {
+          setProducts([]);
+          setError(payload.error || "Căutarea nu a putut fi finalizată.");
+          setUpdatedAt("");
+          return;
+        }
+
+        setProducts(mapProducts(payload).slice(0, 120));
+        setUpdatedAt(payload.summary?.searchedAt || "");
+      } catch (searchError) {
+        if (controller.signal.aborted) return;
+        setProducts([]);
+        setError(searchError instanceof Error ? searchError.message : "Căutarea nu a putut fi finalizată.");
+        setUpdatedAt("");
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    runSearch();
+
+    return () => controller.abort();
+  }, [query]);
 
   const filtered = useMemo(() => products.filter((p) => {
     if (filters.platforms.length > 0 && !filters.platforms.includes(p.platform)) return false;
@@ -91,8 +103,8 @@ export function SearchClient({
     return 0;
   }), [filters, products]);
 
-  const updatedLabel = searchedAt
-    ? new Intl.DateTimeFormat("ro-RO", { dateStyle: "medium", timeStyle: "short" }).format(new Date(searchedAt))
+  const updatedLabel = updatedAt
+    ? new Intl.DateTimeFormat("ro-RO", { dateStyle: "medium", timeStyle: "short" }).format(new Date(updatedAt))
     : "în timp real";
 
   return (
@@ -107,6 +119,12 @@ export function SearchClient({
             </span>
           </Link>
           <SearchBar defaultValue={query} size="normal" className="flex-1 max-w-2xl" />
+          <Link
+            href="/trends"
+            className="shrink-0 hidden sm:flex items-center px-3 py-2 text-sm font-semibold text-[#6B6B6B] hover:text-[#111111] transition-colors"
+          >
+            Trenduri
+          </Link>
           <Link
             href="/auth"
             className="shrink-0 hidden sm:flex items-center px-4 py-2 rounded-lg bg-[#4F7CFF] text-white text-sm font-semibold hover:bg-[#3d6aec] transition-colors"
@@ -143,7 +161,13 @@ export function SearchClient({
           <SearchFilters filters={filters} onChange={setFilters} />
 
           <div className="flex-1 min-w-0">
-            {error ? (
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <MascotSVG size={64} className="mb-4 opacity-30" />
+                <p className="font-semibold text-[#111111] mb-1">Se caută...</p>
+                <p className="text-sm text-[#6B6B6B]">Verificăm marketplace-urile disponibile.</p>
+              </div>
+            ) : error ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <MascotSVG size={64} className="mb-4 opacity-30" />
                 <p className="font-semibold text-[#111111] mb-1">Căutarea a eșuat</p>
@@ -169,53 +193,10 @@ export function SearchClient({
   );
 }
 
-export function mapProducts(payload: SearchPayload): Product[] {
-  return (payload.results || [])
-    .filter((result) => result.ok)
-    .flatMap((result) =>
-      (result.items || []).map((item, index) => {
-        const platform = getPlatformLabel(item.site || result.site || "Marketplace");
-        return {
-          id: item.url || `${platform}-${index}-${item.title || "listing"}`,
-          title: item.title || "Anunț fără titlu",
-          price: Number.isFinite(item.priceRon) ? Math.round(Number(item.priceRon)) : null,
-          platform,
-          platformColor: platformColors[platform] || "#4F7CFF",
-          condition: normalizeCondition(item.condition),
-          location: item.location || "România",
-          daysAgo: estimateDaysAgo(item.postedAt),
-          image: item.imageUrl || undefined,
-          url: item.url || undefined,
-        };
-      })
-    );
-}
-
-function getPlatformLabel(site: string) {
-  return platformLabels[site] || site;
-}
-
-function normalizeCondition(condition = "") {
-  const value = condition.trim().toLowerCase();
-  if (!value) return "Acceptabil";
-  if (value.includes("ca nou")) return "Ca nou";
-  if (value.includes("nou") || value.includes("new")) return "Nou";
-  if (value.includes("bun") || value.includes("used") || value.includes("utilizat")) return "Bun";
-  return condition.trim();
-}
-
 function hasPriceAtLeast(price: number | null, min: number) {
   return price !== null && Number.isFinite(price) && price >= min;
 }
 
 function hasPriceAtMost(price: number | null, max: number) {
   return price !== null && Number.isFinite(price) && price <= max;
-}
-
-function estimateDaysAgo(postedAt = "") {
-  const value = postedAt.toLowerCase();
-  if (!value || value.includes("azi") || value.includes("reactualizat")) return 0;
-  if (value.includes("ieri")) return 1;
-  const number = Number.parseInt(value.match(/\d+/)?.[0] || "", 10);
-  return Number.isFinite(number) ? number : 0;
 }

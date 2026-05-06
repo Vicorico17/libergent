@@ -11,7 +11,7 @@ import { insertOfferFeedbackToSupabase, isSupabaseConfigured } from "./supabase.
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
 const HOST = process.env.HOST || "127.0.0.1";
 const ROOT = process.cwd();
-const PUBLIC_DIR = path.join(ROOT, "public");
+const ASSETS_DIR = path.join(ROOT, "ui", "out");
 
 loadEnv(ROOT);
 
@@ -25,7 +25,10 @@ function sendFile(res, filePath) {
   const typeMap = {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
-    ".js": "application/javascript; charset=utf-8"
+    ".js": "application/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".txt": "text/plain; charset=utf-8"
   };
 
   try {
@@ -124,13 +127,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const filePath = url.pathname === "/"
-    ? path.join(PUBLIC_DIR, "index.html")
-    : url.pathname === "/trends"
-        ? path.join(PUBLIC_DIR, "trends.html")
-      : url.pathname === "/todo"
-        ? path.join(PUBLIC_DIR, "todo.html")
-      : path.join(PUBLIC_DIR, url.pathname);
+  const staticPath = url.pathname.endsWith("/")
+    ? path.join(ASSETS_DIR, url.pathname, "index.html")
+    : path.join(ASSETS_DIR, url.pathname);
+  const routePath = path.join(ASSETS_DIR, url.pathname, "index.html");
+  const filePath = fs.existsSync(staticPath) ? staticPath : routePath;
 
   sendFile(res, filePath);
 });

@@ -55,6 +55,12 @@ export function Navbar() {
           >
             Întrebări
           </Link>
+          <Link
+            href="/trends"
+            className="text-sm text-[#6B6B6B] hover:text-[#111111] transition-colors font-medium"
+          >
+            Trenduri
+          </Link>
         </div>
 
         {/* CTA */}
@@ -110,6 +116,9 @@ export function Navbar() {
           </Link>
           <Link href="#intrebari" className="text-sm font-medium text-[#111111]" onClick={() => setMenuOpen(false)}>
             Întrebări
+          </Link>
+          <Link href="/trends" className="text-sm font-medium text-[#111111]" onClick={() => setMenuOpen(false)}>
+            Trenduri
           </Link>
           <Link
             href="/auth"

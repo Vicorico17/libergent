@@ -8,11 +8,12 @@
     "search": "node src/cli.js search",
     "search:live": "LIBERGENT_MOCK_SEARCH=0 LIBERGENT_MOCK_PROVIDER=0 node src/cli.js search --site all --provider auto --pages 1 --pretty",
     "check": "node src/cli.js --help",
+    "build:ui": "npm --prefix ui run build",
     "dev": "node src/dev.js",
     "dev:api": "node src/server.js",
     "dev:ui": "npm --prefix ui run dev",
     "dev:worker": "npx wrangler dev",
-    "deploy": "npx wrangler deploy"
+    "deploy": "npm run build:ui && npx wrangler deploy"
   },
   "engines": {
     "node": ">=20"
