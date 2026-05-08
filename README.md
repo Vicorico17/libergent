@@ -113,6 +113,10 @@ Because of that, libergent does not default to AI JSON extraction on every page 
 3. AI extraction only where markup is too dynamic or brittle
 4. browser/crawl tools only for the marketplaces that truly require them
 
+## Collaboration workflow
+
+Use the GitHub branch and pull request process in [docs/github-workflow.md](docs/github-workflow.md).
+
 ## Setup
 
 ```bash
