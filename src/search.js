@@ -19,7 +19,7 @@ function tokenize(value = "") {
 }
 
 function filterRelevantItems(items, query) {
-  const queryTokens = tokenize(query);
+  const queryTokens = tokenize(query).filter((token) => token.length > 1 || /^\d+$/.test(token));
   const brandTokens = getQueryBrandTerms(query);
   if (!queryTokens.length) {
     return items;
@@ -185,7 +185,11 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
     items = Array.isArray(raw?.items) ? raw.items : [];
   }
 
+  const unfilteredItems = items;
   items = site.disableQueryFilter ? items : filterRelevantItems(items, query);
+  if (site.key === "autovit.ro" && items.length === 0 && unfilteredItems.length > 0) {
+    items = unfilteredItems.slice(0, limit);
+  }
   rawItemCount = rawItemCount || items.length;
 
   return {
