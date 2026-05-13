@@ -703,7 +703,9 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   if (basketballRimWithNet) {
     return "main_product";
   }
-  if (hasAnchor && hasAccessoryHead && !productWithAccessory && (startsWithAccessory || accessoryForProduct)) {
+  // If the listing is clearly an accessory-for-product phrase, keep it as accessory
+  // even when it also contains generic bundle markers like "set" or "pachet".
+  if (hasAnchor && hasAccessoryHead && (startsWithAccessory || accessoryForProduct)) {
     return "accessory";
   }
   if (productWithAccessory) {

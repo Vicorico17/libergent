@@ -31,3 +31,19 @@ test("ranks exact pro max above pro-only for pro max query", () => {
   assert.ok(exactProMax.relevanceScore > proOnly.relevanceScore);
   assert.ok(proOnly.rejectionReasons.includes("variant_mismatch:pro_max_vs_pro"));
 });
+
+test("does not treat accessory sets as recommended product candidates", () => {
+  const query = "Jeep Compass";
+  const accessorySet = classifyListingIntent(
+    {
+      title: "Set covorase Jeep Compass",
+      description: "Accesorii interior pentru Jeep Compass",
+      price: "200 lei",
+      priceRon: 200
+    },
+    query
+  );
+
+  assert.equal(accessorySet.listingType, "accessory");
+  assert.equal(accessorySet.isRecommendedCandidate, false);
+});
