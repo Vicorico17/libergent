@@ -22,6 +22,10 @@ export type SearchPayload = {
   summary?: {
     totalListings?: number;
     searchedAt?: string;
+    bestOffer?: {
+      url?: string;
+      recommendationScore?: number | null;
+    };
   };
   error?: string;
 };

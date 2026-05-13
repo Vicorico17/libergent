@@ -33,6 +33,7 @@ export function SearchClient({
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [error, setError] = useState(initialError);
   const [updatedAt, setUpdatedAt] = useState(searchedAt);
+  const [bestDealUrl, setBestDealUrl] = useState("");
   const [isLoading, setIsLoading] = useState(Boolean(query));
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export function SearchClient({
         setProducts([]);
         setError("");
         setUpdatedAt("");
+        setBestDealUrl("");
         setIsLoading(false);
         return;
       }
@@ -66,16 +68,21 @@ export function SearchClient({
           setProducts([]);
           setError(payload.error || "Căutarea nu a putut fi finalizată.");
           setUpdatedAt("");
+          setBestDealUrl("");
           return;
         }
 
         setProducts(mapProducts(payload).slice(0, 120));
         setUpdatedAt(payload.summary?.searchedAt || "");
+        const bestOffer = payload.summary?.bestOffer;
+        const hasValidScore = Number.isFinite(bestOffer?.recommendationScore);
+        setBestDealUrl(hasValidScore && bestOffer?.url ? bestOffer.url : "");
       } catch (searchError) {
         if (controller.signal.aborted) return;
         setProducts([]);
         setError(searchError instanceof Error ? searchError.message : "Căutarea nu a putut fi finalizată.");
         setUpdatedAt("");
+        setBestDealUrl("");
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);
@@ -104,25 +111,10 @@ export function SearchClient({
   }), [filters, products]);
 
   const bestDealId = useMemo(() => {
-    let best: Product | null = null;
-
-    for (const product of filtered) {
-      if (product.price === null || !Number.isFinite(product.price)) continue;
-      if (!best) {
-        best = product;
-        continue;
-      }
-      if (product.price < best.price!) {
-        best = product;
-        continue;
-      }
-      if (product.price === best.price && product.daysAgo < best.daysAgo) {
-        best = product;
-      }
-    }
-
-    return best?.id || null;
-  }, [filtered]);
+    if (!bestDealUrl) return null;
+    const bestDeal = filtered.find((product) => product.url === bestDealUrl);
+    return bestDeal?.id || null;
+  }, [bestDealUrl, filtered]);
 
   const updatedLabel = updatedAt
     ? new Intl.DateTimeFormat("ro-RO", { dateStyle: "medium", timeStyle: "short" }).format(new Date(updatedAt))
