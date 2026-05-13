@@ -327,6 +327,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
 
   return {
     results: normalizedResults,
+    bestOffer,
     summary: {
       searchedAt: new Date().toISOString(),
       condition,
