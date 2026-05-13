@@ -9,6 +9,9 @@ test("extractImageCandidate prefers lazy-load attributes and parses srcset", () 
 
   const htmlWithSrcset = '<img srcset="https://img.example.com/pic-640.webp 640w, https://img.example.com/pic-1200.webp 1200w" />';
   assert.equal(extractImageCandidate(htmlWithSrcset), "https://img.example.com/pic-640.webp");
+
+  const htmlWithDataPlaceholder = '<img src="data:image/gif;base64,abc" data-src="https://img.example.com/actual.webp" />';
+  assert.equal(extractImageCandidate(htmlWithDataPlaceholder), "https://img.example.com/actual.webp");
 });
 
 test("parseOlxHtml keeps image when card uses lazy-loaded img attributes", () => {

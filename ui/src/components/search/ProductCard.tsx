@@ -9,6 +9,7 @@ interface Product {
   daysAgo: number;
   postedDateLabel: string;
   image?: string;
+  images?: string[];
   url?: string;
 }
 
@@ -22,6 +23,7 @@ export type { Product };
 export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
   const { title, price, platform, platformColor, condition, location, postedDateLabel, url } = product;
   const hasPrice = price !== null && Number.isFinite(price);
+  const gallery = (product.images || []).filter(Boolean);
 
   const conditionColor =
     condition === "Ca nou" || condition === "Nou cu etichetă"
@@ -69,6 +71,11 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
               <path d="M5 19h14l-1.5-10-4.5 3-3-6-3 6-4.5-3L5 19z" />
             </svg>
             Best deal
+          </span>
+        ) : null}
+        {gallery.length > 1 ? (
+          <span className="absolute right-2.5 bottom-2.5 rounded-full bg-black/70 text-white text-[11px] font-semibold px-2 py-0.5">
+            +{gallery.length - 1} foto
           </span>
         ) : null}
       </div>

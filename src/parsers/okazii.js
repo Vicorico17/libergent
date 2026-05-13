@@ -69,6 +69,16 @@ function normalizeOfferPrice(offer) {
   return `${offer.price} ${currency}`.trim();
 }
 
+function normalizeOfferImages(offer) {
+  const raw = offer?.image;
+  const entries = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const imageUrls = [...new Set(entries.map((value) => toAbsoluteUrl(value || "")).filter(Boolean))];
+  return {
+    imageUrl: imageUrls[0] || "",
+    imageUrls
+  };
+}
+
 function splitListingBlocks(html) {
   return html
     .split(/<div class="lising-old-li\b[^>]*>/i)
@@ -141,7 +151,9 @@ function parseJsonLdOffers(html, limit) {
     .find((entry) => entry?.["@type"] === "Product" && entry?.offers?.offers);
 
   const offers = product?.offers?.offers?.flat?.() || [];
-  const items = offers.slice(0, limit).map((offer) => ({
+  const items = offers.slice(0, limit).map((offer) => {
+    const images = normalizeOfferImages(offer);
+    return {
     title: cleanText(offer.name || ""),
     price: normalizeOfferPrice(offer),
     currency: cleanText(offer.priceCurrency || ""),
@@ -150,8 +162,10 @@ function parseJsonLdOffers(html, limit) {
     condition: normalizeCondition(offer.itemCondition),
     sellerType: cleanText(offer.seller?.name || ""),
     url: toAbsoluteUrl(offer.url || ""),
-    imageUrl: toAbsoluteUrl(offer.image || "")
-  }));
+    imageUrl: images.imageUrl,
+    imageUrls: images.imageUrls
+  };
+  });
 
   return {
     items,

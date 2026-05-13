@@ -77,6 +77,7 @@ export function mapProducts(payload: SearchPayload): Product[] {
           daysAgo: estimateDaysAgo(item.postedAt),
           postedDateLabel: formatPostedDateLabel(item.postedAt),
           image: pickListingImage(item),
+          images: pickListingImages(item),
           url: item.url || undefined,
         };
       })
@@ -116,12 +117,29 @@ export function mapBestOffer(payload: SearchPayload, products: Product[]): Produ
     daysAgo: estimateDaysAgo(bestOffer.postedAt),
     postedDateLabel: formatPostedDateLabel(bestOffer.postedAt),
     image: pickListingImage(bestOffer),
+    images: pickListingImages(bestOffer),
     url: bestOfferUrl || undefined,
   };
 }
 
 function pickListingImage(item: ApiListing) {
-  const candidates: Array<string | undefined> = [
+  const candidates = collectListingImageCandidates(item);
+
+  for (const candidate of candidates) {
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function pickListingImages(item: ApiListing) {
+  return collectListingImageCandidates(item);
+}
+
+function collectListingImageCandidates(item: ApiListing) {
+  const rawCandidates: Array<string | undefined> = [
     item.imageUrl,
     item.image,
     item.thumbnailUrl,
@@ -130,15 +148,18 @@ function pickListingImage(item: ApiListing) {
       typeof entry === "string" ? entry : entry?.url || entry?.src
     )),
   ];
+  const candidates: string[] = [];
+  const seen = new Set<string>();
 
-  for (const candidate of candidates) {
+  for (const candidate of rawCandidates) {
     const normalized = normalizeImageUrl(candidate, item.url);
-    if (normalized) {
-      return normalized;
+    if (normalized && !seen.has(normalized)) {
+      candidates.push(normalized);
+      seen.add(normalized);
     }
   }
 
-  return undefined;
+  return candidates;
 }
 
 function normalizeImageUrl(value?: string, listingUrl?: string) {

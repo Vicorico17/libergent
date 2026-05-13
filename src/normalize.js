@@ -59,12 +59,20 @@ export function normalizeListing(item) {
     currency === "EUR" && Number.isFinite(numericPrice) ? numericPrice * ESTIMATED_EUR_TO_RON :
     null;
 
+  const imageUrls = [...new Set(
+    (Array.isArray(item.imageUrls) ? item.imageUrls : [])
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+  )];
+
   return {
     ...item,
     price: priceText,
     currency,
     numericPrice,
-    priceRon
+    priceRon,
+    imageUrl: item.imageUrl || imageUrls[0] || "",
+    imageUrls
   };
 }
 
