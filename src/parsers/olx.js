@@ -1,3 +1,5 @@
+import { extractImageUrlFromHtmlBlock } from "./image-url.js";
+
 function cleanText(value = "") {
   return decodeHtmlEntities(
     value
@@ -84,7 +86,7 @@ function parseListingCard(card) {
     card.match(/<a[^>]+href="([^"]*\/d\/oferta\/[^"]+)"[^>]*>[\s\S]*?<h4[^>]*>([\s\S]*?)<\/h4>/i);
   const priceMatch = card.match(/data-testid="ad-price"[^>]*>([\s\S]*?)<\/p>/i);
   const locationDateMatch = card.match(/data-testid="location-date"[^>]*>([\s\S]*?)<\/p>/i);
-  const imageMatch = card.match(/<img[^>]+src="([^"]+)"[^>]*>/i);
+  const imageUrl = extractImageUrlFromHtmlBlock(card);
   const conditionMatch = card.match(/data-nx-name="NexusBadge"[^>]*>([\s\S]*?)<\/div>/i);
 
   const title = stripTags(titleBlock?.[2] || "");
@@ -108,7 +110,7 @@ function parseListingCard(card) {
     condition: stripTags(conditionMatch?.[1] || ""),
     sellerType: "",
     url,
-    imageUrl: toAbsoluteUrl(imageMatch?.[1] || "")
+    imageUrl: toAbsoluteUrl(imageUrl)
   };
 }
 

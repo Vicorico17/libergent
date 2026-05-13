@@ -30,17 +30,25 @@ function filterRelevantItems(items, query) {
   }
 
   const requiredNumberTokens = queryTokens.filter((token) => /^\d+$/.test(token));
+  const textTokens = queryTokens.filter((token) => !/^\d+$/.test(token));
+  const minTextMatches = Math.max(1, Math.ceil(textTokens.length * 0.34));
+
   return items.filter((item) => {
     const titleTokens = new Set(tokenize(item.title || ""));
     if (requiredNumberTokens.some((token) => !titleTokens.has(token))) {
       return false;
     }
 
+    const matchedTextTokens = textTokens.filter((token) => titleTokens.has(token)).length;
+    if (matchedTextTokens >= minTextMatches) {
+      return true;
+    }
+
     const matchedTokens = queryTokens.filter((token) => titleTokens.has(token)).length;
     const matchedBrands = brandTokens.filter((token) => titleTokens.has(token)).length;
-    const weightedMatches = matchedTokens + (matchedBrands ? 1.5 : 0);
-    const weightedRequired = queryTokens.length + (brandTokens.length ? 1.5 : 0);
-    return weightedMatches / weightedRequired >= 0.5;
+    const weightedMatches = matchedTokens + (matchedBrands ? 1.25 : 0);
+    const weightedRequired = queryTokens.length + (brandTokens.length ? 1.25 : 0);
+    return weightedMatches / weightedRequired >= 0.4;
   });
 }
 

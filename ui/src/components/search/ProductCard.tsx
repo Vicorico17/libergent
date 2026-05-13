@@ -7,6 +7,7 @@ interface Product {
   condition: string;
   location: string;
   daysAgo: number;
+  postedAtLabel: string;
   image?: string;
   url?: string;
 }
@@ -18,7 +19,7 @@ interface ProductCardProps {
 export type { Product };
 
 export function ProductCard({ product }: ProductCardProps) {
-  const { title, price, platform, platformColor, condition, location, daysAgo, url } = product;
+  const { title, price, platform, platformColor, condition, location, postedAtLabel, url } = product;
   const hasPrice = price !== null && Number.isFinite(price);
 
   const conditionColor =
@@ -79,7 +80,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
         <div className="flex items-center justify-between text-xs text-[#6B6B6B]">
           <span>{location}</span>
-          <span>{daysAgo === 0 ? "azi" : `acum ${daysAgo}z`}</span>
+          <span>{postedAtLabel}</span>
         </div>
 
         <a
