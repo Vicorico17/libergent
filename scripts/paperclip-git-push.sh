@@ -12,6 +12,15 @@ if [[ -z "$branch" ]]; then
 fi
 
 if [[ -z "${GITHUB_PAT_TOKEN:-}" ]]; then
+  for token_file in /paperclip/.github-token /docker/paperclip-aiym/.github-token; do
+    if [[ -r "$token_file" ]]; then
+      GITHUB_PAT_TOKEN="$(tr -d "\r\n" < "$token_file")"
+      break
+    fi
+  done
+fi
+
+if [[ -z "${GITHUB_PAT_TOKEN:-}" ]]; then
   if [[ -r /docker/paperclip-aiym/.env ]]; then
     GITHUB_PAT_TOKEN="$(sed -n "s/^GITHUB_PAT_TOKEN=//p" /docker/paperclip-aiym/.env)"
   fi
