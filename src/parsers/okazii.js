@@ -1,4 +1,4 @@
-import { extractImageCandidate } from "./image.js";
+import { extractImageUrlFromHtmlBlock } from "./image-url.js";
 
 function cleanText(value = "") {
   return decodeHtmlEntities(
@@ -81,7 +81,7 @@ function parseListingCard(block) {
   const titleMatch =
     block.match(/<div class="item-title"[\s\S]*?<a[^>]+href="([^"]+)"[^>]*title="([^"]*)"[^>]*>/i) ||
     block.match(/<div class="item-title"[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
-  const imageCandidate = extractImageCandidate(block);
+  const imageUrl = extractImageUrlFromHtmlBlock(block);
   const priceMatches = [...cleanText(block).matchAll(/\d[\d.\s]*,\s*\d{2}\s*Lei/gi)];
   const title = cleanText(titleMatch?.[2] || "");
   const url = toAbsoluteUrl(titleMatch?.[1] || "");
@@ -102,7 +102,7 @@ function parseListingCard(block) {
     condition: "",
     sellerType: "",
     url,
-    imageUrl: toAbsoluteUrl(imageCandidate)
+    imageUrl: toAbsoluteUrl(imageUrl)
   };
 }
 
