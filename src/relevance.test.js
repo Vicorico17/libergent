@@ -47,3 +47,15 @@ test("does not treat accessory sets as recommended product candidates", () => {
   assert.equal(accessorySet.listingType, "accessory");
   assert.equal(accessorySet.isRecommendedCandidate, false);
 });
+
+test("rejects listings when random critical query token is missing", () => {
+  const query = "asdf iphone 14";
+  const listing = classifyListingIntent(
+    { title: "Apple iPhone 14 128GB", price: "2500 lei", priceRon: 2500 },
+    query
+  );
+
+  assert.equal(listing.isRecommendedCandidate, false);
+  assert.ok(listing.relevanceScore < 55);
+  assert.ok(listing.rejectionReasons.includes("missing_critical_query_tokens"));
+});

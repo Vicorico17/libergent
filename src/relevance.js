@@ -595,10 +595,18 @@ function getMatchStats(title, text, queryProfile) {
   const textTokens = new Set(tokenize(text));
   const requiredTokens = queryProfile.tokens;
   const brandTerms = queryProfile.brandTerms || [];
+  const brandTokenSet = new Set(brandTerms);
+  const nonBrandRequiredTokens = requiredTokens.filter((token) => !brandTokenSet.has(token));
   const requiredNumberTokens = requiredTokens.filter((token) => /^\d+$/.test(token));
   const expandedTokens = queryProfile.expandedTokens;
   const titleMatches = requiredTokens.filter((token) => titleTokens.has(token));
   const textMatches = requiredTokens.filter((token) => textTokens.has(token));
+  const missingRequiredTokens = requiredTokens.filter((token) => !textTokens.has(token));
+  const missingCriticalTokens = nonBrandRequiredTokens.filter((token) =>
+    token.length >= 4 &&
+    !/^\d+$/.test(token) &&
+    !textTokens.has(token)
+  );
   const brandTitleMatches = brandTerms.filter((token) => titleTokens.has(token));
   const brandTextMatches = brandTerms.filter((token) => textTokens.has(token));
   const numberMatches = requiredNumberTokens.filter((token) => textTokens.has(token));
@@ -613,6 +621,8 @@ function getMatchStats(title, text, queryProfile) {
     brandCount: brandTerms.length ? 1 : 0,
     numberMatches,
     expandedMatches,
+    missingRequiredTokens,
+    missingCriticalTokens,
     requiredCount: requiredTokens.length,
     requiredNumberCount: requiredNumberTokens.length
   };
@@ -834,6 +844,9 @@ function scoreRelevance({ item, queryProfile, negativeMatches, matchStats, typeC
   if (matchStats.brandCount && !matchStats.brandTitleMatches.length && matchStats.titleMatches.length < matchStats.requiredCount) {
     score -= 12;
   }
+  if (matchStats.missingCriticalTokens.length) {
+    score -= Math.min(95, matchStats.missingCriticalTokens.length * 55);
+  }
   score += Math.round((typeCompatibilityScore - 0.5) * 40);
 
   return Math.max(0, Math.min(100, score));
@@ -873,7 +886,7 @@ export function classifyListingIntent(item, query) {
     negativeMatches,
     matchStats,
     typeCompatibilityScore
-  }) - (variantMatch.mismatch ? 35 : 0);
+  }) - (variantMatch.mismatch ? 35 : 0) - (matchStats.missingCriticalTokens.length * 25);
   const rejectionReasons = [];
 
   if (typeCompatibilityScore < 0.8) {
@@ -890,6 +903,9 @@ export function classifyListingIntent(item, query) {
   }
   if (matchStats.brandCount && matchStats.brandTextMatches.length === 0) {
     rejectionReasons.push("missing_brand");
+  }
+  if (matchStats.missingCriticalTokens.length) {
+    rejectionReasons.push("missing_critical_query_tokens");
   }
   for (const match of negativeMatches) {
     rejectionReasons.push(`${match.intent}:${match.term}`);
@@ -912,6 +928,6 @@ export function classifyListingIntent(item, query) {
     intentType,
     relevanceScore: Math.max(0, Math.min(100, relevanceScore)),
     rejectionReasons: [...new Set(rejectionReasons)],
-    isRecommendedCandidate: typeCompatibilityScore >= 0.8 && relevanceScore >= 55
+    isRecommendedCandidate: typeCompatibilityScore >= 0.8 && relevanceScore >= 55 && matchStats.missingCriticalTokens.length === 0
   };
 }
