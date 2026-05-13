@@ -6,6 +6,27 @@ export const metadata: Metadata = {
   description:
     "Găsește rapid produse second-hand, fără stres. LiberGent scanează zeci de platforme și îți livrează ce cauți.",
   icons: { icon: "/favicon.ico" },
+  openGraph: {
+    title: "LiberGent — Second-hand inteligent",
+    description:
+      "Găsește rapid produse second-hand, fără stres. LiberGent scanează zeci de platforme și îți livrează ce cauți.",
+    type: "website",
+    locale: "ro_RO",
+    siteName: "LiberGent",
+    images: [
+      {
+        url: "/logo.svg",
+        alt: "LiberGent logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LiberGent — Second-hand inteligent",
+    description:
+      "Găsește rapid produse second-hand, fără stres. LiberGent scanează zeci de platforme și îți livrează ce cauți.",
+    images: ["/logo.svg"],
+  },
 };
 
 export default function RootLayout({
