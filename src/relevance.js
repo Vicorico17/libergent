@@ -618,6 +618,32 @@ function getMatchStats(title, text, queryProfile) {
   };
 }
 
+function detectModelVariantMismatch({ title, text, queryProfile }) {
+  const normalizedTitle = normalizeText(title);
+  const normalizedText = normalizeText(text);
+  const queryTokens = new Set(queryProfile.tokens);
+  const titleTokens = new Set(tokenize(normalizedTitle));
+  const textTokens = new Set(tokenize(normalizedText));
+
+  const queryHasPro = queryTokens.has("pro");
+  const queryHasMax = queryTokens.has("max");
+  const titleHasPro = titleTokens.has("pro") || textTokens.has("pro");
+  const titleHasMax = titleTokens.has("max") || textTokens.has("max");
+
+  const queryWantsProOnly = queryHasPro && !queryHasMax;
+  const queryWantsProMax = queryHasPro && queryHasMax;
+  const titleIsProOnly = titleHasPro && !titleHasMax;
+  const titleIsProMax = titleHasPro && titleHasMax;
+
+  if (queryWantsProOnly && titleIsProMax) {
+    return { mismatch: true, reason: "pro_vs_pro_max" };
+  }
+  if (queryWantsProMax && titleIsProOnly) {
+    return { mismatch: true, reason: "pro_max_vs_pro" };
+  }
+  return { mismatch: false, reason: "" };
+}
+
 function getIntentType(negativeMatches, matchStats) {
   if (!matchStats.requiredCount || (matchStats.textMatches.length === 0 && matchStats.expandedMatches.length === 0)) {
     return "weak_match";
@@ -828,6 +854,7 @@ export function classifyListingIntent(item, query) {
     }
   }
   const matchStats = getMatchStats(title, text, queryProfile);
+  const variantMatch = detectModelVariantMismatch({ title, text, queryProfile });
   const listingType = getListingType({ title, text, queryProfile, negativeMatches });
   if (queryProfile.taxonomy === PRODUCT_TAXONOMY.basketball_hoop && listingType === "main_product") {
     negativeMatches = negativeMatches.filter((match) => !["plasa", "plase", "net", "set"].includes(match.term));
@@ -844,7 +871,7 @@ export function classifyListingIntent(item, query) {
     negativeMatches,
     matchStats,
     typeCompatibilityScore
-  });
+  }) - (variantMatch.mismatch ? 35 : 0);
   const rejectionReasons = [];
 
   if (typeCompatibilityScore < 0.8) {
@@ -868,6 +895,9 @@ export function classifyListingIntent(item, query) {
   if (relevanceScore < 45) {
     rejectionReasons.push("low_relevance");
   }
+  if (variantMatch.mismatch) {
+    rejectionReasons.push(`variant_mismatch:${variantMatch.reason}`);
+  }
 
   return {
     ...item,
@@ -878,7 +908,7 @@ export function classifyListingIntent(item, query) {
     brandTerms: queryProfile.brandTerms,
     typeCompatibilityScore,
     intentType,
-    relevanceScore,
+    relevanceScore: Math.max(0, Math.min(100, relevanceScore)),
     rejectionReasons: [...new Set(rejectionReasons)],
     isRecommendedCandidate: typeCompatibilityScore >= 0.8 && relevanceScore >= 55
   };
