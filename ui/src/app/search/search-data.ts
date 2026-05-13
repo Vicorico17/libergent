@@ -26,6 +26,18 @@ export type SearchPayload = {
   summary?: {
     totalListings?: number;
     searchedAt?: string;
+    bestOffer?: {
+      title?: string;
+      site?: string;
+      priceRon?: number | null;
+      condition?: string;
+      location?: string;
+      postedAt?: string;
+      imageUrl?: string;
+      image?: string;
+      thumbnailUrl?: string;
+      url?: string;
+    } | null;
   };
   error?: string;
 };
@@ -71,6 +83,41 @@ export function mapProducts(payload: SearchPayload): Product[] {
     );
 
   return interleave(groups);
+}
+
+export function mapBestOffer(payload: SearchPayload, products: Product[]): Product | null {
+  const bestOffer = payload.summary?.bestOffer;
+  if (!bestOffer) return null;
+
+  const bestOfferUrl = bestOffer.url?.trim();
+  if (bestOfferUrl) {
+    const existingByUrl = products.find((product) => product.url === bestOfferUrl);
+    if (existingByUrl) return existingByUrl;
+  }
+
+  const bestOfferTitle = bestOffer.title?.trim();
+  const bestOfferSite = getPlatformLabel(bestOffer.site || "Marketplace");
+  if (bestOfferTitle) {
+    const existingByTitleAndSite = products.find(
+      (product) => product.title.trim() === bestOfferTitle && product.platform === bestOfferSite
+    );
+    if (existingByTitleAndSite) return existingByTitleAndSite;
+  }
+
+  const fallbackId = bestOfferUrl || `best-offer-${bestOfferSite}-${bestOfferTitle || "listing"}`;
+  return {
+    id: fallbackId,
+    title: bestOfferTitle || "Anunț recomandat",
+    price: Number.isFinite(bestOffer.priceRon) ? Math.round(Number(bestOffer.priceRon)) : null,
+    platform: bestOfferSite,
+    platformColor: platformColors[bestOfferSite] || "#4F7CFF",
+    condition: normalizeCondition(bestOffer.condition),
+    location: bestOffer.location || "România",
+    daysAgo: estimateDaysAgo(bestOffer.postedAt),
+    postedDateLabel: formatPostedDateLabel(bestOffer.postedAt),
+    image: pickListingImage(bestOffer),
+    url: bestOfferUrl || undefined,
+  };
 }
 
 function pickListingImage(item: ApiListing) {
