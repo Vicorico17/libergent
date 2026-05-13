@@ -8,10 +8,19 @@ test("extractImageCandidate prefers lazy-load attributes and parses srcset", () 
   assert.equal(extractImageCandidate(htmlWithDataSrc), "//cdn.example.com/a.webp");
 
   const htmlWithSrcset = '<img srcset="https://img.example.com/pic-640.webp 640w, https://img.example.com/pic-1200.webp 1200w" />';
-  assert.equal(extractImageCandidate(htmlWithSrcset), "https://img.example.com/pic-640.webp");
+  assert.equal(extractImageCandidate(htmlWithSrcset), "https://img.example.com/pic-1200.webp");
 
   const htmlWithDataPlaceholder = '<img src="data:image/gif;base64,abc" data-src="https://img.example.com/actual.webp" />';
   assert.equal(extractImageCandidate(htmlWithDataPlaceholder), "https://img.example.com/actual.webp");
+});
+
+test("extractImageCandidate prefers the displayed img src over responsive alternates", () => {
+  const html = '<img src="https://frankfurt.apollo.olxcdn.com:443/v1/files/item-RO/image;s=216x152;q=50" srcSet="https://frankfurt.apollo.olxcdn.com:443/v1/files/item-RO/image;s=150x200;q=50 150w, https://frankfurt.apollo.olxcdn.com:443/v1/files/item-RO/image;s=510x680;q=50 600w" />';
+
+  assert.equal(
+    extractImageCandidate(html),
+    "https://frankfurt.apollo.olxcdn.com:443/v1/files/item-RO/image;s=216x152;q=50"
+  );
 });
 
 test("parseOlxHtml keeps image when card uses lazy-loaded img attributes", () => {
@@ -37,5 +46,5 @@ test("parseOlxHtml keeps image when card uses lazy-loaded img attributes", () =>
   const parsed = parseOlxHtml(html, 5);
   assert.equal(parsed.items.length, 2);
   assert.equal(parsed.items[0].imageUrl, "https://images.olxcdn.com/item1.webp");
-  assert.equal(parsed.items[1].imageUrl, "https://images.olxcdn.com/item2-400.webp");
+  assert.equal(parsed.items[1].imageUrl, "https://images.olxcdn.com/item2-800.webp");
 });
