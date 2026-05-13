@@ -63,6 +63,7 @@ export function mapProducts(payload: SearchPayload): Product[] {
           condition: normalizeCondition(item.condition),
           location: item.location || "România",
           daysAgo: estimateDaysAgo(item.postedAt),
+          postedDateLabel: formatPostedDateLabel(item.postedAt),
           image: pickListingImage(item),
           url: item.url || undefined,
         };
@@ -151,9 +152,65 @@ function normalizeCondition(condition = "") {
 }
 
 function estimateDaysAgo(postedAt = "") {
-  const value = postedAt.toLowerCase();
-  if (!value || value.includes("azi") || value.includes("reactualizat")) return 0;
-  if (value.includes("ieri")) return 1;
-  const number = Number.parseInt(value.match(/\d+/)?.[0] || "", 10);
-  return Number.isFinite(number) ? number : 0;
+  const parsed = parsePostedDate(postedAt);
+  if (!parsed) return 0;
+  return daysBetweenLocalDates(new Date(), parsed);
+}
+
+function formatPostedDateLabel(postedAt = "") {
+  const parsed = parsePostedDate(postedAt);
+  if (!parsed) return "azi";
+  if (daysBetweenLocalDates(new Date(), parsed) === 0) return "azi";
+  return new Intl.DateTimeFormat("ro-RO", { dateStyle: "medium" }).format(parsed);
+}
+
+function parsePostedDate(postedAt = "") {
+  const raw = postedAt.trim();
+  const value = raw.toLowerCase();
+
+  if (!value || value.includes("azi") || value.includes("reactualizat")) {
+    return new Date();
+  }
+
+  if (value.includes("ieri")) {
+    return addDays(new Date(), -1);
+  }
+
+  const relativeDayMatch = value.match(/(\d+)\s*(?:z|zi|zile)\b/);
+  if (relativeDayMatch) {
+    const relativeDays = Number.parseInt(relativeDayMatch[1], 10);
+    if (Number.isFinite(relativeDays)) {
+      return addDays(new Date(), -relativeDays);
+    }
+  }
+
+  const dottedDateMatch = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (dottedDateMatch) {
+    const day = Number.parseInt(dottedDateMatch[1], 10);
+    const month = Number.parseInt(dottedDateMatch[2], 10);
+    const year = Number.parseInt(dottedDateMatch[3], 10);
+    const parsed = new Date(year, month - 1, day);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  const fallback = new Date(raw);
+  if (!Number.isNaN(fallback.getTime())) {
+    return fallback;
+  }
+
+  return null;
+}
+
+function addDays(value: Date, deltaDays: number) {
+  const result = new Date(value);
+  result.setDate(result.getDate() + deltaDays);
+  return result;
+}
+
+function daysBetweenLocalDates(a: Date, b: Date) {
+  const startA = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const startB = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((startA.getTime() - startB.getTime()) / 86400000);
 }
