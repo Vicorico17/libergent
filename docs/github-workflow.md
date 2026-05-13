@@ -2,12 +2,30 @@
 
 This repository uses a branch + pull request workflow. Do not push directly to `main`.
 
-## 1. Prepare local branch
+## 1. Verify source of truth and sync main
 
 ```bash
 git fetch origin
+git remote -v
 git checkout main
 git pull --ff-only origin main
+```
+
+Expected remote:
+
+- `origin https://github.com/Vicorico17/libergent.git (fetch)`
+- `origin https://github.com/Vicorico17/libergent.git (push)`
+
+If `origin` is different, fix it before doing any work:
+
+```bash
+git remote set-url origin https://github.com/Vicorico17/libergent.git
+git fetch origin --prune
+```
+
+## 2. Create an issue branch
+
+```bash
 git checkout -b feat/<short-topic>
 ```
 
@@ -18,7 +36,7 @@ Branch naming:
 - `chore/<topic>` for maintenance
 - `docs/<topic>` for documentation only
 
-## 2. Implement and verify
+## 3. Implement and verify
 
 Run the smallest checks that prove your change before pushing.
 
@@ -29,7 +47,7 @@ npm run test
 
 If your change only touches docs, skip runtime checks and explain that in the pull request.
 
-## 3. Commit
+## 4. Commit
 
 Use small, reviewable commits.
 
@@ -47,13 +65,19 @@ Conventional commit prefixes used in this repo:
 - `refactor:`
 - `test:`
 
-## 4. Push branch
+## 5. Push branch with project helper
 
 ```bash
-git push -u origin feat/<short-topic>
+scripts/paperclip-git-push.sh <branch-name>
 ```
 
-## 5. Open pull request
+Notes:
+
+- If `<branch-name>` is omitted, the helper uses the current branch.
+- The helper requires `GITHUB_PAT_TOKEN` (or `/docker/paperclip-aiym/.env` containing it).
+- If pushing fails with auth/permission errors, mark the issue `blocked` and name the owner who must grant token/repo access.
+
+## 6. Open pull request
 
 Create a PR against `main` and include:
 
@@ -62,13 +86,13 @@ Create a PR against `main` and include:
 - verification steps and results
 - risks/rollback notes
 
-## 6. Review and merge
+## 7. Review and merge
 
 - Address review feedback with follow-up commits.
 - Keep history linear where possible (`git pull --ff-only`).
 - Merge only after required checks pass.
 
-## 7. Sync after merge
+## 8. Sync after merge
 
 ```bash
 git checkout main
