@@ -35,6 +35,22 @@ export function SearchClient({
   const [error, setError] = useState(initialError);
   const [updatedAt, setUpdatedAt] = useState(searchedAt);
   const [isLoading, setIsLoading] = useState(Boolean(query));
+  const [loadingProgress, setLoadingProgress] = useState(Boolean(query) ? 8 : 0);
+
+  useEffect(() => {
+    if (!isLoading) return;
+
+    setLoadingProgress((current) => (current > 0 ? current : 8));
+    const timer = window.setInterval(() => {
+      setLoadingProgress((current) => {
+        if (current >= 94) return current;
+        const step = Math.max(1, Math.round((96 - current) * 0.08));
+        return Math.min(94, current + step);
+      });
+    }, 350);
+
+    return () => window.clearInterval(timer);
+  }, [isLoading]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -44,11 +60,13 @@ export function SearchClient({
         setProducts([]);
         setError("");
         setUpdatedAt("");
+        setLoadingProgress(0);
         setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
+      setLoadingProgress(8);
       setError("");
 
       try {
@@ -76,12 +94,14 @@ export function SearchClient({
         setProducts(mappedProducts);
         setBestOffer(mapBestOffer(payload, mappedProducts));
         setUpdatedAt(payload.summary?.searchedAt || "");
+        setLoadingProgress(100);
       } catch (searchError) {
         if (controller.signal.aborted) return;
         setProducts([]);
         setBestOffer(null);
         setError(searchError instanceof Error ? searchError.message : "Căutarea nu a putut fi finalizată.");
         setUpdatedAt("");
+        setLoadingProgress(100);
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);
@@ -109,16 +129,10 @@ export function SearchClient({
       if (filters.sort === "Preț crescător") return aPrice - bPrice;
       if (filters.sort === "Preț descrescător") return bPrice - aPrice;
       if (filters.sort === "Cel mai recent") return a.daysAgo - b.daysAgo;
-      return aPrice - bPrice || a.daysAgo - b.daysAgo;
+      return compareByRank(a, b) || aPrice - bPrice || a.daysAgo - b.daysAgo;
     });
 
-    const bestDealIndex = sorted.findIndex((product) => product.price !== null && Number.isFinite(product.price));
-    if (bestDealIndex <= 0) {
-      return sorted;
-    }
-
-    const [bestDeal] = sorted.splice(bestDealIndex, 1);
-    return [bestDeal, ...sorted];
+    return sorted;
   }, [filters, products]);
 
   const featuredBestOffer = useMemo(() => {
@@ -202,8 +216,12 @@ export function SearchClient({
                   Scanăm marketplace-urile și încărcăm cât mai multe produse relevante.
                 </p>
                 <div className="mt-6 h-2 w-full max-w-xs overflow-hidden rounded-full bg-[#F1F2F4]">
-                  <div className="h-full w-1/3 rounded-full bg-[#4F7CFF] animate-[pulse_1.2s_ease-in-out_infinite]" />
+                  <div
+                    className="h-full rounded-full bg-[#4F7CFF] transition-[width] duration-500 ease-out"
+                    style={{ width: `${loadingProgress}%` }}
+                  />
                 </div>
+                <p className="mt-2 text-xs font-medium text-[#6B6B6B]">{Math.round(loadingProgress)}%</p>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -225,6 +243,16 @@ export function SearchClient({
                     <ProductCard product={featuredBestOffer} isBestDeal />
                   </section>
                 ) : null}
+                {regularResults.length > 0 ? (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-[#111111]">
+                      {filters.sort === "Relevanță" ? "Top rezultate" : "Rezultate"}
+                    </p>
+                    <p className="text-xs text-[#6B6B6B]">
+                      {filters.sort === "Relevanță" ? "Sortate după scorul de recomandare" : `Sortare: ${filters.sort}`}
+                    </p>
+                  </div>
+                ) : null}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                   {regularResults.map((product) => (
                     <ProductCard key={product.id} product={product} />
@@ -245,4 +273,14 @@ function hasPriceAtLeast(price: number | null, min: number) {
 
 function hasPriceAtMost(price: number | null, max: number) {
   return price !== null && Number.isFinite(price) && price <= max;
+}
+
+function compareByRank(a: Product, b: Product) {
+  const aRank = typeof a.rank === "number" && Number.isFinite(a.rank) ? a.rank : Number.POSITIVE_INFINITY;
+  const bRank = typeof b.rank === "number" && Number.isFinite(b.rank) ? b.rank : Number.POSITIVE_INFINITY;
+  if (aRank !== bRank) return aRank - bRank;
+
+  const aScore = typeof a.recommendationScore === "number" && Number.isFinite(a.recommendationScore) ? a.recommendationScore : -1;
+  const bScore = typeof b.recommendationScore === "number" && Number.isFinite(b.recommendationScore) ? b.recommendationScore : -1;
+  return bScore - aScore;
 }

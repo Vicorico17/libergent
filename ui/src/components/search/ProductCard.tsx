@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 interface Product {
   id: string;
   title: string;
@@ -11,6 +15,8 @@ interface Product {
   image?: string;
   images?: string[];
   url?: string;
+  rank?: number;
+  recommendationScore?: number;
 }
 
 interface ProductCardProps {
@@ -24,6 +30,12 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
   const { title, price, platform, platformColor, condition, location, postedDateLabel, url } = product;
   const hasPrice = price !== null && Number.isFinite(price);
   const gallery = (product.images || []).filter(Boolean);
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(product.image) && !imageFailed;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [product.image]);
 
   const conditionColor =
     condition === "Ca nou" || condition === "Nou cu etichetă"
@@ -49,8 +61,15 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
           isBestDeal ? "w-full md:w-56 lg:w-64 aspect-[4/3] md:aspect-auto md:min-h-[190px]" : "w-full aspect-[4/3]"
         }`}
       >
-        {product.image ? (
-          <img src={product.image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        {showImage ? (
+          <img
+            src={product.image}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            onError={() => setImageFailed(true)}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
         ) : (
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-[#D9D9D9]">
             <rect x="6" y="10" width="36" height="28" rx="4" stroke="currentColor" strokeWidth="2" />
@@ -65,6 +84,11 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
         >
           {platform}
         </span>
+        {typeof product.rank === "number" && Number.isFinite(product.rank) ? (
+          <span className="absolute top-2.5 right-2.5 rounded-full bg-white/95 text-[#111111] text-[11px] font-bold px-2 py-0.5 shadow-sm">
+            #{product.rank}
+          </span>
+        ) : null}
         {isBestDeal ? (
           <span className="absolute left-2.5 bottom-2.5 inline-flex items-center gap-1 rounded-full bg-[#FFBD2E] text-[#111111] text-[11px] font-bold px-2 py-0.5">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -100,6 +124,13 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
           <span>{location}</span>
           <span>{postedDateLabel}</span>
         </div>
+
+        {typeof product.recommendationScore === "number" && Number.isFinite(product.recommendationScore) ? (
+          <div className="flex items-center justify-between text-[11px] text-[#6B6B6B]">
+            <span>Scor</span>
+            <span className="font-semibold text-[#111111]">{Math.round(product.recommendationScore || 0)}/100</span>
+          </div>
+        ) : null}
 
         <a
           href={url || "#"}

@@ -61,3 +61,26 @@ test("parseOlxHtml keeps image when card uses lazy-loaded img attributes", () =>
   assert.equal(parsed.items[0].imageUrl, "https://images.olxcdn.com/item1.webp");
   assert.equal(parsed.items[1].imageUrl, "https://images.olxcdn.com/item2-800.webp");
 });
+
+test("parseOlxHtml recovers OLX images from embedded config when card has no thumbnail", () => {
+  const html = String.raw`
+    <script id="olx-init-config">
+      window.__INIT_CONFIG__ = "{\"ads\":[{\"photos\":[\"https:\\u002F\\u002Ffrankfurt.apollo.olxcdn.com:443\\u002Fv1\\u002Ffiles\\u002Fdetail-RO\\u002Fimage;s=1500x2000\"],\"photosSet\":[\"https:\\u002F\\u002Ffrankfurt.apollo.olxcdn.com:443\\u002Fv1\\u002Ffiles\\u002Fdetail-RO\\u002Fimage;s=389x272 1x,https:\\u002F\\u002Ffrankfurt.apollo.olxcdn.com:443\\u002Fv1\\u002Ffiles\\u002Fdetail-RO\\u002Fimage;s=1000x700 3x\"],\"urlPath\":\"\\u002Fd\\u002Foferta\\u002Fdisplay-iphone-IDabc.html\"}]}";
+    </script>
+    <div data-cy="l-card" data-testid="l-card">
+      <a href="/d/oferta/display-iphone-IDabc.html?search_reason=search%7Corganic">
+        <img src="/app/static/media/no_thumbnail.15f456ec5.svg" />
+        <h4>Display iPhone</h4>
+      </a>
+      <p data-testid="ad-price">700 lei</p>
+      <p data-testid="location-date">Bucuresti - Azi</p>
+    </div>
+  `;
+
+  const parsed = parseOlxHtml(html, 5);
+  assert.equal(parsed.items.length, 1);
+  assert.equal(
+    parsed.items[0].imageUrl,
+    "https://frankfurt.apollo.olxcdn.com:443/v1/files/detail-RO/image;s=1000x700"
+  );
+});

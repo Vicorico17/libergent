@@ -85,6 +85,10 @@ function safePriceForTieBreak(priceRon) {
   return Number.isFinite(priceRon) ? priceRon : Number.POSITIVE_INFINITY;
 }
 
+function itemRankKey(item) {
+  return item.url || `${item.site || ""}::${item.title || ""}::${item.price || ""}::${item.location || ""}`;
+}
+
 // Deterministic per-marketplace ranking:
 // - intent/relevance (token and brand match, listing-type penalties)
 // - condition preference
@@ -300,8 +304,8 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     return {
       ...result,
       rawItemCount: result.itemCount,
-      itemCount: items.length,
-      items,
+      itemCount: scoredItems.length,
+      items: scoredItems,
       relatedAccessories,
       partsAndRepair,
       wantedAds,
@@ -326,26 +330,44 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const averagePriceRon = allPricedItems.length
     ? allPricedItems.reduce((sum, item) => sum + item.priceRon, 0) / allPricedItems.length
     : null;
-  const globalMedianPriceRon = median(allScoredItems.map((item) => item.priceRon));
+  const globalMedianPriceRon = median(allScoredItems.map((item) => item.priceRon).filter((value) => Number.isFinite(value)));
   const allBestCandidates = allScoredItems.map((item) => ({
     ...item,
     recommendationScore: scoreGlobalRecommendation(item, globalMedianPriceRon, condition)
   }));
-  const bestOffer = allBestCandidates.length
-    ? allBestCandidates.reduce((best, item) => {
-        if (!best) {
-          return item;
-        }
-        if (item.recommendationScore !== best.recommendationScore) {
-          return item.recommendationScore > best.recommendationScore ? item : best;
-        }
-        return safePriceForTieBreak(item.priceRon) < safePriceForTieBreak(best.priceRon) ? item : best;
-      }, null)
-    : null;
-  const recommendedOffers = pickTopRecommendationsByMarketplace(allBestCandidates);
+  const rankedCandidates = allBestCandidates
+    .sort((a, b) => {
+      if (b.recommendationScore !== a.recommendationScore) {
+        return b.recommendationScore - a.recommendationScore;
+      }
+      return safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon);
+    })
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1
+    }));
+  const rankByKey = new Map(rankedCandidates.map((item) => [itemRankKey(item), item]));
+  const rankedResults = normalizedResults.map((result) => {
+    if (!result.ok) {
+      return result;
+    }
+
+    return {
+      ...result,
+      items: result.items
+        .map((item) => rankByKey.get(itemRankKey({ ...item, site: result.site })) || item)
+        .sort((a, b) => {
+          const aRank = Number.isFinite(a.rank) ? a.rank : Number.POSITIVE_INFINITY;
+          const bRank = Number.isFinite(b.rank) ? b.rank : Number.POSITIVE_INFINITY;
+          return aRank - bRank;
+        })
+    };
+  });
+  const bestOffer = rankedCandidates[0] || null;
+  const recommendedOffers = pickTopRecommendationsByMarketplace(rankedCandidates);
 
   return {
-    results: normalizedResults,
+    results: rankedResults,
     bestOffer,
     summary: {
       searchedAt: new Date().toISOString(),

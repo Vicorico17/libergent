@@ -42,6 +42,68 @@ function toAbsoluteUrl(url = "") {
   return value;
 }
 
+function decodeOlxJsonString(value = "") {
+  return value
+    .replace(/\\\\u002F/gi, "/")
+    .replace(/\\\\u0026/gi, "&")
+    .replace(/\\\\u003D/gi, "=")
+    .replace(/\\u002F/gi, "/")
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\u003D/gi, "=")
+    .replace(/\\"/g, "\"")
+    .replace(/\\\//g, "/")
+    .replace(/\\\\/g, "\\");
+}
+
+function pickBestPhotosSetCandidate(value = "") {
+  const candidates = decodeOlxJsonString(value)
+    .split(",")
+    .map((entry) => {
+      const [url = "", descriptor = ""] = entry.trim().split(/\s+/);
+      const score = Number.parseInt(descriptor.replace(/[^\d]/g, ""), 10);
+      return {
+        url,
+        score: Number.isFinite(score) ? score : 0
+      };
+    })
+    .filter((candidate) => candidate.url);
+
+  return candidates.sort((a, b) => b.score - a.score)[0]?.url || "";
+}
+
+function listingPathKey(url = "") {
+  try {
+    return new URL(toAbsoluteUrl(url)).pathname;
+  } catch {
+    return toAbsoluteUrl(url).split("?")[0];
+  }
+}
+
+function extractFirstEscapedArrayValue(value = "") {
+  return value.match(/\\?"([\s\S]*?)\\?"/)?.[1] || "";
+}
+
+function extractEmbeddedOlxImages(html = "") {
+  const imageByPath = new Map();
+  const listingMatches = html.matchAll(/\\"photos\\":\[(.*?)\]([\s\S]{0,5000}?)\\"urlPath\\":\\"(.*?)\\"/g);
+
+  for (const match of listingMatches) {
+    const photosRaw = match[1] || "";
+    const objectTail = match[2] || "";
+    const urlPath = decodeOlxJsonString(match[3] || "");
+    const photosSetRaw = objectTail.match(/\\"photosSet\\":\[(.*?)\]/)?.[1] || "";
+    const imageUrl =
+      pickBestPhotosSetCandidate(extractFirstEscapedArrayValue(photosSetRaw)) ||
+      decodeOlxJsonString(extractFirstEscapedArrayValue(photosRaw));
+
+    if (urlPath && imageUrl) {
+      imageByPath.set(listingPathKey(urlPath), imageUrl);
+    }
+  }
+
+  return imageByPath;
+}
+
 function parsePrice(line = "") {
   const match = line.match(/(\d[\d\s.]*)\s*(lei|ron|€|eur)?/i);
   return match ? `${match[1].trim()} ${match[2] || ""}`.trim() : line.trim();
@@ -80,7 +142,7 @@ function splitListingCards(html) {
   });
 }
 
-function parseListingCard(card) {
+function parseListingCard(card, embeddedImages = new Map()) {
   const titleBlock =
     card.match(/data-testid="ad-card-title"[\s\S]*?<a[^>]+href="([^"]+)"[\s\S]*?<h4[^>]*>([\s\S]*?)<\/h4>/i) ||
     card.match(/<a[^>]+href="([^"]*\/d\/oferta\/[^"]+)"[^>]*>[\s\S]*?<h4[^>]*>([\s\S]*?)<\/h4>/i);
@@ -94,6 +156,7 @@ function parseListingCard(card) {
   if (!title || !url) {
     return null;
   }
+  const embeddedImageUrl = embeddedImages.get(listingPathKey(url)) || "";
 
   const locationDate = stripTags(locationDateMatch?.[1] || "");
   const locationSplit = locationDate.split(" - ");
@@ -110,7 +173,7 @@ function parseListingCard(card) {
     condition: stripTags(conditionMatch?.[1] || ""),
     sellerType: "",
     url,
-    imageUrl: toAbsoluteUrl(imageUrl)
+    imageUrl: toAbsoluteUrl(imageUrl || embeddedImageUrl)
   };
 }
 
@@ -167,8 +230,9 @@ export function parseOlxMarkdown(markdown, limit) {
 
 export function parseOlxHtml(html, limit) {
   const blocks = splitListingCards(html);
+  const embeddedImages = extractEmbeddedOlxImages(html);
   const items = blocks
-    .map(parseListingCard)
+    .map((card) => parseListingCard(card, embeddedImages))
     .filter(Boolean)
     .slice(0, limit);
 

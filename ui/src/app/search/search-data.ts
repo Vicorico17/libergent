@@ -13,6 +13,9 @@ export type ApiListing = {
   images?: Array<string | { url?: string; src?: string }>;
   thumbnailUrl?: string;
   url?: string;
+  rank?: number;
+  offerScore?: number;
+  recommendationScore?: number;
 };
 
 export type ApiResult = {
@@ -37,6 +40,9 @@ export type SearchPayload = {
       image?: string;
       thumbnailUrl?: string;
       url?: string;
+      rank?: number;
+      offerScore?: number;
+      recommendationScore?: number;
     } | null;
   };
   error?: string;
@@ -79,6 +85,8 @@ export function mapProducts(payload: SearchPayload): Product[] {
           image: pickListingImage(item),
           images: pickListingImages(item),
           url: item.url || undefined,
+          rank: typeof item.rank === "number" && Number.isFinite(item.rank) ? item.rank : undefined,
+          recommendationScore: pickRecommendationScore(item),
         };
       })
     );
@@ -119,7 +127,19 @@ export function mapBestOffer(payload: SearchPayload, products: Product[]): Produ
     image: pickListingImage(bestOffer),
     images: pickListingImages(bestOffer),
     url: bestOfferUrl || undefined,
+    rank: typeof bestOffer.rank === "number" && Number.isFinite(bestOffer.rank) ? bestOffer.rank : undefined,
+    recommendationScore: pickRecommendationScore(bestOffer),
   };
+}
+
+function pickRecommendationScore(item: ApiListing) {
+  if (typeof item.recommendationScore === "number" && Number.isFinite(item.recommendationScore)) {
+    return item.recommendationScore;
+  }
+  if (typeof item.offerScore === "number" && Number.isFinite(item.offerScore)) {
+    return item.offerScore;
+  }
+  return undefined;
 }
 
 function pickListingImage(item: ApiListing) {
