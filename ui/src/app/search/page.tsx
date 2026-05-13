@@ -15,6 +15,7 @@ export default function SearchPage() {
 function SearchPageContent() {
   const searchParams = useSearchParams();
   const query = String(searchParams.get("q") || "").trim();
+  const requesterLocation = String(searchParams.get("location") || "").trim();
 
-  return <SearchClient query={query} />;
+  return <SearchClient query={query} requesterLocation={requesterLocation} />;
 }

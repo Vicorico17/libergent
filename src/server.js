@@ -66,6 +66,7 @@ const server = http.createServer(async (req, res) => {
     const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
     const site = url.searchParams.get("site") || "default";
+    const requesterLocation = (url.searchParams.get("requesterLocation") || url.searchParams.get("location") || "").trim();
     const limitParam = url.searchParams.get("limit");
     const pagesParam = url.searchParams.get("pages");
     const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
@@ -82,7 +83,15 @@ const server = http.createServer(async (req, res) => {
         : site === "default"
           ? getDefaultSiteKeys()
           : [getSite(site).key];
-      const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys });
+      const payload = await searchAcrossSites({
+        query,
+        condition,
+        provider,
+        limit,
+        maxPages,
+        requesterLocation,
+        siteKeys
+      });
       await logSearchEvent({ query, condition, provider, siteKeys, payload });
       sendJson(res, 200, payload);
     } catch (error) {

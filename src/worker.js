@@ -63,6 +63,7 @@ async function handleApi(request, env) {
     const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
     const site = url.searchParams.get("site") || "default";
+    const requesterLocation = (url.searchParams.get("requesterLocation") || url.searchParams.get("location") || "").trim();
     const limitParam = url.searchParams.get("limit");
     const pagesParam = url.searchParams.get("pages");
     const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
@@ -85,6 +86,7 @@ async function handleApi(request, env) {
         provider,
         limit,
         maxPages,
+        requesterLocation,
         siteKeys
       });
 

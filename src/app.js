@@ -134,6 +134,7 @@ export async function searchAcrossSites({
   provider = "auto",
   limit,
   maxPages,
+  requesterLocation = "",
   siteKeys = getDefaultSiteKeys()
 }) {
   const orderedSiteKeys = [...siteKeys].sort((a, b) => getSite(a).priority - getSite(b).priority);
@@ -147,7 +148,8 @@ export async function searchAcrossSites({
       {
         condition,
         creditBudget,
-        creditsUsed: 0
+        creditsUsed: 0,
+        requesterLocation
       }
     );
   }
@@ -167,6 +169,7 @@ export async function searchAcrossSites({
   return aggregateMarketplaceResults(rawResults, {
     condition,
     creditBudget,
-    creditsUsed: rawResults.reduce((sum, result) => sum + (result.ok ? result.creditsUsed || 0 : 0), 0)
+    creditsUsed: rawResults.reduce((sum, result) => sum + (result.ok ? result.creditsUsed || 0 : 0), 0),
+    requesterLocation
   });
 }
