@@ -214,9 +214,11 @@ export function SearchClient({
                     <ProductCard product={featuredBestOffer} isBestDeal />
                   </section>
                 ) : null}
-                {regularResults.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                  {regularResults.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
               </div>
             )}
           </div>

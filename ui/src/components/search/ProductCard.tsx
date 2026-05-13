@@ -32,7 +32,9 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
 
   return (
     <div
-      className="bg-white rounded-2xl overflow-hidden flex flex-col md:flex-row hover:shadow-md transition-shadow group"
+      className={`bg-white rounded-2xl overflow-hidden hover:shadow-md transition-shadow group ${
+        isBestDeal ? "flex flex-col md:flex-row" : "flex flex-col"
+      }`}
       style={{
         boxShadow: isBestDeal
           ? "0 8px 20px rgba(255,189,46,0.22), 0 0 0 2px rgba(255,189,46,0.45)"
@@ -40,7 +42,11 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
       }}
     >
       {/* Image */}
-      <div className="relative bg-[#F8F9FA] w-full md:w-56 lg:w-64 shrink-0 aspect-[4/3] md:aspect-auto md:min-h-[190px] flex items-center justify-center overflow-hidden">
+      <div
+        className={`relative bg-[#F8F9FA] shrink-0 flex items-center justify-center overflow-hidden ${
+          isBestDeal ? "w-full md:w-56 lg:w-64 aspect-[4/3] md:aspect-auto md:min-h-[190px]" : "w-full aspect-[4/3]"
+        }`}
+      >
         {product.image ? (
           <img src={product.image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
@@ -68,11 +74,14 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
       </div>
 
       {/* Content */}
-      <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
-        <p className="text-base font-semibold text-[#111111] leading-snug line-clamp-2">{title}</p>
+      <div className={`flex flex-col flex-1 ${isBestDeal ? "p-4 md:p-5 gap-3" : "p-4 gap-2"}`}>
+        <p className={`font-semibold text-[#111111] leading-snug line-clamp-2 ${isBestDeal ? "text-base" : "text-sm"}`}>{title}</p>
 
-        <div className="flex items-center justify-between mt-auto pt-1 gap-3">
-          <span className="font-pixel text-[#111111] whitespace-nowrap" style={{ fontSize: "15px" }}>
+        <div className={`flex items-center justify-between mt-auto pt-1 ${isBestDeal ? "gap-3" : ""}`}>
+          <span
+            className={`font-pixel text-[#111111] ${isBestDeal ? "whitespace-nowrap" : ""}`}
+            style={{ fontSize: isBestDeal ? "15px" : "14px" }}
+          >
             {hasPrice ? `${price.toLocaleString("ro-RO")} RON` : "Fără preț"}
           </span>
           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#F8F9FA]" style={{ color: conditionColor }}>
@@ -80,7 +89,7 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
           </span>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-[#6B6B6B] gap-3">
+        <div className={`flex items-center justify-between text-xs text-[#6B6B6B] ${isBestDeal ? "gap-3" : ""}`}>
           <span>{location}</span>
           <span>{postedDateLabel}</span>
         </div>
@@ -89,7 +98,9 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
           href={url || "#"}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-1 inline-flex justify-center items-center h-10 rounded-xl border border-[#D9D9D9] text-sm font-semibold text-[#111111] hover:border-[#4F7CFF] hover:text-[#4F7CFF] transition-colors md:w-44"
+          className={`mt-1 inline-flex justify-center items-center rounded-xl border border-[#D9D9D9] font-semibold text-[#111111] hover:border-[#4F7CFF] hover:text-[#4F7CFF] transition-colors ${
+            isBestDeal ? "h-10 text-sm md:w-44" : "h-9 text-xs"
+          }`}
         >
           Vezi anunțul →
         </a>
