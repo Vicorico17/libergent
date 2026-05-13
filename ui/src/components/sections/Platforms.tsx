@@ -1,15 +1,15 @@
 const platforms = [
   { name: "OLX", color: "#0047AB" },
   { name: "Vinted", color: "#09B1BA" },
-  { name: "Facebook\nMarketplace", color: "#1877F2" },
+  { name: "LaJumate", color: "#0D7A44" },
   { name: "Publi24", color: "#E84C0C" },
-  { name: "Storia", color: "#7B3FBE" },
-  { name: "MerXu", color: "#0066CC" },
+  { name: "Okazii", color: "#7B3FBE" },
+  { name: "Autovit*", color: "#0066CC" },
 ];
 
 export function Platforms() {
   return (
-    <section className="bg-white py-20 px-6">
+    <section id="platforme" className="bg-white py-20 px-6">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-12">
           <p className="text-xs font-pixel text-[#6B6B6B] mb-4 tracking-widest uppercase">
@@ -19,10 +19,10 @@ export function Platforms() {
             className="font-pixel text-[#111111] mb-4"
             style={{ fontSize: "clamp(16px, 3vw, 32px)", lineHeight: 1.2 }}
           >
-            Găsim pe toate platformele.
+            Platforme active acum.
           </h2>
           <p className="text-[#6B6B6B] text-base max-w-md mx-auto">
-            Tu nu trebuie să verifici fiecare în parte. Noi o facem pentru tine.
+            Căutăm în marketplace-uri active din România și centralizăm rezultatele într-un singur loc.
           </p>
         </div>
 
@@ -41,10 +41,10 @@ export function Platforms() {
             </div>
           ))}
 
-          <div className="flex items-center justify-center rounded-xl px-6 py-3 bg-[#F8F9FA] border border-dashed border-[#D9D9D9] min-w-[120px]">
-            <span className="text-sm text-[#6B6B6B] font-medium">+ mai multe...</span>
-          </div>
         </div>
+        <p className="text-xs text-[#6B6B6B] text-center mt-4">
+          * Autovit este inclus pentru căutări din categoria auto.
+        </p>
       </div>
     </section>
   );

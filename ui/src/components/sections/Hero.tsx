@@ -25,7 +25,7 @@ const plusSigns: PlusSign[] = [
 const featureItems = [
   {
     label: "Căutare inteligentă",
-    desc: "Scanăm zeci de platforme pentru tine.",
+    desc: "Căutăm pe platforme second-hand din România.",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <circle cx="11" cy="11" r="8" stroke="#4F7CFF" strokeWidth="2" />
@@ -57,7 +57,7 @@ const featureItems = [
   },
   {
     label: "Urmezi cele mai bune oferte",
-    desc: "Oportunitățile bune nu mai scapă.",
+    desc: "Compari rapid rezultate din mai multe surse.",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
         <path d="M3 17l4-8 4 4 4-6 4 4" stroke="#FFC857" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -104,7 +104,7 @@ export function Hero() {
         <p className="text-[#6B6B6B] text-lg md:text-xl font-medium mb-4 leading-relaxed">
           Găsește rapid produse second-hand,
           <br />
-          fără stres.
+          din mai multe platforme din România.
         </p>
 
         <div className="flex items-center gap-3 mb-8 text-base md:text-lg font-semibold">
