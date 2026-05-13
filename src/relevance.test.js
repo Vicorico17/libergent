@@ -59,3 +59,19 @@ test("rejects listings when random critical query token is missing", () => {
   assert.ok(listing.relevanceScore < 55);
   assert.ok(listing.rejectionReasons.includes("missing_critical_query_tokens"));
 });
+
+test("penalizes non-jimny Suzuki listings for Suzuki Jimny queries", () => {
+  const query = "Suzuki Jimny";
+  const jimnyListing = classifyListingIntent(
+    { title: "Suzuki Jimny 1.5 4x4 2020", price: "14900 euro", priceRon: 74500 },
+    query
+  );
+  const vitaraListing = classifyListingIntent(
+    { title: "Suzuki Vitara 1.6 benzina 2018", price: "10900 euro", priceRon: 54500 },
+    query
+  );
+
+  assert.ok(jimnyListing.relevanceScore > vitaraListing.relevanceScore);
+  assert.equal(vitaraListing.isRecommendedCandidate, false);
+  assert.ok(vitaraListing.rejectionReasons.includes("missing_critical_query_tokens"));
+});
