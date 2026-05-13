@@ -31,12 +31,15 @@ function parseSrcset(value = "") {
 }
 
 function isUsableImageUrl(value = "") {
-  return Boolean(value) && !/^data:/i.test(value);
+  return Boolean(value) &&
+    !/^data:/i.test(value) &&
+    !/no[_-]?thumbnail/i.test(value) &&
+    !/\/placeholder\./i.test(value);
 }
 
 export function extractImageCandidate(htmlChunk = "") {
-  const imgTag = htmlChunk.match(/<img\b[\s\S]*?>/i)?.[0] || "";
-  if (!imgTag) {
+  const imgTags = [...htmlChunk.matchAll(/<img\b[\s\S]*?>/gi)].map((match) => match[0]);
+  if (!imgTags.length) {
     return "";
   }
 
@@ -50,20 +53,22 @@ export function extractImageCandidate(htmlChunk = "") {
     "srcset"
   ];
 
-  for (const attribute of directCandidateAttributes) {
-    const value = getAttribute(imgTag, attribute).trim();
-    if (!value) {
-      continue;
-    }
-    if (attribute === "srcset" || attribute === "data-srcset") {
-      const fromSrcset = parseSrcset(value);
-      if (isUsableImageUrl(fromSrcset)) {
-        return fromSrcset;
+  for (const imgTag of imgTags) {
+    for (const attribute of directCandidateAttributes) {
+      const value = getAttribute(imgTag, attribute).trim();
+      if (!value) {
+        continue;
       }
-      continue;
-    }
-    if (isUsableImageUrl(value)) {
-      return value;
+      if (attribute === "srcset" || attribute === "data-srcset") {
+        const fromSrcset = parseSrcset(value);
+        if (isUsableImageUrl(fromSrcset)) {
+          return fromSrcset;
+        }
+        continue;
+      }
+      if (isUsableImageUrl(value)) {
+        return value;
+      }
     }
   }
 

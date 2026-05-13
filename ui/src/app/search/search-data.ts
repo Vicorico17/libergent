@@ -173,11 +173,11 @@ function normalizeImageUrl(value?: string, listingUrl?: string) {
   }
 
   if (raw.startsWith("//")) {
-    return `https:${raw}`;
+    return proxiedMarketplaceImage(`https:${raw}`);
   }
 
   if (/^https?:\/\//i.test(raw)) {
-    return raw;
+    return proxiedMarketplaceImage(raw);
   }
 
   try {
@@ -189,6 +189,19 @@ function normalizeImageUrl(value?: string, listingUrl?: string) {
   }
 
   return undefined;
+}
+
+function proxiedMarketplaceImage(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.hostname === "frankfurt.apollo.olxcdn.com" || url.hostname === "images.olxcdn.com") {
+      return `/api/image?url=${encodeURIComponent(url.toString())}`;
+    }
+  } catch {
+    return value;
+  }
+
+  return value;
 }
 
 function interleave<T>(groups: T[][]) {

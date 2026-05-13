@@ -23,6 +23,19 @@ test("extractImageCandidate prefers the displayed img src over responsive altern
   );
 });
 
+test("extractImageCandidate skips marketplace placeholder thumbnails", () => {
+  const html = `
+    <img src="https://www.olx.ro/app/static/media/no_thumbnail.15f456ec5.svg" />
+    <img src="https://frankfurt.apollo.olxcdn.com:443/v1/files/item-RO/image;s=216x152;q=50" />
+  `;
+
+  assert.equal(
+    extractImageCandidate(html),
+    "https://frankfurt.apollo.olxcdn.com:443/v1/files/item-RO/image;s=216x152;q=50"
+  );
+  assert.equal(extractImageCandidate('<img src="https://www.olx.ro/app/static/media/no_thumbnail.15f456ec5.svg" />'), "");
+});
+
 test("parseOlxHtml keeps image when card uses lazy-loaded img attributes", () => {
   const html = `
     <div data-cy="l-card" data-testid="l-card">

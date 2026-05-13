@@ -359,12 +359,14 @@ export function getDefaultSiteKeys() {
 }
 
 export function getSiteKeysForAllSearch(query) {
-  if (isCarQuery(query)) {
-    return ["autovit.ro"];
-  }
-
-  return Object.values(SITES)
+  const defaultSiteKeys = Object.values(SITES)
     .filter((site) => site.defaultEnabled)
     .sort((a, b) => a.priority - b.priority)
     .map((site) => site.key);
+
+  if (isCarQuery(query)) {
+    return ["autovit.ro", ...defaultSiteKeys];
+  }
+
+  return defaultSiteKeys;
 }

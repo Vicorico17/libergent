@@ -54,9 +54,10 @@ export function SearchClient({
       try {
         const params = new URLSearchParams({
           q: query,
-          site: "default",
+          site: "all",
           provider: "auto",
           limit: "500",
+          pages: "12",
         });
         const response = await fetch(`/api/search?${params.toString()}`, {
           signal: controller.signal,
@@ -71,7 +72,7 @@ export function SearchClient({
           return;
         }
 
-        const mappedProducts = mapProducts(payload).slice(0, 120);
+        const mappedProducts = mapProducts(payload).slice(0, 500);
         setProducts(mappedProducts);
         setBestOffer(mapBestOffer(payload, mappedProducts));
         setUpdatedAt(payload.summary?.searchedAt || "");
@@ -189,10 +190,20 @@ export function SearchClient({
 
           <div className="flex-1 min-w-0">
             {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <MascotSVG size={64} className="mb-4 opacity-30" />
-                <p className="font-semibold text-[#111111] mb-1">Se caută...</p>
-                <p className="text-sm text-[#6B6B6B]">Verificăm marketplace-urile disponibile.</p>
+              <div className="min-h-[420px] rounded-lg border border-[#D9D9D9] bg-white flex flex-col items-center justify-center px-6 py-24 text-center">
+                <div className="relative mb-5">
+                  <span className="absolute inset-0 rounded-full bg-[#4F7CFF]/10 animate-ping" />
+                  <div className="relative h-20 w-20 rounded-full bg-[#F8F9FA] flex items-center justify-center">
+                    <MascotSVG size={58} className="opacity-80" />
+                  </div>
+                </div>
+                <p className="font-semibold text-[#111111] mb-1">Căutarea este în desfășurare</p>
+                <p className="text-sm text-[#6B6B6B] max-w-sm">
+                  Scanăm marketplace-urile și încărcăm cât mai multe produse relevante.
+                </p>
+                <div className="mt-6 h-2 w-full max-w-xs overflow-hidden rounded-full bg-[#F1F2F4]">
+                  <div className="h-full w-1/3 rounded-full bg-[#4F7CFF] animate-[pulse_1.2s_ease-in-out_infinite]" />
+                </div>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">

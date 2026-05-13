@@ -5,9 +5,8 @@ import { buildMockSearchResult } from "./mock.js";
 
 const MAX_CREDITS_PER_SITE = 3;
 const DEFAULT_SITE_TIMEOUT_MS = 20000;
-const SERVERLESS_MAX_PAGES = 2;
-const SERVERLESS_MAX_RESULTS_PER_SITE = 120;
-const SERVERLESS_SITE_TIMEOUT_MS = 6000;
+const SERVERLESS_MAX_RESULTS_PER_SITE = 500;
+const SERVERLESS_SITE_TIMEOUT_MS = 30000;
 
 function isServerlessRuntime() {
   return Boolean(
@@ -69,11 +68,11 @@ function getCreditBudget(siteKeys, provider) {
 }
 
 function getSiteTimeoutMs(site, pages) {
+  const configuredTimeout = site.timeoutMs ?? DEFAULT_SITE_TIMEOUT_MS;
   if (isServerlessRuntime()) {
-    return SERVERLESS_SITE_TIMEOUT_MS;
+    return Math.min(configuredTimeout * Math.max(1, pages), SERVERLESS_SITE_TIMEOUT_MS);
   }
 
-  const configuredTimeout = site.timeoutMs ?? DEFAULT_SITE_TIMEOUT_MS;
   return Math.max(
     DEFAULT_SITE_TIMEOUT_MS,
     Math.min(configuredTimeout * Math.max(1, pages), DEFAULT_SITE_TIMEOUT_MS * Math.max(1, pages))
@@ -93,10 +92,7 @@ async function searchSite({ siteKey, query, condition, provider, limit, maxPages
   const searchProvider = normalizeProvider(provider);
   const resolvedProvider = searchProvider === "auto" ? site.provider : searchProvider;
   const affordablePages = getMaxAffordablePages(site, searchProvider);
-  const runtimeMaxPages = isServerlessRuntime()
-    ? Math.min(affordablePages, SERVERLESS_MAX_PAGES)
-    : affordablePages;
-  const desiredPages = Math.min(maxPages ?? runtimeMaxPages, runtimeMaxPages);
+  const desiredPages = Math.min(maxPages ?? affordablePages, affordablePages);
   const runtimeMaxResults = isServerlessRuntime()
     ? Math.min((site.pageSize || SERVERLESS_MAX_RESULTS_PER_SITE) * desiredPages, SERVERLESS_MAX_RESULTS_PER_SITE)
     : Number.POSITIVE_INFINITY;

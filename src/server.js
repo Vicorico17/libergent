@@ -8,6 +8,11 @@ import { buildHistoryPayload, logSearchEvent } from "./history.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { insertOfferFeedbackToSupabase, isSupabaseConfigured } from "./supabase.js";
 
+const ALLOWED_IMAGE_HOSTS = new Set([
+  "frankfurt.apollo.olxcdn.com",
+  "images.olxcdn.com"
+]);
+
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
 const HOST = process.env.HOST || "127.0.0.1";
 const ROOT = process.cwd();
@@ -18,6 +23,44 @@ loadEnv(ROOT);
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload, null, 2));
+}
+
+function isAllowedImageUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && ALLOWED_IMAGE_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function proxyImage(res, imageUrl) {
+  if (!isAllowedImageUrl(imageUrl)) {
+    sendJson(res, 400, { error: "Image host is not allowed" });
+    return;
+  }
+
+  const response = await fetch(imageUrl, {
+    headers: {
+      "user-agent": "Mozilla/5.0 (compatible; libergent/0.1; +https://localhost)",
+      accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+      referer: "https://www.olx.ro/"
+    },
+    redirect: "follow"
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!response.ok || !contentType.startsWith("image/")) {
+    sendJson(res, 502, { error: `Image fetch failed (${response.status})` });
+    return;
+  }
+
+  res.writeHead(200, {
+    "content-type": contentType,
+    "cache-control": "public, max-age=86400",
+    "access-control-allow-origin": "*"
+  });
+  res.end(Buffer.from(await response.arrayBuffer()));
 }
 
 function sendFile(res, filePath) {
@@ -60,6 +103,15 @@ function readJsonBody(req) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
+
+  if (url.pathname === "/api/image") {
+    try {
+      await proxyImage(res, url.searchParams.get("url") || "");
+    } catch (error) {
+      sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
+    }
+    return;
+  }
 
   if (url.pathname === "/api/search") {
     const query = url.searchParams.get("q")?.trim();

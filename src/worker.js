@@ -3,6 +3,11 @@ import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-bas
 import { insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 
+const ALLOWED_IMAGE_HOSTS = new Set([
+  "frankfurt.apollo.olxcdn.com",
+  "images.olxcdn.com"
+]);
+
 function applyEnv(env = {}) {
   if (!globalThis.process) {
     globalThis.process = { env: {} };
@@ -25,6 +30,48 @@ function json(payload, status = 200) {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store"
+    }
+  });
+}
+
+function isAllowedImageUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && ALLOWED_IMAGE_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function proxyImage(url) {
+  if (!isAllowedImageUrl(url)) {
+    return json({ error: "Image host is not allowed" }, 400);
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      "user-agent": "Mozilla/5.0 (compatible; libergent/0.1; +https://localhost)",
+      accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+      referer: "https://www.olx.ro/"
+    },
+    redirect: "follow"
+  });
+
+  if (!response.ok) {
+    return json({ error: `Image fetch failed (${response.status})` }, 502);
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.startsWith("image/")) {
+    return json({ error: "Upstream response is not an image" }, 502);
+  }
+
+  return new Response(response.body, {
+    status: 200,
+    headers: {
+      "content-type": contentType,
+      "cache-control": "public, max-age=86400",
+      "access-control-allow-origin": "*"
     }
   });
 }
@@ -57,6 +104,10 @@ async function handleApi(request, env) {
   applyEnv(env);
 
   const url = new URL(request.url);
+
+  if (url.pathname === "/api/image") {
+    return proxyImage(url.searchParams.get("url") || "");
+  }
 
   if (url.pathname === "/api/search") {
     const query = url.searchParams.get("q")?.trim();
