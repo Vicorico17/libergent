@@ -111,6 +111,66 @@ test("vacuum query keeps complete bagged vacuum listings", () => {
   assert.equal(listing.isRecommendedCandidate, true);
 });
 
+test("rejects listings that use query as a shape or style descriptor", () => {
+  const campingTable = classifyListingIntent(
+    {
+      title: "Masa Camping Pliabila Tip Valiza 120x60x70cm Aluminiu si MDF",
+      price: "120 lei",
+      priceRon: 120
+    },
+    "valiza"
+  );
+  const suitcase = classifyListingIntent(
+    {
+      title: "Valiza voiaj Samsonite mare",
+      price: "180 lei",
+      priceRon: 180
+    },
+    "valiza"
+  );
+  const trolley = classifyListingIntent(
+    {
+      title: "Troler valiza calatorie",
+      price: "100 lei",
+      priceRon: 100
+    },
+    "valiza"
+  );
+
+  assert.notEqual(campingTable.listingType, "main_product");
+  assert.equal(campingTable.isRecommendedCandidate, false);
+  assert.equal(suitcase.listingType, "main_product");
+  assert.equal(suitcase.isRecommendedCandidate, true);
+  assert.equal(trolley.listingType, "main_product");
+  assert.equal(trolley.isRecommendedCandidate, true);
+  assert.ok(suitcase.relevanceScore > campingTable.relevanceScore);
+});
+
+test("luggage query rejects tool cases and keeps travel luggage", () => {
+  const toolCase = classifyListingIntent(
+    {
+      title: "Valiza BOSCH 5-40 pentru rotopercutor sau picamar SDS MAX",
+      price: "160 lei",
+      priceRon: 160
+    },
+    "valiza"
+  );
+  const suitcase = classifyListingIntent(
+    {
+      title: "Valiza troller mare plastic dur ABS Samsonite",
+      price: "220 lei",
+      priceRon: 220
+    },
+    "valiza"
+  );
+
+  assert.notEqual(toolCase.listingType, "main_product");
+  assert.equal(toolCase.isRecommendedCandidate, false);
+  assert.equal(suitcase.listingType, "main_product");
+  assert.equal(suitcase.isRecommendedCandidate, true);
+  assert.ok(suitcase.relevanceScore > toolCase.relevanceScore);
+});
+
 test("car query rejects accessories and keeps complete vehicle listing as recommended", () => {
   const query = "BMW X5";
   const accessory = classifyListingIntent(

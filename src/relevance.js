@@ -226,6 +226,15 @@ const BUNDLE_MARKERS = [
   "set"
 ];
 
+const ATTRIBUTE_MATCH_MARKERS = [
+  "format",
+  "forma de",
+  "in forma de",
+  "model",
+  "stil",
+  "tip"
+];
+
 const PRODUCT_TAXONOMY = {
   trumpet: {
     category: "instrument",
@@ -257,6 +266,23 @@ const PRODUCT_TAXONOMY = {
     tokens: ["money", "tree", "pachira", "arborele", "banilor", "copacul"],
     accessories: ["seminte"],
     exclusions: MEDIA_OR_TOY_HEADS
+  },
+  luggage: {
+    category: "luggage",
+    aliases: ["valiza", "geamantan", "troler", "troller", "suitcase", "luggage"],
+    tokens: ["valiza", "geamantan", "troler", "troller", "suitcase", "luggage"],
+    accessories: ["husa", "roata", "roti"],
+    exclusions: [
+      "bormasina",
+      "camping",
+      "masina de gaurit",
+      "masa",
+      "picamar",
+      "pliabila",
+      "rotopercutor",
+      "scule",
+      "unelte"
+    ]
   },
   air_fryer: {
     category: "kitchen",
@@ -385,6 +411,11 @@ const QUERY_ALIASES = [
     tokens: PRODUCT_TAXONOMY.money_tree.tokens
   },
   {
+    category: "luggage",
+    patterns: PRODUCT_TAXONOMY.luggage.aliases,
+    tokens: PRODUCT_TAXONOMY.luggage.tokens
+  },
+  {
     category: "kitchen",
     patterns: PRODUCT_TAXONOMY.air_fryer.aliases,
     tokens: PRODUCT_TAXONOMY.air_fryer.tokens
@@ -456,6 +487,10 @@ const CATEGORY_EXCLUSIONS = {
     ...PRODUCT_TAXONOMY.money_tree.accessories,
     ...PRODUCT_TAXONOMY.money_tree.exclusions
   ],
+  luggage: [
+    ...PRODUCT_TAXONOMY.luggage.accessories,
+    ...PRODUCT_TAXONOMY.luggage.exclusions
+  ],
   kitchen: [
     ...PRODUCT_TAXONOMY.air_fryer.accessories
   ]
@@ -469,6 +504,7 @@ const CATEGORY_PRICE_FLOORS_RON = {
   vehicle: 7000,
   sport: 120,
   plant: 20,
+  luggage: 30,
   kitchen: 80
 };
 
@@ -773,6 +809,9 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   const accessorySet = ["set", "pachet", "kit"].some((marker) => titleText.startsWith(`${marker} `)) &&
     hasAnchor &&
     hasAccessoryHead;
+  const anchorUsedAsAttribute = productAnchors.some((anchor) =>
+    ATTRIBUTE_MATCH_MARKERS.some((marker) => titleText.includes(`${normalizeText(marker)} ${anchor}`))
+  );
   const basketballRimWithNet = queryProfile.taxonomy === PRODUCT_TAXONOMY.basketball_hoop &&
     (titleTokens.has("inel") || titleTokens.has("panou")) &&
     (titleTokens.has("plasa") || titleTokens.has("plase") || titleTokens.has("net"));
@@ -780,8 +819,16 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   if (basketballRimWithNet) {
     return "main_product";
   }
-  if (queryProfile.queryType === "main_product" && startsWithProductAnchor && !startsWithAccessory) {
+  if (
+    queryProfile.queryType === "main_product" &&
+    startsWithProductAnchor &&
+    !startsWithAccessory &&
+    !negativeMatches.some((match) => match.intent === "part" || match.intent === "irrelevant")
+  ) {
     return "main_product";
+  }
+  if (queryProfile.queryType === "main_product" && anchorUsedAsAttribute && !startsWithProductAnchor) {
+    return "weak_match";
   }
   // If the listing is clearly an accessory-for-product phrase, keep it as accessory
   // even when it also contains generic bundle markers like "set" or "pachet".
