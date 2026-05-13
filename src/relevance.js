@@ -173,6 +173,15 @@ const VEHICLE_PART_HEADS = [
   "stopuri"
 ];
 
+const VEHICLE_ACCESSORY_HEADS = [
+  "covoare",
+  "covoras",
+  "covorase",
+  "presuri",
+  "suport telefon",
+  "suport telefoane"
+];
+
 const SPARE_PART_HEADS = [
   "acumulator",
   "baterie",
@@ -210,7 +219,7 @@ const PRODUCT_TAXONOMY = {
     category: "vehicle",
     aliases: ["jeep compass"],
     tokens: ["jeep", "compass"],
-    accessories: ["covorase", "husa", "huse", "jante", "anvelope", "cauciucuri"],
+    accessories: [...VEHICLE_ACCESSORY_HEADS, "husa", "huse", "jante", "anvelope", "cauciucuri"],
     parts: VEHICLE_PART_HEADS
   },
   table_tennis_table: {
@@ -244,16 +253,20 @@ const BRAND_ALIASES = [
   { brand: "acer", aliases: ["acer"] },
   { brand: "adidas", aliases: ["adidas"] },
   { brand: "aeg", aliases: ["aeg"] },
+  { brand: "audi", aliases: ["audi"] },
   { brand: "apple", aliases: ["apple", "iphone", "ipad", "macbook"] },
   { brand: "ariston", aliases: ["ariston"] },
   { brand: "asus", aliases: ["asus"] },
   { brand: "beko", aliases: ["beko"] },
   { brand: "bosch", aliases: ["bosch"] },
   { brand: "canon", aliases: ["canon"] },
+  { brand: "citroen", aliases: ["citroen"] },
+  { brand: "dacia", aliases: ["dacia"] },
   { brand: "decathlon", aliases: ["decathlon"] },
   { brand: "dell", aliases: ["dell"] },
   { brand: "dyson", aliases: ["dyson"] },
   { brand: "electrolux", aliases: ["electrolux"] },
+  { brand: "ford", aliases: ["ford"] },
   { brand: "garmin", aliases: ["garmin"] },
   { brand: "harman kardon", aliases: ["harman kardon", "harman"] },
   { brand: "huawei", aliases: ["huawei"] },
@@ -265,22 +278,47 @@ const BRAND_ALIASES = [
   { brand: "lenovo", aliases: ["lenovo"] },
   { brand: "lg", aliases: ["lg"] },
   { brand: "miele", aliases: ["miele"] },
+  { brand: "mercedes", aliases: ["mercedes", "mercedes benz"] },
   { brand: "microsoft", aliases: ["microsoft", "xbox"] },
   { brand: "new balance", aliases: ["new balance", "nb"] },
   { brand: "nike", aliases: ["nike", "jordan", "air jordan"] },
   { brand: "nintendo", aliases: ["nintendo", "switch"] },
   { brand: "nvidia", aliases: ["nvidia", "geforce", "rtx"] },
   { brand: "philips", aliases: ["philips"] },
+  { brand: "peugeot", aliases: ["peugeot"] },
   { brand: "puma", aliases: ["puma"] },
   { brand: "reebok", aliases: ["reebok"] },
+  { brand: "renault", aliases: ["renault"] },
   { brand: "samsung", aliases: ["samsung", "galaxy"] },
+  { brand: "seat", aliases: ["seat"] },
   { brand: "siemens", aliases: ["siemens"] },
+  { brand: "skoda", aliases: ["skoda"] },
   { brand: "sony", aliases: ["sony", "playstation", "ps5", "ps4"] },
+  { brand: "toyota", aliases: ["toyota"] },
+  { brand: "volkswagen", aliases: ["volkswagen", "vw"] },
   { brand: "whirlpool", aliases: ["whirlpool"] },
   { brand: "xiaomi", aliases: ["xiaomi", "redmi", "poco"] },
   { brand: "yamaha", aliases: ["yamaha"] },
   { brand: "zanussi", aliases: ["zanussi"] }
 ];
+
+const VEHICLE_BRANDS = new Set([
+  "audi",
+  "bmw",
+  "citroen",
+  "dacia",
+  "ford",
+  "jeep",
+  "mercedes",
+  "opel",
+  "peugeot",
+  "renault",
+  "seat",
+  "skoda",
+  "toyota",
+  "volkswagen",
+  "vw"
+]);
 
 const QUERY_ALIASES = [
   {
@@ -509,6 +547,8 @@ function getQueryProfile(query) {
   const brandTerms = getQueryBrandTerms(query);
   const categories = new Set();
   const taxonomy = getProductTaxonomy(normalized);
+  const tokenSet = new Set(baseTokens);
+  const hasVehicleBrand = [...VEHICLE_BRANDS].some((brand) => tokenSet.has(brand));
 
   for (const alias of QUERY_ALIASES) {
     if (alias.patterns.some((pattern) => normalized.includes(pattern))) {
@@ -522,6 +562,9 @@ function getQueryProfile(query) {
   }
   for (const token of brandTerms) {
     expandedTokens.add(token);
+  }
+  if (hasVehicleBrand && baseTokens.length >= 2) {
+    categories.add("vehicle");
   }
 
   return {
