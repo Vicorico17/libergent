@@ -197,7 +197,7 @@ export function SearchClient({
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <MascotSVG size={64} className="mb-4 opacity-30" />
-                <p className="font-semibold text-[#111111] mb-1">Căutarea a eșuat</p>
+                <p className="font-semibold text-[#111111] mb-1">Căutare eșuată</p>
                 <p className="text-sm text-[#6B6B6B] max-w-md">{error}</p>
               </div>
             ) : filtered.length === 0 ? (
