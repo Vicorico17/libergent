@@ -74,4 +74,29 @@ test("penalizes non-jimny Suzuki listings for Suzuki Jimny queries", () => {
   assert.ok(jimnyListing.relevanceScore > vitaraListing.relevanceScore);
   assert.equal(vitaraListing.isRecommendedCandidate, false);
   assert.ok(vitaraListing.rejectionReasons.includes("missing_critical_query_tokens"));
+test("car query rejects accessories and keeps complete vehicle listing as recommended", () => {
+  const query = "BMW X5";
+  const accessory = classifyListingIntent(
+    {
+      title: "Covorase BMW X5 set complet",
+      description: "Presuri textile pentru BMW X5",
+      price: "250 lei",
+      priceRon: 250
+    },
+    query
+  );
+  const vehicle = classifyListingIntent(
+    {
+      title: "BMW X5 3.0d xDrive 2015",
+      description: "Masina in stare buna, acte la zi",
+      price: "16500 euro",
+      priceRon: 82000
+    },
+    query
+  );
+
+  assert.notEqual(accessory.listingType, "main_product");
+  assert.equal(accessory.isRecommendedCandidate, false);
+  assert.ok(vehicle.isRecommendedCandidate);
+  assert.ok(vehicle.relevanceScore > accessory.relevanceScore);
 });
