@@ -1,6 +1,79 @@
 import { normalizeListing } from "./normalize.js";
 import { classifyListingIntent, getQueryBrandTerms, tokenize } from "./relevance.js";
 
+const CITY_COORDINATES = {
+  "alba iulia": { lat: 46.0695, lon: 23.5702 },
+  arad: { lat: 46.1866, lon: 21.3123 },
+  bacau: { lat: 46.567, lon: 26.9146 },
+  baia: { lat: 47.6597, lon: 23.5819 },
+  brasov: { lat: 45.6579, lon: 25.6012 },
+  braila: { lat: 45.2692, lon: 27.9575 },
+  bucuresti: { lat: 44.4268, lon: 26.1025 },
+  buzau: { lat: 45.1503, lon: 26.8161 },
+  cluj: { lat: 46.7712, lon: 23.6236 },
+  constanta: { lat: 44.1598, lon: 28.6348 },
+  craiova: { lat: 44.3302, lon: 23.7949 },
+  galati: { lat: 45.4353, lon: 28.008 },
+  iasi: { lat: 47.1585, lon: 27.6014 },
+  oradea: { lat: 47.0465, lon: 21.9189 },
+  pitesti: { lat: 44.8565, lon: 24.8692 },
+  ploiesti: { lat: 44.9369, lon: 26.0124 },
+  sibiu: { lat: 45.7983, lon: 24.1256 },
+  suceava: { lat: 47.6635, lon: 26.2732 },
+  timisoara: { lat: 45.7489, lon: 21.2087 },
+  targu: { lat: 46.5424, lon: 24.5575 }
+};
+
+function normalizeLocationText(value = "") {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function toRadians(value) {
+  return (value * Math.PI) / 180;
+}
+
+function haversineDistanceKm(a, b) {
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(b.lat - a.lat);
+  const dLon = toRadians(b.lon - a.lon);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLon = Math.sin(dLon / 2);
+  const aa = sinLat * sinLat + Math.cos(toRadians(a.lat)) * Math.cos(toRadians(b.lat)) * sinLon * sinLon;
+  const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+  return earthRadiusKm * c;
+}
+
+function resolveLocationCoordinates(location = "") {
+  const normalized = normalizeLocationText(location);
+  if (!normalized) {
+    return null;
+  }
+
+  const entries = Object.entries(CITY_COORDINATES).sort((a, b) => b[0].length - a[0].length);
+  for (const [token, coords] of entries) {
+    if (normalized.includes(token)) {
+      return coords;
+    }
+  }
+
+  return null;
+}
+
+function distanceScore(distanceKm) {
+  if (!Number.isFinite(distanceKm)) {
+    return 60;
+  }
+  if (distanceKm <= 5) return 100;
+  if (distanceKm <= 25) return 90;
+  if (distanceKm <= 75) return 75;
+  if (distanceKm <= 150) return 60;
+  if (distanceKm <= 300) return 45;
+  return 30;
+}
+
 function median(values) {
   if (!values.length) {
     return null;
@@ -160,7 +233,7 @@ function scoreOffer(item, query, medianPriceRon, condition) {
 
 // Cross-marketplace recommendation score used for "best offer possible":
 // relevance + value + freshness + condition, then penalties for low-confidence signals.
-function scoreGlobalRecommendation(item, medianPriceRon, condition) {
+function scoreGlobalRecommendation(item, medianPriceRon, condition, requesterLocation) {
   const relevance = Number.isFinite(item.relevanceScore) ? item.relevanceScore : 50;
   const value = priceValueScore(item.priceRon, medianPriceRon);
   const freshness = Math.min(100, recencyScore(item.postedAt) * 5);
@@ -168,12 +241,20 @@ function scoreGlobalRecommendation(item, medianPriceRon, condition) {
     condition === "any" ? 70 :
     matchesCondition(item, condition) ? 100 :
     25;
+  const requesterCoords = resolveLocationCoordinates(requesterLocation);
+  const listingCoords = resolveLocationCoordinates(item.location);
+  const distanceKm =
+    requesterCoords && listingCoords
+      ? haversineDistanceKm(requesterCoords, listingCoords)
+      : Number.NaN;
+  const localityScore = distanceScore(distanceKm);
 
   let score = Math.round(
-    (relevance * 0.46) +
-    (value * 0.34) +
-    (freshness * 0.12) +
-    (conditionScore * 0.08)
+    (relevance * 0.42) +
+    (value * 0.3) +
+    (freshness * 0.1) +
+    (conditionScore * 0.08) +
+    (localityScore * 0.1)
   );
 
   if (Number.isFinite(item.priceRon) && Number.isFinite(medianPriceRon) && medianPriceRon > 0) {
@@ -195,7 +276,10 @@ function scoreGlobalRecommendation(item, medianPriceRon, condition) {
     score -= 30;
   }
 
-  return Math.max(0, Math.min(100, score));
+  return {
+    recommendationScore: Math.max(0, Math.min(100, score)),
+    distanceKm
+  };
 }
 
 function pickTopRecommendationsByMarketplace(items, limit = 4) {
@@ -256,7 +340,10 @@ function splitClassifiedItems(items) {
   };
 }
 
-export function aggregateMarketplaceResults(results, { condition = "any", creditBudget = null, creditsUsed = null } = {}) {
+export function aggregateMarketplaceResults(
+  results,
+  { condition = "any", creditBudget = null, creditsUsed = null, requesterLocation = "" } = {}
+) {
   const normalizedResults = results.map((result) => {
     if (!result.ok) {
       return result;
@@ -327,10 +414,14 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     ? allPricedItems.reduce((sum, item) => sum + item.priceRon, 0) / allPricedItems.length
     : null;
   const globalMedianPriceRon = median(allScoredItems.map((item) => item.priceRon));
-  const allBestCandidates = allScoredItems.map((item) => ({
-    ...item,
-    recommendationScore: scoreGlobalRecommendation(item, globalMedianPriceRon, condition)
-  }));
+  const allBestCandidates = allScoredItems.map((item) => {
+    const scoreData = scoreGlobalRecommendation(item, globalMedianPriceRon, condition, requesterLocation);
+    return {
+      ...item,
+      recommendationScore: scoreData.recommendationScore,
+      distanceKm: scoreData.distanceKm
+    };
+  });
   const bestOffer = allBestCandidates.length
     ? allBestCandidates.reduce((best, item) => {
         if (!best) {
@@ -338,6 +429,9 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
         }
         if (item.recommendationScore !== best.recommendationScore) {
           return item.recommendationScore > best.recommendationScore ? item : best;
+        }
+        if (Number.isFinite(item.distanceKm) && Number.isFinite(best.distanceKm) && item.distanceKm !== best.distanceKm) {
+          return item.distanceKm < best.distanceKm ? item : best;
         }
         return safePriceForTieBreak(item.priceRon) < safePriceForTieBreak(best.priceRon) ? item : best;
       }, null)

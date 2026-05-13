@@ -18,6 +18,7 @@ const defaultFilters: Filters = {
 
 type SearchClientProps = {
   query: string;
+  requesterLocation?: string;
   initialProducts?: Product[];
   initialError?: string;
   searchedAt?: string;
@@ -25,6 +26,7 @@ type SearchClientProps = {
 
 export function SearchClient({
   query,
+  requesterLocation = "",
   initialProducts,
   initialError = "",
   searchedAt = "",
@@ -58,6 +60,9 @@ export function SearchClient({
           provider: "auto",
           limit: "500",
         });
+        if (requesterLocation) {
+          params.set("requesterLocation", requesterLocation);
+        }
         const response = await fetch(`/api/search?${params.toString()}`, {
           signal: controller.signal,
         });
@@ -91,7 +96,7 @@ export function SearchClient({
     runSearch();
 
     return () => controller.abort();
-  }, [query]);
+  }, [query, requesterLocation]);
 
   const filtered = useMemo(() => {
     const base = products.filter((p) => {
