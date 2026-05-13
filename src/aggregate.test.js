@@ -80,3 +80,22 @@ test("keeps listings with missing optional metadata in recommendation output", (
   assert.ok(noPriceOffer, "expected no-price listing to still be scored and surfaced");
   assert.ok(Number.isFinite(noPriceOffer.recommendationScore));
 });
+
+test("does not surface recommendations when critical random tokens are missing", () => {
+  const query = "asdf iphone 14";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Apple iPhone 14 128GB impecabil",
+        price: "2500 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://olx.ro/iphone14"
+      }
+    ])
+  ]);
+
+  assert.equal(aggregated.results[0].itemCount, 0);
+  assert.equal(aggregated.summary.recommendedOffers.length, 0);
+  assert.equal(aggregated.bestOffer, null);
+});
