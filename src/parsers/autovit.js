@@ -1,3 +1,5 @@
+import { extractImageCandidate } from "./image.js";
+
 function decodeHtmlEntities(value = "") {
   return value
     .replace(/&nbsp;/gi, " ")
@@ -79,7 +81,7 @@ function parseTitle(block) {
 
 function parseListingBlock(block) {
   const urlMatch = block.match(/<a[^>]+href="((?:https?:\/\/www\.autovit\.ro)?\/autoturisme\/[^"]+)"[^>]*>/i);
-  const imageMatch = block.match(/<img[^>]+src="([^"]+)"[^>]*>/i);
+  const imageCandidate = extractImageCandidate(block);
   const title = parseTitle(block);
   const url = toAbsoluteUrl(urlMatch?.[1] || "");
 
@@ -112,7 +114,7 @@ function parseListingBlock(block) {
     condition: details.join(" • "),
     sellerType: /Privat/i.test(text) ? "Privat" : /Profesionist/i.test(text) ? "Profesionist" : "",
     url,
-    imageUrl: toAbsoluteUrl(imageMatch?.[1] || "")
+    imageUrl: toAbsoluteUrl(imageCandidate)
   };
 }
 
