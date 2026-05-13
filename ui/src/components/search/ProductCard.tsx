@@ -13,11 +13,12 @@ interface Product {
 
 interface ProductCardProps {
   product: Product;
+  isBestDeal?: boolean;
 }
 
 export type { Product };
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
   const { title, price, platform, platformColor, condition, location, daysAgo, url } = product;
   const hasPrice = price !== null && Number.isFinite(price);
 
@@ -31,7 +32,11 @@ export function ProductCard({ product }: ProductCardProps) {
   return (
     <div
       className="bg-white rounded-2xl overflow-hidden flex flex-col hover:shadow-md transition-shadow group"
-      style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)" }}
+      style={{
+        boxShadow: isBestDeal
+          ? "0 8px 20px rgba(255,189,46,0.22), 0 0 0 2px rgba(255,189,46,0.45)"
+          : "0 2px 8px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)",
+      }}
     >
       {/* Image */}
       <div className="relative bg-[#F8F9FA] aspect-[4/3] flex items-center justify-center overflow-hidden">
@@ -51,6 +56,14 @@ export function ProductCard({ product }: ProductCardProps) {
         >
           {platform}
         </span>
+        {isBestDeal ? (
+          <span className="absolute left-2.5 bottom-2.5 inline-flex items-center gap-1 rounded-full bg-[#FFBD2E] text-[#111111] text-[11px] font-bold px-2 py-0.5">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M5 19h14l-1.5-10-4.5 3-3-6-3 6-4.5-3L5 19z" />
+            </svg>
+            Best deal
+          </span>
+        ) : null}
         {/* Save button */}
         <button className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-sm">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
