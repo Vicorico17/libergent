@@ -6,7 +6,7 @@ import { MascotSVG } from "@/components/MascotSVG";
 import { SearchBar } from "@/components/SearchBar";
 import { ProductCard, type Product } from "@/components/search/ProductCard";
 import { SearchFilters, type Filters } from "@/components/search/SearchFilters";
-import { mapProducts, type SearchPayload } from "./search-data";
+import { mapBestOffer, mapProducts, type SearchPayload } from "./search-data";
 
 const defaultFilters: Filters = {
   platforms: [],
@@ -31,6 +31,7 @@ export function SearchClient({
 }: SearchClientProps) {
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
+  const [bestOffer, setBestOffer] = useState<Product | null>(null);
   const [error, setError] = useState(initialError);
   const [updatedAt, setUpdatedAt] = useState(searchedAt);
   const [isLoading, setIsLoading] = useState(Boolean(query));
@@ -64,16 +65,20 @@ export function SearchClient({
 
         if (!response.ok || payload.error) {
           setProducts([]);
+          setBestOffer(null);
           setError(payload.error || "Căutarea nu a putut fi finalizată.");
           setUpdatedAt("");
           return;
         }
 
-        setProducts(mapProducts(payload).slice(0, 120));
+        const mappedProducts = mapProducts(payload).slice(0, 120);
+        setProducts(mappedProducts);
+        setBestOffer(mapBestOffer(payload, mappedProducts));
         setUpdatedAt(payload.summary?.searchedAt || "");
       } catch (searchError) {
         if (controller.signal.aborted) return;
         setProducts([]);
+        setBestOffer(null);
         setError(searchError instanceof Error ? searchError.message : "Căutarea nu a putut fi finalizată.");
         setUpdatedAt("");
       } finally {
@@ -115,26 +120,15 @@ export function SearchClient({
     return [bestDeal, ...sorted];
   }, [filters, products]);
 
-  const bestDealId = useMemo(() => {
-    let best: Product | null = null;
+  const featuredBestOffer = useMemo(() => {
+    if (!bestOffer) return null;
+    return filtered.find((product) => product.id === bestOffer.id) || null;
+  }, [bestOffer, filtered]);
 
-    for (const product of filtered) {
-      if (product.price === null || !Number.isFinite(product.price)) continue;
-      if (!best) {
-        best = product;
-        continue;
-      }
-      if (product.price < best.price!) {
-        best = product;
-        continue;
-      }
-      if (product.price === best.price && product.daysAgo < best.daysAgo) {
-        best = product;
-      }
-    }
-
-    return best?.id || null;
-  }, [filtered]);
+  const regularResults = useMemo(() => {
+    if (!featuredBestOffer) return filtered;
+    return filtered.filter((product) => product.id !== featuredBestOffer.id);
+  }, [featuredBestOffer, filtered]);
 
   const updatedLabel = updatedAt
     ? new Intl.DateTimeFormat("ro-RO", { dateStyle: "medium", timeStyle: "short" }).format(new Date(updatedAt))
@@ -214,8 +208,14 @@ export function SearchClient({
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                {filtered.map((product) => (
-                  <ProductCard key={product.id} product={product} isBestDeal={product.id === bestDealId} />
+                {featuredBestOffer ? (
+                  <section className="rounded-2xl border border-[#FFBD2E] bg-[#FFF8E6] p-3 sm:p-4">
+                    <p className="text-xs sm:text-sm font-semibold text-[#7A5200] mb-3">Best deal recomandat</p>
+                    <ProductCard product={featuredBestOffer} isBestDeal />
+                  </section>
+                ) : null}
+                {regularResults.map((product) => (
+                  <ProductCard key={product.id} product={product} />
                 ))}
               </div>
             )}
