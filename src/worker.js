@@ -1,5 +1,6 @@
 import { searchAcrossSites } from "./app.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
+import { resolveRequesterLocation } from "./requester-location.js";
 import { insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 
@@ -63,7 +64,10 @@ async function handleApi(request, env) {
     const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
     const site = url.searchParams.get("site") || "default";
-    const requesterLocation = (url.searchParams.get("requesterLocation") || url.searchParams.get("location") || "").trim();
+    const requesterLocation = await resolveRequesterLocation({
+      explicitLocation: (url.searchParams.get("requesterLocation") || url.searchParams.get("location") || "").trim(),
+      headers: request.headers
+    });
     const limitParam = url.searchParams.get("limit");
     const pagesParam = url.searchParams.get("pages");
     const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;

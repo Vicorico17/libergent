@@ -6,6 +6,7 @@ import { loadEnv } from "./env.js";
 import { searchAcrossSites } from "./app.js";
 import { buildHistoryPayload, logSearchEvent } from "./history.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { resolveRequesterLocation } from "./requester-location.js";
 import { insertOfferFeedbackToSupabase, isSupabaseConfigured } from "./supabase.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
@@ -66,7 +67,10 @@ const server = http.createServer(async (req, res) => {
     const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
     const site = url.searchParams.get("site") || "default";
-    const requesterLocation = (url.searchParams.get("requesterLocation") || url.searchParams.get("location") || "").trim();
+    const requesterLocation = await resolveRequesterLocation({
+      explicitLocation: (url.searchParams.get("requesterLocation") || url.searchParams.get("location") || "").trim(),
+      headers: req.headers
+    });
     const limitParam = url.searchParams.get("limit");
     const pagesParam = url.searchParams.get("pages");
     const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
