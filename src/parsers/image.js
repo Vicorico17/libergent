@@ -11,6 +11,10 @@ function parseSrcset(value = "") {
   return firstCandidate || "";
 }
 
+function isUsableImageUrl(value = "") {
+  return Boolean(value) && !/^data:/i.test(value);
+}
+
 export function extractImageCandidate(htmlChunk = "") {
   const imgTag = htmlChunk.match(/<img\b[\s\S]*?>/i)?.[0] || "";
   if (!imgTag) {
@@ -18,6 +22,7 @@ export function extractImageCandidate(htmlChunk = "") {
   }
 
   const directCandidateAttributes = [
+    "data-lazy",
     "data-src",
     "data-original",
     "data-lazy-src",
@@ -33,12 +38,14 @@ export function extractImageCandidate(htmlChunk = "") {
     }
     if (attribute === "srcset" || attribute === "data-srcset") {
       const fromSrcset = parseSrcset(value);
-      if (fromSrcset) {
+      if (isUsableImageUrl(fromSrcset)) {
         return fromSrcset;
       }
       continue;
     }
-    return value;
+    if (isUsableImageUrl(value)) {
+      return value;
+    }
   }
 
   return "";

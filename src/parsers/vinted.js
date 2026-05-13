@@ -1,4 +1,4 @@
-import { extractImageUrlFromHtmlBlock } from "./image-url.js";
+import { extractImageCandidate } from "./image.js";
 
 function cleanText(value = "") {
   return decodeHtmlEntities(
@@ -91,7 +91,7 @@ function splitGridItems(html) {
 
 function parseGridItem(card) {
   const linkMatch = card.match(/<a[^>]+href="([^"]*\/items\/[^"]+)"[^>]*title="([^"]*)"[^>]*>/i);
-  const imageUrl = extractImageUrlFromHtmlBlock(card);
+  const imageUrl = extractImageCandidate(card);
   const imageAltMatch = card.match(/<img[^>]+alt="([^"]*)"[^>]*>/i);
   const rawLabel = cleanText(linkMatch?.[2] || imageAltMatch?.[1] || "");
   const url = toAbsoluteUrl(linkMatch?.[1] || "");

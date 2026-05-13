@@ -1,4 +1,4 @@
-import { extractImageUrlFromHtmlBlock } from "./image-url.js";
+import { extractImageCandidate } from "./image.js";
 
 function decodeHtmlEntities(value = "") {
   return value
@@ -81,7 +81,7 @@ function parseTitle(block) {
 
 function parseListingBlock(block) {
   const urlMatch = block.match(/<a[^>]+href="((?:https?:\/\/www\.autovit\.ro)?\/autoturisme\/[^"]+)"[^>]*>/i);
-  const imageUrl = extractImageUrlFromHtmlBlock(block);
+  const imageUrl = extractImageCandidate(block);
   const title = parseTitle(block);
   const url = toAbsoluteUrl(urlMatch?.[1] || "");
 

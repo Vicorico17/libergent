@@ -1,4 +1,4 @@
-import { extractImageUrlFromHtmlBlock } from "./image-url.js";
+import { extractImageCandidate } from "./image.js";
 
 function decodeHtmlEntities(value = "") {
   return value
@@ -56,7 +56,7 @@ function parsePrice(block) {
 
 function parseArticleBlock(block) {
   const titleMatch = block.match(/<h2[^>]+class="[^"]*\barticle-title\b[^"]*"[^>]*>[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
-  const imageUrl = extractImageUrlFromHtmlBlock(block);
+  const imageUrl = extractImageCandidate(block);
   const locationMatch = block.match(/<p[^>]+class="[^"]*\barticle-location\b[^"]*"[^>]*>[\s\S]*?<span>([\s\S]*?)<\/span>/i);
   const dateMatch = block.match(/<p[^>]+class="[^"]*\barticle-date\b[^"]*"[^>]*>[\s\S]*?<span>([\s\S]*?)<\/span>/i);
   const sellerTypeMatch = block.match(/<span[^>]+class="[^"]*\barticle-lbl-txt\b[^"]*"[^>]*>(Telefon validat)<\/span>/i);
