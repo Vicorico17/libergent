@@ -6,7 +6,7 @@ const steps = [
     accent: "#4F7CFF",
     accentClass: "pixel-border-blue",
     label: "Observă.",
-    desc: "Scanăm zeci de platforme second-hand în timp real, în locul tău.",
+    desc: "Căutăm pe marketplace-uri active din România, în locul tău.",
     sub: "Găsește ce contează.",
   },
   {
@@ -14,7 +14,7 @@ const steps = [
     accent: "#A259FF",
     accentClass: "pixel-border-purple",
     label: "Analizează.",
-    desc: "Filtrăm zgomotul. Îți arătăm doar ce e relevant și la prețul corect.",
+    desc: "Filtrăm zgomotul și grupăm rezultatele relevante într-un singur flux.",
     sub: "Filtrăm zgomotul.",
   },
   {

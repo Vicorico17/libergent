@@ -8,7 +8,7 @@ const features = [
       </svg>
     ),
     title: "Căutare inteligentă",
-    desc: "Scanăm simultan zeci de platforme second-hand și îți prezentăm cele mai bune rezultate, sortate după relevanță.",
+    desc: "Căutăm simultan pe marketplace-uri active din România și ordonăm rezultatele după relevanță.",
     accent: "#4F7CFF",
     bg: "bg-[#EEF3FF]",
   },
@@ -20,7 +20,7 @@ const features = [
       </svg>
     ),
     title: "Doar ce contează",
-    desc: "Algoritmul nostru filtrează listingurile irelevante, duplicate și expirate. Îți arătăm doar ce merită atenția ta.",
+    desc: "Filtrăm rezultate duplicate și listinguri cu semnal slab, ca să găsești mai repede ce te interesează.",
     accent: "#A259FF",
     bg: "bg-[#F4EEFF]",
   },
@@ -31,7 +31,7 @@ const features = [
       </svg>
     ),
     title: "Economisești timp",
-    desc: "În loc de 3 ore de scrollat pe OLX, Vinted și Facebook, îți ia 30 de secunde. Caută o dată, găsești tot.",
+    desc: "Cauți o singură dată și compari anunțuri din mai multe platforme fără tab-uri separate.",
     accent: "#FF6B6B",
     bg: "bg-[#FFF0F0]",
   },
@@ -42,8 +42,8 @@ const features = [
         <path d="M4 26h24" stroke="#FFC857" strokeWidth="2" strokeLinecap="round" />
       </svg>
     ),
-    title: "Urmezi cele mai bune oferte",
-    desc: "Setezi alerte pentru produsele care te interesează și primești notificări imediat ce apare ceva nou.",
+    title: "Compari mai rapid ofertele",
+    desc: "Vezi preț, sursă și detalii esențiale în același flux, ca să alegi mai repede oferta potrivită.",
     accent: "#FFC857",
     bg: "bg-[#FFF9EE]",
   },
@@ -53,8 +53,8 @@ const features = [
         <path d="M16 3l2.5 8h8.5l-7 5 2.5 8-7-5-7 5 2.5-8-7-5h8.5L16 3z" stroke="#4F7CFF" strokeWidth="2" strokeLinejoin="round" />
       </svg>
     ),
-    title: "Alerte în timp real",
-    desc: "Nu ratezi nicio ofertă. Trimitem notificări push sau email imediat ce apare un produs care corespunde criteriilor tale.",
+    title: "Trenduri de căutare",
+    desc: "Poți urmări istoricul căutărilor pentru a observa ce produse sunt căutate frecvent în timp.",
     accent: "#4F7CFF",
     bg: "bg-[#EEF3FF]",
   },
@@ -66,7 +66,7 @@ const features = [
       </svg>
     ),
     title: "Multi-platformă",
-    desc: "Un singur loc pentru tot second-hand-ul din România. OLX, Vinted, Facebook Marketplace și multe altele.",
+    desc: "Un singur loc pentru marketplace-uri active din România, cu extindere graduală spre alte piețe.",
     accent: "#A259FF",
     bg: "bg-[#F4EEFF]",
   },
