@@ -15,12 +15,28 @@ function isUsableImageUrl(value = "") {
   return Boolean(value) && !/^data:/i.test(value);
 }
 
-export function extractImageCandidate(htmlChunk = "") {
-  const imgTag = htmlChunk.match(/<img\b[\s\S]*?>/i)?.[0] || "";
-  if (!imgTag) {
+function normalizeCandidate(value = "") {
+  const candidate = value.trim();
+  if (!candidate) {
     return "";
   }
 
+  if (/^data:/i.test(candidate)) {
+    return "";
+  }
+
+  if (/^blob:/i.test(candidate)) {
+    return "";
+  }
+
+  if (/placeholder|spacer|avatar|icon|logo/i.test(candidate)) {
+    return "";
+  }
+
+  return candidate;
+}
+
+function extractFromTag(tag = "") {
   const directCandidateAttributes = [
     "data-lazy",
     "data-src",
@@ -32,19 +48,37 @@ export function extractImageCandidate(htmlChunk = "") {
   ];
 
   for (const attribute of directCandidateAttributes) {
-    const value = getAttribute(imgTag, attribute).trim();
+    const value = getAttribute(tag, attribute).trim();
     if (!value) {
       continue;
     }
     if (attribute === "srcset" || attribute === "data-srcset") {
       const fromSrcset = parseSrcset(value);
-      if (isUsableImageUrl(fromSrcset)) {
-        return fromSrcset;
+      const normalizedSrcset = normalizeCandidate(fromSrcset);
+      if (isUsableImageUrl(normalizedSrcset)) {
+        return normalizedSrcset;
       }
       continue;
     }
-    if (isUsableImageUrl(value)) {
-      return value;
+    const normalized = normalizeCandidate(value);
+    if (isUsableImageUrl(normalized)) {
+      return normalized;
+    }
+  }
+
+  return "";
+}
+
+export function extractImageCandidate(htmlChunk = "") {
+  const mediaTags = [
+    ...htmlChunk.matchAll(/<img\b[\s\S]*?>/gi),
+    ...htmlChunk.matchAll(/<source\b[\s\S]*?>/gi)
+  ].map((match) => match[0]);
+
+  for (const tag of mediaTags) {
+    const candidate = extractFromTag(tag);
+    if (candidate) {
+      return candidate;
     }
   }
 

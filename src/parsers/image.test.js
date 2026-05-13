@@ -14,6 +14,22 @@ test("extractImageCandidate prefers lazy-load attributes and parses srcset", () 
   assert.equal(extractImageCandidate(htmlWithDataPlaceholder), "https://img.example.com/actual.webp");
 });
 
+test("extractImageCandidate skips placeholders and checks later media tags", () => {
+  const html = `
+    <img src="/placeholder.png" />
+    <img src="https://images.olxcdn.com/real-image.webp" />
+  `;
+  assert.equal(extractImageCandidate(html), "https://images.olxcdn.com/real-image.webp");
+
+  const pictureHtml = `
+    <picture>
+      <source srcset="https://images.olxcdn.com/real-source.webp 640w, https://images.olxcdn.com/real-source-2.webp 1200w" />
+      <img src="/logo.svg" />
+    </picture>
+  `;
+  assert.equal(extractImageCandidate(pictureHtml), "https://images.olxcdn.com/real-source.webp");
+});
+
 test("parseOlxHtml keeps image when card uses lazy-loaded img attributes", () => {
   const html = `
     <div data-cy="l-card" data-testid="l-card">
@@ -38,4 +54,22 @@ test("parseOlxHtml keeps image when card uses lazy-loaded img attributes", () =>
   assert.equal(parsed.items.length, 2);
   assert.equal(parsed.items[0].imageUrl, "https://images.olxcdn.com/item1.webp");
   assert.equal(parsed.items[1].imageUrl, "https://images.olxcdn.com/item2-400.webp");
+});
+
+test("parseOlxHtml skips placeholder image and keeps real card image", () => {
+  const html = `
+    <div data-cy="l-card" data-testid="l-card">
+      <a href="/d/oferta/test-3">
+        <h4>Telefon Google Pixel</h4>
+      </a>
+      <p data-testid="ad-price">2 100 lei</p>
+      <p data-testid="location-date">Iasi - Azi</p>
+      <img src="/placeholder.png" />
+      <img src="https://images.olxcdn.com/item3.webp" />
+    </div>
+  `;
+
+  const parsed = parseOlxHtml(html, 5);
+  assert.equal(parsed.items.length, 1);
+  assert.equal(parsed.items[0].imageUrl, "https://images.olxcdn.com/item3.webp");
 });
