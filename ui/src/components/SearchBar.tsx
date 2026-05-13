@@ -23,9 +23,9 @@ export function SearchBar({ defaultValue = "", size = "hero", className = "" }: 
   const isHero = size === "hero";
 
   return (
-    <form onSubmit={handleSubmit} className={`flex items-center gap-0 ${className}`}>
+    <form onSubmit={handleSubmit} className={`flex items-center gap-0 min-w-0 ${className}`}>
       <div
-        className={`flex items-center flex-1 bg-white rounded-l-2xl border border-r-0 border-[#D9D9D9] ${
+        className={`flex items-center min-w-0 flex-1 bg-white rounded-l-2xl border border-r-0 border-[#D9D9D9] ${
           isHero ? "h-14 px-5 shadow-lg" : "h-11 px-4 shadow-sm"
         }`}
         style={{ boxShadow: isHero ? "0 4px 24px rgba(0,0,0,0.10)" : undefined }}
@@ -45,8 +45,8 @@ export function SearchBar({ defaultValue = "", size = "hero", className = "" }: 
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Caută produsul..."
-          className={`flex-1 bg-transparent outline-none text-[#111111] placeholder-[#6B6B6B] font-medium ${
-            isHero ? "text-base" : "text-sm"
+          className={`flex-1 min-w-0 bg-transparent outline-none text-[#111111] placeholder-[#6B6B6B] font-medium ${
+            isHero ? "text-base" : "text-base md:text-sm"
           }`}
           autoComplete="off"
         />
@@ -54,10 +54,23 @@ export function SearchBar({ defaultValue = "", size = "hero", className = "" }: 
       <button
         type="submit"
         className={`shrink-0 bg-[#4F7CFF] hover:bg-[#3d6aec] text-white font-semibold rounded-r-2xl transition-colors ${
-          isHero ? "h-14 px-7 text-base" : "h-11 px-5 text-sm"
+          isHero ? "h-14 px-7 text-base" : "h-11 px-3 sm:px-5 text-sm"
         }`}
       >
-        Caută
+        {isHero ? (
+          "Caută"
+        ) : (
+          <>
+            <span className="sm:hidden" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="2" />
+                <path d="M15 15l3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </span>
+            <span className="hidden sm:inline">Caută</span>
+            <span className="sr-only sm:hidden">Caută</span>
+          </>
+        )}
       </button>
     </form>
   );

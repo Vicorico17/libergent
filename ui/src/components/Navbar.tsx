@@ -23,7 +23,7 @@ export function Navbar() {
         scrolled ? "bg-white/90 backdrop-blur-md shadow-sm border-b border-[#D9D9D9]" : "bg-transparent"
       }`}
     >
-      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
           <MascotSVG size={32} />
@@ -81,7 +81,7 @@ export function Navbar() {
 
         {/* Mobile hamburger */}
         <button
-          className="md:hidden p-2 rounded-md text-[#111111]"
+          className="md:hidden p-2.5 rounded-md text-[#111111]"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label="Toggle menu"
         >
@@ -107,7 +107,7 @@ export function Navbar() {
           menuOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
         }`}
       >
-        <div className="bg-white border-t border-[#D9D9D9] px-6 py-4 flex flex-col gap-4">
+        <div className="bg-white border-t border-[#D9D9D9] px-4 py-4 flex flex-col gap-4">
           <Link href="#cum-functioneaza" className="text-sm font-medium text-[#111111]" onClick={() => setMenuOpen(false)}>
             Cum funcționează
           </Link>

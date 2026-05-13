@@ -51,6 +51,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html,
+body {
+  overflow-x: hidden;
+}
+
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
 .font-pixel {
   font-family: "Courier New", monospace;
   image-rendering: pixelated;

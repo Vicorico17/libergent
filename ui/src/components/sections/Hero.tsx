@@ -69,7 +69,7 @@ const featureItems = [
 
 export function Hero() {
   return (
-    <section className="hero-gradient relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-16">
+    <section className="hero-gradient relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-16 sm:pt-20">
       {/* Scattered plus signs */}
       {plusSigns.map((p, i) => (
         <span
@@ -91,8 +91,8 @@ export function Hero() {
       ))}
 
       {/* Main hero content */}
-      <div className="relative z-10 flex flex-col items-center text-center px-6 max-w-2xl mx-auto">
-        <MascotSVG size={120} className="mb-6 drop-shadow-sm" />
+      <div className="relative z-10 flex flex-col items-center text-center px-4 sm:px-6 max-w-2xl mx-auto">
+        <MascotSVG size={104} className="mb-5 drop-shadow-sm sm:w-[120px] sm:h-[120px]" />
 
         <h1
           className="font-pixel text-[#111111] mb-5"
@@ -101,9 +101,9 @@ export function Hero() {
           LiberGent
         </h1>
 
-        <p className="text-[#6B6B6B] text-lg md:text-xl font-medium mb-4 leading-relaxed">
+        <p className="text-[#6B6B6B] text-base sm:text-lg md:text-xl font-medium mb-4 leading-relaxed">
           Găsește rapid produse second-hand,
-          <br />
+          <br className="hidden sm:block" />
           din mai multe platforme din România.
         </p>
 
@@ -122,9 +122,9 @@ export function Hero() {
       </div>
 
       {/* Bottom feature bar */}
-      <div className="relative z-10 w-full max-w-4xl mx-auto px-6 mt-16 mb-8">
+      <div className="relative z-10 w-full max-w-4xl mx-auto px-4 sm:px-6 mt-12 sm:mt-16 mb-8">
         <div
-          className="bg-white rounded-2xl px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-5"
+          className="bg-white rounded-2xl px-5 py-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5"
           style={{ boxShadow: "0 2px 20px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04)" }}
         >
           {featureItems.map((item) => (
