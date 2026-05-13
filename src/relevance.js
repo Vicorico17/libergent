@@ -44,12 +44,18 @@ const NEGATIVE_INTENTS = {
     "acumulator",
     "baterie",
     "cablu",
+    "cap",
+    "capete",
     "capac",
     "carcasa",
     "curea",
+    "duza",
+    "duze",
     "display",
     "ecran",
     "etui",
+    "filtru",
+    "filtre",
     "folie",
     "furtun",
     "garnitura",
@@ -107,6 +113,7 @@ const ACCESSORY_HEADS = [
   "accesorii",
   "accesoriu",
   "adaptor",
+  "alimentator",
   "banda",
   "box",
   "cablu",
@@ -129,15 +136,25 @@ const ACCESSORY_HEADS = [
   "mingi",
   "paleta",
   "palete",
+  "perie",
+  "perii",
   "plasa",
   "plase",
   "protector",
   "racheta",
   "rachete",
+  "recipient",
+  "rezervor",
+  "rola",
+  "role",
+  "sac",
+  "saci",
   "seminte",
   "stand",
   "stativ",
   "suport",
+  "tub",
+  "tuburi",
   "toc"
 ];
 
@@ -289,6 +306,7 @@ const BRAND_ALIASES = [
   { brand: "puma", aliases: ["puma"] },
   { brand: "reebok", aliases: ["reebok"] },
   { brand: "renault", aliases: ["renault"] },
+  { brand: "rowenta", aliases: ["rowenta", "rowneta"] },
   { brand: "samsung", aliases: ["samsung", "galaxy"] },
   { brand: "seat", aliases: ["seat"] },
   { brand: "siemens", aliases: ["siemens"] },
@@ -720,9 +738,12 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   ].map(normalizeText);
   const allSparePartHeads = SPARE_PART_HEADS.map(normalizeText);
   const queryAnchors = queryProfile.expandedTokens.map(normalizeText);
+  const brandAnchorSet = new Set((queryProfile.brandTerms || []).map(normalizeText));
+  const productAnchors = queryAnchors.filter((token) => !brandAnchorSet.has(token));
   const hasAnchor = queryAnchors.some((token) => textTokens.has(token) || titleText.includes(token));
   const hasAccessoryHead = allAccessoryHeads.some((term) => textTokens.has(term) || titleText.includes(term));
   const hasSparePartHead = allSparePartHeads.some((term) => textTokens.has(term) || titleText.includes(term));
+  const startsWithProductAnchor = productAnchors.some((anchor) => titleText.startsWith(`${anchor} `) || titleText === anchor);
 
   if (negativeMatches.some((match) => match.intent === "wanted")) {
     return "wanted";
@@ -739,7 +760,7 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
 
   const startsWithAccessory = allAccessoryHeads.some((term) => titleText.startsWith(`${term} `));
   const accessoryForProduct = allAccessoryHeads.some((term) =>
-    queryAnchors.some((anchor) =>
+    productAnchors.some((anchor) =>
       titleText.includes(`${term} ${anchor}`) ||
       titleText.includes(`${term} pentru ${anchor}`) ||
       titleText.includes(`${term} for ${anchor}`) ||
@@ -749,6 +770,9 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   const productWithAccessory = BUNDLE_MARKERS.some((marker) => titleText.includes(normalizeText(marker))) &&
     hasAnchor &&
     hasAccessoryHead;
+  const accessorySet = ["set", "pachet", "kit"].some((marker) => titleText.startsWith(`${marker} `)) &&
+    hasAnchor &&
+    hasAccessoryHead;
   const basketballRimWithNet = queryProfile.taxonomy === PRODUCT_TAXONOMY.basketball_hoop &&
     (titleTokens.has("inel") || titleTokens.has("panou")) &&
     (titleTokens.has("plasa") || titleTokens.has("plase") || titleTokens.has("net"));
@@ -756,9 +780,12 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   if (basketballRimWithNet) {
     return "main_product";
   }
+  if (queryProfile.queryType === "main_product" && startsWithProductAnchor && !startsWithAccessory) {
+    return "main_product";
+  }
   // If the listing is clearly an accessory-for-product phrase, keep it as accessory
   // even when it also contains generic bundle markers like "set" or "pachet".
-  if (hasAnchor && hasAccessoryHead && (startsWithAccessory || accessoryForProduct)) {
+  if (hasAnchor && hasAccessoryHead && (startsWithAccessory || accessoryForProduct || accessorySet)) {
     return "accessory";
   }
   if (productWithAccessory) {

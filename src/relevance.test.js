@@ -58,6 +58,59 @@ test("rejects listings when random critical query token is missing", () => {
   assert.equal(listing.isRecommendedCandidate, false);
   assert.ok(listing.relevanceScore < 55);
   assert.ok(listing.rejectionReasons.includes("missing_critical_query_tokens"));
+});
+
+test("vacuum query rejects Rowenta accessory listings", () => {
+  const query = "aspirator rowneta";
+  const vacuum = classifyListingIntent(
+    {
+      title: "Aspirator Rowenta Swift Power Cyclonic",
+      price: "295 lei",
+      priceRon: 295
+    },
+    query
+  );
+  const tube = classifyListingIntent(
+    {
+      title: "Tub telescopic aspirator Rowenta SS-2230002521",
+      price: "65 lei",
+      priceRon: 65
+    },
+    query
+  );
+  const brush = classifyListingIntent(
+    {
+      title: "Perie aspirator Rowenta originala",
+      price: "45 lei",
+      priceRon: 45
+    },
+    query
+  );
+
+  assert.equal(vacuum.listingType, "main_product");
+  assert.equal(vacuum.isRecommendedCandidate, true);
+  assert.notEqual(tube.listingType, "main_product");
+  assert.notEqual(brush.listingType, "main_product");
+  assert.equal(tube.isRecommendedCandidate, false);
+  assert.equal(brush.isRecommendedCandidate, false);
+  assert.ok(vacuum.relevanceScore > tube.relevanceScore);
+  assert.ok(vacuum.relevanceScore > brush.relevanceScore);
+});
+
+test("vacuum query keeps complete bagged vacuum listings", () => {
+  const listing = classifyListingIntent(
+    {
+      title: "Aspirator cu sac Rowenta Silence Force",
+      price: "250 lei",
+      priceRon: 250
+    },
+    "aspirator rowenta"
+  );
+
+  assert.equal(listing.listingType, "main_product");
+  assert.equal(listing.isRecommendedCandidate, true);
+});
+
 test("car query rejects accessories and keeps complete vehicle listing as recommended", () => {
   const query = "BMW X5";
   const accessory = classifyListingIntent(
