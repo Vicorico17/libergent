@@ -18,7 +18,11 @@ export function buildListingSchema(limit) {
             condition: { type: "string" },
             sellerType: { type: "string" },
             url: { type: "string" },
-            imageUrl: { type: "string" }
+            imageUrl: { type: "string" },
+            imageUrls: {
+              type: "array",
+              items: { type: "string" }
+            }
           },
           required: ["title"]
         }

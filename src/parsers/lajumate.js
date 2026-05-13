@@ -26,6 +26,16 @@ function buildImageUrl(ad) {
   return path ? `https://api-preprod.lajumate.ro/storage/${path}` : "";
 }
 
+function buildImageUrls(ad) {
+  const candidates = [
+    ad.mainImage?.path,
+    ...(Array.isArray(ad.images) ? ad.images.map((image) => image?.path) : [])
+  ]
+    .filter(Boolean)
+    .map((path) => `https://api-preprod.lajumate.ro/storage/${path}`);
+  return [...new Set(candidates)];
+}
+
 export function parseLajumateHtml(html, limit) {
   const data = extractNextData(html);
   const ads = data?.props?.pageProps?.adsServer;
@@ -36,7 +46,9 @@ export function parseLajumateHtml(html, limit) {
 
   const totalResults = Number.parseInt(data?.props?.pageProps?.paginationServer?.total, 10) || ads.length;
 
-  const items = ads.slice(0, limit).map((ad) => ({
+  const items = ads.slice(0, limit).map((ad) => {
+    const imageUrls = buildImageUrls(ad);
+    return {
     title: cleanText(ad.title || ""),
     price: ad.price ? `${cleanText(String(ad.price))} ${ad.currency || ""}`.trim() : "",
     currency: ad.currency || "",
@@ -45,8 +57,10 @@ export function parseLajumateHtml(html, limit) {
     condition: cleanText(findAdField(ad, "condition")),
     sellerType: cleanText(findAdField(ad, "person_type")),
     url: buildListingUrl(ad),
-    imageUrl: buildImageUrl(ad)
-  }));
+    imageUrl: imageUrls[0] || buildImageUrl(ad),
+    imageUrls
+  };
+  });
 
   return {
     items,

@@ -81,7 +81,7 @@ function parseTitle(block) {
 
 function parseListingBlock(block) {
   const urlMatch = block.match(/<a[^>]+href="((?:https?:\/\/www\.autovit\.ro)?\/autoturisme\/[^"]+)"[^>]*>/i);
-  const imageCandidate = extractImageCandidate(block);
+  const imageUrl = extractImageCandidate(block);
   const title = parseTitle(block);
   const url = toAbsoluteUrl(urlMatch?.[1] || "");
 
@@ -114,7 +114,7 @@ function parseListingBlock(block) {
     condition: details.join(" • "),
     sellerType: /Privat/i.test(text) ? "Privat" : /Profesionist/i.test(text) ? "Profesionist" : "",
     url,
-    imageUrl: toAbsoluteUrl(imageCandidate)
+    imageUrl: toAbsoluteUrl(imageUrl)
   };
 }
 
