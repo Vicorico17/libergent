@@ -23,39 +23,83 @@ function buildBasePrompt(siteLabel, query, limit, extra = "") {
 }
 
 const CAR_MAKES = [
+  "abarth",
+  "alfa",
+  "alfa-romeo",
   "audi",
+  "bentley",
   "bmw",
+  "byd",
+  "cadillac",
   "chevrolet",
+  "chrysler",
   "citroen",
+  "cupra",
   "dacia",
+  "daewoo",
+  "dodge",
+  "ds",
   "fiat",
   "ford",
   "honda",
   "hyundai",
+  "infiniti",
+  "isuzu",
+  "iveco",
+  "jaguar",
   "jeep",
   "kia",
+  "lancia",
+  "land",
+  "land-rover",
+  "lexus",
+  "maserati",
   "mazda",
   "mercedes",
+  "mercedes-benz",
+  "mg",
+  "mini",
   "mitsubishi",
   "nissan",
   "opel",
   "peugeot",
+  "polestar",
+  "porsche",
+  "range",
   "renault",
+  "saab",
   "seat",
   "skoda",
+  "smart",
+  "subaru",
   "suzuki",
+  "tesla",
   "toyota",
   "volkswagen",
   "volvo"
 ];
 
-const CAR_MODELS = [
-  "compass",
-  "golf",
-  "logan",
-  "octavia",
-  "passat",
-  "x5"
+const CAR_KEYWORDS = [
+  "masina",
+  "masini",
+  "autoturism",
+  "autoturisme",
+  "auto",
+  "suv",
+  "sedan",
+  "coupe",
+  "cabrio",
+  "break",
+  "combi",
+  "pickup",
+  "hatchback",
+  "diesel",
+  "benzina",
+  "hibrid",
+  "hybrid",
+  "electric",
+  "electrica",
+  "4x4"
 ];
 
 function slugifyCarPath(query) {
@@ -84,10 +128,28 @@ export function isCarQuery(query = "") {
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
   const tokenSet = new Set(tokens);
+  const joined = tokens.join(" ");
+  const hasYear = /\b(19[8-9]\d|20[0-3]\d)\b/.test(normalized);
+  const hasMileage = /\b\d{1,3}(?:[ .]\d{3})?\s*km\b/.test(normalized);
+  const hasVariantCode = /\b([a-z]\d{1,2}|\d\.\d)\b/.test(normalized);
+  const hasCarKeyword = CAR_KEYWORDS.some((keyword) => tokenSet.has(keyword) || joined.includes(keyword));
 
-  return CAR_MAKES.some((make) => tokenSet.has(make)) ||
-    tokens.some((token) => CAR_MODELS.includes(token)) ||
-    /\b(auto|autoturism|autoturisme|suv)\b/.test(normalized);
+  const hasCarMake = CAR_MAKES.some((make) => {
+    if (make.includes("-")) {
+      return joined.includes(make.replace("-", " "));
+    }
+    return tokenSet.has(make);
+  });
+
+  if (hasCarKeyword || hasCarMake || hasMileage) {
+    return true;
+  }
+
+  if (tokens.length >= 2 && hasYear && hasVariantCode) {
+    return true;
+  }
+
+  return false;
 }
 
 export const SITES = {

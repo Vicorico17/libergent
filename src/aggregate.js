@@ -275,7 +275,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       wantedAds,
       secondaryMatches
     } = splitClassifiedItems(classifiedItems);
-    const items = productMatches;
+    const items = productMatches.length ? productMatches : secondaryMatches;
     const pricedItems = items.filter((item) => Number.isFinite(item.priceRon));
     const medianPriceRon = median(pricedItems.map((item) => item.priceRon));
     const lowest = pricedItems.length
