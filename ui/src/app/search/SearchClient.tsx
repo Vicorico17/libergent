@@ -88,20 +88,32 @@ export function SearchClient({
     return () => controller.abort();
   }, [query]);
 
-  const filtered = useMemo(() => products.filter((p) => {
-    if (filters.platforms.length > 0 && !filters.platforms.includes(p.platform)) return false;
-    if (filters.conditions.length > 0 && !filters.conditions.includes(p.condition)) return false;
-    if (filters.priceMin && !hasPriceAtLeast(p.price, Number(filters.priceMin))) return false;
-    if (filters.priceMax && !hasPriceAtMost(p.price, Number(filters.priceMax))) return false;
-    return true;
-  }).sort((a, b) => {
-    const aPrice = a.price !== null && Number.isFinite(a.price) ? a.price : Number.POSITIVE_INFINITY;
-    const bPrice = b.price !== null && Number.isFinite(b.price) ? b.price : Number.POSITIVE_INFINITY;
-    if (filters.sort === "Preț crescător") return aPrice - bPrice;
-    if (filters.sort === "Preț descrescător") return bPrice - aPrice;
-    if (filters.sort === "Cel mai recent") return a.daysAgo - b.daysAgo;
-    return 0;
-  }), [filters, products]);
+  const filtered = useMemo(() => {
+    const base = products.filter((p) => {
+      if (filters.platforms.length > 0 && !filters.platforms.includes(p.platform)) return false;
+      if (filters.conditions.length > 0 && !filters.conditions.includes(p.condition)) return false;
+      if (filters.priceMin && !hasPriceAtLeast(p.price, Number(filters.priceMin))) return false;
+      if (filters.priceMax && !hasPriceAtMost(p.price, Number(filters.priceMax))) return false;
+      return true;
+    });
+
+    const sorted = [...base].sort((a, b) => {
+      const aPrice = a.price !== null && Number.isFinite(a.price) ? a.price : Number.POSITIVE_INFINITY;
+      const bPrice = b.price !== null && Number.isFinite(b.price) ? b.price : Number.POSITIVE_INFINITY;
+      if (filters.sort === "Preț crescător") return aPrice - bPrice;
+      if (filters.sort === "Preț descrescător") return bPrice - aPrice;
+      if (filters.sort === "Cel mai recent") return a.daysAgo - b.daysAgo;
+      return aPrice - bPrice || a.daysAgo - b.daysAgo;
+    });
+
+    const bestDealIndex = sorted.findIndex((product) => product.price !== null && Number.isFinite(product.price));
+    if (bestDealIndex <= 0) {
+      return sorted;
+    }
+
+    const [bestDeal] = sorted.splice(bestDealIndex, 1);
+    return [bestDeal, ...sorted];
+  }, [filters, products]);
 
   const bestDealId = useMemo(() => {
     let best: Product | null = null;
@@ -201,7 +213,7 @@ export function SearchClient({
                 <p className="text-sm text-[#6B6B6B]">Încearcă să ajustezi filtrele sau caută altceva.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="flex flex-col gap-4">
                 {filtered.map((product) => (
                   <ProductCard key={product.id} product={product} isBestDeal={product.id === bestDealId} />
                 ))}
