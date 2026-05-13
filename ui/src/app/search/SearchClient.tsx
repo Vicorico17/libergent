@@ -103,6 +103,27 @@ export function SearchClient({
     return 0;
   }), [filters, products]);
 
+  const bestDealId = useMemo(() => {
+    let best: Product | null = null;
+
+    for (const product of filtered) {
+      if (product.price === null || !Number.isFinite(product.price)) continue;
+      if (!best) {
+        best = product;
+        continue;
+      }
+      if (product.price < best.price!) {
+        best = product;
+        continue;
+      }
+      if (product.price === best.price && product.daysAgo < best.daysAgo) {
+        best = product;
+      }
+    }
+
+    return best?.id || null;
+  }, [filtered]);
+
   const updatedLabel = updatedAt
     ? new Intl.DateTimeFormat("ro-RO", { dateStyle: "medium", timeStyle: "short" }).format(new Date(updatedAt))
     : "în timp real";
@@ -182,7 +203,7 @@ export function SearchClient({
             ) : (
               <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filtered.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard key={product.id} product={product} isBestDeal={product.id === bestDealId} />
                 ))}
               </div>
             )}
