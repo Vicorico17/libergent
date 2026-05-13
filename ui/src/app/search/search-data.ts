@@ -8,6 +8,10 @@ export type ApiListing = {
   location?: string;
   postedAt?: string;
   imageUrl?: string;
+  image?: string;
+  imageUrls?: string[];
+  images?: Array<string | { url?: string; src?: string }>;
+  thumbnailUrl?: string;
   url?: string;
 };
 
@@ -59,13 +63,63 @@ export function mapProducts(payload: SearchPayload): Product[] {
           condition: normalizeCondition(item.condition),
           location: item.location || "România",
           daysAgo: estimateDaysAgo(item.postedAt),
-          image: item.imageUrl || undefined,
+          image: pickListingImage(item),
           url: item.url || undefined,
         };
       })
     );
 
   return interleave(groups);
+}
+
+function pickListingImage(item: ApiListing) {
+  const candidates: Array<string | undefined> = [
+    item.imageUrl,
+    item.image,
+    item.thumbnailUrl,
+    ...(item.imageUrls || []),
+    ...((item.images || []).map((entry) =>
+      typeof entry === "string" ? entry : entry?.url || entry?.src
+    )),
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeImageUrl(candidate, item.url);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeImageUrl(value?: string, listingUrl?: string) {
+  const raw = value?.trim();
+  if (!raw) {
+    return undefined;
+  }
+
+  if (raw.startsWith("data:image/")) {
+    return raw;
+  }
+
+  if (raw.startsWith("//")) {
+    return `https:${raw}`;
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+
+  try {
+    if (listingUrl && /^https?:\/\//i.test(listingUrl)) {
+      return new URL(raw, listingUrl).toString();
+    }
+  } catch {
+    return undefined;
+  }
+
+  return undefined;
 }
 
 function interleave<T>(groups: T[][]) {
