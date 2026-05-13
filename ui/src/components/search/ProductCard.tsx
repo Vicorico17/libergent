@@ -31,7 +31,7 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
 
   return (
     <div
-      className="bg-white rounded-2xl overflow-hidden flex flex-col hover:shadow-md transition-shadow group"
+      className="bg-white rounded-2xl overflow-hidden flex flex-col md:flex-row hover:shadow-md transition-shadow group"
       style={{
         boxShadow: isBestDeal
           ? "0 8px 20px rgba(255,189,46,0.22), 0 0 0 2px rgba(255,189,46,0.45)"
@@ -39,7 +39,7 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
       }}
     >
       {/* Image */}
-      <div className="relative bg-[#F8F9FA] aspect-[4/3] flex items-center justify-center overflow-hidden">
+      <div className="relative bg-[#F8F9FA] w-full md:w-56 lg:w-64 shrink-0 aspect-[4/3] md:aspect-auto md:min-h-[190px] flex items-center justify-center overflow-hidden">
         {product.image ? (
           <img src={product.image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
@@ -78,11 +78,11 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
       </div>
 
       {/* Content */}
-      <div className="p-4 flex flex-col gap-2 flex-1">
-        <p className="text-sm font-semibold text-[#111111] leading-snug line-clamp-2">{title}</p>
+      <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
+        <p className="text-base font-semibold text-[#111111] leading-snug line-clamp-2">{title}</p>
 
-        <div className="flex items-center justify-between mt-auto pt-1">
-          <span className="font-pixel text-[#111111]" style={{ fontSize: "14px" }}>
+        <div className="flex items-center justify-between mt-auto pt-1 gap-3">
+          <span className="font-pixel text-[#111111] whitespace-nowrap" style={{ fontSize: "15px" }}>
             {hasPrice ? `${price.toLocaleString("ro-RO")} RON` : "Fără preț"}
           </span>
           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#F8F9FA]" style={{ color: conditionColor }}>
@@ -90,7 +90,7 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
           </span>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-[#6B6B6B]">
+        <div className="flex items-center justify-between text-xs text-[#6B6B6B] gap-3">
           <span>{location}</span>
           <span>{daysAgo === 0 ? "azi" : `acum ${daysAgo}z`}</span>
         </div>
@@ -99,7 +99,7 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
           href={url || "#"}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-1 inline-flex justify-center items-center h-9 rounded-xl border border-[#D9D9D9] text-xs font-semibold text-[#111111] hover:border-[#4F7CFF] hover:text-[#4F7CFF] transition-colors"
+          className="mt-1 inline-flex justify-center items-center h-10 rounded-xl border border-[#D9D9D9] text-sm font-semibold text-[#111111] hover:border-[#4F7CFF] hover:text-[#4F7CFF] transition-colors md:w-44"
         >
           Vezi anunțul →
         </a>
