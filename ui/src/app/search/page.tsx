@@ -15,6 +15,7 @@ export default function SearchPage() {
 function SearchPageContent() {
   const searchParams = useSearchParams();
   const query = String(searchParams.get("q") || "").trim();
+  const country = searchParams.get("country") === "pl" ? "pl" : "ro";
 
-  return <SearchClient query={query} />;
+  return <SearchClient query={query} country={country} />;
 }

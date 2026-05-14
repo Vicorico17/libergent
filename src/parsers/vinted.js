@@ -25,7 +25,7 @@ function decodeHtmlEntities(value = "") {
     .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(Number.parseInt(code, 16)));
 }
 
-function toAbsoluteUrl(url = "") {
+function toAbsoluteUrl(url = "", baseUrl = "https://www.vinted.ro") {
   const value = cleanText(url);
   if (!value) {
     return "";
@@ -37,7 +37,7 @@ function toAbsoluteUrl(url = "") {
     return `https:${value}`;
   }
   if (value.startsWith("/")) {
-    return `https://www.vinted.ro${value}`;
+    return `${baseUrl}${value}`;
   }
   return value;
 }
@@ -67,7 +67,7 @@ function parseCondition(label = "", fallback = "") {
 }
 
 function parsePriceFromLabel(label = "") {
-  const match = cleanText(label).match(/(\d[\d.,\s]*)\s*(Lei|RON|€|EUR)\b/i);
+  const match = cleanText(label).match(/(\d[\d.,\s]*)\s*(Lei|RON|€|EUR|PLN|zł)\b/i);
   return match ? `${match[1].trim()} ${match[2]}` : "";
 }
 
@@ -89,12 +89,12 @@ function splitGridItems(html) {
   });
 }
 
-function parseGridItem(card) {
+function parseGridItem(card, baseUrl) {
   const linkMatch = card.match(/<a[^>]+href="([^"]*\/items\/[^"]+)"[^>]*title="([^"]*)"[^>]*>/i);
   const imageUrl = extractImageCandidate(card);
   const imageAltMatch = card.match(/<img[^>]+alt="([^"]*)"[^>]*>/i);
   const rawLabel = cleanText(linkMatch?.[2] || imageAltMatch?.[1] || "");
-  const url = toAbsoluteUrl(linkMatch?.[1] || "");
+  const url = toAbsoluteUrl(linkMatch?.[1] || "", baseUrl);
 
   if (!rawLabel || !url) {
     return null;
@@ -109,13 +109,13 @@ function parseGridItem(card) {
     title: parseTitle(rawLabel),
     description: rawLabel,
     price,
-    currency: /\blei\b/i.test(price) ? "Lei" : price.match(/\b(RON|EUR|€)\b/i)?.[1] || "",
+    currency: /\bzł|pln\b/i.test(price) ? "PLN" : /\blei\b/i.test(price) ? "Lei" : price.match(/\b(RON|EUR|€)\b/i)?.[1] || "",
     location: "",
     postedAt: "",
     condition: parseCondition(rawLabel),
     sellerType: "",
     url,
-    imageUrl: toAbsoluteUrl(imageUrl)
+    imageUrl: toAbsoluteUrl(imageUrl, baseUrl)
   };
 }
 
@@ -178,10 +178,10 @@ export function parseVintedMarkdown(markdown, limit) {
   };
 }
 
-export function parseVintedHtml(html, limit) {
+export function parseVintedHtml(html, limit, { baseUrl = "https://www.vinted.ro" } = {}) {
   const blocks = splitGridItems(html);
   const items = blocks
-    .map(parseGridItem)
+    .map((card) => parseGridItem(card, baseUrl))
     .filter(Boolean)
     .slice(0, limit);
 

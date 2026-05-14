@@ -343,6 +343,64 @@ export const SITES = {
   }
 };
 
+const COUNTRY_SITE_KEYS = {
+  ro: ["olx.ro", "lajumate.ro", "vinted.ro", "okazii.ro", "publi24.ro"],
+  pl: ["olx.pl", "vinted.pl"]
+};
+
+Object.assign(SITES, {
+  "olx.pl": {
+    key: "olx.pl",
+    label: "OLX Poland",
+    priority: 1,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-local",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 20000,
+    pageSize: 50,
+    maxPages: 12,
+    defaultLimit: 50,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.olx.pl/oferty/q-${slugifySpacesWithDash(query)}/?search%5Border%5D=created_at%3Adesc`;
+    },
+    pagedSearchUrl(query, page) {
+      const base = this.searchUrl(query);
+      return page <= 1 ? base : `${base}&page=${page}`;
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("OLX Poland", query, limit, "Polish classifieds results. Keep only listing cards.");
+    }
+  },
+  "vinted.pl": {
+    key: "vinted.pl",
+    label: "Vinted Poland",
+    priority: 2,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-local",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 25000,
+    pageSize: 95,
+    maxPages: 6,
+    defaultLimit: 95,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.vinted.pl/catalog?search_text=${encodeSearchText(query)}&order=newest_first`;
+    },
+    pagedSearchUrl(query, page) {
+      const base = this.searchUrl(query);
+      return page <= 1 ? base : `${base}&page=${page}`;
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("Vinted Poland", query, limit, "Polish Vinted catalog feed. Keep only product tiles.");
+    }
+  }
+});
+
 export function getSite(siteKey) {
   const site = SITES[siteKey];
   if (!site) {
@@ -351,19 +409,17 @@ export function getSite(siteKey) {
   return site;
 }
 
-export function getDefaultSiteKeys() {
-  return Object.values(SITES)
-    .filter((site) => site.defaultEnabled)
+export function getDefaultSiteKeys(country = "ro") {
+  const normalizedCountry = country === "pl" ? "pl" : "ro";
+  return (COUNTRY_SITE_KEYS[normalizedCountry] || COUNTRY_SITE_KEYS.ro)
+    .map((key) => SITES[key])
+    .filter(Boolean)
     .sort((a, b) => a.priority - b.priority)
     .map((site) => site.key);
 }
 
-export function getSiteKeysForAllSearch(query) {
-  const defaultSiteKeys = Object.values(SITES)
-    .filter((site) => site.defaultEnabled)
-    .sort((a, b) => a.priority - b.priority)
-    .map((site) => site.key);
-
+export function getSiteKeysForAllSearch(query, country = "ro") {
+  const defaultSiteKeys = getDefaultSiteKeys(country);
   if (isCarQuery(query)) {
     return ["autovit.ro", ...defaultSiteKeys];
   }

@@ -5,18 +5,19 @@ import { useRouter } from "next/navigation";
 
 interface SearchBarProps {
   defaultValue?: string;
+  country?: "ro" | "pl";
   size?: "hero" | "normal";
   className?: string;
 }
 
-export function SearchBar({ defaultValue = "", size = "hero", className = "" }: SearchBarProps) {
+export function SearchBar({ defaultValue = "", country = "ro", size = "hero", className = "" }: SearchBarProps) {
   const [query, setQuery] = useState(defaultValue);
   const router = useRouter();
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+      router.push(`/search?q=${encodeURIComponent(query.trim())}&country=${country}`);
     }
   };
 

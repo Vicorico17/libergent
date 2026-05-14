@@ -1,4 +1,5 @@
 const ESTIMATED_EUR_TO_RON = 5;
+const ESTIMATED_PLN_TO_RON = 1.15;
 
 function detectCurrency(priceText = "") {
   const value = priceText.toLowerCase();
@@ -10,6 +11,9 @@ function detectCurrency(priceText = "") {
   }
   if (value.includes("$") || value.includes("usd")) {
     return "USD";
+  }
+  if (value.includes("pln") || value.includes("zł")) {
+    return "PLN";
   }
   return null;
 }
@@ -57,6 +61,7 @@ export function normalizeListing(item) {
   const priceRon =
     currency === "RON" ? numericPrice :
     currency === "EUR" && Number.isFinite(numericPrice) ? numericPrice * ESTIMATED_EUR_TO_RON :
+    currency === "PLN" && Number.isFinite(numericPrice) ? numericPrice * ESTIMATED_PLN_TO_RON :
     null;
 
   const imageUrls = [...new Set(

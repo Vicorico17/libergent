@@ -53,8 +53,10 @@ const platformLabels: Record<string, string> = {
   "lajumate.ro": "Lajumate",
   "okazii.ro": "Okazii",
   "olx.ro": "OLX",
+  "olx.pl": "OLX",
   "publi24.ro": "Publi24",
   "vinted.ro": "Vinted",
+  "vinted.pl": "Vinted",
 };
 
 const platformColors: Record<string, string> = {

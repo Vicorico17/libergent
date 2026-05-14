@@ -9,6 +9,16 @@ import { parseVintedHtml, parseVintedMarkdown } from "./parsers/vinted.js";
 import { parseAutovitHtml } from "./parsers/autovit.js";
 import { getQueryBrandTerms } from "./relevance.js";
 
+function getHostForSite(siteKey) {
+  if (siteKey.endsWith(".pl")) {
+    return siteKey.startsWith("vinted") ? "https://www.vinted.pl" : "https://www.olx.pl";
+  }
+  if (siteKey.endsWith(".ro")) {
+    return siteKey.startsWith("vinted") ? "https://www.vinted.ro" : "https://www.olx.ro";
+  }
+  return "";
+}
+
 function tokenize(value = "") {
   return value
     .toLowerCase()
@@ -204,14 +214,14 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
       totalResults = parsed.totalResults;
       rawItemCount = getRawItemCount(parsed, items);
       hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "olx.ro") {
-      const parsed = parseOlxHtml(raw, limit);
+    } else if (site.key === "olx.ro" || site.key === "olx.pl") {
+      const parsed = parseOlxHtml(raw, limit, { baseUrl: getHostForSite(site.key) });
       items = parsed.items;
       totalResults = parsed.totalResults;
       rawItemCount = getRawItemCount(parsed, items);
       hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "vinted.ro") {
-      const parsed = parseVintedHtml(raw, limit);
+    } else if (site.key === "vinted.ro" || site.key === "vinted.pl") {
+      const parsed = parseVintedHtml(raw, limit, { baseUrl: getHostForSite(site.key) });
       items = parsed.items;
       totalResults = parsed.totalResults;
       rawItemCount = getRawItemCount(parsed, items);
@@ -240,7 +250,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
       waitForMs: site.waitForMs,
       timeoutMs: site.timeoutMs
     });
-    const parser = site.key === "vinted.ro" ? parseVintedMarkdown : parseOlxMarkdown;
+    const parser = site.key.startsWith("vinted") ? parseVintedMarkdown : parseOlxMarkdown;
     const parsed = parser(raw?.markdown || "", limit);
     items = parsed.items;
     totalResults = parsed.totalResults;

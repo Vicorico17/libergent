@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MascotSVG } from "@/components/MascotSVG";
 import { SearchBar } from "@/components/SearchBar";
 import { ProductCard, type Product } from "@/components/search/ProductCard";
@@ -18,6 +19,7 @@ const defaultFilters: Filters = {
 
 type SearchClientProps = {
   query: string;
+  country?: "ro" | "pl";
   initialProducts?: Product[];
   initialError?: string;
   searchedAt?: string;
@@ -25,10 +27,12 @@ type SearchClientProps = {
 
 export function SearchClient({
   query,
+  country = "ro",
   initialProducts,
   initialError = "",
   searchedAt = "",
 }: SearchClientProps) {
+  const router = useRouter();
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [bestOffer, setBestOffer] = useState<Product | null>(null);
@@ -72,6 +76,7 @@ export function SearchClient({
       try {
         const params = new URLSearchParams({
           q: query,
+          country,
           site: "all",
           provider: "auto",
           limit: "500",
@@ -112,7 +117,16 @@ export function SearchClient({
     runSearch();
 
     return () => controller.abort();
-  }, [query]);
+  }, [query, country]);
+
+  const switchCountry = (nextCountry: "ro" | "pl") => {
+    const params = new URLSearchParams();
+    if (query) {
+      params.set("q", query);
+    }
+    params.set("country", nextCountry);
+    router.push(`/search?${params.toString()}`);
+  };
 
   const filtered = useMemo(() => {
     const base = products.filter((p) => {
@@ -160,7 +174,25 @@ export function SearchClient({
               LiberGent
             </span>
           </Link>
-          <SearchBar defaultValue={query} size="normal" className="flex-1 max-w-2xl" />
+          <SearchBar defaultValue={query} country={country} size="normal" className="flex-1 max-w-2xl" />
+          <div className="hidden sm:flex items-center gap-1 rounded-lg border border-[#D9D9D9] bg-white p-1">
+            <button
+              type="button"
+              onClick={() => switchCountry("ro")}
+              className={`px-2 py-1 text-sm rounded ${country === "ro" ? "bg-[#F1F5FF]" : ""}`}
+              aria-label="Romania"
+            >
+              🇷🇴
+            </button>
+            <button
+              type="button"
+              onClick={() => switchCountry("pl")}
+              className={`px-2 py-1 text-sm rounded ${country === "pl" ? "bg-[#F1F5FF]" : ""}`}
+              aria-label="Poland"
+            >
+              🇵🇱
+            </button>
+          </div>
           <Link
             href="/trends"
             className="shrink-0 hidden sm:flex items-center px-3 py-2 text-sm font-semibold text-[#6B6B6B] hover:text-[#111111] transition-colors"

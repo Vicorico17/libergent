@@ -118,6 +118,7 @@ const server = http.createServer(async (req, res) => {
     const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
     const site = url.searchParams.get("site") || "default";
+    const country = url.searchParams.get("country") === "pl" ? "pl" : "ro";
     const limitParam = url.searchParams.get("limit");
     const pagesParam = url.searchParams.get("pages");
     const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
@@ -130,9 +131,9 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const siteKeys = site === "all"
-        ? getSiteKeysForAllSearch(query)
+        ? getSiteKeysForAllSearch(query, country)
         : site === "default"
-          ? getDefaultSiteKeys()
+          ? getDefaultSiteKeys(country)
           : [getSite(site).key];
       const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys });
       await logSearchEvent({ query, condition, provider, siteKeys, payload });
