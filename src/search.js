@@ -18,6 +18,74 @@ function tokenize(value = "") {
     .filter(Boolean);
 }
 
+function tokenDistanceAtMostOne(a, b) {
+  if (!a || !b) {
+    return false;
+  }
+
+  if (a === b) {
+    return true;
+  }
+
+  if (Math.abs(a.length - b.length) > 1) {
+    return false;
+  }
+
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      i += 1;
+      j += 1;
+      continue;
+    }
+
+    edits += 1;
+    if (edits > 1) {
+      return false;
+    }
+
+    if (a.length > b.length) {
+      i += 1;
+    } else if (a.length < b.length) {
+      j += 1;
+    } else {
+      i += 1;
+      j += 1;
+    }
+  }
+
+  if (i < a.length || j < b.length) {
+    edits += 1;
+  }
+
+  return edits <= 1;
+}
+
+function tokenMatchesQueryToken(titleTokens, queryToken) {
+  if (!queryToken) {
+    return false;
+  }
+
+  for (const titleToken of titleTokens) {
+    if (titleToken === queryToken) {
+      return true;
+    }
+
+    if (queryToken.length >= 4 && titleToken.startsWith(queryToken)) {
+      return true;
+    }
+
+    if (queryToken.length >= 5 && titleToken.length >= 5 && tokenDistanceAtMostOne(titleToken, queryToken)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function filterRelevantItems(items, query) {
   const queryTokens = tokenize(query).filter((token) => token.length > 1 || /^\d+$/.test(token));
   const brandTokens = getQueryBrandTerms(query);
@@ -26,18 +94,22 @@ function filterRelevantItems(items, query) {
   }
 
   if (queryTokens.length === 1) {
-    return items.filter((item) => String(item.title || "").trim());
+    const [singleToken] = queryTokens;
+    return items.filter((item) => {
+      const titleTokens = tokenize(item.title || "");
+      return tokenMatchesQueryToken(titleTokens, singleToken);
+    });
   }
 
   const requiredNumberTokens = queryTokens.filter((token) => /^\d+$/.test(token));
   return items.filter((item) => {
-    const titleTokens = new Set(tokenize(item.title || ""));
-    if (requiredNumberTokens.some((token) => !titleTokens.has(token))) {
+    const titleTokens = tokenize(item.title || "");
+    if (requiredNumberTokens.some((token) => !titleTokens.includes(token))) {
       return false;
     }
 
-    const matchedTokens = queryTokens.filter((token) => titleTokens.has(token)).length;
-    const matchedBrands = brandTokens.filter((token) => titleTokens.has(token)).length;
+    const matchedTokens = queryTokens.filter((token) => tokenMatchesQueryToken(titleTokens, token)).length;
+    const matchedBrands = brandTokens.filter((token) => tokenMatchesQueryToken(titleTokens, token)).length;
     const weightedMatches = matchedTokens + (matchedBrands ? 1.5 : 0);
     const weightedRequired = queryTokens.length + (brandTokens.length ? 1.5 : 0);
     return weightedMatches / weightedRequired >= 0.5;
@@ -314,3 +386,8 @@ export async function runSearch({ provider, site, query, limit, maxPages }) {
     creditsUsed: results.length * (site.estimatedCreditsPerPage || 0)
   };
 }
+
+export const __testables = {
+  tokenize,
+  filterRelevantItems
+};
