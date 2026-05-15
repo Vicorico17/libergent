@@ -59,6 +59,7 @@ function Marquee() {
 
 const navLinks = [
   { label: "CUM FUNCȚIONEAZĂ", href: "#cum-functioneaza" },
+  { label: "TRENDURI",         href: "/trenduri" },
   { label: "PRICING",          href: "#pricing" },
   { label: "DESPRE NOI",       href: "#" },
 ];
