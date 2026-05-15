@@ -14,14 +14,32 @@ function detectCurrency(priceText = "") {
   return null;
 }
 
-function parseNumberFromPrice(priceText = "") {
-  const matches = priceText.match(/[\d.,\s]+/g);
+function normalizeCurrency(value, priceText = "") {
+  const raw = value ? String(value).trim().toUpperCase() : detectCurrency(priceText);
+  if (raw === "LEI" || raw === "LEU" || raw === "RON") {
+    return "RON";
+  }
+  if (raw === "€" || raw === "EUR") {
+    return "EUR";
+  }
+  if (raw === "$" || raw === "USD") {
+    return "USD";
+  }
+  return raw || null;
+}
+
+function parseNumberFromPrice(priceValue = "") {
+  if (typeof priceValue === "number") {
+    return Number.isFinite(priceValue) ? priceValue : null;
+  }
+
+  const priceText = String(priceValue || "");
+  const matches = priceText.match(/\d[\d.,\s]*/g);
   if (!matches) {
     return null;
   }
 
-  const candidate = matches
-    .join(" ")
+  const candidate = matches[0]
     .replace(/\u00a0/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -36,28 +54,95 @@ function parseNumberFromPrice(priceText = "") {
   const decimalSeparator =
     lastCommaIndex >= 0 && lastDotIndex >= 0
       ? lastCommaIndex > lastDotIndex ? "," : "."
-      : /[,.]\d{2}$/.test(compact)
-        ? compact.at(-3)
-        : null;
+      : getSingleDecimalSeparator(compact);
   const normalized = decimalSeparator
-    ? compact
-        .replace(new RegExp(`[^\\d\\${decimalSeparator}]`, "g"), "")
-        .replace(decimalSeparator, ".")
+    ? normalizeDecimalNumber(compact, decimalSeparator)
     : compact.replace(/[^\d]/g, "");
 
   const value = Number.parseFloat(normalized);
   return Number.isFinite(value) ? value : null;
 }
 
-export function normalizeListing(item) {
-  const priceText = typeof item.price === "string" ? item.price.trim() : "";
-  const rawCurrency = item.currency ? String(item.currency).toUpperCase() : detectCurrency(priceText);
-  const currency = rawCurrency === "LEI" || rawCurrency === "LEU" ? "RON" : rawCurrency;
-  const numericPrice = parseNumberFromPrice(priceText);
-  const priceRon =
-    currency === "RON" ? numericPrice :
+function getSingleDecimalSeparator(compact) {
+  const commaCount = (compact.match(/,/g) || []).length;
+  const dotCount = (compact.match(/\./g) || []).length;
+  const separator =
+    commaCount === 1 && dotCount === 0 ? "," :
+    dotCount === 1 && commaCount === 0 ? "." :
+    null;
+
+  if (!separator) {
+    return null;
+  }
+
+  const [integerPart, decimalPart] = compact.split(separator);
+  const integerDigits = integerPart.replace(/[^\d]/g, "");
+  const decimalDigits = decimalPart.replace(/[^\d]/g, "");
+
+  return integerDigits && decimalDigits.length > 0 && decimalDigits.length <= 2
+    ? separator
+    : null;
+}
+
+function normalizeDecimalNumber(compact, decimalSeparator) {
+  const decimalIndex = compact.lastIndexOf(decimalSeparator);
+  if (decimalIndex === -1) {
+    return compact.replace(/[^\d]/g, "");
+  }
+
+  const integerPart = compact.slice(0, decimalIndex).replace(/[^\d]/g, "");
+  const decimalPart = compact.slice(decimalIndex + 1).replace(/[^\d]/g, "");
+  return decimalPart
+    ? `${integerPart || "0"}.${decimalPart}`
+    : integerPart;
+}
+
+function getPriceText(item) {
+  if (typeof item.price === "string") {
+    return item.price.trim();
+  }
+  if (Number.isFinite(item.price)) {
+    return String(item.price);
+  }
+  if (typeof item.priceRon === "string" && item.priceRon.trim()) {
+    return item.priceRon.trim();
+  }
+  if (Number.isFinite(item.priceRon)) {
+    return String(item.priceRon);
+  }
+  return "";
+}
+
+function getNumericPrice(item, priceText) {
+  const parsedPrice = parseNumberFromPrice(priceText);
+  if (Number.isFinite(parsedPrice)) {
+    return parsedPrice;
+  }
+
+  const parsedNumericPrice = parseNumberFromPrice(item.numericPrice);
+  if (Number.isFinite(parsedNumericPrice)) {
+    return parsedNumericPrice;
+  }
+
+  return null;
+}
+
+function getPriceRon(item, currency, numericPrice) {
+  const explicitPriceRon = parseNumberFromPrice(item.priceRon);
+  if (Number.isFinite(explicitPriceRon)) {
+    return explicitPriceRon;
+  }
+
+  return currency === "RON" ? numericPrice :
     currency === "EUR" && Number.isFinite(numericPrice) ? numericPrice * ESTIMATED_EUR_TO_RON :
     null;
+}
+
+export function normalizeListing(item) {
+  const priceText = getPriceText(item);
+  const currency = normalizeCurrency(item.currency, priceText);
+  const numericPrice = getNumericPrice(item, priceText);
+  const priceRon = getPriceRon(item, currency, numericPrice);
 
   const imageUrls = [...new Set(
     (Array.isArray(item.imageUrls) ? item.imageUrls : [])

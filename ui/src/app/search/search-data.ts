@@ -1,6 +1,6 @@
 export type ApiListing = {
   title?: string;
-  priceRon?: number | null;
+  priceRon?: number | string | null;
   site?: string;
   condition?: string;
   location?: string;
@@ -97,11 +97,12 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
   const url = item.url?.trim();
   const images = pickListingImages(item);
   const score = pickRecommendationScore(item);
+  const priceRon = parseApiNumber(item.priceRon);
 
   return {
     id: url || `${idPrefix || platform}-${index}-${item.title || "listing"}`,
     title: item.title || "Anunț fără titlu",
-    price: Number.isFinite(item.priceRon) ? Math.round(Number(item.priceRon)) : null,
+    price: Number.isFinite(priceRon) ? Number(priceRon) : null,
     source: platform,
     city: item.location || "România",
     condition: normalizeCondition(item.condition),
@@ -113,6 +114,35 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     rank: typeof item.rank === "number" && Number.isFinite(item.rank) ? item.rank : undefined,
     score,
   };
+}
+
+function parseApiNumber(value: number | string | null | undefined) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const match = value.match(/\d[\d.,\s]*/);
+  if (!match) {
+    return null;
+  }
+
+  const compact = match[0].replace(/\s/g, "");
+  const lastCommaIndex = compact.lastIndexOf(",");
+  const lastDotIndex = compact.lastIndexOf(".");
+  const decimalSeparator =
+    lastCommaIndex >= 0 && lastDotIndex >= 0
+      ? lastCommaIndex > lastDotIndex ? "," : "."
+      : /[,.]\d{1,2}$/.test(compact)
+        ? compact.at(-2) === "," || compact.at(-2) === "." ? compact.at(-2) : compact.at(-3)
+        : null;
+  const normalized = decimalSeparator
+    ? `${compact.slice(0, compact.lastIndexOf(decimalSeparator)).replace(/[^\d]/g, "")}.${compact.slice(compact.lastIndexOf(decimalSeparator) + 1).replace(/[^\d]/g, "")}`
+    : compact.replace(/[^\d]/g, "");
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function pickRecommendationScore(item: ApiListing) {
