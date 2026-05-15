@@ -8,6 +8,7 @@ import { parsePubli24Html } from "./parsers/publi24.js";
 import { parseVintedHtml, parseVintedMarkdown } from "./parsers/vinted.js";
 import { parseAutovitHtml } from "./parsers/autovit.js";
 import { getQueryBrandTerms } from "./relevance.js";
+import { buildAbortSignal } from "./abort.js";
 
 function tokenize(value = "") {
   return value
@@ -116,9 +117,9 @@ function filterRelevantItems(items, query) {
   });
 }
 
-async function fetchHtmlDirect({ url, timeoutMs = 15000 }) {
+async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: buildAbortSignal({ timeoutMs, signal }),
     headers: {
       "user-agent": "Mozilla/5.0 (compatible; libergent/0.1; +https://localhost)",
       accept: "text/html,application/xhtml+xml"
@@ -170,7 +171,7 @@ function extractCloudflareCrawlItems(raw) {
   });
 }
 
-async function runSinglePageSearch({ provider, site, query, limit, page }) {
+async function runSinglePageSearch({ provider, site, query, limit, page, signal }) {
   const url = typeof site.pagedSearchUrl === "function" ? site.pagedSearchUrl(query, page) : site.searchUrl(query);
   const schema = buildListingSchema(limit);
   const prompt = site.prompt(query, limit);
@@ -186,11 +187,12 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
     raw = await crawlWithCloudflare({
       crawlConfig: site.crawlConfig(query),
       schema,
-      timeoutMs: site.timeoutMs
+      timeoutMs: site.timeoutMs,
+      signal
     });
     items = extractCloudflareCrawlItems(raw);
   } else if (site.strategy === "direct-html-local") {
-    raw = await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs });
+    raw = await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs, signal });
 
     if (site.key === "lajumate.ro") {
       const parsed = parseLajumateHtml(raw, limit);
@@ -232,13 +234,14 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
       throw new Error(`No direct HTML parser configured for ${site.key}`);
     }
   } else if (resolvedProvider === "cloudflare") {
-    raw = await scrapeWithCloudflare({ url, prompt, schema, timeoutMs: site.timeoutMs });
+    raw = await scrapeWithCloudflare({ url, prompt, schema, timeoutMs: site.timeoutMs, signal });
     items = Array.isArray(raw?.items) ? raw.items : [];
   } else if (site.strategy === "firecrawl-markdown-local") {
     raw = await scrapeMarkdownWithFirecrawl({
       url,
       waitForMs: site.waitForMs,
-      timeoutMs: site.timeoutMs
+      timeoutMs: site.timeoutMs,
+      signal
     });
     const parser = site.key === "vinted.ro" ? parseVintedMarkdown : parseOlxMarkdown;
     const parsed = parser(raw?.markdown || "", limit);
@@ -252,7 +255,8 @@ async function runSinglePageSearch({ provider, site, query, limit, page }) {
       prompt,
       schema,
       waitForMs: site.waitForMs,
-      timeoutMs: site.timeoutMs
+      timeoutMs: site.timeoutMs,
+      signal
     });
     items = Array.isArray(raw?.items) ? raw.items : [];
   }
@@ -306,9 +310,9 @@ function shouldStopAfterPage(pageResult, nextItems, currentItems, pageSize) {
   return (pageResult.rawItemCount || pageResult.itemCount) < Math.max(5, Math.floor(pageSize / 3));
 }
 
-export async function runSearch({ provider, site, query, limit, maxPages }) {
+export async function runSearch({ provider, site, query, limit, maxPages, signal }) {
   if (site.strategy === "crawl-seed") {
-    const result = await runSinglePageSearch({ provider, site, query, limit, page: 1 });
+    const result = await runSinglePageSearch({ provider, site, query, limit, page: 1, signal });
     return {
       ...result,
       pagesUsed: 1,
@@ -325,12 +329,14 @@ export async function runSearch({ provider, site, query, limit, maxPages }) {
     site,
     query,
     limit: Math.min(pageSize, effectiveLimit),
-    page: 1
+    page: 1,
+    signal
   });
 
   const results = [firstPage];
   let items = dedupeItems(firstPage.items);
   let exhaustedReason = firstPage.rawItemCount === 0 ? "empty-first-page" : "limit";
+  let pageError = null;
   const estimatedTotalPages = estimateTotalPages(firstPage, pageSize, effectiveLimit);
   const targetPages = Math.max(1, Math.min(cappedMaxPages, estimatedTotalPages));
 
@@ -340,13 +346,21 @@ export async function runSearch({ provider, site, query, limit, maxPages }) {
       break;
     }
 
-    const pageResult = await runSinglePageSearch({
-      provider,
-      site,
-      query,
-      limit: Math.min(pageSize, effectiveLimit),
-      page
-    });
+    let pageResult;
+    try {
+      pageResult = await runSinglePageSearch({
+        provider,
+        site,
+        query,
+        limit: Math.min(pageSize, effectiveLimit),
+        page,
+        signal
+      });
+    } catch (error) {
+      pageError = error instanceof Error ? error.message : String(error);
+      exhaustedReason = "page-error";
+      break;
+    }
 
     results.push(pageResult);
     const nextItems = dedupeItems([...items, ...pageResult.items]);
@@ -383,6 +397,7 @@ export async function runSearch({ provider, site, query, limit, maxPages }) {
     pagesUsed: results.length,
     pagesTargeted: targetPages,
     exhaustedReason,
+    pageError,
     creditsUsed: results.length * (site.estimatedCreditsPerPage || 0)
   };
 }

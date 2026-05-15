@@ -7,6 +7,8 @@ const MAX_CREDITS_PER_SITE = 3;
 const DEFAULT_SITE_TIMEOUT_MS = 20000;
 const SERVERLESS_MAX_RESULTS_PER_SITE = 500;
 const SERVERLESS_SITE_TIMEOUT_MS = 30000;
+const SITE_SEARCH_ATTEMPTS = 2;
+const SITE_RETRY_DELAY_MS = 300;
 
 function isServerlessRuntime() {
   return Boolean(
@@ -24,15 +26,47 @@ function normalizeProvider(provider) {
   return provider === "auto" ? "auto" : "direct";
 }
 
-function withTimeout(promise, timeoutMs, message) {
-  let timeoutId;
-  const timeout = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
-  });
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  return Promise.race([promise, timeout]).finally(() => {
+function withTimeout(operation, timeoutMs, message) {
+  const controller = new AbortController();
+  let timeoutId;
+
+  timeoutId = setTimeout(() => {
+    controller.abort(new Error(message));
+  }, timeoutMs);
+
+  return operation(controller.signal).catch((error) => {
+    if (controller.signal.aborted) {
+      throw new Error(message);
+    }
+    throw error;
+  }).finally(() => {
     clearTimeout(timeoutId);
   });
+}
+
+function buildSiteFailureResult({ siteKey, query, condition, provider, error, attempts = 1 }) {
+  const requestedProvider = provider || "direct";
+  let resolvedProvider = requestedProvider === "auto" ? "auto" : requestedProvider;
+  try {
+    const site = getSite(siteKey);
+    resolvedProvider = requestedProvider === "auto" ? site.provider : resolvedProvider;
+  } catch {
+    // Keep the normalized request provider for invalid site keys.
+  }
+
+  return {
+    ok: false,
+    site: siteKey,
+    query,
+    condition,
+    provider: resolvedProvider,
+    attempts,
+    error: error instanceof Error ? error.message : String(error)
+  };
 }
 
 function getCreditsPerPage(site, provider) {
@@ -87,41 +121,103 @@ function getDefaultLimit(site, pages, provider) {
   return site.defaultLimit ?? site.pageSize ?? 20;
 }
 
-async function searchSite({ siteKey, query, condition, provider, limit, maxPages }) {
-  const site = getSite(siteKey);
-  const searchProvider = normalizeProvider(provider);
-  const resolvedProvider = searchProvider === "auto" ? site.provider : searchProvider;
-  const affordablePages = getMaxAffordablePages(site, searchProvider);
-  const desiredPages = Math.min(maxPages ?? affordablePages, affordablePages);
-  const runtimeMaxResults = isServerlessRuntime()
-    ? Math.min((site.pageSize || SERVERLESS_MAX_RESULTS_PER_SITE) * desiredPages, SERVERLESS_MAX_RESULTS_PER_SITE)
-    : Number.POSITIVE_INFINITY;
-  const desiredLimit = Math.min(limit ?? getDefaultLimit(site, desiredPages, searchProvider), runtimeMaxResults);
-  const affordableLimit = Math.min(desiredLimit, (site.pageSize || desiredLimit) * desiredPages);
+async function searchSiteOnce({ siteKey, query, condition, provider, limit, maxPages, attempt }) {
+  let site;
+  let searchProvider = normalizeProvider(provider);
+  let resolvedProvider = searchProvider;
 
   try {
+    site = getSite(siteKey);
+    resolvedProvider = searchProvider === "auto" ? site.provider : searchProvider;
+    const affordablePages = getMaxAffordablePages(site, searchProvider);
+    const desiredPages = Math.min(maxPages ?? affordablePages, affordablePages);
+    const runtimeMaxResults = isServerlessRuntime()
+      ? Math.min((site.pageSize || SERVERLESS_MAX_RESULTS_PER_SITE) * desiredPages, SERVERLESS_MAX_RESULTS_PER_SITE)
+      : Number.POSITIVE_INFINITY;
+    const desiredLimit = Math.min(limit ?? getDefaultLimit(site, desiredPages, searchProvider), runtimeMaxResults);
+    const affordableLimit = Math.min(desiredLimit, (site.pageSize || desiredLimit) * desiredPages);
     const result = await withTimeout(
-      runSearch({
+      (signal) => runSearch({
         provider: searchProvider,
         site,
         query,
         limit: affordableLimit,
-        maxPages: desiredPages
+        maxPages: desiredPages,
+        signal
       }),
       getSiteTimeoutMs(site, desiredPages),
       `${site.label} a depășit timpul maxim de răspuns.`
     );
-    return { ok: true, ...result };
+    return { ok: true, attempts: attempt, ...result };
   } catch (error) {
-    return {
-      ok: false,
-      site: siteKey,
+    return buildSiteFailureResult({
+      siteKey,
       query,
       condition,
       provider: resolvedProvider,
-      error: error instanceof Error ? error.message : String(error)
-    };
+      attempts: attempt,
+      error
+    });
   }
+}
+
+function isRetryableResult(result) {
+  if (!result.ok) {
+    return !/Missing environment variables|Unsupported site/i.test(result.error || "");
+  }
+
+  return result.itemCount === 0 && (result.rawItemCount || 0) === 0 && result.totalResults !== 0;
+}
+
+async function searchSite({ siteKey, query, condition, provider, limit, maxPages }) {
+  const errors = [];
+
+  for (let attempt = 1; attempt <= SITE_SEARCH_ATTEMPTS; attempt += 1) {
+    const result = await searchSiteOnce({ siteKey, query, condition, provider, limit, maxPages, attempt });
+
+    if (!isRetryableResult(result) || attempt === SITE_SEARCH_ATTEMPTS) {
+      return errors.length ? { ...result, previousErrors: errors } : result;
+    }
+
+    if (!result.ok) {
+      errors.push(result.error);
+    } else {
+      errors.push("empty response");
+    }
+
+    await delay(SITE_RETRY_DELAY_MS * attempt);
+  }
+
+  return buildSiteFailureResult({
+    siteKey,
+    query,
+    condition,
+    provider,
+    attempts: SITE_SEARCH_ATTEMPTS,
+    error: "Marketplace search did not complete."
+  });
+}
+
+async function searchAllRequestedSites({ orderedSiteKeys, query, condition, provider, limit, maxPages }) {
+  const searches = orderedSiteKeys.map((siteKey) =>
+    searchSite({ siteKey, query, condition, provider, limit, maxPages })
+  );
+  const settled = await Promise.allSettled(searches);
+
+  return settled.map((entry, index) => {
+    if (entry.status === "fulfilled") {
+      return entry.value;
+    }
+
+    return buildSiteFailureResult({
+      siteKey: orderedSiteKeys[index],
+      query,
+      condition,
+      provider,
+      attempts: SITE_SEARCH_ATTEMPTS,
+      error: entry.reason
+    });
+  });
 }
 
 export async function searchAcrossSites({
@@ -132,7 +228,7 @@ export async function searchAcrossSites({
   maxPages,
   siteKeys = getDefaultSiteKeys()
 }) {
-  const orderedSiteKeys = [...siteKeys].sort((a, b) => getSite(a).priority - getSite(b).priority);
+  const orderedSiteKeys = [...new Set(siteKeys)].sort((a, b) => getSite(a).priority - getSite(b).priority);
   const creditBudget = getCreditBudget(orderedSiteKeys, provider);
 
   if (isMockSearchEnabled()) {
@@ -148,17 +244,14 @@ export async function searchAcrossSites({
     );
   }
 
-  const rawResults = isServerlessRuntime()
-    ? await Promise.all(
-        orderedSiteKeys.map((siteKey) => searchSite({ siteKey, query, condition, provider, limit, maxPages }))
-      )
-    : [];
-
-  if (!isServerlessRuntime()) {
-    for (const siteKey of orderedSiteKeys) {
-      rawResults.push(await searchSite({ siteKey, query, condition, provider, limit, maxPages }));
-    }
-  }
+  const rawResults = await searchAllRequestedSites({
+    orderedSiteKeys,
+    query,
+    condition,
+    provider,
+    limit,
+    maxPages
+  });
 
   return aggregateMarketplaceResults(rawResults, {
     condition,

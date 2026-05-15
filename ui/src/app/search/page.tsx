@@ -18,6 +18,12 @@ const SOURCES_LIST = ["OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "AUTOVIT
 const SORT_OPTIONS = ["relevanță", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
 const COND_OPTIONS = ["nou", "folosit", "ca nou", "bun", "acceptabil"]
 
+type MarketplaceStatus = {
+  successful: number
+  total: number
+  failed: string[]
+}
+
 // — Loader config —
 const SOURCE_TIMING = [
   { name: "OLX",      start: 0,  end: 25 },
@@ -652,6 +658,7 @@ function SearchResultsContent() {
   const [error, setError]           = useState("")
   const [searchedAt, setSearchedAt] = useState("")
   const [totalListings, setTotalListings] = useState(0)
+  const [marketplaceStatus, setMarketplaceStatus] = useState<MarketplaceStatus>({ successful: 0, total: 0, failed: [] })
   const [isLoading, setIsLoading]   = useState(false)
 
   // Loader state
@@ -670,6 +677,7 @@ function SearchResultsContent() {
         setError("")
         setSearchedAt("")
         setTotalListings(0)
+        setMarketplaceStatus({ successful: 0, total: 0, failed: [] })
         setIsLoading(false)
         setShowLoader(false)
         setLoaderProgress(0)
@@ -712,6 +720,13 @@ function SearchResultsContent() {
           setBestOffer(mapBestOffer(payload, mapped))
           setSearchedAt(payload.summary?.searchedAt || "")
           setTotalListings(payload.summary?.totalListings ?? mapped.length)
+          setMarketplaceStatus({
+            successful: payload.summary?.successfulMarketplaces ?? (payload.results || []).filter((result) => result.ok).length,
+            total: payload.summary?.marketplaces ?? (payload.results || []).length,
+            failed: (payload.results || [])
+              .filter((result) => !result.ok)
+              .map((result) => (result.site || "marketplace").toUpperCase()),
+          })
         })
         .catch((searchError) => {
           if (controller.signal.aborted) return
@@ -720,6 +735,7 @@ function SearchResultsContent() {
           setSearchedAt("")
           setTotalListings(0)
           setError(searchError instanceof Error ? searchError.message : String(searchError))
+          setMarketplaceStatus({ successful: 0, total: 0, failed: [] })
         })
         .finally(() => {
           if (controller.signal.aborted) return
@@ -793,12 +809,21 @@ function SearchResultsContent() {
   const averageScore = results.length
     ? Math.round(results.reduce((sum, item) => sum + item.score, 0) / results.length)
     : 0
-  const sourceCount = new Set(results.map((item) => item.source)).size
+  const marketplaceValue = marketplaceStatus.total ? `${marketplaceStatus.successful}/${marketplaceStatus.total}` : "0/0"
   const updatedLabel = searchedAt ? formatDateTime(searchedAt) : "în timp real"
   const statusLabel = !query ? "Introduceți o căutare" : isLoading ? "Search Session Running" : error ? "Search Session Failed" : "Search Session Complete"
   const duplicateCount = Math.max(0, totalListings - results.length)
   const agentNotes = [
     { text: error || `${results.length} rezultate normalizate`, pulse: false },
+    { text: marketplaceStatus.total ? `${marketplaceValue} marketplace-uri au răspuns` : "marketplace-uri în așteptare", pulse: isLoading },
+    {
+      text: marketplaceStatus.total
+        ? marketplaceStatus.failed.length
+          ? `erori marketplace: ${marketplaceStatus.failed.join(", ")}`
+          : "toate marketplace-urile cerute au fost încercate"
+        : "niciun marketplace pornit încă",
+      pulse: false
+    },
     { text: duplicateCount ? `${duplicateCount} duplicate eliminate` : "duplicate verificate", pulse: false },
     { text: shownBestOffer ? `Best price detected on ${shownBestOffer.source}` : "Best offer în așteptare", pulse: false },
     { text: isLoading ? "Recommendation updating live" : "Recommendation updated live", pulse: isLoading },
@@ -849,7 +874,7 @@ function SearchResultsContent() {
               {[
                 { value: String(filteredResults.length), label: "Results" },
                 { value: `${averageScore}%`, label: "Avg Score" },
-                { value: String(sourceCount), label: "Sources" },
+                { value: marketplaceValue, label: "Marketplaces" },
                 { value: String(duplicateCount), label: "Duplicates Removed" },
               ].map(({ value, label }) => (
                 <div key={label} className="p-4 flex flex-col items-center justify-center gap-1" style={{ borderRight: `1px solid ${INK}` }}>

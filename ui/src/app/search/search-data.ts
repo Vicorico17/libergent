@@ -20,6 +20,7 @@ export type ApiResult = {
   ok: boolean;
   site?: string;
   items?: ApiListing[];
+  error?: string;
 };
 
 export type SearchPayload = {
@@ -27,6 +28,8 @@ export type SearchPayload = {
   summary?: {
     totalListings?: number;
     searchedAt?: string;
+    marketplaces?: number;
+    successfulMarketplaces?: number;
     bestOffer?: ApiListing | null;
   };
   error?: string;

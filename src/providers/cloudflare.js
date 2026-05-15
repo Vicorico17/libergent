@@ -1,4 +1,5 @@
 import { requireEnv } from "../env.js";
+import { buildAbortSignal } from "../abort.js";
 
 function isMockProviderEnabled() {
   return process.env.LIBERGENT_MOCK_PROVIDER === "1";
@@ -31,7 +32,7 @@ function buildMockItems(url) {
   ];
 }
 
-async function postCloudflare(endpointPath, body, timeoutMs = 45000) {
+async function postCloudflare(endpointPath, body, timeoutMs = 45000, signal) {
   if (isMockProviderEnabled()) {
     const mockItems = buildMockItems(body.url);
 
@@ -65,7 +66,7 @@ async function postCloudflare(endpointPath, body, timeoutMs = 45000) {
   const endpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/${endpointPath}`;
   const response = await fetch(endpoint, {
     method: "POST",
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: buildAbortSignal({ timeoutMs, signal }),
     headers: {
       Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
       "Content-Type": "application/json"
@@ -81,7 +82,7 @@ async function postCloudflare(endpointPath, body, timeoutMs = 45000) {
   return payload;
 }
 
-export async function scrapeWithCloudflare({ url, prompt, schema, timeoutMs = 45000 }) {
+export async function scrapeWithCloudflare({ url, prompt, schema, timeoutMs = 45000, signal }) {
   const payload = await postCloudflare(
     "json",
     {
@@ -93,13 +94,14 @@ export async function scrapeWithCloudflare({ url, prompt, schema, timeoutMs = 45
       },
       userAgent: "libergent/0.1"
     },
-    timeoutMs
+    timeoutMs,
+    signal
   );
 
   return payload?.result ?? payload;
 }
 
-export async function crawlWithCloudflare({ crawlConfig, schema, timeoutMs = 45000 }) {
+export async function crawlWithCloudflare({ crawlConfig, schema, timeoutMs = 45000, signal }) {
   const config = {
     ...crawlConfig,
     jsonOptions: {
@@ -114,6 +116,6 @@ export async function crawlWithCloudflare({ crawlConfig, schema, timeoutMs = 450
     }
   };
 
-  const payload = await postCloudflare("crawl", config, timeoutMs);
+  const payload = await postCloudflare("crawl", config, timeoutMs, signal);
   return payload?.result ?? payload;
 }

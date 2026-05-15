@@ -1,4 +1,5 @@
 import { requireEnv } from "../env.js";
+import { buildAbortSignal } from "../abort.js";
 
 const API_BASE_URL = "https://api.firecrawl.dev/v2";
 const SCRAPE_API_URL = `${API_BASE_URL}/scrape`;
@@ -12,12 +13,12 @@ async function parseJsonResponse(response, contextLabel) {
   return payload;
 }
 
-export async function scrapeWithFirecrawl({ url, prompt, schema, waitForMs, timeoutMs = 45000 }) {
+export async function scrapeWithFirecrawl({ url, prompt, schema, waitForMs, timeoutMs = 45000, signal }) {
   requireEnv(["FIRECRAWL_API_KEY"]);
 
   const response = await fetch(SCRAPE_API_URL, {
     method: "POST",
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: buildAbortSignal({ timeoutMs, signal }),
     headers: {
       Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
       "Content-Type": "application/json"
@@ -50,12 +51,12 @@ export async function scrapeWithFirecrawl({ url, prompt, schema, waitForMs, time
   return payload?.data?.json ?? payload?.json ?? payload?.data ?? payload;
 }
 
-export async function scrapeMarkdownWithFirecrawl({ url, waitForMs, timeoutMs = 45000 }) {
+export async function scrapeMarkdownWithFirecrawl({ url, waitForMs, timeoutMs = 45000, signal }) {
   requireEnv(["FIRECRAWL_API_KEY"]);
 
   const response = await fetch(SCRAPE_API_URL, {
     method: "POST",
-    signal: AbortSignal.timeout(timeoutMs),
+    signal: buildAbortSignal({ timeoutMs, signal }),
     headers: {
       Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`,
       "Content-Type": "application/json"
