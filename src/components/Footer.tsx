@@ -1,59 +1,82 @@
 import Link from "next/link";
-import { MascotSVG } from "./MascotSVG";
+import { LogoIcon } from "./LogoIcon";
 
-const links = {
+const BG    = "#0A0A0A";
+const CREAM = "#F3F0E7";
+const PINK  = "#FF2A6D";
+const MONO  = "var(--font-mono-var), monospace";
+
+const NAV_LINKS = {
   Produs: [
     { label: "Cum funcționează", href: "#cum-functioneaza" },
-    { label: "Prețuri", href: "#planuri" },
-    { label: "Platforme", href: "#platforme" },
+    { label: "Căutare", href: "#" },
+    { label: "Alerte", href: "#" },
+    { label: "Statistici", href: "#" },
   ],
   Companie: [
-    { label: "Despre noi", href: "#despre-noi" },
+    { label: "Despre noi", href: "#" },
     { label: "Blog", href: "#" },
+    { label: "Cariere", href: "#" },
     { label: "Contact", href: "#" },
   ],
   Legal: [
     { label: "Politică de confidențialitate", href: "#" },
-    { label: "Termeni și condiții", href: "#" },
+    { label: "Termeni", href: "#" },
     { label: "Cookie-uri", href: "#" },
   ],
 };
 
+
 export function Footer() {
   return (
-    <footer className="bg-[#111111] border-t border-[#333333] pt-16 pb-8 px-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="grid md:grid-cols-4 gap-10 mb-14">
-          {/* Brand */}
-          <div className="flex flex-col gap-4">
-            <Link href="/" className="flex items-center gap-2.5">
-              <MascotSVG size={28} color="#ffffff" />
-              <span className="font-pixel text-white" style={{ fontSize: "11px" }}>
+    <footer
+      className="px-6 py-14"
+      style={{ background: BG, fontFamily: MONO, borderTop: "2px solid #1A1A1A" }}
+    >
+      <div className="max-w-[1280px] mx-auto">
+
+        {/* 5-column grid */}
+        <div
+          className="grid grid-cols-1 md:grid-cols-5 gap-10 md:gap-0"
+          style={{ borderBottom: `1px solid ${CREAM}12` }}
+        >
+          {/* Col 1: Brand */}
+          <div
+            className="flex flex-col gap-5 pb-10 md:pb-14 md:pr-8"
+            style={{ borderRight: `1px solid ${CREAM}12` }}
+          >
+            <Link href="/" className="flex items-center gap-3">
+              <LogoIcon size={24} color={CREAM} eyeColor={BG} />
+              <span className="text-[13px] tracking-widest uppercase" style={{ color: CREAM }}>
                 LiberGent
               </span>
             </Link>
-            <p className="text-sm text-[#6B6B6B] leading-relaxed max-w-[200px]">
-              Găsește rapid produse second-hand, fără stres.
+            <p className="text-[12px] leading-relaxed" style={{ color: `${CREAM}55` }}>
+              Agentul tău pentru oferte second-hand din România.
             </p>
-            <div className="flex items-center gap-3 mt-2">
-              <span className="text-xs text-[#4F7CFF] font-semibold">Observă.</span>
-              <span className="text-xs text-[#A259FF] font-semibold">Analizează.</span>
-              <span className="text-xs text-[#FFC857] font-semibold">Livrează.</span>
+            <div className="flex items-center gap-2 text-[10px] tracking-widest uppercase" style={{ color: `${CREAM}33` }}>
+              <div style={{ width: 4, height: 4, background: PINK, flexShrink: 0 }} />
+              <span>Observă · Analizează · Livrează</span>
             </div>
           </div>
 
-          {/* Links */}
-          {Object.entries(links).map(([section, items]) => (
-            <div key={section}>
-              <p className="text-xs font-semibold text-[#6B6B6B] uppercase tracking-widest mb-4">
+          {/* Cols 2-4: Link groups */}
+          {Object.entries(NAV_LINKS).map(([section, items]) => (
+            <div
+              key={section}
+              className="flex flex-col gap-5 pb-10 md:pb-14 md:px-8"
+              style={{ borderRight: `1px solid ${CREAM}12` }}
+            >
+              <div className="text-[10px] tracking-widest uppercase" style={{ color: `${CREAM}44` }}>
                 {section}
-              </p>
-              <ul className="flex flex-col gap-2.5">
+              </div>
+              <ul className="flex flex-col gap-3">
                 {items.map((item) => (
                   <li key={item.label}>
                     <Link
                       href={item.href}
-                      className="text-sm text-[#6B6B6B] hover:text-white transition-colors"
+                      className="text-[12px] opacity-40 hover:opacity-100 transition-opacity duration-150"
+                      style={{ color: CREAM }}
                     >
                       {item.label}
                     </Link>
@@ -62,26 +85,66 @@ export function Footer() {
               </ul>
             </div>
           ))}
+
+          {/* Col 5: Newsletter */}
+          <div className="flex flex-col gap-5 pb-10 md:pb-14 md:pl-8">
+            <div className="text-[10px] tracking-widest uppercase" style={{ color: `${CREAM}44` }}>
+              Newsletter
+            </div>
+            <p className="text-[12px] leading-relaxed" style={{ color: `${CREAM}55` }}>
+              Actualizări lunare. Fără spam.
+            </p>
+            <div className="flex" style={{ border: `1px solid ${CREAM}22` }}>
+              <input
+                type="email"
+                placeholder="email@exemplu.ro"
+                className="flex-1 bg-transparent text-[12px] px-3 py-2.5 outline-none placeholder:opacity-25"
+                style={{ color: CREAM, fontFamily: MONO }}
+              />
+              <button
+                type="button"
+                className="px-3.5 py-2.5 text-[14px] hover:-translate-y-px hover:-translate-x-px transition-transform duration-150"
+                style={{
+                  background: PINK,
+                  color: CREAM,
+                  boxShadow: `2px 2px 0 0 ${CREAM}33`,
+                }}
+              >
+                →
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="border-t border-[#333333] pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-[#6B6B6B]">
-            © 2026 LiberGent · Toate drepturile rezervate.
-          </p>
-          <div className="flex items-center gap-4">
-            {/* Instagram */}
-            <a href="#" className="text-[#6B6B6B] hover:text-white transition-colors" aria-label="Instagram">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-              </svg>
-            </a>
-            {/* TikTok */}
-            <a href="#" className="text-[#6B6B6B] hover:text-white transition-colors" aria-label="TikTok">
-              <svg width="16" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.13 8.13 0 004.77 1.52V6.76a4.85 4.85 0 01-1-.07z" />
-              </svg>
-            </a>
+        {/* Bottom strip */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6">
+
+          {/* Left: pink dot + copyright */}
+          <div className="flex items-center gap-2.5">
+            <div style={{ width: 6, height: 6, background: PINK, flexShrink: 0 }} />
+            <span className="text-[11px]" style={{ color: `${CREAM}33` }}>
+              © 2026 LiberGent — Toate drepturile rezervate.
+            </span>
           </div>
+
+          {/* Center: crosshair icon */}
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className="shrink-0">
+            <circle cx="9" cy="9" r="7" stroke={CREAM} strokeWidth="0.75" opacity="0.18" />
+            <line x1="0" y1="9" x2="5.5" y2="9" stroke={CREAM} strokeWidth="0.75" opacity="0.25" />
+            <line x1="12.5" y1="9" x2="18" y2="9" stroke={CREAM} strokeWidth="0.75" opacity="0.25" />
+            <line x1="9" y1="0" x2="9" y2="5.5" stroke={CREAM} strokeWidth="0.75" opacity="0.25" />
+            <line x1="9" y1="12.5" x2="9" y2="18" stroke={CREAM} strokeWidth="0.75" opacity="0.25" />
+            <circle cx="9" cy="9" r="1.5" fill={CREAM} opacity="0.18" />
+          </svg>
+
+          {/* Right: tagline + dot */}
+          <div className="flex items-center gap-2.5">
+            <span className="text-[11px]" style={{ color: `${CREAM}2A` }}>
+              Cauți mai puțin. Găsești mai bine.
+            </span>
+            <div style={{ width: 4, height: 4, background: PINK, opacity: 0.5, flexShrink: 0 }} />
+          </div>
+
         </div>
       </div>
     </footer>

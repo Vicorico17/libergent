@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Press_Start_2P, Inter, Caveat } from "next/font/google";
+import { Press_Start_2P, Inter, Caveat, Space_Mono, DotGothic16, VT323, JetBrains_Mono } from "next/font/google";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 const pixel = Press_Start_2P({
@@ -21,6 +22,34 @@ const caveat = Caveat({
   display: "swap",
 });
 
+const spaceMono = Space_Mono({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--font-mono-var",
+  display: "swap",
+});
+
+const dotGothic = DotGothic16({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-dotgothic-var",
+  display: "swap",
+});
+
+const vt323 = VT323({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-vt323-var",
+  display: "swap",
+});
+
+const jetbrains = JetBrains_Mono({
+  weight: ["400", "500", "600", "700"],
+  subsets: ["latin"],
+  variable: "--font-jetbrains-var",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "LiberGent — Second-hand inteligent",
   description:
@@ -34,7 +63,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ro" className={`${pixel.variable} ${inter.variable} ${caveat.variable}`}>
+    <html lang="ro" className={`${pixel.variable} ${inter.variable} ${caveat.variable} ${spaceMono.variable} ${dotGothic.variable} ${vt323.variable} ${jetbrains.variable} ${GeistMono.variable}`}>
       <body className="min-h-screen flex flex-col">{children}</body>
     </html>
   );

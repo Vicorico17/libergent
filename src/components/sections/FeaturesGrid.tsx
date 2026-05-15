@@ -1,112 +1,152 @@
-const features = [
+const BG   = "#F5F2EB";
+const INK  = "#111111";
+const PINK = "#FF2A6D";
+const MONO = "var(--font-mono-var), monospace";
+
+const TESTIMONIALS = [
   {
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <circle cx="14" cy="14" r="10" stroke="#4F7CFF" strokeWidth="2.5" />
-        <path d="M28 28l-6-6" stroke="#4F7CFF" strokeWidth="2.5" strokeLinecap="round" />
-        <path d="M10 14h8M14 10v8" stroke="#4F7CFF" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    ),
-    title: "Căutare inteligentă",
-    desc: "Scanăm simultan zeci de platforme second-hand și îți prezentăm cele mai bune rezultate, sortate după relevanță.",
-    accent: "#4F7CFF",
-    bg: "bg-[#EEF3FF]",
+    id: "01",
+    initials: "AM",
+    name: "Andreea M.",
+    city: "Cluj-Napoca",
+    quote:
+      "Am găsit exact ce căutam în 10 minute, în loc de 2 ore pe OLX. LiberGent a schimbat complet cum cumpăr second-hand.",
   },
   {
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <rect x="4" y="3" width="24" height="26" rx="3" stroke="#A259FF" strokeWidth="2.5" />
-        <path d="M10 11h12M10 16h12M10 21h8" stroke="#A259FF" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    ),
-    title: "Doar ce contează",
-    desc: "Algoritmul nostru filtrează listingurile irelevante, duplicate și expirate. Îți arătăm doar ce merită atenția ta.",
-    accent: "#A259FF",
-    bg: "bg-[#F4EEFF]",
+    id: "02",
+    initials: "MT",
+    name: "Mihai T.",
+    city: "București",
+    quote:
+      "Nu mai pierd vremea scrollând prin mii de anunțuri. LiberGent face asta pentru mine și îmi trimite direct ce e relevant.",
   },
   {
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <path d="M16 28.5l-2-1.8C7.2 20.4 3 16.8 3 12.2 3 8.1 6.1 5 10.2 5c2.2 0 4.4 1 5.8 2.6C17.4 6 19.6 5 21.8 5 25.9 5 29 8.1 29 12.2c0 4.6-4.2 8.2-11 14.5L16 28.5z" fill="#FF6B6B" />
-      </svg>
-    ),
-    title: "Economisești timp",
-    desc: "În loc de 3 ore de scrollat pe OLX, Vinted și Facebook, îți ia 30 de secunde. Caută o dată, găsești tot.",
-    accent: "#FF6B6B",
-    bg: "bg-[#FFF0F0]",
+    id: "03",
+    initials: "CP",
+    name: "Cristina P.",
+    city: "Timișoara",
+    quote:
+      "Simplu, rapid, exact ce trebuia. Am economisit mult timp și am găsit produse la prețuri mult mai bune decât mă așteptam.",
   },
-  {
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <path d="M4 22l6-12 6 6 6-9 6 6" stroke="#FFC857" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M4 26h24" stroke="#FFC857" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-    ),
-    title: "Urmezi cele mai bune oferte",
-    desc: "Setezi alerte pentru produsele care te interesează și primești notificări imediat ce apare ceva nou.",
-    accent: "#FFC857",
-    bg: "bg-[#FFF9EE]",
-  },
-  {
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <path d="M16 3l2.5 8h8.5l-7 5 2.5 8-7-5-7 5 2.5-8-7-5h8.5L16 3z" stroke="#4F7CFF" strokeWidth="2" strokeLinejoin="round" />
-      </svg>
-    ),
-    title: "Alerte în timp real",
-    desc: "Nu ratezi nicio ofertă. Trimitem notificări push sau email imediat ce apare un produs care corespunde criteriilor tale.",
-    accent: "#4F7CFF",
-    bg: "bg-[#EEF3FF]",
-  },
-  {
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-        <circle cx="16" cy="16" r="12" stroke="#A259FF" strokeWidth="2.5" />
-        <path d="M10 16h12M16 10l6 6-6 6" stroke="#A259FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-    title: "Multi-platformă",
-    desc: "Un singur loc pentru tot second-hand-ul din România. OLX, Vinted, Facebook Marketplace și multe altele.",
-    accent: "#A259FF",
-    bg: "bg-[#F4EEFF]",
-  },
+];
+
+const CORNERS = [
+  "top-[2px] left-[2px]",
+  "top-[2px] right-[2px]",
+  "bottom-[2px] left-[2px]",
+  "bottom-[2px] right-[2px]",
 ];
 
 export function FeaturesGrid() {
   return (
-    <section className="bg-[#F8F9FA] py-20 px-6">
-      <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-14">
-          <p className="text-xs font-pixel text-[#A259FF] mb-4 tracking-widest uppercase">
-            De ce LiberGent?
-          </p>
-          <h2
-            className="font-pixel text-[#111111]"
-            style={{ fontSize: "clamp(16px, 3vw, 32px)", lineHeight: 1.2 }}
+    <section style={{ background: BG, fontFamily: MONO }} className="px-6 py-16 lg:py-24">
+      <div className="max-w-[1280px] mx-auto">
+
+        {/* Section header */}
+        <div className="text-center mb-16 flex flex-col items-center">
+          <div
+            className="text-[11px] tracking-widest uppercase mb-6 font-normal"
+            style={{ color: PINK }}
           >
-            Tot ce ai nevoie.
-            <br />
-            Într-un singur loc.
-          </h2>
+            05 / TESTIMONIALE
+          </div>
+
+          <div className="flex items-end justify-center gap-2 mb-6">
+            <h2
+              className="font-bold tracking-tight leading-[0.95]"
+              style={{ fontFamily: MONO, fontSize: "clamp(36px, 5vw, 68px)", color: INK }}
+            >
+              Ce spun utilizatorii.
+            </h2>
+            <div
+              className="animate-pulse shrink-0 mb-2"
+              style={{ width: 12, height: 12, background: PINK }}
+            />
+          </div>
+
+          <div className="flex items-start gap-3 max-w-md text-left">
+            <div className="shrink-0 mt-[7px]" style={{ width: 8, height: 8, background: PINK }} />
+            <p className="text-[15px] font-normal leading-relaxed" style={{ color: INK }}>
+              Povești reale de la oameni care caută mai repede și aleg mai bine.
+            </p>
+          </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {features.map((f) => (
-            <div
-              key={f.title}
-              className="bg-white rounded-2xl p-6 flex flex-col gap-4 hover:shadow-md transition-shadow"
-              style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.04)" }}
+        {/* Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+          {TESTIMONIALS.map((t) => (
+            <article
+              key={t.id}
+              className="relative flex flex-col hover:-translate-y-1 transition-transform duration-300 group"
+              style={{ border: `1px solid ${INK}`, padding: "32px" }}
             >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${f.bg}`}>
-                {f.icon}
+              {/* Corner pixel marks */}
+              {CORNERS.map((pos) => (
+                <div
+                  key={pos}
+                  className={`absolute ${pos} w-1 h-1`}
+                  style={{ background: INK }}
+                />
+              ))}
+
+              {/* Card top: rating squares + label */}
+              <div className="flex justify-between items-center mb-10 text-[11px] tracking-widest">
+                <div className="flex gap-1.5">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} style={{ width: 10, height: 10, background: PINK }} />
+                  ))}
+                </div>
+                <span className="font-normal uppercase" style={{ color: INK }}>
+                  USER REPORT {t.id}
+                </span>
               </div>
-              <div>
-                <h3 className="font-semibold text-[#111111] text-base mb-1.5">{f.title}</h3>
-                <p className="text-sm text-[#6B6B6B] leading-relaxed">{f.desc}</p>
+
+              {/* Quote */}
+              <p
+                className="text-[15px] leading-[1.8] flex-grow font-normal"
+                style={{ color: INK }}
+              >
+                "{t.quote}"
+              </p>
+
+              {/* Card bottom */}
+              <div
+                className="flex justify-between items-end mt-10 pt-5"
+                style={{ borderTop: `1px solid ${INK}` }}
+              >
+                <div className="flex items-center gap-4">
+                  {/* Avatar badge */}
+                  <div className="p-[1px]" style={{ background: INK }}>
+                    <div
+                      className="w-10 h-10 flex items-center justify-center text-[13px] font-normal"
+                      style={{ background: BG, color: INK }}
+                    >
+                      {t.initials}
+                    </div>
+                  </div>
+                  <div className="text-[12px]">
+                    <div className="font-bold" style={{ color: INK }}>{t.name}</div>
+                    <div className="mt-0.5" style={{ color: `${INK}B3` }}>{t.city}</div>
+                  </div>
+                </div>
+
+                {/* Arrow — translates right on group hover */}
+                <div className="transition-transform duration-300 group-hover:translate-x-1.5">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M5 12h14M12 5l7 7-7 7"
+                      stroke={PINK}
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
               </div>
-            </div>
+            </article>
           ))}
         </div>
+
       </div>
     </section>
   );

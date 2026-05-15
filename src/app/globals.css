@@ -32,11 +32,16 @@
   --font-pixel: var(--font-pixel-var);
   --font-sans: var(--font-sans-var);
   --font-handwritten: var(--font-handwritten-var);
+  --font-mono: var(--font-mono-var);
+  --font-dotgothic: var(--font-dotgothic-var);
+  --font-vt323: var(--font-vt323-var);
+  --font-jetbrains: var(--font-jetbrains-var);
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #111111;
+  --background: #F5F4EE;
+  --foreground: #1C1C2E;
+  --font-mono-var: var(--font-geist-mono);
 }
 
 * {
@@ -44,8 +49,8 @@
 }
 
 body {
-  background: #ffffff;
-  color: #111111;
+  background: #F5F4EE;
+  color: #1C1C2E;
   font-family: var(--font-sans-var), Inter, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -69,20 +74,104 @@ body {
     #f6f6ff;
 }
 
-/* Plus scatter animation */
-@keyframes float {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-8px) rotate(5deg); }
+/* Floating badge animations */
+@keyframes badge-float-1 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes badge-float-2 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes badge-float-3 {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
 }
 
-.plus-float {
-  animation: float 4s ease-in-out infinite;
-}
+.badge-float-1 { animation: badge-float-1 3.8s ease-in-out infinite; }
+.badge-float-2 { animation: badge-float-2 4.4s ease-in-out infinite 0.6s; }
+.badge-float-3 { animation: badge-float-3 3.6s ease-in-out infinite 1.2s; }
 
 /* Pixel border accent */
 .pixel-border-blue  { border-top: 4px solid #4F7CFF; }
 .pixel-border-purple { border-top: 4px solid #A259FF; }
 .pixel-border-yellow { border-top: 4px solid #FFC857; }
+
+/* Chamfered corners */
+.clip-chamfer    { clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px); }
+.clip-chamfer-sm { clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px); }
+.clip-chamfer-lg { clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px); }
+
+/* Radar pulse rings */
+@keyframes radar-pulse {
+  0%   { transform: translate(-50%, -50%) scale(0.8); opacity: 0.4; }
+  100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+}
+.radar-ring         { animation: radar-pulse 4s linear infinite; }
+.radar-ring-delayed { animation: radar-pulse 4s linear infinite 2s; }
+
+/* Data packet travel */
+@keyframes move-packet {
+  0%   { left: 15%; opacity: 0; transform: translateY(-50%) scale(0.5); }
+  10%  { opacity: 1; transform: translateY(-50%) scale(1); }
+  90%  { opacity: 1; transform: translateY(-50%) scale(1); }
+  100% { left: 85%; opacity: 0; transform: translateY(-50%) scale(0.5); }
+}
+.packet-anim { animation: move-packet 3s linear infinite; }
+
+/* Pulse bar variants (network load bars) */
+@keyframes pulse-bar {
+  0%, 100% { transform: scaleY(0.6); }
+  50%       { transform: scaleY(1); }
+}
+.anim-bar-1 { animation: pulse-bar 1.2s ease-in-out infinite; }
+.anim-bar-2 { animation: pulse-bar 0.9s ease-in-out infinite 0.2s; }
+.anim-bar-3 { animation: pulse-bar 1.5s ease-in-out infinite 0.4s; }
+
+/* Feature card: dotted separator line */
+.dot-sep {
+  height: 1px;
+  background-image: linear-gradient(to right, #0A0A0A 40%, transparent 40%);
+  background-size: 4px 1px;
+  background-repeat: repeat-x;
+  margin-bottom: 1.5rem;
+}
+
+/* Soft pulse (LIVE indicator dot) */
+@keyframes soft-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.25; }
+}
+.soft-pulse { animation: soft-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+/* Blinking cursor */
+@keyframes text-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.blink { animation: text-blink 1s step-end infinite; }
+
+/* Loading bars (card 01 footer) */
+@keyframes bar-loading {
+  0%, 100% { opacity: 0.2; transform: scaleY(0.7); }
+  50%       { opacity: 1;   transform: scaleY(1); }
+}
+.bar-loading { animation: bar-loading 1.2s ease-in-out infinite; }
+
+/* Price graph bar bounce (card 03) */
+@keyframes graph-bounce {
+  0%   { transform: scaleY(0.88); }
+  100% { transform: scaleY(1.12); }
+}
+
+/* Terminal scan line */
+@keyframes scanline {
+  0%   { top: 0%;   opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.scan-line { animation: scanline 4s linear infinite; }
 
 /* Smooth accordion */
 .accordion-content {
