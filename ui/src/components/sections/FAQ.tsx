@@ -5,23 +5,23 @@ import { useState } from "react";
 const faqs = [
   {
     q: "Cum funcționează LiberGent?",
-    a: "LiberGent caută simultan pe marketplace-uri active din România și îți returnează rezultate într-un format unificat. Nu mai verifici fiecare platformă separat.",
+    a: "LiberGent scanează automat platformele second-hand (OLX, Vinted, Facebook Marketplace etc.) și îți prezintă produsele relevante pentru căutarea ta. Nu trebuie să verifici fiecare platformă manual — noi facem asta pentru tine.",
   },
   {
     q: "Este gratuit?",
-    a: "Da. Accesul actual este beta și este gratuit. Nu există încă planuri comerciale active în produs.",
+    a: "Da, planul de bază este complet gratuit. Ai acces la 5 căutări pe zi și 3 platforme. Planul PRO (29 RON/lună) deblochează căutări nelimitate, toate platformele și alerte în timp real.",
   },
   {
     q: "Pe ce platforme căutați?",
-    a: "Momentan căutăm pe OLX, Vinted, LaJumate, Okazii și Publi24. Pentru căutări auto includem și Autovit. Extindem acoperirea gradual.",
+    a: "Momentan scanăm OLX, Vinted, Facebook Marketplace, Publi24 și Storia. Adăugăm platforme noi constant — urmărește anunțurile noastre pentru actualizări.",
   },
   {
     q: "Cât de des sunt actualizate rezultatele?",
-    a: "Rezultatele sunt generate la fiecare căutare pe baza surselor active din acel moment.",
+    a: "Scanăm platformele la fiecare câteva minute, astfel încât să nu ratezi nicio ofertă nouă. Planul PRO include alerte care te anunță imediat ce apare un produs nou.",
   },
   {
     q: "Pot seta alerte pentru un produs?",
-    a: "Nu încă. Alertele sunt planificate, dar nu sunt disponibile în versiunea actuală.",
+    a: "Da, funcția de alerte este disponibilă în planul PRO. Setezi criteriile (produs, preț maxim, stare) și primești o notificare imediat ce apare ceva potrivit.",
   },
   {
     q: "Datele mele sunt în siguranță?",

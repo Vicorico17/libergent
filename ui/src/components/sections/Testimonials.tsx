@@ -64,7 +64,7 @@ export function Testimonials() {
               style={{ boxShadow: "0 0 0 1px rgba(0,0,0,0.06)" }}
             >
               <Stars count={t.stars} />
-              <p className="text-[#111111] text-sm leading-relaxed flex-1">“{t.quote}”</p>
+              <p className="text-[#111111] text-sm leading-relaxed flex-1">&ldquo;{t.quote}&rdquo;</p>
               <div className="flex items-center gap-3 pt-2 border-t border-[#D9D9D9]">
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"

@@ -110,7 +110,7 @@ export function TrendsClient() {
   const totals = payload?.totals || {};
   const topQueries = payload?.topQueries || [];
   const topKeywords = payload?.topKeywords || [];
-  const dailyTrend = payload?.dailyTrend || [];
+  const dailyTrend = useMemo(() => payload?.dailyTrend || [], [payload?.dailyTrend]);
   const recentSearches = payload?.recentSearches || [];
   const maxDailyCount = useMemo(() => Math.max(...dailyTrend.map((entry) => entry.count), 1), [dailyTrend]);
 

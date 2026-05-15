@@ -1,13 +1,10 @@
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/sections/Hero";
-import { StatsBar } from "@/components/sections/StatsBar";
+import { FeatureCards } from "@/components/sections/FeatureCards";
 import { HowItWorks } from "@/components/sections/HowItWorks";
-import { Platforms } from "@/components/sections/Platforms";
 import { FeaturesGrid } from "@/components/sections/FeaturesGrid";
-import { Testimonials } from "@/components/sections/Testimonials";
 import { Pricing } from "@/components/sections/Pricing";
-import { FAQ } from "@/components/sections/FAQ";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 
 export default function Home() {
@@ -16,13 +13,10 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
-        <StatsBar />
+        <FeatureCards />
         <HowItWorks />
-        <Platforms />
         <FeaturesGrid />
-        <Testimonials />
         <Pricing />
-        <FAQ />
         <FinalCTA />
       </main>
       <Footer />

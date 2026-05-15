@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-const platforms = ["OLX", "Vinted", "Lajumate", "Okazii", "Publi24", "Autovit"];
-const conditions = ["Nou", "Folosit", "Ca nou", "Bun", "Acceptabil"];
+const platforms = ["OLX", "Vinted", "Facebook Marketplace", "Publi24", "Storia"];
+const conditions = ["Nou cu etichetă", "Ca nou", "Bun", "Acceptabil"];
 const sortOptions = ["Relevanță", "Preț crescător", "Preț descrescător", "Cel mai recent"];
 
 interface Filters {

@@ -1,7 +1,7 @@
 const stats = [
-  { value: "5+", label: "Platforme active" },
-  { value: "1", label: "Căutare unificată" },
-  { value: "Beta", label: "Acces gratuit" },
+  { value: "12.400+", label: "Produse găsite" },
+  { value: "48", label: "Platforme scanate" },
+  { value: "6", label: "Categorii active" },
 ];
 
 export function StatsBar() {

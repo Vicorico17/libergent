@@ -1,41 +1,23 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
 interface Product {
   id: string;
   title: string;
-  price: number | null;
+  price: number;
   platform: string;
   platformColor: string;
   condition: string;
   location: string;
   daysAgo: number;
-  postedDateLabel: string;
   image?: string;
-  images?: string[];
-  url?: string;
-  rank?: number;
-  recommendationScore?: number;
 }
 
 interface ProductCardProps {
   product: Product;
-  isBestDeal?: boolean;
 }
 
 export type { Product };
 
-export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
-  const { title, price, platform, platformColor, condition, location, postedDateLabel, url } = product;
-  const hasPrice = price !== null && Number.isFinite(price);
-  const gallery = (product.images || []).filter(Boolean);
-  const [imageFailed, setImageFailed] = useState(false);
-  const showImage = Boolean(product.image) && !imageFailed;
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [product.image]);
+export function ProductCard({ product }: ProductCardProps) {
+  const { title, price, platform, platformColor, condition, location, daysAgo } = product;
 
   const conditionColor =
     condition === "Ca nou" || condition === "Nou cu etichetă"
@@ -46,30 +28,13 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
 
   return (
     <div
-      className={`bg-white rounded-2xl overflow-hidden hover:shadow-md transition-shadow group ${
-        isBestDeal ? "flex flex-col md:flex-row" : "flex flex-col"
-      }`}
-      style={{
-        boxShadow: isBestDeal
-          ? "0 8px 20px rgba(255,189,46,0.22), 0 0 0 2px rgba(255,189,46,0.45)"
-          : "0 2px 8px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)",
-      }}
+      className="bg-white rounded-2xl overflow-hidden flex flex-col hover:shadow-md transition-shadow group"
+      style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)" }}
     >
       {/* Image */}
-      <div
-        className={`relative bg-[#F8F9FA] shrink-0 flex items-center justify-center overflow-hidden ${
-          isBestDeal ? "w-full md:w-56 lg:w-64 aspect-[4/3] md:aspect-auto md:min-h-[190px]" : "w-full aspect-[4/3]"
-        }`}
-      >
-        {showImage ? (
-          <img
-            src={product.image}
-            alt={title}
-            loading="lazy"
-            decoding="async"
-            onError={() => setImageFailed(true)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
+      <div className="relative bg-[#F8F9FA] aspect-[4/3] flex items-center justify-center overflow-hidden">
+        {product.image ? (
+          <img src={product.image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
         ) : (
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-[#D9D9D9]">
             <rect x="6" y="10" width="36" height="28" rx="4" stroke="currentColor" strokeWidth="2" />
@@ -84,61 +49,42 @@ export function ProductCard({ product, isBestDeal = false }: ProductCardProps) {
         >
           {platform}
         </span>
-        {typeof product.rank === "number" && Number.isFinite(product.rank) ? (
-          <span className="absolute top-2.5 right-2.5 rounded-full bg-white/95 text-[#111111] text-[11px] font-bold px-2 py-0.5 shadow-sm">
-            #{product.rank}
-          </span>
-        ) : null}
-        {isBestDeal ? (
-          <span className="absolute left-2.5 bottom-2.5 inline-flex items-center gap-1 rounded-full bg-[#FFBD2E] text-[#111111] text-[11px] font-bold px-2 py-0.5">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <path d="M5 19h14l-1.5-10-4.5 3-3-6-3 6-4.5-3L5 19z" />
-            </svg>
-            Best deal
-          </span>
-        ) : null}
-        {gallery.length > 1 ? (
-          <span className="absolute right-2.5 bottom-2.5 rounded-full bg-black/70 text-white text-[11px] font-semibold px-2 py-0.5">
-            +{gallery.length - 1} foto
-          </span>
-        ) : null}
+        {/* Save button */}
+        <button className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-sm">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+              stroke="#FF6B6B"
+              strokeWidth="2"
+              fill="none"
+            />
+          </svg>
+        </button>
       </div>
 
       {/* Content */}
-      <div className={`flex flex-col flex-1 ${isBestDeal ? "p-4 md:p-5 gap-3" : "p-4 gap-2"}`}>
-        <p className={`font-semibold text-[#111111] leading-snug line-clamp-2 ${isBestDeal ? "text-base" : "text-sm"}`}>{title}</p>
+      <div className="p-4 flex flex-col gap-2 flex-1">
+        <p className="text-sm font-semibold text-[#111111] leading-snug line-clamp-2">{title}</p>
 
-        <div className={`flex items-center justify-between mt-auto pt-1 ${isBestDeal ? "gap-3" : ""}`}>
-          <span
-            className={`font-pixel text-[#111111] ${isBestDeal ? "whitespace-nowrap" : ""}`}
-            style={{ fontSize: isBestDeal ? "15px" : "14px" }}
-          >
-            {hasPrice ? `${price.toLocaleString("ro-RO")} RON` : "Fără preț"}
+        <div className="flex items-center justify-between mt-auto pt-1">
+          <span className="font-pixel text-[#111111]" style={{ fontSize: "14px" }}>
+            {price.toLocaleString("ro-RO")} RON
           </span>
           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#F8F9FA]" style={{ color: conditionColor }}>
             {condition}
           </span>
         </div>
 
-        <div className={`flex items-center justify-between text-xs text-[#6B6B6B] ${isBestDeal ? "gap-3" : ""}`}>
+        <div className="flex items-center justify-between text-xs text-[#6B6B6B]">
           <span>{location}</span>
-          <span>{postedDateLabel}</span>
+          <span>{daysAgo === 0 ? "azi" : `acum ${daysAgo}z`}</span>
         </div>
 
-        {typeof product.recommendationScore === "number" && Number.isFinite(product.recommendationScore) ? (
-          <div className="flex items-center justify-between text-[11px] text-[#6B6B6B]">
-            <span>Scor</span>
-            <span className="font-semibold text-[#111111]">{Math.round(product.recommendationScore || 0)}/100</span>
-          </div>
-        ) : null}
-
         <a
-          href={url || "#"}
+          href="#"
           target="_blank"
           rel="noopener noreferrer"
-          className={`mt-1 inline-flex justify-center items-center rounded-xl border border-[#D9D9D9] font-semibold text-[#111111] hover:border-[#4F7CFF] hover:text-[#4F7CFF] transition-colors ${
-            isBestDeal ? "h-10 text-sm md:w-44" : "h-9 text-xs"
-          }`}
+          className="mt-1 inline-flex justify-center items-center h-9 rounded-xl border border-[#D9D9D9] text-xs font-semibold text-[#111111] hover:border-[#4F7CFF] hover:text-[#4F7CFF] transition-colors"
         >
           Vezi anunțul →
         </a>

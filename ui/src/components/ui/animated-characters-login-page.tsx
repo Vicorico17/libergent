@@ -27,21 +27,42 @@ function AnimatedMascot({
   isBlinking: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [bounds, setBounds] = useState<DOMRect | null>(null);
+  const [bounds, setBounds] = useState<{ left: number; top: number; width: number } | null>(null);
   // Real logo viewBox: 848.88 × 838.5 → aspect ≈ 0.988 (nearly square)
   const h = Math.round(size * 0.988);
 
   useEffect(() => {
-    if (ref.current) {
-      setBounds(ref.current.getBoundingClientRect());
-    }
-  }, [mouseX, mouseY, size]);
+    const node = ref.current;
+    if (!node) return;
+
+    let frame = requestAnimationFrame(() => {
+      const rect = node.getBoundingClientRect();
+      setBounds({ left: rect.left, top: rect.top, width: rect.width });
+    });
+
+    const updateBounds = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const rect = node.getBoundingClientRect();
+        setBounds({ left: rect.left, top: rect.top, width: rect.width });
+      });
+    };
+
+    const observer = new ResizeObserver(updateBounds);
+    observer.observe(node);
+    window.addEventListener("resize", updateBounds);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", updateBounds);
+    };
+  }, [size]);
 
   // Body skew — leans toward the cursor
-  const skew = (() => {
-    if (!bounds || mouseX === 0) return 0;
-    return Math.max(-10, Math.min(10, -(mouseX - (bounds.left + bounds.width / 2)) / 70));
-  })();
+  const skew = bounds && mouseX !== 0
+    ? Math.max(-10, Math.min(10, -(mouseX - (bounds.left + bounds.width / 2)) / 70))
+    : 0;
 
   // Eye centers derived from real logo PNG pixel analysis
   const lx = size * 0.307; // left  eye ~30.7% from left
