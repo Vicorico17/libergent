@@ -91,15 +91,16 @@ export function Hero() {
             className="font-semibold leading-[1.1]"
             style={{ fontFamily: MONO, fontSize: "clamp(40px, 5.5vw, 72px)", color: INK }}
           >
-            Cauți mai puțin<span style={{ color: PINK }}>.</span>
+            Caută second-hand<br />în România<span style={{ color: PINK }}>.</span>
             <br />
-            Găsești mai bine<span style={{ color: PINK }}>.</span>
+            Compară ofertele<span style={{ color: PINK }}>.</span>
           </h1>
 
           {/* Body copy */}
           <p className="text-base lg:text-lg leading-relaxed max-w-lg" style={{ color: `${INK}E6` }}>
-            LiberGent caută produse second-hand pe mai multe platforme din România
-            și îți arată doar rezultatele care merită atenția ta.
+            LiberGent caută produse second-hand pe OLX, Vinted, LaJumate,
+            Okazii, Publi24 și Autovit, apoi grupează anunțurile relevante,
+            prețurile și ofertele bune într-un singur loc.
           </p>
 
           {/* Search form with gradient hover border */}
@@ -130,7 +131,7 @@ export function Hero() {
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Caută produsul..."
+                  placeholder="Caută iPhone, laptop, mobilă..."
                   className="bg-transparent outline-none w-full text-lg font-semibold"
                   style={{ fontFamily: MONO, color: INK }}
                   autoComplete="off"
@@ -157,7 +158,7 @@ export function Hero() {
               <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke={PINK} strokeWidth="2" strokeLinejoin="round" />
             </svg>
             <span style={{ fontFamily: MONO }}>
-              Agentul este <span style={{ color: PINK }}>activ</span>. Găsim noi restul.
+              Agentul este <span style={{ color: PINK }}>activ</span>. Verifică marketplace-uri din București, Cluj, Iași, Timișoara și restul României.
             </span>
           </div>
         </div>

@@ -8,16 +8,16 @@ const MONO  = "var(--font-mono-var), monospace";
 
 const NAV_LINKS = {
   Produs: [
-    { label: "Cum funcționează", href: "#cum-functioneaza" },
+    { label: "Cum funcționează", href: "/#cum-functioneaza" },
     { label: "Căutare", href: "/search" },
-    { label: "Alerte", href: "#" },
+    { label: "Prețuri și alerte", href: "/pricing" },
     { label: "Trenduri", href: "/trenduri" },
   ],
   Companie: [
-    { label: "Despre noi", href: "#" },
-    { label: "Blog", href: "#" },
-    { label: "Cariere", href: "#" },
-    { label: "Contact", href: "#" },
+    { label: "Despre LiberGent", href: "/#cum-functioneaza" },
+    { label: "Întrebări frecvente", href: "/#intrebari" },
+    { label: "Căutare live", href: "/search" },
+    { label: "Trenduri second-hand", href: "/trenduri" },
   ],
   Legal: [
     { label: "Politică de confidențialitate", href: "#" },
@@ -52,7 +52,8 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-[12px] leading-relaxed" style={{ color: `${CREAM}55` }}>
-              Agentul tău pentru oferte second-hand din România.
+              Motor de căutare pentru oferte second-hand din România: OLX, Vinted,
+              LaJumate, Okazii, Publi24 și Autovit.
             </p>
             <div className="flex items-center gap-2 text-[10px] tracking-widest uppercase" style={{ color: `${CREAM}33` }}>
               <div style={{ width: 4, height: 4, background: PINK, flexShrink: 0 }} />
@@ -140,7 +141,7 @@ export function Footer() {
           {/* Right: tagline + dot */}
           <div className="flex items-center gap-2.5">
             <span className="text-[11px]" style={{ color: `${CREAM}2A` }}>
-              Cauți mai puțin. Găsești mai bine.
+              Caută second-hand. Compară oferte. Alege mai bine.
             </span>
             <div style={{ width: 4, height: 4, background: PINK, opacity: 0.5, flexShrink: 0 }} />
           </div>

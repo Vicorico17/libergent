@@ -10,9 +10,9 @@ const MONO = "var(--font-mono-var), monospace";
 
 const NAV_LINKS = [
   { label: "Cum funcționează", href: "/#cum-functioneaza" },
-  { label: "Despre noi",       href: "#" },
-  { label: "Întrebări",        href: "#" },
-  { label: "Trenduri",         href: "#" },
+  { label: "Căutare",          href: "/search" },
+  { label: "Întrebări",        href: "/#intrebari" },
+  { label: "Trenduri",         href: "/trenduri" },
 ];
 
 function CheckIcon() {

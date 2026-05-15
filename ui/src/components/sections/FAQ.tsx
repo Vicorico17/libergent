@@ -1,37 +1,31 @@
-"use client";
-
-import { useState } from "react";
-
-const faqs = [
+export const FAQ_ITEMS = [
   {
     q: "Cum funcționează LiberGent?",
-    a: "LiberGent scanează automat platformele second-hand (OLX, Vinted, Facebook Marketplace etc.) și îți prezintă produsele relevante pentru căutarea ta. Nu trebuie să verifici fiecare platformă manual — noi facem asta pentru tine.",
+    a: "LiberGent caută produsul tău pe mai multe marketplace-uri second-hand din România, normalizează anunțurile și îți arată rezultate comparabile într-un singur flux. Nu trebuie să verifici manual fiecare platformă.",
+  },
+  {
+    q: "Pe ce marketplace-uri caută LiberGent?",
+    a: "Căutarea activă acoperă OLX, Vinted, LaJumate, Okazii și Publi24. Pentru căutări auto, LiberGent include și Autovit, astfel încât mașinile second-hand să fie comparate cu sursele potrivite.",
+  },
+  {
+    q: "Ce pot căuta cu LiberGent?",
+    a: "Poți căuta telefoane, laptopuri, electronice, mobilă, electrocasnice, haine, accesorii și mașini. Exemple utile sunt iPhone 15, MacBook Air, canapea extensibilă, frigider Samsung sau BMW seria 1.",
+  },
+  {
+    q: "LiberGent compară prețurile?",
+    a: "Da. Rezultatele sunt normalizate pentru a putea compara rapid prețurile, starea produsului, locația și sursa anunțului. Agentul evidențiază ofertele care par relevante pentru căutarea ta.",
   },
   {
     q: "Este gratuit?",
-    a: "Da, planul de bază este complet gratuit. Ai acces la 5 căutări pe zi și 3 platforme. Planul PRO (29 RON/lună) deblochează căutări nelimitate, toate platformele și alerte în timp real.",
+    a: "Da. Beta actuală este gratuită și permite căutări multi-platformă fără card. Funcțiile Premium, precum alerte inteligente și monitorizare salvată, vor fi lansate separat.",
   },
   {
-    q: "Pe ce platforme căutați?",
-    a: "Momentan scanăm OLX, Vinted, Facebook Marketplace, Publi24 și Storia. Adăugăm platforme noi constant — urmărește anunțurile noastre pentru actualizări.",
-  },
-  {
-    q: "Cât de des sunt actualizate rezultatele?",
-    a: "Scanăm platformele la fiecare câteva minute, astfel încât să nu ratezi nicio ofertă nouă. Planul PRO include alerte care te anunță imediat ce apare un produs nou.",
-  },
-  {
-    q: "Pot seta alerte pentru un produs?",
-    a: "Da, funcția de alerte este disponibilă în planul PRO. Setezi criteriile (produs, preț maxim, stare) și primești o notificare imediat ce apare ceva potrivit.",
-  },
-  {
-    q: "Datele mele sunt în siguranță?",
-    a: "Absolut. Nu stocăm date personale inutile și nu le vindem niciunui terț. Citește politica noastră de confidențialitate pentru detalii complete.",
+    q: "În ce orașe din România funcționează?",
+    a: "LiberGent caută anunțuri disponibile în toată România, inclusiv București, Cluj-Napoca, Iași, Timișoara, Brașov, Constanța, Craiova și alte orașe afișate de marketplace-uri.",
   },
 ];
 
 export function FAQ() {
-  const [open, setOpen] = useState<number | null>(null);
-
   return (
     <section id="intrebari" className="bg-white py-20 px-6">
       <div className="max-w-2xl mx-auto">
@@ -45,35 +39,32 @@ export function FAQ() {
           >
             Întrebări frecvente.
           </h2>
+          <p className="mt-4 text-sm text-[#6B6B6B] leading-relaxed">
+            Răspunsuri scurte despre căutarea second-hand multi-platformă,
+            compararea prețurilor și marketplace-urile acoperite în România.
+          </p>
         </div>
 
         <div className="flex flex-col gap-2">
-          {faqs.map((faq, i) => (
-            <div
-              key={i}
-              className="border border-[#D9D9D9] rounded-xl overflow-hidden"
+          {FAQ_ITEMS.map((faq) => (
+            <details
+              key={faq.q}
+              className="group border border-[#D9D9D9] rounded-lg overflow-hidden"
             >
-              <button
-                className="w-full flex items-center justify-between px-5 py-4 text-left gap-4 hover:bg-[#F8F9FA] transition-colors"
-                onClick={() => setOpen(open === i ? null : i)}
-                aria-expanded={open === i}
-              >
+              <summary className="w-full flex items-center justify-between px-5 py-4 text-left gap-4 hover:bg-[#F8F9FA] transition-colors cursor-pointer list-none">
                 <span className="font-semibold text-[#111111] text-sm">{faq.q}</span>
                 <span
-                  className="shrink-0 w-6 h-6 rounded-full border border-[#D9D9D9] flex items-center justify-center transition-transform"
-                  style={{ transform: open === i ? "rotate(45deg)" : "rotate(0deg)" }}
+                  className="shrink-0 w-6 h-6 rounded-full border border-[#D9D9D9] flex items-center justify-center transition-transform group-open:rotate-45"
                 >
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M6 2v8M2 6h8" stroke="#111111" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>
                 </span>
-              </button>
-              {open === i && (
-                <div className="px-5 pb-4">
-                  <p className="text-sm text-[#6B6B6B] leading-relaxed">{faq.a}</p>
-                </div>
-              )}
-            </div>
+              </summary>
+              <div className="px-5 pb-4">
+                <p className="text-sm text-[#6B6B6B] leading-relaxed">{faq.a}</p>
+              </div>
+            </details>
           ))}
         </div>
       </div>

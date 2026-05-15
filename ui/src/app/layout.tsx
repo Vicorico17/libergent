@@ -55,10 +55,48 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://libergent.ro";
+
 export const metadata: Metadata = {
-  title: "LiberGent — Second-hand inteligent",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "LiberGent | Căutare second-hand în România",
+    template: "%s | LiberGent",
+  },
   description:
-    "Găsește rapid produse second-hand, fără stres. LiberGent scanează zeci de platforme și îți livrează ce cauți.",
+    "LiberGent caută produse second-hand în România pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit, compară prețuri și îți arată ofertele relevante într-un singur loc.",
+  keywords: [
+    "LiberGent",
+    "produse second-hand",
+    "cautare OLX",
+    "cautare Vinted",
+    "comparare preturi second-hand",
+    "anunturi second-hand Romania",
+    "marketplace Romania",
+    "oferte second-hand",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "ro_RO",
+    url: "/",
+    siteName: "LiberGent",
+    title: "LiberGent | Caută produse second-hand pe mai multe marketplace-uri",
+    description:
+      "Caută o singură dată și verifică rapid oferte second-hand din România pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LiberGent | Căutare second-hand multi-platformă",
+    description:
+      "Găsește și compară oferte second-hand din România într-un singur loc.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   icons: { icon: "/favicon.ico" },
 };
 

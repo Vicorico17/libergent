@@ -251,12 +251,13 @@ export function FeatureCards() {
             className="font-bold leading-[0.95] mb-5"
             style={{ fontFamily: MONO, fontSize: "clamp(40px, 5.5vw, 80px)", color: BLACK }}
           >
-            Agentul face<br />
-            munca murdară<span style={{ color: PINK }}>.</span>
+            Căutare<br />
+            second-hand completă<span style={{ color: PINK }}>.</span>
           </h2>
 
-          <p className="text-[16px] font-medium" style={{ color: `${BLACK}99`, fontFamily: MONO }}>
-            Scrii produsul. Noi scanăm restul.
+          <p className="text-[16px] font-medium max-w-2xl" style={{ color: `${BLACK}99`, fontFamily: MONO }}>
+            Scrii produsul o singură dată. LiberGent verifică marketplace-urile active,
+            elimină duplicatele și compară prețurile pentru anunțuri second-hand din România.
           </p>
         </div>
 

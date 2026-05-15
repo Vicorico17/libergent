@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const platforms = ["OLX", "Vinted", "Facebook Marketplace", "Publi24", "Storia"];
+const platforms = ["OLX", "Vinted", "LaJumate", "Okazii", "Publi24", "Autovit"];
 const conditions = ["Nou cu etichetă", "Ca nou", "Bun", "Acceptabil"];
 const sortOptions = ["Relevanță", "Preț crescător", "Preț descrescător", "Cel mai recent"];
 

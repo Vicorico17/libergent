@@ -8,10 +8,10 @@ const TICKER_TEXT =
   "AGENT ACTIV: ROMÂNIA +++ SCANARE MULTI-PLATFORMĂ +++ ACTUALIZARE LIVE +++ INTELIGENȚĂ ARTIFICIALĂ PENTRU SECOND-HAND";
 
 const navLinks = [
-  { label: "CUM FUNCȚIONEAZĂ", href: "#cum-functioneaza" },
+  { label: "CUM FUNCȚIONEAZĂ", href: "/#cum-functioneaza" },
   { label: "TRENDURI", href: "/trenduri" },
-  { label: "PRICING", href: "#pricing" },
-  { label: "DESPRE NOI", href: "#" },
+  { label: "PREȚURI", href: "/pricing" },
+  { label: "ÎNTREBĂRI", href: "/#intrebari" },
 ];
 
 function Marquee() {

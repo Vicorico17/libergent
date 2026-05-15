@@ -76,15 +76,15 @@ export function HowItWorks() {
             </div>
             <h2 className="font-semibold tracking-tighter leading-[1.15]"
               style={{ fontSize: "clamp(28px, 3.5vw, 42px)", color: INK }}>
-              Conectat la sursele<br />
-              care contează
+              Conectat la marketplace-urile<br />
+              folosite în România
               <span className="inline-block ml-1.5 -mb-0.5" style={{ width: 12, height: 12, background: PINK }} />
             </h2>
           </div>
           <p className="lg:max-w-[320px] lg:pl-6 text-[13px] leading-[1.7] pt-2"
             style={{ borderLeft: `1px solid ${INK}4D`, color: `${INK}CC` }}>
-            Agentul monitorizează marketplace-urile în timp real și mută rezultatele
-            într-un singur flux inteligent.
+            Agentul pornește căutarea pe OLX, Vinted, LaJumate, Okazii, Publi24
+            și Autovit pentru căutările auto, apoi mută anunțurile într-un singur flux comparabil.
           </p>
         </div>
 

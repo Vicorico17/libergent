@@ -143,12 +143,12 @@ export function FinalCTA() {
           className="font-bold leading-none tracking-tight"
           style={{ fontFamily: MONO, fontSize: "clamp(44px, 7vw, 96px)", color: INK }}
         >
-          Gata să găsești ce cauți?
+          Găsește oferta second-hand potrivită.
         </h2>
 
         {/* Subtitle */}
         <p className="text-[13px] tracking-wide normal-case" style={{ color: `${INK}99` }}>
-          Fără card. Fără complicații.
+          Caută gratuit pe marketplace-uri din România. Fără card. Fără cont obligatoriu.
         </p>
 
         {/* Tagline */}
