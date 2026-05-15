@@ -11,7 +11,7 @@ const NAV_LINKS = {
     { label: "Cum funcționează", href: "#cum-functioneaza" },
     { label: "Căutare", href: "/search" },
     { label: "Alerte", href: "#" },
-    { label: "Trenduri", href: "/trends" },
+    { label: "Trenduri", href: "/trenduri" },
   ],
   Companie: [
     { label: "Despre noi", href: "#" },

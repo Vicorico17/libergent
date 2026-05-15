@@ -1,5 +1,5 @@
-import { TrendsClient } from "./TrendsClient";
+import TrenduriPage from "../trenduri/page";
 
 export default function TrendsPage() {
-  return <TrendsClient />;
+  return <TrenduriPage />;
 }

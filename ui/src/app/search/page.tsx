@@ -313,7 +313,7 @@ function SearchNav({ query }: { query: string }) {
       </form>
 
       <div className="flex items-center gap-5 text-[12px] uppercase font-bold flex-none ml-auto">
-        <Link href="/trends" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Trenduri</Link>
+        <Link href="/trenduri" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Trenduri</Link>
         <Link href="/auth" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Cont</Link>
         <div
           className="w-8 h-8 flex items-center justify-center cursor-pointer transition-colors duration-150"

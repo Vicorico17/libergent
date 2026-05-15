@@ -9,7 +9,7 @@ const TICKER_TEXT =
 
 const navLinks = [
   { label: "CUM FUNCȚIONEAZĂ", href: "#cum-functioneaza" },
-  { label: "TRENDURI", href: "/trends" },
+  { label: "TRENDURI", href: "/trenduri" },
   { label: "PRICING", href: "#pricing" },
   { label: "DESPRE NOI", href: "#" },
 ];
