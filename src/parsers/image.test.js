@@ -84,3 +84,22 @@ test("parseOlxHtml recovers OLX images from embedded config when card has no thu
     "https://frankfurt.apollo.olxcdn.com:443/v1/files/detail-RO/image;s=1000x700"
   );
 });
+
+test("parseOlxHtml unwraps OLX optimized thumbnail URLs", () => {
+  const target = "https://ireland.apollo.olxcdn.com/v1/files/item-RO/image;s=216x152;q=50";
+  const optimized = `/_next/image?url=${encodeURIComponent(target)}&w=384&q=75`;
+  const html = `
+    <div data-cy="l-card" data-testid="l-card">
+      <a href="/d/oferta/test-optimized">
+        <h4>Telefon Apple iPhone</h4>
+      </a>
+      <p data-testid="ad-price">2 450 lei</p>
+      <p data-testid="location-date">Bucuresti - Azi</p>
+      <img src="${optimized}" />
+    </div>
+  `;
+
+  const parsed = parseOlxHtml(html, 5);
+  assert.equal(parsed.items.length, 1);
+  assert.equal(parsed.items[0].imageUrl, target);
+});

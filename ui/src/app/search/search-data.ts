@@ -192,7 +192,7 @@ function normalizeImageUrl(value?: string, listingUrl?: string) {
 
   try {
     if (listingUrl && /^https?:\/\//i.test(listingUrl)) {
-      return new URL(raw, listingUrl).toString();
+      return proxiedMarketplaceImage(new URL(raw, listingUrl).toString());
     }
   } catch {
     return undefined;
@@ -203,8 +203,8 @@ function normalizeImageUrl(value?: string, listingUrl?: string) {
 
 function proxiedMarketplaceImage(value: string) {
   try {
-    const url = new URL(value);
-    if (url.hostname === "frankfurt.apollo.olxcdn.com" || url.hostname === "images.olxcdn.com") {
+    const url = unwrapOlxOptimizerUrl(new URL(value));
+    if (isOlxCdnHost(url.hostname)) {
       return `/api/image?url=${encodeURIComponent(url.toString())}`;
     }
   } catch {
@@ -212,6 +212,28 @@ function proxiedMarketplaceImage(value: string) {
   }
 
   return value;
+}
+
+function unwrapOlxOptimizerUrl(url: URL) {
+  if (url.hostname !== "www.olx.ro" || url.pathname !== "/_next/image") {
+    return url;
+  }
+
+  const nestedUrl = url.searchParams.get("url");
+  if (!nestedUrl) {
+    return url;
+  }
+
+  try {
+    return new URL(nestedUrl);
+  } catch {
+    return url;
+  }
+}
+
+function isOlxCdnHost(hostname = "") {
+  const value = hostname.toLowerCase();
+  return value === "olxcdn.com" || value.endsWith(".olxcdn.com");
 }
 
 function interleave<T>(groups: T[][]) {

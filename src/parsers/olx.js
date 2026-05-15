@@ -42,6 +42,24 @@ function toAbsoluteUrl(url = "") {
   return value;
 }
 
+function normalizeOlxImageUrl(url = "") {
+  const absoluteUrl = toAbsoluteUrl(url);
+  if (!absoluteUrl) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(absoluteUrl);
+    if (parsed.hostname === "www.olx.ro" && parsed.pathname === "/_next/image") {
+      return toAbsoluteUrl(parsed.searchParams.get("url") || absoluteUrl);
+    }
+  } catch {
+    return absoluteUrl;
+  }
+
+  return absoluteUrl;
+}
+
 function decodeOlxJsonString(value = "") {
   return value
     .replace(/\\\\u002F/gi, "/")
@@ -173,7 +191,7 @@ function parseListingCard(card, embeddedImages = new Map()) {
     condition: stripTags(conditionMatch?.[1] || ""),
     sellerType: "",
     url,
-    imageUrl: toAbsoluteUrl(imageUrl || embeddedImageUrl)
+    imageUrl: normalizeOlxImageUrl(imageUrl || embeddedImageUrl)
   };
 }
 

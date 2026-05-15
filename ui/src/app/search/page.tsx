@@ -485,14 +485,44 @@ function FilterPanel({ sort, setSort, sources, toggleSource, conditions, toggleC
 // — ResultCard —
 type ResultItem = SearchResultItem
 
+function useListingImage(item: SearchResultItem) {
+  const images = useMemo(() => {
+    const values = item.images.length ? item.images : item.image ? [item.image] : []
+    return [...new Set(values.filter(Boolean))]
+  }, [item.image, item.images])
+  const [imageState, setImageState] = useState({ itemId: item.id, imageIndex: 0, failed: false })
+  const activeState = imageState.itemId === item.id
+    ? imageState
+    : { itemId: item.id, imageIndex: 0, failed: false }
+  const activeIndex = Math.min(activeState.imageIndex, Math.max(images.length - 1, 0))
+
+  function handleImageError() {
+    setImageState((current) => {
+      const base = current.itemId === item.id
+        ? current
+        : { itemId: item.id, imageIndex: 0, failed: false }
+      if (base.imageIndex + 1 < images.length) {
+        return { ...base, imageIndex: base.imageIndex + 1 }
+      }
+      return { ...base, failed: true }
+    })
+  }
+
+  return {
+    image: activeState.failed ? undefined : images[activeIndex],
+    handleImageError,
+  }
+}
+
 function ResultCard({ item }: { item: ResultItem }) {
   const [hov, setHov] = useState(false)
+  const { image, handleImageError } = useListingImage(item)
   const content = (
     <>
-      {item.image ? (
+      {image ? (
         <div className="relative aspect-[4/3] overflow-hidden" style={{ borderBottom: `1px solid ${INK}`, background: "#DDD9CE" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
+          <img src={image} alt={item.title} className="h-full w-full object-cover" onError={handleImageError} />
         </div>
       ) : (
         <div className="relative aspect-[4/3] overflow-hidden flex items-center justify-center" style={{ borderBottom: `1px solid ${INK}`, background: "#DDD9CE" }}>
@@ -562,6 +592,8 @@ function PanelHeader({ title }: { title: string }) {
 }
 
 function RecommendationCard({ item }: { item: SearchResultItem }) {
+  const { image, handleImageError } = useListingImage(item)
+
   return (
     <div
       className="hover:-translate-y-0.5 transition-all duration-300"
@@ -575,10 +607,10 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
         <PanelHeader title="Agent Recommendation" />
         <div className="flex flex-col md:flex-row">
           <div className="w-full md:w-2/5 relative overflow-hidden" style={{ minHeight: 256, background: "#DDD9CE", borderRight: `1px solid ${INK}` }}>
-            {item.image ? (
+            {image ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.image} alt={item.title} className="absolute inset-0 h-full w-full object-cover" />
+                <img src={image} alt={item.title} className="absolute inset-0 h-full w-full object-cover" onError={handleImageError} />
                 <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.08)" }} />
               </>
             ) : (

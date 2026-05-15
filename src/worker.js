@@ -2,11 +2,7 @@ import { searchAcrossSites } from "./app.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
 import { insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
-
-const ALLOWED_IMAGE_HOSTS = new Set([
-  "frankfurt.apollo.olxcdn.com",
-  "images.olxcdn.com"
-]);
+import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 
 function applyEnv(env = {}) {
   if (!globalThis.process) {
@@ -34,21 +30,13 @@ function json(payload, status = 200) {
   });
 }
 
-function isAllowedImageUrl(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && ALLOWED_IMAGE_HOSTS.has(url.hostname);
-  } catch {
-    return false;
-  }
-}
-
 async function proxyImage(url) {
-  if (!isAllowedImageUrl(url)) {
+  const targetUrl = getMarketplaceImageProxyTarget(url);
+  if (!targetUrl) {
     return json({ error: "Image host is not allowed" }, 400);
   }
 
-  const response = await fetch(url, {
+  const response = await fetch(targetUrl, {
     headers: {
       "user-agent": "Mozilla/5.0 (compatible; libergent/0.1; +https://localhost)",
       accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
