@@ -130,6 +130,30 @@ test("laptop query rejects keyboard replacement parts", () => {
     },
     "Laptop Lenovo IdeaPad Slim 5"
   );
+  const memory = classifyListingIntent(
+    {
+      title: "Memorie RAM Laptop DDR4 8GB 3200MHz",
+      price: "80 lei",
+      priceRon: 80
+    },
+    "laptop"
+  );
+  const laptopWithRamSpec = classifyListingIntent(
+    {
+      title: "Laptop Dell Latitude i5 16GB RAM SSD 512GB",
+      price: "1450 lei",
+      priceRon: 1450
+    },
+    "laptop"
+  );
+  const memoryQuery = classifyListingIntent(
+    {
+      title: "Memorie RAM Laptop DDR4 8GB 3200MHz",
+      price: "80 lei",
+      priceRon: 80
+    },
+    "memorie ram laptop"
+  );
   const wrongSeries = classifyListingIntent(
     {
       title: "Laptop Lenovo IdeaPad Slim 3 14ABR8 AMD Ryzen 5",
@@ -144,6 +168,13 @@ test("laptop query rejects keyboard replacement parts", () => {
   assert.notEqual(keyboard.listingType, "main_product");
   assert.equal(cooler.isRecommendedCandidate, false);
   assert.notEqual(cooler.listingType, "main_product");
+  assert.equal(memory.isRecommendedCandidate, false);
+  assert.equal(memory.listingType, "spare_part");
+  assert.equal(laptopWithRamSpec.isRecommendedCandidate, true);
+  assert.equal(laptopWithRamSpec.listingType, "main_product");
+  assert.equal(memoryQuery.isRecommendedCandidate, true);
+  assert.equal(memoryQuery.queryType, "spare_part");
+  assert.equal(memoryQuery.listingType, "spare_part");
   assert.equal(wrongSeries.isRecommendedCandidate, false);
   assert.ok(wrongSeries.rejectionReasons.includes("missing_critical_query_tokens"));
 });

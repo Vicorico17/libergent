@@ -288,6 +288,15 @@ const SPARE_PART_HEADS = [
   ...VEHICLE_PART_HEADS
 ];
 
+const CONTEXTUAL_SPARE_PART_PHRASES = [
+  "memorie laptop",
+  "memorie ram",
+  "placuta ram",
+  "placute ram",
+  "ram laptop",
+  "sodimm"
+];
+
 const BUNDLE_MARKERS = [
   "bundle",
   "cu accesorii",
@@ -817,7 +826,11 @@ function parseQueryType({ normalized, tokens, taxonomy }) {
   if (hasAnyToken(tokenSet, NEGATIVE_INTENTS.service)) {
     return "service";
   }
-  if (includesAnyPhrase(normalized, NEGATIVE_PHRASES.part) || hasAnyToken(tokenSet, SPARE_PART_HEADS)) {
+  if (
+    includesAnyPhrase(normalized, NEGATIVE_PHRASES.part) ||
+    includesAnyPhrase(normalized, CONTEXTUAL_SPARE_PART_PHRASES) ||
+    hasAnyToken(tokenSet, SPARE_PART_HEADS)
+  ) {
     return "spare_part";
   }
   if (hasAnyToken(tokenSet, NEGATIVE_INTENTS.broken)) {
@@ -1017,7 +1030,8 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   const productAnchors = queryAnchors.filter((token) => !brandAnchorSet.has(token));
   const hasAnchor = queryAnchors.some((token) => textHasTerm(titleText, textTokens, token));
   const hasAccessoryHead = allAccessoryHeads.some((term) => textHasTerm(titleText, textTokens, term));
-  const hasSparePartHead = allSparePartHeads.some((term) => textHasTerm(titleText, textTokens, term));
+  const hasSparePartHead = allSparePartHeads.some((term) => textHasTerm(titleText, textTokens, term)) ||
+    includesAnyPhrase(titleText, CONTEXTUAL_SPARE_PART_PHRASES);
   const startsWithProductAnchor = productAnchors.some((anchor) => textStartsWithTerm(titleText, anchor));
   const startsWithAccessory = allAccessoryHeads.some((term) => textStartsWithTerm(titleText, term));
   const accessoryForProduct = allAccessoryHeads.some((term) =>
