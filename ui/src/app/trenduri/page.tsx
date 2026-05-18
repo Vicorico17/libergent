@@ -9,6 +9,10 @@ const INK  = "#101010";
 const PINK = "#FF4F8B";
 const MONO = "var(--font-mono-var), monospace";
 const HISTORY_STORAGE_KEY = "libergent-search-history-v1";
+const TOP_QUERY_LIMIT = 30;
+const TOP_KEYWORD_LIMIT = 40;
+const DAILY_TREND_LIMIT = 30;
+const RECENT_SEARCH_LIMIT = 100;
 
 type CountEntry = {
   value: string;
@@ -314,13 +318,13 @@ function buildHistoryPayloadFromEntries(entries: RecentSearch[]): HistoryPayload
       uniqueQueries: queryCounts.size,
       uniqueKeywords: keywordCounts.size,
     },
-    topQueries: buildCountList(queryCounts, 12),
-    topKeywords: buildCountList(keywordCounts, 20),
+    topQueries: buildCountList(queryCounts, TOP_QUERY_LIMIT),
+    topKeywords: buildCountList(keywordCounts, TOP_KEYWORD_LIMIT),
     dailyTrend: [...dailyCounts.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-14)
+      .slice(-DAILY_TREND_LIMIT)
       .map(([date, count]) => ({ date, count })),
-    recentSearches: entries.slice(0, 30),
+    recentSearches: entries.slice(0, RECENT_SEARCH_LIMIT),
   };
 }
 
@@ -427,9 +431,9 @@ export default function TrenduriPage() {
   }, [fallbackPayload]);
 
   const totals = payload.totals || {};
-  const topQueries = payload.topQueries?.length ? payload.topQueries.slice(0, 12) : fallbackPayload.topQueries || [];
-  const topKeywords = payload.topKeywords?.length ? payload.topKeywords.slice(0, 20) : fallbackPayload.topKeywords || [];
-  const recentSearches = payload.recentSearches?.length ? payload.recentSearches.slice(0, 5) : fallbackPayload.recentSearches || [];
+  const topQueries = payload.topQueries?.length ? payload.topQueries.slice(0, TOP_QUERY_LIMIT) : fallbackPayload.topQueries || [];
+  const topKeywords = payload.topKeywords?.length ? payload.topKeywords.slice(0, TOP_KEYWORD_LIMIT) : fallbackPayload.topKeywords || [];
+  const recentSearches = payload.recentSearches?.length ? payload.recentSearches.slice(0, RECENT_SEARCH_LIMIT) : fallbackPayload.recentSearches || [];
   const dailyEntries = payload.dailyTrend?.length ? payload.dailyTrend : fallbackPayload.dailyTrend || [];
   const maxDailyCount = Math.max(...dailyEntries.map((entry) => entry.count), 1);
   const dailyVolume = dailyEntries.map((entry) => ({

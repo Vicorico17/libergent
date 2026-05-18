@@ -352,6 +352,30 @@ const PRODUCT_TAXONOMY = {
     aliases: ["airfryer", "air fryer", "friteuza cu aer", "friteuza cu aer cald", "friteuza aer cald"],
     tokens: ["airfryer", "air", "fryer", "friteuza", "aer", "cald"],
     accessories: ["cos", "filtre", "forme", "hartie", "liners", "paper", "silicon", "tava"]
+  },
+  padel: {
+    category: "padel",
+    aliases: ["padel", "padla", "padel racket", "racheta padel", "paleta padel"],
+    tokens: ["padel", "padla", "racket", "racheta", "rakieta", "paleta", "uto"],
+    racketEvidence: [
+      "at10",
+      "attack",
+      "cobalt",
+      "equation",
+      "genius",
+      "hybrit",
+      "hybrid",
+      "luxury",
+      "ml10",
+      "nextgen",
+      "quantum",
+      "racket",
+      "racheta",
+      "rakieta",
+      "uto",
+      "x one",
+      "x-one"
+    ]
   }
 };
 
@@ -390,6 +414,7 @@ const BRAND_ALIASES = [
   { brand: "new balance", aliases: ["new balance", "nb"] },
   { brand: "nike", aliases: ["nike", "jordan", "air jordan"] },
   { brand: "nintendo", aliases: ["nintendo", "switch"] },
+  { brand: "nox", aliases: ["nox"] },
   { brand: "nvidia", aliases: ["nvidia", "geforce", "rtx"] },
   { brand: "philips", aliases: ["philips"] },
   { brand: "peugeot", aliases: ["peugeot"] },
@@ -483,6 +508,11 @@ const QUERY_ALIASES = [
     category: "kitchen",
     patterns: PRODUCT_TAXONOMY.air_fryer.aliases,
     tokens: PRODUCT_TAXONOMY.air_fryer.tokens
+  },
+  {
+    category: "padel",
+    patterns: PRODUCT_TAXONOMY.padel.aliases,
+    tokens: PRODUCT_TAXONOMY.padel.tokens
   }
 ];
 
@@ -577,6 +607,8 @@ const CATEGORY_PRICE_FLOORS_RON = {
 };
 
 const TOKEN_VARIANTS = {
+  padel: ["padla", "padeluto"],
+  padla: ["padel"],
   husa: ["huse"],
   huse: ["husa"]
 };
@@ -639,6 +671,27 @@ function textStartsWithTerm(text, term) {
     return text === normalizedTerm || text.startsWith(`${normalizedTerm} `);
   }
   return getTokenVariants(normalizedTerm).some((variant) => text === variant || text.startsWith(`${variant} `));
+}
+
+function hasPadelProductEvidence(text, textTokens, queryProfile) {
+  if (queryProfile.taxonomy !== PRODUCT_TAXONOMY.padel) {
+    return false;
+  }
+
+  const evidenceTerms = queryProfile.taxonomy.racketEvidence || [];
+  return evidenceTerms.some((term) => textHasTerm(text, textTokens, term));
+}
+
+function hasRequiredTokenEvidence(text, textTokens, token, queryProfile) {
+  if (tokenSetHasTerm(textTokens, token)) {
+    return true;
+  }
+
+  if (["padel", "padla"].includes(normalizeText(token)) && hasPadelProductEvidence(text, textTokens, queryProfile)) {
+    return true;
+  }
+
+  return false;
 }
 
 function getProductTaxonomy(normalizedQuery) {
@@ -780,7 +833,11 @@ function findNegativeMatches(text, queryProfile) {
     }
   }
 
-  for (const category of queryProfile.categories) {
+  const categoriesForExclusions = queryProfile.queryType === "main_product"
+    ? queryProfile.categories
+    : queryProfile.categories.filter((category) => category !== "vehicle");
+
+  for (const category of categoriesForExclusions) {
     for (const term of CATEGORY_EXCLUSIONS[category] || []) {
       const normalizedTerm = normalizeText(term);
       if (textHasTerm(queryProfile.normalized, queryTokenSet, normalizedTerm)) {
@@ -805,13 +862,13 @@ function getMatchStats(title, text, queryProfile) {
   const nonBrandRequiredTokens = requiredTokens.filter((token) => !brandTokenSet.has(token));
   const requiredNumberTokens = requiredTokens.filter((token) => /^\d+$/.test(token));
   const expandedTokens = queryProfile.expandedTokens;
-  const titleMatches = requiredTokens.filter((token) => tokenSetHasTerm(titleTokens, token));
-  const textMatches = requiredTokens.filter((token) => tokenSetHasTerm(textTokens, token));
-  const missingRequiredTokens = requiredTokens.filter((token) => !tokenSetHasTerm(textTokens, token));
+  const titleMatches = requiredTokens.filter((token) => hasRequiredTokenEvidence(titleText, titleTokens, token, queryProfile));
+  const textMatches = requiredTokens.filter((token) => hasRequiredTokenEvidence(text, textTokens, token, queryProfile));
+  const missingRequiredTokens = requiredTokens.filter((token) => !hasRequiredTokenEvidence(text, textTokens, token, queryProfile));
   const missingCriticalTokens = nonBrandRequiredTokens.filter((token) =>
     token.length >= 4 &&
     !/^\d+$/.test(token) &&
-    !tokenSetHasTerm(textTokens, token)
+    !hasRequiredTokenEvidence(text, textTokens, token, queryProfile)
   );
   const brandTitleMatches = brandTerms.filter((token) => tokenSetHasTerm(titleTokens, token));
   const brandTextMatches = brandTerms.filter((token) => tokenSetHasTerm(textTokens, token));

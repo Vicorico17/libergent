@@ -288,3 +288,61 @@ test("generic car make query rejects parts, toys, and apparel", () => {
   assert.equal(toy.isRecommendedCandidate, false);
   assert.equal(apparel.isRecommendedCandidate, false);
 });
+
+test("vehicle part query keeps tire and wheel listings instead of full cars", () => {
+  const query = "anvelope audi";
+  const tires = classifyListingIntent(
+    {
+      title: "Jante aliaj originale Audi 20 Q5 S-Line anvelope vara Nexen 255/45 R20",
+      price: "4600 lei",
+      priceRon: 4600
+    },
+    query
+  );
+  const vehicle = classifyListingIntent(
+    {
+      title: "Audi A7 50 TDI quattro Tiptronic MHEV",
+      price: "258933 lei",
+      priceRon: 258933
+    },
+    query
+  );
+
+  assert.equal(tires.listingType, "spare_part");
+  assert.equal(tires.isRecommendedCandidate, true);
+  assert.equal(vehicle.isRecommendedCandidate, false);
+  assert.ok(vehicle.rejectionReasons.includes("type_mismatch:spare_part->main_product"));
+});
+
+test("padel Nox query keeps Nox racket models with padel synonyms", () => {
+  const query = "padel nox";
+  const model = classifyListingIntent(
+    {
+      title: "NOX AT Genius Luxury Series",
+      price: "400 lei",
+      priceRon: 400
+    },
+    query
+  );
+  const translatedRacket = classifyListingIntent(
+    {
+      title: "Rakieta do padla NOX hybrit lite",
+      price: "400 lei",
+      priceRon: 400
+    },
+    query
+  );
+  const otherBrand = classifyListingIntent(
+    {
+      title: "Babolat Defiance - padel racket",
+      price: "300 lei",
+      priceRon: 300
+    },
+    query
+  );
+
+  assert.equal(model.isRecommendedCandidate, true);
+  assert.equal(translatedRacket.isRecommendedCandidate, true);
+  assert.equal(otherBrand.isRecommendedCandidate, false);
+  assert.ok(otherBrand.rejectionReasons.includes("missing_brand"));
+});

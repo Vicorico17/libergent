@@ -1,4 +1,8 @@
 export const MAX_HISTORY_ENTRIES = 500;
+export const HISTORY_RECENT_LIMIT = 100;
+export const HISTORY_TOP_QUERY_LIMIT = 30;
+export const HISTORY_TOP_KEYWORD_LIMIT = 40;
+export const HISTORY_DAILY_LIMIT = 30;
 
 export function tokenizeQuery(query = "") {
   return query
@@ -66,12 +70,12 @@ export function buildHistoryPayloadFromEntries(entries) {
       uniqueQueries: queryCounts.size,
       uniqueKeywords: keywordCounts.size
     },
-    topQueries: buildCountList(queryCounts, 12),
-    topKeywords: buildCountList(keywordCounts, 20),
+    topQueries: buildCountList(queryCounts, HISTORY_TOP_QUERY_LIMIT),
+    topKeywords: buildCountList(keywordCounts, HISTORY_TOP_KEYWORD_LIMIT),
     dailyTrend: [...dailyCounts.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-14)
+      .slice(-HISTORY_DAILY_LIMIT)
       .map(([date, count]) => ({ date, count })),
-    recentSearches: entries.slice(0, 30)
+    recentSearches: entries.slice(0, HISTORY_RECENT_LIMIT)
   };
 }

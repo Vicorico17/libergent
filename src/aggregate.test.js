@@ -189,3 +189,37 @@ test("generic car make search surfaces vehicles instead of parts and branded goo
   assert.equal(aggregated.bestOffer?.url, "https://olx.ro/bmw-car");
   assert.equal(aggregated.summary.totalListings, 1);
 });
+
+test("vehicle part search surfaces tire listings instead of complete vehicles", () => {
+  const query = "anvelope audi";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("publi24.ro", query, [
+      {
+        title: "Audi A7 50 TDI quattro Tiptronic MHEV",
+        price: "258933 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://publi24.ro/audi-car"
+      },
+      {
+        title: "Set 4 Jante Aliaj cu Anvelope Iarna 245/45 R18 Audi",
+        price: "2084 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://publi24.ro/audi-tires"
+      },
+      {
+        title: "Roti Audi jante anvelope complete",
+        price: "781 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://publi24.ro/audi-wheels"
+      }
+    ])
+  ]);
+
+  const urls = aggregated.results.flatMap((result) => result.items.map((item) => item.url));
+
+  assert.deepEqual(urls.sort(), ["https://publi24.ro/audi-tires", "https://publi24.ro/audi-wheels"].sort());
+  assert.equal(aggregated.summary.totalListings, 2);
+});

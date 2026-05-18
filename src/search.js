@@ -9,6 +9,7 @@ import { parseVintedHtml, parseVintedMarkdown } from "./parsers/vinted.js";
 import { parseAutovitHtml } from "./parsers/autovit.js";
 import { getQueryBrandTerms } from "./relevance.js";
 import { buildAbortSignal } from "./abort.js";
+import { normalizeMarketplaceQuery } from "./query-normalization.js";
 
 function tokenize(value = "") {
   return value
@@ -311,8 +312,10 @@ function shouldStopAfterPage(pageResult, nextItems, currentItems, pageSize) {
 }
 
 export async function runSearch({ provider, site, query, limit, maxPages, signal }) {
+  const marketplaceQuery = normalizeMarketplaceQuery(query);
+
   if (site.strategy === "crawl-seed") {
-    const result = await runSinglePageSearch({ provider, site, query, limit, page: 1, signal });
+    const result = await runSinglePageSearch({ provider, site, query: marketplaceQuery, limit, page: 1, signal });
     return {
       ...result,
       pagesUsed: 1,
@@ -327,7 +330,7 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
   const firstPage = await runSinglePageSearch({
     provider,
     site,
-    query,
+    query: marketplaceQuery,
     limit: Math.min(pageSize, effectiveLimit),
     page: 1,
     signal
@@ -351,7 +354,7 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
       pageResult = await runSinglePageSearch({
         provider,
         site,
-        query,
+        query: marketplaceQuery,
         limit: Math.min(pageSize, effectiveLimit),
         page,
         signal
@@ -389,8 +392,8 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
     provider: results[0]?.provider ?? (provider === "auto" ? site.provider : provider),
     strategy: `${site.strategy}:${results.length}-pages`,
     site: site.key,
-    url: site.searchUrl(query),
-    query,
+    url: site.searchUrl(marketplaceQuery),
+    query: marketplaceQuery,
     itemCount: items.length,
     items,
     totalResults: results[0]?.totalResults ?? null,

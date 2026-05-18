@@ -8,6 +8,10 @@ import { MascotSVG } from "@/components/MascotSVG";
 import { SearchBar } from "@/components/SearchBar";
 
 const HISTORY_STORAGE_KEY = "libergent-search-history-v1";
+const TOP_QUERY_LIMIT = 30;
+const TOP_KEYWORD_LIMIT = 40;
+const DAILY_TREND_LIMIT = 30;
+const RECENT_SEARCH_LIMIT = 100;
 
 type CountEntry = {
   value: string;
@@ -214,7 +218,7 @@ export function TrendsClient() {
           <Panel title="Recent searches" description="Ultimele căutări care au intrat în sistem.">
             {recentSearches.length ? (
               <div className="space-y-3">
-                {recentSearches.slice(0, 12).map((entry, index) => (
+                {recentSearches.slice(0, RECENT_SEARCH_LIMIT).map((entry, index) => (
                   <article key={`${entry.query || "search"}-${entry.searchedAt || index}`} className="rounded-lg border border-[#D9D9D9] bg-[#F8F9FA] p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -360,13 +364,13 @@ function buildHistoryPayloadFromEntries(entries: RecentSearch[]): HistoryPayload
       uniqueQueries: queryCounts.size,
       uniqueKeywords: keywordCounts.size,
     },
-    topQueries: buildCountList(queryCounts, 12),
-    topKeywords: buildCountList(keywordCounts, 20),
+    topQueries: buildCountList(queryCounts, TOP_QUERY_LIMIT),
+    topKeywords: buildCountList(keywordCounts, TOP_KEYWORD_LIMIT),
     dailyTrend: [...dailyCounts.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-14)
+      .slice(-DAILY_TREND_LIMIT)
       .map(([date, count]) => ({ date, count })),
-    recentSearches: entries.slice(0, 30),
+    recentSearches: entries.slice(0, RECENT_SEARCH_LIMIT),
   };
 }
 

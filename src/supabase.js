@@ -1,4 +1,10 @@
-import { MAX_HISTORY_ENTRIES } from "./history-base.js";
+import {
+  HISTORY_DAILY_LIMIT,
+  HISTORY_RECENT_LIMIT,
+  HISTORY_TOP_KEYWORD_LIMIT,
+  HISTORY_TOP_QUERY_LIMIT,
+  MAX_HISTORY_ENTRIES
+} from "./history-base.js";
 
 const DEFAULT_TABLE = "search_events";
 const DEFAULT_QUERY_STATS_TABLE = "search_query_stats";
@@ -243,7 +249,7 @@ function mapCountRow(row, key) {
   };
 }
 
-export async function readTopQueriesFromSupabase({ limit = 12 } = {}, env = process.env) {
+export async function readTopQueriesFromSupabase({ limit = HISTORY_TOP_QUERY_LIMIT } = {}, env = process.env) {
   const config = getSupabaseConfig(env);
   if (!config) {
     return [];
@@ -262,7 +268,7 @@ export async function readTopQueriesFromSupabase({ limit = 12 } = {}, env = proc
   return Array.isArray(rows) ? rows.map((row) => mapCountRow(row, "query")) : [];
 }
 
-export async function readTopKeywordsFromSupabase({ limit = 20 } = {}, env = process.env) {
+export async function readTopKeywordsFromSupabase({ limit = HISTORY_TOP_KEYWORD_LIMIT } = {}, env = process.env) {
   const config = getSupabaseConfig(env);
   if (!config) {
     return [];
@@ -316,8 +322,8 @@ export async function readSupabaseHistoryPayload(env = process.env) {
     topKeywords,
     dailyTrend: [...dailyCounts.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-14)
+      .slice(-HISTORY_DAILY_LIMIT)
       .map(([date, count]) => ({ date, count })),
-    recentSearches: recentSearches.slice(0, 30)
+    recentSearches: recentSearches.slice(0, HISTORY_RECENT_LIMIT)
   };
 }
