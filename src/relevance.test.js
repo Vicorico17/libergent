@@ -232,3 +232,59 @@ test("car query rejects accessories and keeps complete vehicle listing as recomm
   assert.ok(vehicle.isRecommendedCandidate);
   assert.ok(vehicle.relevanceScore > accessory.relevanceScore);
 });
+
+test("generic car make query rejects parts, toys, and apparel", () => {
+  const query = "bmw";
+  const vehicle = classifyListingIntent(
+    {
+      title: "BMW Seria 3 320d 2015",
+      description: "Autoturism diesel in stare buna",
+      price: "35000 lei",
+      priceRon: 35000
+    },
+    query
+  );
+  const steeringRack = classifyListingIntent(
+    {
+      title: "Caseta Directie Bmw E65/E66 Volan Stanga",
+      price: "800 lei",
+      priceRon: 800
+    },
+    query
+  );
+  const bodyPanel = classifyListingIntent(
+    {
+      title: "Fata completa / bot complet bmw x6 f16 pachet M",
+      price: "23427 lei",
+      priceRon: 23427
+    },
+    query
+  );
+  const toy = classifyListingIntent(
+    {
+      title: "Macheta BMW seria 5 F10 Welly 1/36",
+      price: "70 lei",
+      priceRon: 70
+    },
+    query
+  );
+  const apparel = classifyListingIntent(
+    {
+      title: "Sneakersy Puma BMW Motorsport r 36",
+      price: "36105 lei",
+      priceRon: 36105
+    },
+    query
+  );
+
+  assert.equal(vehicle.listingType, "main_product");
+  assert.equal(vehicle.isRecommendedCandidate, true);
+  assert.notEqual(steeringRack.listingType, "main_product");
+  assert.notEqual(bodyPanel.listingType, "main_product");
+  assert.notEqual(toy.listingType, "main_product");
+  assert.notEqual(apparel.listingType, "main_product");
+  assert.equal(steeringRack.isRecommendedCandidate, false);
+  assert.equal(bodyPanel.isRecommendedCandidate, false);
+  assert.equal(toy.isRecommendedCandidate, false);
+  assert.equal(apparel.isRecommendedCandidate, false);
+});

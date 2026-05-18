@@ -136,3 +136,56 @@ test("surfaces matching accessories for accessory searches", () => {
   assert.equal(aggregated.summary.totalListings, 2);
   assert.equal(aggregated.summary.recommendedOffers.length, 2);
 });
+
+test("generic car make search surfaces vehicles instead of parts and branded goods", () => {
+  const query = "bmw";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "BMW Seria 3 320d 2015",
+        price: "35000 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://olx.ro/bmw-car"
+      },
+      {
+        title: "Caseta Directie Bmw E65/E66 Volan Stanga",
+        price: "800 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://olx.ro/bmw-part"
+      },
+      {
+        title: "Fata completa / bot complet bmw x6 f16 pachet M",
+        price: "23427 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://olx.ro/bmw-front"
+      }
+    ]),
+    makeResult("vinted.ro", query, [
+      {
+        title: "Sneakersy Puma BMW Motorsport r 36",
+        price: "36105 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://vinted.ro/bmw-puma"
+      }
+    ]),
+    makeResult("okazii.ro", query, [
+      {
+        title: "Macheta BMW seria 5 F10 Welly 1/36",
+        price: "70 lei",
+        condition: "nou",
+        postedAt: "Azi",
+        url: "https://okazii.ro/bmw-model"
+      }
+    ])
+  ]);
+
+  const urls = aggregated.results.flatMap((result) => result.items.map((item) => item.url));
+
+  assert.deepEqual(urls, ["https://olx.ro/bmw-car"]);
+  assert.equal(aggregated.bestOffer?.url, "https://olx.ro/bmw-car");
+  assert.equal(aggregated.summary.totalListings, 1);
+});

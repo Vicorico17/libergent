@@ -170,25 +170,87 @@ const MEDIA_OR_TOY_HEADS = [
 ];
 
 const VEHICLE_PART_HEADS = [
+  "alternator",
+  "amortizor",
+  "amortizoare",
   "anvelopa",
   "anvelope",
+  "antena",
   "aripa",
   "bara",
+  "bot",
+  "cadru",
   "capota",
+  "caseta",
+  "catalizator",
   "cauciuc",
   "cauciucuri",
+  "dezmembrari",
+  "dezmembrez",
+  "dezmembrat",
+  "dezmembrate",
+  "diferential",
+  "directie",
+  "electromotor",
+  "etrier",
+  "etriere",
+  "evacuare",
   "far",
   "faruri",
+  "felga",
+  "felgi",
+  "fuzeta",
   "grila",
+  "grile",
+  "grup",
+  "hutoracs",
+  "injector",
+  "injectoare",
   "janta",
   "jante",
+  "nara",
+  "nari",
   "oglinda",
   "oglinzi",
   "parbriz",
+  "planetara",
+  "prag",
+  "praguri",
   "portiera",
+  "punte",
   "radiator",
+  "rezervor",
   "stop",
   "stopuri"
+];
+
+const VEHICLE_NON_VEHICLE_TERMS = [
+  "adidasi",
+  "altaya",
+  "atlas",
+  "bburago",
+  "blazer",
+  "buty",
+  "die cast",
+  "diecast",
+  "herpa",
+  "hot wheels",
+  "kaido",
+  "kisauto",
+  "kurtka",
+  "lego",
+  "macheta",
+  "machete",
+  "majorette",
+  "marynarka",
+  "matchbox",
+  "pantofi",
+  "puma",
+  "recznik",
+  "sapka",
+  "sneakersy",
+  "spodnie",
+  "welly"
 ];
 
 const VEHICLE_ACCESSORY_HEADS = [
@@ -302,6 +364,7 @@ const BRAND_ALIASES = [
   { brand: "ariston", aliases: ["ariston"] },
   { brand: "asus", aliases: ["asus"] },
   { brand: "beko", aliases: ["beko"] },
+  { brand: "bmw", aliases: ["bmw"] },
   { brand: "bosch", aliases: ["bosch"] },
   { brand: "canon", aliases: ["canon"] },
   { brand: "citroen", aliases: ["citroen"] },
@@ -478,7 +541,11 @@ const CATEGORY_EXCLUSIONS = {
   ],
   vehicle: [
     ...PRODUCT_TAXONOMY.jeep_compass.accessories,
-    ...PRODUCT_TAXONOMY.jeep_compass.parts
+    ...PRODUCT_TAXONOMY.jeep_compass.parts,
+    ...VEHICLE_PART_HEADS,
+    ...VEHICLE_NON_VEHICLE_TERMS,
+    "bot complet",
+    "fata completa"
   ],
   sport: [
     ...PRODUCT_TAXONOMY.table_tennis_table.accessories,
@@ -659,7 +726,7 @@ function getQueryProfile(query) {
   for (const token of brandTerms) {
     expandedTokens.add(token);
   }
-  if (hasVehicleBrand && baseTokens.length >= 2) {
+  if (hasVehicleBrand) {
     categories.add("vehicle");
   }
 
