@@ -99,3 +99,40 @@ test("does not surface recommendations when critical random tokens are missing",
   assert.equal(aggregated.summary.recommendedOffers.length, 0);
   assert.equal(aggregated.bestOffer, null);
 });
+
+test("surfaces matching accessories for accessory searches", () => {
+  const query = "husa iphone";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Husa iPhone 15 Pro Max",
+        price: "30 lei",
+        condition: "nou",
+        postedAt: "Azi",
+        url: "https://olx.ro/husa"
+      },
+      {
+        title: "Apple iPhone 14 Pro 128GB",
+        price: "2500 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://olx.ro/iphone"
+      }
+    ]),
+    makeResult("vinted.ro", query, [
+      {
+        title: "Huse iPhone 14 Pro Max",
+        price: "45 lei",
+        condition: "nou",
+        postedAt: "Azi",
+        url: "https://vinted.ro/huse"
+      }
+    ])
+  ]);
+
+  const urls = aggregated.results.flatMap((result) => result.items.map((item) => item.url));
+
+  assert.deepEqual(urls.sort(), ["https://olx.ro/husa", "https://vinted.ro/huse"].sort());
+  assert.equal(aggregated.summary.totalListings, 2);
+  assert.equal(aggregated.summary.recommendedOffers.length, 2);
+});

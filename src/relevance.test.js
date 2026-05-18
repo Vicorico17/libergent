@@ -111,6 +111,41 @@ test("vacuum query keeps complete bagged vacuum listings", () => {
   assert.equal(listing.isRecommendedCandidate, true);
 });
 
+test("accessory query keeps iPhone case listings as recommendations", () => {
+  const query = "husa iphone";
+  const husa = classifyListingIntent(
+    {
+      title: "Husa iPhone 15 Pro Max",
+      price: "30 lei",
+      priceRon: 30
+    },
+    query
+  );
+  const huse = classifyListingIntent(
+    {
+      title: "Huse iPhone 14 Pro Max",
+      price: "40 lei",
+      priceRon: 40
+    },
+    query
+  );
+  const phone = classifyListingIntent(
+    {
+      title: "Apple iPhone 14 Pro 128GB",
+      price: "2500 lei",
+      priceRon: 2500
+    },
+    query
+  );
+
+  assert.equal(husa.listingType, "accessory");
+  assert.equal(husa.isRecommendedCandidate, true);
+  assert.equal(huse.listingType, "accessory");
+  assert.equal(huse.isRecommendedCandidate, true);
+  assert.equal(phone.isRecommendedCandidate, false);
+  assert.ok(phone.rejectionReasons.includes("type_mismatch:accessory->main_product"));
+});
+
 test("rejects listings that use query as a shape or style descriptor", () => {
   const campingTable = classifyListingIntent(
     {

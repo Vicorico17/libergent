@@ -128,6 +128,7 @@ const ACCESSORY_HEADS = [
   "folie",
   "geanta",
   "husa",
+  "huse",
   "incarcator",
   "kit",
   "mouthpiece",
@@ -508,6 +509,11 @@ const CATEGORY_PRICE_FLOORS_RON = {
   kitchen: 80
 };
 
+const TOKEN_VARIANTS = {
+  husa: ["huse"],
+  huse: ["husa"]
+};
+
 export function normalizeText(value = "") {
   return String(value)
     .toLowerCase()
@@ -529,7 +535,43 @@ function hasAnyToken(tokens, terms) {
 }
 
 function includesAnyPhrase(text, phrases) {
-  return phrases.some((phrase) => text.includes(normalizeText(phrase)));
+  const textTokens = new Set(tokenize(text));
+  return phrases.some((phrase) => textHasTerm(text, textTokens, phrase));
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getTokenVariants(token) {
+  const normalized = normalizeText(token);
+  return [normalized, ...(TOKEN_VARIANTS[normalized] || [])];
+}
+
+function tokenSetHasTerm(tokens, term) {
+  return getTokenVariants(term).some((variant) => tokens.has(variant));
+}
+
+function textHasTerm(text, tokens, term) {
+  const normalizedTerm = normalizeText(term);
+  if (!normalizedTerm) {
+    return false;
+  }
+  if (normalizedTerm.includes(" ")) {
+    return new RegExp(`(?:^| )${escapeRegExp(normalizedTerm)}(?: |$)`).test(text);
+  }
+  return tokenSetHasTerm(tokens, normalizedTerm);
+}
+
+function textStartsWithTerm(text, term) {
+  const normalizedTerm = normalizeText(term);
+  if (!normalizedTerm) {
+    return false;
+  }
+  if (normalizedTerm.includes(" ")) {
+    return text === normalizedTerm || text.startsWith(`${normalizedTerm} `);
+  }
+  return getTokenVariants(normalizedTerm).some((variant) => text === variant || text.startsWith(`${variant} `));
 }
 
 function getProductTaxonomy(normalizedQuery) {
@@ -640,7 +682,7 @@ function getQueryProfile(query) {
 }
 
 function includesToken(tokens, term) {
-  return tokens.has(normalizeText(term));
+  return tokenSetHasTerm(tokens, term);
 }
 
 function findNegativeMatches(text, queryProfile) {
@@ -665,7 +707,7 @@ function findNegativeMatches(text, queryProfile) {
       if (queryProfile.normalized.includes(normalizedPhrase)) {
         continue;
       }
-      if (text.includes(normalizedPhrase)) {
+      if (textHasTerm(text, textTokens, phrase)) {
         matches.push({ intent, term: phrase });
       }
     }
@@ -674,10 +716,10 @@ function findNegativeMatches(text, queryProfile) {
   for (const category of queryProfile.categories) {
     for (const term of CATEGORY_EXCLUSIONS[category] || []) {
       const normalizedTerm = normalizeText(term);
-      if (queryProfile.normalized.includes(normalizedTerm)) {
+      if (textHasTerm(queryProfile.normalized, queryTokenSet, normalizedTerm)) {
         continue;
       }
-      if (text.includes(normalizedTerm)) {
+      if (textHasTerm(text, textTokens, normalizedTerm)) {
         matches.push({ intent: "irrelevant", term });
       }
     }
@@ -696,18 +738,18 @@ function getMatchStats(title, text, queryProfile) {
   const nonBrandRequiredTokens = requiredTokens.filter((token) => !brandTokenSet.has(token));
   const requiredNumberTokens = requiredTokens.filter((token) => /^\d+$/.test(token));
   const expandedTokens = queryProfile.expandedTokens;
-  const titleMatches = requiredTokens.filter((token) => titleTokens.has(token));
-  const textMatches = requiredTokens.filter((token) => textTokens.has(token));
-  const missingRequiredTokens = requiredTokens.filter((token) => !textTokens.has(token));
+  const titleMatches = requiredTokens.filter((token) => tokenSetHasTerm(titleTokens, token));
+  const textMatches = requiredTokens.filter((token) => tokenSetHasTerm(textTokens, token));
+  const missingRequiredTokens = requiredTokens.filter((token) => !tokenSetHasTerm(textTokens, token));
   const missingCriticalTokens = nonBrandRequiredTokens.filter((token) =>
     token.length >= 4 &&
     !/^\d+$/.test(token) &&
-    !textTokens.has(token)
+    !tokenSetHasTerm(textTokens, token)
   );
-  const brandTitleMatches = brandTerms.filter((token) => titleTokens.has(token));
-  const brandTextMatches = brandTerms.filter((token) => textTokens.has(token));
-  const numberMatches = requiredNumberTokens.filter((token) => textTokens.has(token));
-  const expandedMatches = expandedTokens.filter((token) => textTokens.has(token));
+  const brandTitleMatches = brandTerms.filter((token) => tokenSetHasTerm(titleTokens, token));
+  const brandTextMatches = brandTerms.filter((token) => tokenSetHasTerm(textTokens, token));
+  const numberMatches = requiredNumberTokens.filter((token) => tokenSetHasTerm(textTokens, token));
+  const expandedMatches = expandedTokens.filter((token) => tokenSetHasTerm(textTokens, token));
 
   return {
     exactPhrase: Boolean(queryProfile.normalized && titleText.includes(queryProfile.normalized)),
@@ -776,10 +818,26 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   const queryAnchors = queryProfile.expandedTokens.map(normalizeText);
   const brandAnchorSet = new Set((queryProfile.brandTerms || []).map(normalizeText));
   const productAnchors = queryAnchors.filter((token) => !brandAnchorSet.has(token));
-  const hasAnchor = queryAnchors.some((token) => textTokens.has(token) || titleText.includes(token));
-  const hasAccessoryHead = allAccessoryHeads.some((term) => textTokens.has(term) || titleText.includes(term));
-  const hasSparePartHead = allSparePartHeads.some((term) => textTokens.has(term) || titleText.includes(term));
-  const startsWithProductAnchor = productAnchors.some((anchor) => titleText.startsWith(`${anchor} `) || titleText === anchor);
+  const hasAnchor = queryAnchors.some((token) => textHasTerm(titleText, textTokens, token));
+  const hasAccessoryHead = allAccessoryHeads.some((term) => textHasTerm(titleText, textTokens, term));
+  const hasSparePartHead = allSparePartHeads.some((term) => textHasTerm(titleText, textTokens, term));
+  const startsWithProductAnchor = productAnchors.some((anchor) => textStartsWithTerm(titleText, anchor));
+  const startsWithAccessory = allAccessoryHeads.some((term) => textStartsWithTerm(titleText, term));
+  const accessoryForProduct = allAccessoryHeads.some((term) =>
+    productAnchors.some((anchor) =>
+      titleText.includes(`${normalizeText(term)} ${anchor}`) ||
+      titleText.includes(`${normalizeText(term)} pentru ${anchor}`) ||
+      titleText.includes(`${normalizeText(term)} for ${anchor}`) ||
+      titleText.includes(`${anchor} ${normalizeText(term)}`)
+    )
+  );
+  const productWithAccessory = BUNDLE_MARKERS.some((marker) => textHasTerm(titleText, titleTokens, marker)) &&
+    hasAnchor &&
+    hasAccessoryHead;
+  const accessorySet = ["set", "pachet", "kit"].some((marker) => textStartsWithTerm(titleText, marker)) &&
+    hasAnchor &&
+    hasAccessoryHead;
+  const clearAccessoryMatch = hasAnchor && hasAccessoryHead && (startsWithAccessory || accessoryForProduct || accessorySet);
 
   if (negativeMatches.some((match) => match.intent === "wanted")) {
     return "wanted";
@@ -790,25 +848,13 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   if (negativeMatches.some((match) => match.intent === "broken")) {
     return "broken_or_for_parts";
   }
+  if (queryProfile.queryType === "accessory" && hasAnchor && hasAccessoryHead) {
+    return "accessory";
+  }
   if (includesAnyPhrase(text, NEGATIVE_PHRASES.part) || hasSparePartHead) {
     return "spare_part";
   }
 
-  const startsWithAccessory = allAccessoryHeads.some((term) => titleText.startsWith(`${term} `));
-  const accessoryForProduct = allAccessoryHeads.some((term) =>
-    productAnchors.some((anchor) =>
-      titleText.includes(`${term} ${anchor}`) ||
-      titleText.includes(`${term} pentru ${anchor}`) ||
-      titleText.includes(`${term} for ${anchor}`) ||
-      titleText.includes(`${anchor} ${term}`)
-    )
-  );
-  const productWithAccessory = BUNDLE_MARKERS.some((marker) => titleText.includes(normalizeText(marker))) &&
-    hasAnchor &&
-    hasAccessoryHead;
-  const accessorySet = ["set", "pachet", "kit"].some((marker) => titleText.startsWith(`${marker} `)) &&
-    hasAnchor &&
-    hasAccessoryHead;
   const anchorUsedAsAttribute = productAnchors.some((anchor) =>
     ATTRIBUTE_MATCH_MARKERS.some((marker) => titleText.includes(`${normalizeText(marker)} ${anchor}`))
   );
@@ -832,7 +878,7 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   }
   // If the listing is clearly an accessory-for-product phrase, keep it as accessory
   // even when it also contains generic bundle markers like "set" or "pachet".
-  if (hasAnchor && hasAccessoryHead && (startsWithAccessory || accessoryForProduct || accessorySet)) {
+  if (clearAccessoryMatch) {
     return "accessory";
   }
   if (productWithAccessory) {
@@ -853,11 +899,11 @@ function matchStatsHasProductEvidence(titleTokens, queryProfile) {
     return false;
   }
   const requiredNumberTokens = queryProfile.tokens.filter((token) => /^\d+$/.test(token));
-  if (requiredNumberTokens.some((token) => !titleTokens.has(token))) {
+  if (requiredNumberTokens.some((token) => !tokenSetHasTerm(titleTokens, token))) {
     return false;
   }
-  return queryProfile.tokens.some((token) => titleTokens.has(token)) ||
-    queryProfile.expandedTokens.some((token) => titleTokens.has(token));
+  return queryProfile.tokens.some((token) => tokenSetHasTerm(titleTokens, token)) ||
+    queryProfile.expandedTokens.some((token) => tokenSetHasTerm(titleTokens, token));
 }
 
 function scoreTypeCompatibility(queryType, listingType) {
@@ -981,7 +1027,7 @@ export function classifyListingIntent(item, query) {
   let negativeMatches = findNegativeMatches(text, queryProfile);
   for (const category of queryProfile.categories) {
     const priceFloor = CATEGORY_PRICE_FLOORS_RON[category];
-    if (Number.isFinite(priceFloor) && Number.isFinite(item.priceRon) && item.priceRon < priceFloor) {
+    if (queryProfile.queryType === "main_product" && Number.isFinite(priceFloor) && Number.isFinite(item.priceRon) && item.priceRon < priceFloor) {
       negativeMatches.push({ intent: "irrelevant", term: "price_below_category_floor" });
     }
   }
