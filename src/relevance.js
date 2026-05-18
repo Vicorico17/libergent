@@ -48,6 +48,7 @@ const NEGATIVE_INTENTS = {
     "capete",
     "capac",
     "carcasa",
+    "cooler",
     "curea",
     "duza",
     "duze",
@@ -73,6 +74,7 @@ const NEGATIVE_INTENTS = {
     "steag",
     "steaguri",
     "suport",
+    "tastatura",
     "telecomanda",
     "tok",
     "usa"
@@ -120,6 +122,7 @@ const ACCESSORY_HEADS = [
   "capac",
   "case",
   "charger",
+  "cooler",
   "ghiveci",
   "ghivece",
   "cutie",
@@ -154,6 +157,7 @@ const ACCESSORY_HEADS = [
   "stand",
   "stativ",
   "suport",
+  "tastatura",
   "tub",
   "tuburi",
   "toc"
@@ -266,10 +270,12 @@ const SPARE_PART_HEADS = [
   "acumulator",
   "baterie",
   "carcasa",
+  "cooler",
   "display",
   "ecran",
   "furtun",
   "garnitura",
+  "keyboard",
   "modul",
   "motor",
   "piesa",
@@ -277,6 +283,7 @@ const SPARE_PART_HEADS = [
   "placa",
   "pompa",
   "rulment",
+  "tastatura",
   "usa",
   ...VEHICLE_PART_HEADS
 ];
@@ -613,6 +620,33 @@ const TOKEN_VARIANTS = {
   huse: ["husa"]
 };
 
+const STRICT_VARIANT_TOKENS = new Set([
+  "ips",
+  "isofix",
+  "max",
+  "mini",
+  "nvme",
+  "oled",
+  "plus",
+  "pro",
+  "ti",
+  "ultra",
+  "usb",
+  "xxl"
+]);
+
+const MODEL_PHRASE_ANCHORS = new Set([
+  "force",
+  "scooter",
+  "slim"
+]);
+
+const SIZE_PHRASE_ANCHORS = new Set([
+  "marime",
+  "marimea",
+  "size"
+]);
+
 export function normalizeText(value = "") {
   return String(value)
     .toLowerCase()
@@ -692,6 +726,45 @@ function hasRequiredTokenEvidence(text, textTokens, token, queryProfile) {
   }
 
   return false;
+}
+
+function isStructuredModelToken(token) {
+  const normalized = normalizeText(token);
+  return /^(?:[a-z]+\d+[a-z0-9]*|\d+[a-z]+[a-z0-9]*)$/.test(normalized);
+}
+
+function isStrictRequiredToken(token) {
+  const normalized = normalizeText(token);
+  return normalized.length >= 4 ||
+    STRICT_VARIANT_TOKENS.has(normalized) ||
+    isStructuredModelToken(normalized);
+}
+
+function getMissingContextualPhrases(text, queryProfile) {
+  const missing = [];
+  const tokens = queryProfile.tokens || [];
+  const textTokens = new Set(tokenize(text));
+
+  for (let index = 0; index < tokens.length - 1; index += 1) {
+    const token = normalizeText(tokens[index]);
+    const nextToken = normalizeText(tokens[index + 1]);
+
+    const requiresModelPhrase = MODEL_PHRASE_ANCHORS.has(token) &&
+      (/^\d+$/.test(nextToken) || isStructuredModelToken(nextToken));
+    const requiresSizePhrase = SIZE_PHRASE_ANCHORS.has(token) &&
+      /^[a-z0-9]{1,4}$/.test(nextToken);
+
+    if (!requiresModelPhrase && !requiresSizePhrase) {
+      continue;
+    }
+
+    const phrase = `${token} ${nextToken}`;
+    if (!textHasTerm(text, textTokens, phrase)) {
+      missing.push(phrase);
+    }
+  }
+
+  return missing;
 }
 
 function getProductTaxonomy(normalizedQuery) {
@@ -866,10 +939,10 @@ function getMatchStats(title, text, queryProfile) {
   const textMatches = requiredTokens.filter((token) => hasRequiredTokenEvidence(text, textTokens, token, queryProfile));
   const missingRequiredTokens = requiredTokens.filter((token) => !hasRequiredTokenEvidence(text, textTokens, token, queryProfile));
   const missingCriticalTokens = nonBrandRequiredTokens.filter((token) =>
-    token.length >= 4 &&
+    isStrictRequiredToken(token) &&
     !/^\d+$/.test(token) &&
     !hasRequiredTokenEvidence(text, textTokens, token, queryProfile)
-  );
+  ).concat(getMissingContextualPhrases(text, queryProfile));
   const brandTitleMatches = brandTerms.filter((token) => tokenSetHasTerm(titleTokens, token));
   const brandTextMatches = brandTerms.filter((token) => tokenSetHasTerm(textTokens, token));
   const numberMatches = requiredNumberTokens.filter((token) => tokenSetHasTerm(textTokens, token));
@@ -1204,6 +1277,15 @@ export function classifyListingIntent(item, query) {
     rejectionReasons.push(`variant_mismatch:${variantMatch.reason}`);
   }
 
+  const uniqueRejectionReasons = [...new Set(rejectionReasons)];
+  const hasHardRejection = uniqueRejectionReasons.some((reason) =>
+    reason === "missing_brand" ||
+    reason.startsWith("type_mismatch:") ||
+    reason.startsWith("wanted") ||
+    reason.startsWith("service") ||
+    reason.startsWith("broken")
+  );
+
   return {
     ...item,
     queryType: queryProfile.queryType,
@@ -1214,7 +1296,7 @@ export function classifyListingIntent(item, query) {
     typeCompatibilityScore,
     intentType,
     relevanceScore: Math.max(0, Math.min(100, relevanceScore)),
-    rejectionReasons: [...new Set(rejectionReasons)],
-    isRecommendedCandidate: typeCompatibilityScore >= 0.8 && relevanceScore >= 55 && matchStats.missingCriticalTokens.length === 0
+    rejectionReasons: uniqueRejectionReasons,
+    isRecommendedCandidate: !hasHardRejection && typeCompatibilityScore >= 0.8 && relevanceScore >= 55 && matchStats.missingCriticalTokens.length === 0
   };
 }

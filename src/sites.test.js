@@ -20,4 +20,15 @@ test("detects common car searches and routes all-search to Autovit first", () =>
 test("does not classify non-car terms as car searches", () => {
   assert.equal(isCarQuery("masina de spalat samsung"), false);
   assert.equal(isCarQuery("spalat rufe slim"), false);
+  assert.equal(isCarQuery("scaun auto copii isofix"), false);
+  assert.equal(isCarQuery("trotineta electrica xiaomi"), false);
+  assert.equal(isCarQuery("anvelope audi"), false);
+  assert.equal(isCarQuery("anveolpe audi"), false);
+  assert.deepEqual(getSiteKeysForAllSearch("anveolpe audi"), [
+    "olx.ro",
+    "lajumate.ro",
+    "vinted.ro",
+    "okazii.ro",
+    "publi24.ro"
+  ]);
 });

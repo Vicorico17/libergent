@@ -1,3 +1,5 @@
+import { normalizeMarketplaceQuery } from "./query-normalization.js";
+
 function slugifySpacesWithDash(value) {
   return value.trim().replace(/\s+/g, "-");
 }
@@ -102,6 +104,20 @@ const CAR_KEYWORDS = [
   "4x4"
 ];
 
+const CAR_PART_KEYWORDS = [
+  "anvelopa",
+  "anvelope",
+  "baterie",
+  "cauciucuri",
+  "janta",
+  "jante",
+  "parbriz",
+  "piesa",
+  "piese",
+  "roti",
+  "ulei"
+];
+
 function slugifyCarPath(query) {
   const tokens = query
     .trim()
@@ -116,11 +132,14 @@ function slugifyCarPath(query) {
 }
 
 export function isCarQuery(query = "") {
-  const normalized = query
+  const normalized = normalizeMarketplaceQuery(query)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
   if (/\bmasin[ai]\s+de\s+spalat\b/.test(normalized) || /\bspalat\s+rufe\b/.test(normalized)) {
+    return false;
+  }
+  if (/\b(scaun\s+auto|isofix|trotineta|scooter)\b/.test(normalized)) {
     return false;
   }
 
@@ -129,6 +148,11 @@ export function isCarQuery(query = "") {
     .filter(Boolean);
   const tokenSet = new Set(tokens);
   const joined = tokens.join(" ");
+  const hasCarPartKeyword = CAR_PART_KEYWORDS.some((keyword) => tokenSet.has(keyword));
+  if (hasCarPartKeyword) {
+    return false;
+  }
+
   const hasYear = /\b(19[8-9]\d|20[0-3]\d)\b/.test(normalized);
   const hasMileage = /\b\d{1,3}(?:[ .]\d{3})?\s*km\b/.test(normalized);
   const hasVariantCode = /\b([a-z]\d{1,2}|\d\.\d)\b/.test(normalized);

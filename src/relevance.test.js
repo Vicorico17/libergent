@@ -32,6 +32,122 @@ test("ranks exact pro max above pro-only for pro max query", () => {
   assert.ok(proOnly.rejectionReasons.includes("variant_mismatch:pro_max_vs_pro"));
 });
 
+test("requires exact model and variant tokens for technical product searches", () => {
+  const s24 = classifyListingIntent(
+    { title: "Samsung Galaxy S24 Ultra 256GB", price: "3200 lei", priceRon: 3200 },
+    "Samsung Galaxy S24 Ultra 256GB"
+  );
+  const s23 = classifyListingIntent(
+    { title: "Samsung Galaxy S23 Ultra 256GB", price: "2800 lei", priceRon: 2800 },
+    "Samsung Galaxy S24 Ultra 256GB"
+  );
+  const pro = classifyListingIntent(
+    { title: "iPhone 15 Pro 128GB sigilat", price: "4100 lei", priceRon: 4100 },
+    "iphone 15 pro sigilat"
+  );
+  const plus = classifyListingIntent(
+    { title: "Iphone 15 Plus Black sigilat 128 GB", price: "3500 lei", priceRon: 3500 },
+    "iphone 15 pro sigilat"
+  );
+  const wrongBrand = classifyListingIntent(
+    { title: "Xiaomi Redmi Note 15 Pro Black sigilat", price: "1400 lei", priceRon: 1400 },
+    "iphone 15 pro sigilat"
+  );
+
+  assert.equal(s24.isRecommendedCandidate, true);
+  assert.equal(s23.isRecommendedCandidate, false);
+  assert.ok(s23.rejectionReasons.includes("missing_critical_query_tokens"));
+  assert.equal(pro.isRecommendedCandidate, true);
+  assert.equal(plus.isRecommendedCandidate, false);
+  assert.ok(plus.rejectionReasons.includes("missing_critical_query_tokens"));
+  assert.equal(wrongBrand.isRecommendedCandidate, false);
+  assert.ok(wrongBrand.rejectionReasons.includes("missing_brand"));
+});
+
+test("requires structured size and spec tokens when they are part of the query", () => {
+  const r16 = classifyListingIntent(
+    { title: "Vand 4 cauciucuri iarna 205/55/R16", price: "500 lei", priceRon: 500 },
+    "cauciucuri iarna 205/55/r16"
+  );
+  const r17 = classifyListingIntent(
+    { title: "4 Anvelope IARNA 205.55.17 Hankook dot 2024", price: "600 lei", priceRon: 600 },
+    "cauciucuri iarna 205/55/r16"
+  );
+  const washer8kg = classifyListingIntent(
+    { title: "Masina de spalat rufe Beko 8kg 1400 rpm", price: "900 lei", priceRon: 900 },
+    "masina de spalat Beko 8kg"
+  );
+  const washer7kg = classifyListingIntent(
+    { title: "Masina de spalat Beko 7 kg WRE 70220", price: "650 lei", priceRon: 650 },
+    "masina de spalat Beko 8kg"
+  );
+
+  assert.equal(r16.isRecommendedCandidate, true);
+  assert.equal(r17.isRecommendedCandidate, false);
+  assert.ok(r17.rejectionReasons.includes("missing_critical_query_tokens"));
+  assert.equal(washer8kg.isRecommendedCandidate, true);
+  assert.equal(washer7kg.isRecommendedCandidate, false);
+  assert.ok(washer7kg.rejectionReasons.includes("missing_critical_query_tokens"));
+});
+
+test("requires contextual size phrases for marketplace size queries", () => {
+  const size4 = classifyListingIntent(
+    { title: "Scutece Pampers Premium Care marimea 4, 9-14kg", price: "80 lei", priceRon: 80 },
+    "Scutece Pampers mărimea 4"
+  );
+  const size2 = classifyListingIntent(
+    { title: "Scutece Pampers Premium Care XXL Pachet Lunar Marimea 2 pentru 4-8kg", price: "120 lei", priceRon: 120 },
+    "Scutece Pampers mărimea 4"
+  );
+
+  assert.equal(size4.isRecommendedCandidate, true);
+  assert.equal(size2.isRecommendedCandidate, false);
+  assert.ok(size2.rejectionReasons.includes("missing_critical_query_tokens"));
+});
+
+test("laptop query rejects keyboard replacement parts", () => {
+  const laptop = classifyListingIntent(
+    {
+      title: "Laptop Lenovo IdeaPad Slim 5 14IRL8 Intel i5 16GB 512GB",
+      price: "2200 lei",
+      priceRon: 2200
+    },
+    "Laptop Lenovo IdeaPad Slim 5"
+  );
+  const keyboard = classifyListingIntent(
+    {
+      title: "Tastatura Laptop Lenovo IdeaPad Slim 5 15IRH9R layout US",
+      price: "180 lei",
+      priceRon: 180
+    },
+    "Laptop Lenovo IdeaPad Slim 5"
+  );
+  const cooler = classifyListingIntent(
+    {
+      title: "Cooler Laptop Lenovo IdeaPad Slim 5 5F10S14193",
+      price: "120 lei",
+      priceRon: 120
+    },
+    "Laptop Lenovo IdeaPad Slim 5"
+  );
+  const wrongSeries = classifyListingIntent(
+    {
+      title: "Laptop Lenovo IdeaPad Slim 3 14ABR8 AMD Ryzen 5",
+      price: "1800 lei",
+      priceRon: 1800
+    },
+    "Laptop Lenovo IdeaPad Slim 5"
+  );
+
+  assert.equal(laptop.isRecommendedCandidate, true);
+  assert.equal(keyboard.isRecommendedCandidate, false);
+  assert.notEqual(keyboard.listingType, "main_product");
+  assert.equal(cooler.isRecommendedCandidate, false);
+  assert.notEqual(cooler.listingType, "main_product");
+  assert.equal(wrongSeries.isRecommendedCandidate, false);
+  assert.ok(wrongSeries.rejectionReasons.includes("missing_critical_query_tokens"));
+});
+
 test("does not treat accessory sets as recommended product candidates", () => {
   const query = "Jeep Compass";
   const accessorySet = classifyListingIntent(
