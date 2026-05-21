@@ -61,6 +61,27 @@ function compareByRank(a: SearchResultItem, b: SearchResultItem) {
   return aRank - bRank || b.score - a.score
 }
 
+function isGreatAgentDeal(item: SearchResultItem) {
+  return item.score > 90
+}
+
+function getAgentScoreExplanation(item: SearchResultItem) {
+  const reasons = [`scor agent ${item.score}%`]
+
+  if (typeof item.rank === "number" && item.rank <= 3) {
+    reasons.push(`top ${item.rank} în rezultate`)
+  }
+  if (item.price !== null) {
+    reasons.push(`preț valid: ${formatRon(item.price)}`)
+  }
+  if (item.condition && item.condition.toLowerCase() !== "necunoscut") {
+    reasons.push(`condiție ${item.condition.toLowerCase()}`)
+  }
+
+  reasons.push(`sursă verificată: ${item.source}`)
+  return reasons.join(" · ")
+}
+
 // — Atoms —
 function Arrow({ size = 14 }: { size?: number }) {
   return (
@@ -95,6 +116,26 @@ function ScoreBar({ score, total = 10 }: { score: number; total?: number }) {
         />
       ))}
     </div>
+  )
+}
+
+function AgentScoreBadge({ item, compact = false }: { item: SearchResultItem; compact?: boolean }) {
+  if (!isGreatAgentDeal(item)) return null
+
+  return (
+    <span
+      className={`inline-flex items-center justify-center font-bold uppercase ${compact ? "px-2 py-1 text-[9px]" : "px-3 py-1.5 text-[10px]"}`}
+      title={getAgentScoreExplanation(item)}
+      style={{
+        background: GREEN,
+        border: `1px solid ${INK}`,
+        boxShadow: `2px 2px 0 ${INK}`,
+        color: INK,
+        fontFamily: MONO,
+      }}
+    >
+      Deal foarte bun
+    </span>
   )
 }
 
@@ -389,22 +430,32 @@ interface FilterPanelProps {
   priceMin: string; setPriceMin: (v: string) => void
   priceMax: string; setPriceMax: (v: string) => void
   onReset: () => void
+  canClose: boolean
+  onClose: () => void
 }
 
 function FilterLabel({ children }: { children: ReactNode }) {
   return <h3 className="text-[10px] uppercase font-bold pb-1.5" style={{ borderBottom: `1px dashed ${INK}` }}>{children}</h3>
 }
 
-function FilterPanel({ sort, setSort, sources, toggleSource, conditions, toggleCondition, priceMin, setPriceMin, priceMax, setPriceMax, onReset }: FilterPanelProps) {
+function FilterPanel({ sort, setSort, sources, toggleSource, conditions, toggleCondition, priceMin, setPriceMin, priceMax, setPriceMax, onReset, canClose, onClose }: FilterPanelProps) {
   return (
     <aside className="w-full lg:w-64 flex-none flex flex-col" style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
       <div className="flex justify-between items-center p-3" style={{ background: "white", borderBottom: `1px solid ${INK}` }}>
         <h2 className="text-[14px] font-bold uppercase">Filters</h2>
-        <svg width="14" height="4" viewBox="0 0 14 4" fill="none">
-          <circle cx="2" cy="2" r="1.5" fill={INK} />
-          <circle cx="7" cy="2" r="1.5" fill={INK} />
-          <circle cx="12" cy="2" r="1.5" fill={INK} />
-        </svg>
+        <button
+          type="button"
+          disabled={!canClose}
+          onClick={onClose}
+          aria-label="Close filters"
+          className="h-7 w-7 flex items-center justify-center transition-opacity"
+          style={{ border: `1px solid ${INK}`, color: INK, opacity: canClose ? 1 : 0.35, cursor: canClose ? "pointer" : "not-allowed" }}
+          title={canClose ? "Close filters" : "Filters can be closed after search completes"}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
       </div>
 
       <div className="flex flex-col gap-6 p-4 flex-1" style={{ background: CREAM }}>
@@ -517,12 +568,16 @@ function useListingImage(item: SearchResultItem) {
 function ResultCard({ item }: { item: ResultItem }) {
   const [hov, setHov] = useState(false)
   const { image, handleImageError } = useListingImage(item)
+  const scoreExplanation = getAgentScoreExplanation(item)
   const content = (
     <>
       {image ? (
         <div className="relative aspect-[4/3] overflow-hidden" style={{ borderBottom: `1px solid ${INK}`, background: "#DDD9CE" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={image} alt={item.title} className="h-full w-full object-cover" onError={handleImageError} />
+          <div className="absolute left-3 top-3">
+            <AgentScoreBadge item={item} compact />
+          </div>
         </div>
       ) : (
         <div className="relative aspect-[4/3] overflow-hidden flex items-center justify-center" style={{ borderBottom: `1px solid ${INK}`, background: "#DDD9CE" }}>
@@ -536,6 +591,9 @@ function ResultCard({ item }: { item: ResultItem }) {
             <circle cx="160" cy="120" r="34" stroke={INK} strokeWidth="1" opacity="0.22" />
             <path d="M144 120h32M160 104v32" stroke={INK} strokeWidth="1" opacity="0.28" />
           </svg>
+          <div className="absolute left-3 top-3">
+            <AgentScoreBadge item={item} compact />
+          </div>
         </div>
       )}
       <div className="flex flex-col gap-4 p-4 flex-1">
@@ -552,6 +610,11 @@ function ResultCard({ item }: { item: ResultItem }) {
           <span>Scor: <span style={{ color: `${INK}66` }}>{item.score}%</span></span>
           <ScoreBar score={item.score} total={8} />
         </div>
+        {isGreatAgentDeal(item) && (
+          <p className="text-[9px] uppercase font-bold leading-snug" style={{ color: `${INK}88` }}>
+            De ce: {scoreExplanation}
+          </p>
+        )}
         <span
           className="w-full py-2 text-[10px] font-bold uppercase flex justify-center items-center gap-1 transition-colors duration-150"
           style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO }}
@@ -593,6 +656,7 @@ function PanelHeader({ title }: { title: string }) {
 
 function RecommendationCard({ item }: { item: SearchResultItem }) {
   const { image, handleImageError } = useListingImage(item)
+  const scoreExplanation = getAgentScoreExplanation(item)
 
   return (
     <div
@@ -634,10 +698,16 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
               <span className="text-[10px] font-bold tracking-widest">#01</span>
               <span className="text-[13px] font-bold uppercase">Agent Pick</span>
             </div>
+            <div className="absolute top-4 right-4">
+              <AgentScoreBadge item={item} />
+            </div>
           </div>
           <div className="flex-1 p-6 md:p-8 flex flex-col justify-between" style={{ background: "white" }}>
             <div>
-              <h3 className="text-[22px] font-bold uppercase tracking-tight mb-2">{item.title}</h3>
+              <div className="flex flex-col gap-3 mb-2">
+                <AgentScoreBadge item={item} />
+                <h3 className="text-[22px] font-bold uppercase tracking-tight">{item.title}</h3>
+              </div>
               <p className="text-[11px] uppercase font-bold mb-6" style={{ color: `${INK}55` }}>
                 {item.source} / {item.city}
               </p>
@@ -655,6 +725,11 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
                   {item.condition}
                 </span>
               </div>
+              {isGreatAgentDeal(item) && (
+                <div className="p-3 text-[11px] uppercase font-bold leading-relaxed" style={{ border: `1px solid ${INK}`, background: CREAM }}>
+                  Eu l-aș alege pe acesta pentru că are {scoreExplanation}.
+                </div>
+              )}
             </div>
             <div className="mt-8 flex justify-end">
               <a
@@ -692,6 +767,8 @@ function SearchResultsContent() {
   const [totalListings, setTotalListings] = useState(0)
   const [marketplaceStatus, setMarketplaceStatus] = useState<MarketplaceStatus>({ successful: 0, total: 0, failed: [] })
   const [isLoading, setIsLoading]   = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(true)
+  const [searchReportOpen, setSearchReportOpen] = useState(true)
 
   // Loader state
   const [showLoader, setShowLoader]       = useState(false)
@@ -703,6 +780,7 @@ function SearchResultsContent() {
     const controller = new AbortController()
 
     const searchId = setTimeout(() => {
+      setFiltersOpen(true)
       if (!query) {
         setResults([])
         setBestOffer(null)
@@ -719,6 +797,7 @@ function SearchResultsContent() {
 
       setIsLoading(true)
       setShowLoader(true)
+      setSearchReportOpen(true)
       setLoaderProgress(8)
       setLoaderDone(false)
       setError("")
@@ -778,6 +857,7 @@ function SearchResultsContent() {
           setLoaderProgress(100)
           setTimeout(() => {
             setLoaderDone(true)
+            setSearchReportOpen(false)
             setTimeout(() => {
               setShowLoader(false)
               setIsLoading(false)
@@ -844,6 +924,7 @@ function SearchResultsContent() {
   const marketplaceValue = marketplaceStatus.total ? `${marketplaceStatus.successful}/${marketplaceStatus.total}` : "0/0"
   const updatedLabel = searchedAt ? formatDateTime(searchedAt) : "în timp real"
   const statusLabel = !query ? "Introduceți o căutare" : isLoading ? "Search Session Running" : error ? "Search Session Failed" : "Search Session Complete"
+  const canCloseFilters = Boolean(query) && !isLoading && !showLoader
   const duplicateCount = Math.max(0, totalListings - results.length)
   const agentNotes = [
     { text: error || `${results.length} rezultate normalizate`, pulse: false },
@@ -888,21 +969,51 @@ function SearchResultsContent() {
       {/* Main */}
       <main className="flex-1 w-full max-w-[1800px] mx-auto px-6 py-6 flex flex-col lg:flex-row gap-6">
 
-        <FilterPanel
-          sort={sort} setSort={setSort}
-          sources={sources} toggleSource={toggleSource}
-          conditions={conditions} toggleCondition={toggleCondition}
-          priceMin={priceMin} setPriceMin={setPriceMin}
-          priceMax={priceMax} setPriceMax={setPriceMax}
-          onReset={resetFilters}
-        />
+        {filtersOpen ? (
+          <FilterPanel
+            sort={sort} setSort={setSort}
+            sources={sources} toggleSource={toggleSource}
+            conditions={conditions} toggleCondition={toggleCondition}
+            priceMin={priceMin} setPriceMin={setPriceMin}
+            priceMax={priceMax} setPriceMax={setPriceMax}
+            onReset={resetFilters}
+            canClose={canCloseFilters}
+            onClose={() => {
+              if (canCloseFilters) setFiltersOpen(false)
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className="w-full lg:w-12 flex-none flex lg:flex-col items-center justify-center gap-2 p-3 text-[11px] font-bold uppercase"
+            style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
+            aria-label="Open filters"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <span className="lg:[writing-mode:vertical-rl] lg:rotate-180">Filters</span>
+          </button>
+        )}
 
         <div className="flex-1 flex flex-col gap-6 min-w-0">
 
           {/* Search Report */}
           <section style={{ border: `1px solid ${INK}` }}>
-            <PanelHeader title="Search Report" />
-            <div className="grid grid-cols-2 md:grid-cols-5" style={{ background: "white" }}>
+            <div className="p-3 flex justify-between items-center" style={{ background: "white", borderBottom: `1px solid ${INK}` }}>
+              <h2 className="text-[14px] font-bold uppercase">Search Report</h2>
+              <button
+                type="button"
+                onClick={() => setSearchReportOpen((open) => !open)}
+                className="md:hidden h-7 w-7 flex items-center justify-center"
+                style={{ border: `1px solid ${INK}`, color: INK }}
+                aria-label={searchReportOpen ? "Close search report" : "Open search report"}
+              >
+                <ChevronDown size={14} />
+              </button>
+            </div>
+            <div className={`${searchReportOpen ? "grid" : "hidden md:grid"} grid-cols-2 md:grid-cols-5`} style={{ background: "white" }}>
               {[
                 { value: String(filteredResults.length), label: "Results" },
                 { value: `${averageScore}%`, label: "Avg Score" },
