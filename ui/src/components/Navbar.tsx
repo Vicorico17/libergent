@@ -99,14 +99,6 @@ export function Navbar() {
           ))}
         </div>
 
-        <Link
-          href="/auth"
-          className="hidden md:inline-flex items-center gap-1.5 text-[10px] font-bold tracking-[0.1em] text-white px-5 py-2.5 transition-colors hover:bg-[#FF4F8B]"
-          style={{ background: "#090909", border: "2px solid #090909" }}
-        >
-          CONECTEAZĂ-TE →
-        </Link>
-
         <button
           type="button"
           className="md:hidden flex items-center justify-center w-10 h-10 text-[#101010]"
@@ -152,14 +144,6 @@ export function Navbar() {
               {link.label}
             </Link>
           ))}
-          <Link
-            href="/auth"
-            className="inline-flex justify-center items-center text-[11px] font-bold tracking-[0.1em] text-white px-5 py-3"
-            style={{ background: "#090909", border: "2px solid #090909" }}
-            onClick={() => setMenuOpen(false)}
-          >
-            CONECTEAZĂ-TE →
-          </Link>
         </div>
       </div>
 

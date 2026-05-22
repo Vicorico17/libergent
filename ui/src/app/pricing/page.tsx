@@ -147,13 +147,6 @@ export default function PricingPage() {
           </nav>
 
           <div className="flex items-center gap-5">
-            <Link
-              href="/auth"
-              className="hidden sm:block text-[11px] uppercase tracking-widest hover:opacity-60 transition-opacity"
-              style={{ color: INK }}
-            >
-              Intră în cont
-            </Link>
             <div
               className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-[#111] hover:text-white transition-colors"
               style={{ border: `2px solid ${INK}` }}

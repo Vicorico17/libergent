@@ -36,6 +36,10 @@ const SOURCE_TIMING = [
 const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const MAIN_BLOCKS   = 15
 const SOURCE_BLOCKS = 10
+const SEARCH_RESULT_LIMIT = 180
+const SEARCH_PAGE_LIMIT = 3
+const INITIAL_VISIBLE_RESULTS = 48
+const VISIBLE_RESULT_STEP = 48
 
 function formatSearchTime() {
   return new Date().toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })
@@ -361,18 +365,6 @@ function SearchNav({ query }: { query: string }) {
 
       <div className="flex items-center gap-5 text-[12px] uppercase font-bold flex-none ml-auto">
         <Link href="/trenduri" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Trenduri</Link>
-        <Link href="/auth" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Cont</Link>
-        <div
-          className="w-8 h-8 flex items-center justify-center cursor-pointer transition-colors duration-150"
-          style={{ border: `1px solid ${INK}`, color: INK }}
-          onMouseEnter={(e) => { const el = e.currentTarget; el.style.background = INK; el.style.color = "white" }}
-          onMouseLeave={(e) => { const el = e.currentTarget; el.style.background = "transparent"; el.style.color = INK }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </div>
       </div>
     </nav>
   )
@@ -463,7 +455,15 @@ function FilterPanel({ sort, setSort, sources, toggleSource, conditions, toggleC
           <FilterLabel>Sortare</FilterLabel>
           <div className="flex flex-col gap-2.5">
             {SORT_OPTIONS.map((opt) => (
-              <label key={opt} className="flex items-center gap-3 cursor-pointer" onClick={() => setSort(opt)}>
+              <label key={opt} className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="sort"
+                  value={opt}
+                  checked={sort === opt}
+                  onChange={() => setSort(opt)}
+                  className="sr-only"
+                />
                 <div className="w-3.5 h-3.5 rounded-full border flex-none flex items-center justify-center" style={{ borderColor: INK, background: "white" }}>
                   {sort === opt && <div className="w-1.5 h-1.5 rounded-full" style={{ background: INK }} />}
                 </div>
@@ -477,7 +477,13 @@ function FilterPanel({ sort, setSort, sources, toggleSource, conditions, toggleC
           <FilterLabel>Surse</FilterLabel>
           <div className="flex flex-col gap-2.5">
             {SOURCES_LIST.map((src) => (
-              <label key={src} className="flex items-center gap-3 cursor-pointer" onClick={() => toggleSource(src)}>
+              <label key={src} className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sources.has(src)}
+                  onChange={() => toggleSource(src)}
+                  className="sr-only"
+                />
                 <div className="w-3.5 h-3.5 border flex-none flex items-center justify-center" style={{ borderColor: INK, background: "white" }}>
                   {sources.has(src) && <div style={{ width: 7, height: 7, background: INK }} />}
                 </div>
@@ -490,11 +496,11 @@ function FilterPanel({ sort, setSort, sources, toggleSource, conditions, toggleC
         <div className="flex flex-col gap-3">
           <FilterLabel>Preț (RON)</FilterLabel>
           <div className="flex items-center gap-2">
-            <input type="text" placeholder="MIN" value={priceMin} onChange={(e) => setPriceMin(e.target.value)}
+            <input type="number" min="0" inputMode="numeric" placeholder="MIN" value={priceMin} onChange={(e) => setPriceMin(e.target.value)}
               className="w-full text-[11px] p-2 text-center uppercase focus:outline-none placeholder:opacity-30"
               style={{ background: "white", border: `1px solid ${INK}`, fontFamily: MONO, color: INK }} />
             <span className="text-[11px] font-bold flex-none">—</span>
-            <input type="text" placeholder="MAX" value={priceMax} onChange={(e) => setPriceMax(e.target.value)}
+            <input type="number" min="0" inputMode="numeric" placeholder="MAX" value={priceMax} onChange={(e) => setPriceMax(e.target.value)}
               className="w-full text-[11px] p-2 text-center uppercase focus:outline-none placeholder:opacity-30"
               style={{ background: "white", border: `1px solid ${INK}`, fontFamily: MONO, color: INK }} />
           </div>
@@ -504,7 +510,13 @@ function FilterPanel({ sort, setSort, sources, toggleSource, conditions, toggleC
           <FilterLabel>Stare</FilterLabel>
           <div className="flex flex-col gap-2.5">
             {COND_OPTIONS.map((cond) => (
-              <label key={cond} className="flex items-center gap-3 cursor-pointer" onClick={() => toggleCondition(cond)}>
+              <label key={cond} className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={conditions.has(cond)}
+                  onChange={() => toggleCondition(cond)}
+                  className="sr-only"
+                />
                 <div className="w-3.5 h-3.5 border flex-none flex items-center justify-center" style={{ borderColor: INK, background: "white" }}>
                   {conditions.has(cond) && <div style={{ width: 7, height: 7, background: INK }} />}
                 </div>
@@ -569,6 +581,14 @@ function ResultCard({ item }: { item: ResultItem }) {
   const [hov, setHov] = useState(false)
   const { image, handleImageError } = useListingImage(item)
   const scoreExplanation = getAgentScoreExplanation(item)
+  const cardStyle = {
+    border: `1px solid ${INK}`,
+    background: "white",
+    fontFamily: MONO,
+    transform: hov ? "translateY(-4px)" : "none",
+    boxShadow: hov ? `4px 4px 0px ${INK}` : "none",
+    transition: "transform 0.25s, box-shadow 0.25s",
+  }
   const content = (
     <>
       {image ? (
@@ -625,19 +645,25 @@ function ResultCard({ item }: { item: ResultItem }) {
     </>
   )
 
+  if (!item.url) {
+    return (
+      <div
+        aria-disabled="true"
+        className="flex flex-col overflow-hidden opacity-70"
+        style={cardStyle}
+      >
+        {content}
+      </div>
+    )
+  }
+
   return (
     <a
-      href={item.url || "#"}
-      target={item.url ? "_blank" : undefined}
-      rel={item.url ? "noopener noreferrer" : undefined}
-      aria-disabled={!item.url}
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
       className="flex flex-col overflow-hidden"
-      style={{
-        border: `1px solid ${INK}`, background: "white", fontFamily: MONO,
-        transform: hov ? "translateY(-4px)" : "none",
-        boxShadow: hov ? `4px 4px 0px ${INK}` : "none",
-        transition: "transform 0.25s, box-shadow 0.25s",
-      }}
+      style={cardStyle}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
     >
@@ -732,15 +758,25 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
               )}
             </div>
             <div className="mt-8 flex justify-end">
-              <a
-                href={item.url || "#"}
-                target={item.url ? "_blank" : undefined}
-                rel={item.url ? "noopener noreferrer" : undefined}
-                className="flex items-center gap-2 px-6 py-3 text-[12px] font-bold uppercase transition-all duration-150"
-                style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO, boxShadow: `2px 2px 0px ${INK}` }}
-              >
-                Vezi Oferta <Arrow size={16} />
-              </a>
+              {item.url ? (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-6 py-3 text-[12px] font-bold uppercase transition-all duration-150"
+                  style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO, boxShadow: `2px 2px 0px ${INK}` }}
+                >
+                  Vezi Oferta <Arrow size={16} />
+                </a>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  className="flex items-center gap-2 px-6 py-3 text-[12px] font-bold uppercase opacity-60"
+                  style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO }}
+                >
+                  Fără link direct
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -769,6 +805,7 @@ function SearchResultsContent() {
   const [isLoading, setIsLoading]   = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(true)
   const [searchReportOpen, setSearchReportOpen] = useState(true)
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS)
 
   // Loader state
   const [showLoader, setShowLoader]       = useState(false)
@@ -798,6 +835,7 @@ function SearchResultsContent() {
       setIsLoading(true)
       setShowLoader(true)
       setSearchReportOpen(true)
+      setVisibleCount(INITIAL_VISIBLE_RESULTS)
       setLoaderProgress(8)
       setLoaderDone(false)
       setError("")
@@ -815,8 +853,8 @@ function SearchResultsContent() {
         q: query,
         site: "all",
         provider: "auto",
-        limit: "500",
-        pages: "12",
+        limit: String(SEARCH_RESULT_LIMIT),
+        pages: String(SEARCH_PAGE_LIMIT),
       })
 
       fetch(`/api/search?${params.toString()}`, { signal: controller.signal })
@@ -826,7 +864,7 @@ function SearchResultsContent() {
             throw new Error(payload.error || "Căutarea nu a putut fi finalizată.")
           }
 
-          const mapped = mapSearchResults(payload).slice(0, 500)
+          const mapped = mapSearchResults(payload).slice(0, SEARCH_RESULT_LIMIT)
           setResults(mapped)
           setBestOffer(mapBestOffer(payload, mapped))
           setSearchedAt(payload.summary?.searchedAt || "")
@@ -878,9 +916,13 @@ function SearchResultsContent() {
     return () => clearInterval(id)
   }, [])
 
-  const toggleSource    = (s: string) => setSources(prev => { const n = new Set(prev); if (n.has(s)) n.delete(s); else n.add(s); return n })
-  const toggleCondition = (c: string) => setConditions(prev => { const n = new Set(prev); if (n.has(c)) n.delete(c); else n.add(c); return n })
-  const resetFilters    = () => { setSort(SORT_OPTIONS[0]); setSources(new Set(SOURCES_LIST)); setConditions(new Set()); setPriceMin(""); setPriceMax("") }
+  const resetVisibleResults = () => setVisibleCount(INITIAL_VISIBLE_RESULTS)
+  const updateSort = (value: string) => { setSort(value); resetVisibleResults() }
+  const updatePriceMin = (value: string) => { setPriceMin(value); resetVisibleResults() }
+  const updatePriceMax = (value: string) => { setPriceMax(value); resetVisibleResults() }
+  const toggleSource    = (s: string) => { setSources(prev => { const n = new Set(prev); if (n.has(s)) n.delete(s); else n.add(s); return n }); resetVisibleResults() }
+  const toggleCondition = (c: string) => { setConditions(prev => { const n = new Set(prev); if (n.has(c)) n.delete(c); else n.add(c); return n }); resetVisibleResults() }
+  const resetFilters    = () => { setSort(SORT_OPTIONS[0]); setSources(new Set(SOURCES_LIST)); setConditions(new Set()); setPriceMin(""); setPriceMax(""); resetVisibleResults() }
 
   const filteredResults = useMemo(() => {
     const base = results.filter((item) => {
@@ -909,6 +951,8 @@ function SearchResultsContent() {
     if (!shownBestOffer) return filteredResults
     return filteredResults.filter((item) => item.id !== shownBestOffer.id)
   }, [filteredResults, shownBestOffer])
+
+  const visibleRegularResults = regularResults.slice(0, visibleCount)
 
   const sourceBreakdown = useMemo(() => {
     const total = Math.max(results.length, 1)
@@ -971,11 +1015,11 @@ function SearchResultsContent() {
 
         {filtersOpen ? (
           <FilterPanel
-            sort={sort} setSort={setSort}
+            sort={sort} setSort={updateSort}
             sources={sources} toggleSource={toggleSource}
             conditions={conditions} toggleCondition={toggleCondition}
-            priceMin={priceMin} setPriceMin={setPriceMin}
-            priceMax={priceMax} setPriceMax={setPriceMax}
+            priceMin={priceMin} setPriceMin={updatePriceMin}
+            priceMax={priceMax} setPriceMax={updatePriceMax}
             onReset={resetFilters}
             canClose={canCloseFilters}
             onClose={() => {
@@ -1056,9 +1100,23 @@ function SearchResultsContent() {
                 </div>
               </div>
               {regularResults.length ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {regularResults.map((item) => <ResultCard key={item.id} item={item} />)}
-                </div>
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {visibleRegularResults.map((item) => <ResultCard key={item.id} item={item} />)}
+                  </div>
+                  {visibleRegularResults.length < regularResults.length && (
+                    <div className="mt-5 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleCount((count) => count + VISIBLE_RESULT_STEP)}
+                        className="px-5 py-3 text-[11px] font-bold uppercase"
+                        style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
+                      >
+                        Arată mai multe ({regularResults.length - visibleRegularResults.length})
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="p-6 text-[12px] uppercase font-bold" style={{ border: `1px solid ${INK}`, background: "white", color: `${INK}99` }}>
                   {query ? "Nu există rezultate pentru filtrele curente." : "Caută un produs ca să vezi rezultate live."}

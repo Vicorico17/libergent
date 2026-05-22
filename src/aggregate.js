@@ -24,24 +24,105 @@ function matchesCondition(item, condition) {
   return true;
 }
 
-function recencyScore(postedAt = "") {
-  const value = postedAt.toLowerCase();
+const ROMANIAN_MONTHS = new Map([
+  ["ianuarie", 0],
+  ["februarie", 1],
+  ["martie", 2],
+  ["aprilie", 3],
+  ["mai", 4],
+  ["iunie", 5],
+  ["iulie", 6],
+  ["august", 7],
+  ["septembrie", 8],
+  ["octombrie", 9],
+  ["noiembrie", 10],
+  ["decembrie", 11]
+]);
+
+function stripDiacritics(value = "") {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function parsePostedAtDate(postedAt = "", now = new Date()) {
+  const raw = String(postedAt || "").trim();
+  const value = stripDiacritics(raw.toLowerCase());
+
   if (!value) {
-    return 0;
+    return null;
   }
   if (value.includes("azi")) {
-    return 18;
+    return now;
   }
   if (value.includes("ieri")) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - 1);
+    return date;
+  }
+
+  const relativeDaysMatch = value.match(/(\d+)\s*(?:z|zi|zile)\b/);
+  if (relativeDaysMatch) {
+    const days = Number.parseInt(relativeDaysMatch[1], 10);
+    if (Number.isFinite(days)) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - days);
+      return date;
+    }
+  }
+
+  const dottedDateMatch = value.match(/\b(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b/);
+  if (dottedDateMatch) {
+    const day = Number.parseInt(dottedDateMatch[1], 10);
+    const month = Number.parseInt(dottedDateMatch[2], 10);
+    const year = Number.parseInt(dottedDateMatch[3], 10);
+    const date = new Date(year, month - 1, day);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const monthDateMatch = value.match(/\b(?:(\d{1,2})\s+)?([a-z]+)\s+(\d{4})\b/);
+  if (monthDateMatch) {
+    const day = monthDateMatch[1] ? Number.parseInt(monthDateMatch[1], 10) : 1;
+    const month = ROMANIAN_MONTHS.get(monthDateMatch[2]);
+    const year = Number.parseInt(monthDateMatch[3], 10);
+    if (month !== undefined && Number.isFinite(day) && Number.isFinite(year)) {
+      const date = new Date(year, month, day);
+      return Number.isNaN(date.getTime()) ? null : date;
+    }
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function daysAgoFromDate(date, now = new Date()) {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const then = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.max(0, Math.round((today.getTime() - then.getTime()) / 86400000));
+}
+
+function recencyScore(postedAt = "") {
+  const value = stripDiacritics(String(postedAt || "").toLowerCase());
+  const parsed = parsePostedAtDate(postedAt);
+
+  if (!parsed) {
+    return value.includes("reactualizat") ? 10 : 0;
+  }
+
+  const daysAgo = daysAgoFromDate(parsed);
+  if (daysAgo <= 0) {
+    return 18;
+  }
+  if (daysAgo === 1) {
     return 14;
   }
-  if (value.includes("reactualizat")) {
+  if (daysAgo <= 7) {
     return 10;
   }
-  if (value.includes("martie 2026")) {
-    return 8;
+  if (daysAgo <= 30) {
+    return 6;
   }
-  if (value.includes("februarie 2026")) {
+  if (daysAgo <= 90) {
     return 3;
   }
   return 1;

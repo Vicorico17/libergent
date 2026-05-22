@@ -9,6 +9,7 @@ const SERVERLESS_MAX_RESULTS_PER_SITE = 500;
 const SERVERLESS_SITE_TIMEOUT_MS = 30000;
 const SITE_SEARCH_ATTEMPTS = 2;
 const SITE_RETRY_DELAY_MS = 300;
+const SITE_SEARCH_CONCURRENCY = 3;
 
 function isServerlessRuntime() {
   return Boolean(
@@ -198,11 +199,35 @@ async function searchSite({ siteKey, query, condition, provider, limit, maxPages
   });
 }
 
-async function searchAllRequestedSites({ orderedSiteKeys, query, condition, provider, limit, maxPages }) {
-  const searches = orderedSiteKeys.map((siteKey) =>
-    searchSite({ siteKey, query, condition, provider, limit, maxPages })
+async function settleWithConcurrency(items, concurrency, mapper) {
+  const settled = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+
+      try {
+        settled[index] = { status: "fulfilled", value: await mapper(items[index], index) };
+      } catch (reason) {
+        settled[index] = { status: "rejected", reason };
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
   );
-  const settled = await Promise.allSettled(searches);
+  return settled;
+}
+
+async function searchAllRequestedSites({ orderedSiteKeys, query, condition, provider, limit, maxPages }) {
+  const settled = await settleWithConcurrency(
+    orderedSiteKeys,
+    SITE_SEARCH_CONCURRENCY,
+    (siteKey) => searchSite({ siteKey, query, condition, provider, limit, maxPages })
+  );
 
   return settled.map((entry, index) => {
     if (entry.status === "fulfilled") {

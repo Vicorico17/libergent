@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export function LogoIcon({
   size = 40,
   className = "",
@@ -8,12 +10,13 @@ export function LogoIcon({
   className?: string;
 }) {
   return (
-    <img
+    <Image
       src="/logo.svg"
       width={size}
       height={size}
       alt=""
       aria-hidden="true"
+      unoptimized
       className={className}
       style={{ imageRendering: "pixelated", objectFit: "contain" }}
     />

@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 interface Product {
   id: string;
   title: string;
@@ -8,6 +10,7 @@ interface Product {
   location: string;
   daysAgo: number;
   image?: string;
+  url?: string;
 }
 
 interface ProductCardProps {
@@ -34,7 +37,14 @@ export function ProductCard({ product }: ProductCardProps) {
       {/* Image */}
       <div className="relative bg-[#F8F9FA] aspect-[4/3] flex items-center justify-center overflow-hidden">
         {product.image ? (
-          <img src={product.image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          <Image
+            src={product.image}
+            alt={title}
+            fill
+            unoptimized
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+          />
         ) : (
           <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="text-[#D9D9D9]">
             <rect x="6" y="10" width="36" height="28" rx="4" stroke="currentColor" strokeWidth="2" />
@@ -80,14 +90,23 @@ export function ProductCard({ product }: ProductCardProps) {
           <span>{daysAgo === 0 ? "azi" : `acum ${daysAgo}z`}</span>
         </div>
 
-        <a
-          href="#"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-1 inline-flex justify-center items-center h-9 rounded-xl border border-[#D9D9D9] text-xs font-semibold text-[#111111] hover:border-[#4F7CFF] hover:text-[#4F7CFF] transition-colors"
-        >
-          Vezi anunțul →
-        </a>
+        {product.url ? (
+          <a
+            href={product.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex justify-center items-center h-9 rounded-xl border border-[#D9D9D9] text-xs font-semibold text-[#111111] hover:border-[#4F7CFF] hover:text-[#4F7CFF] transition-colors"
+          >
+            Vezi anunțul →
+          </a>
+        ) : (
+          <span
+            aria-disabled="true"
+            className="mt-1 inline-flex justify-center items-center h-9 rounded-xl border border-[#D9D9D9] text-xs font-semibold text-[#6B6B6B]"
+          >
+            Fără link direct
+          </span>
+        )}
       </div>
     </div>
   );

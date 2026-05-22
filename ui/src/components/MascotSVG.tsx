@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 interface MascotSVGProps {
   size?: number;
   color?: string;
@@ -6,13 +8,15 @@ interface MascotSVGProps {
 
 export function MascotSVG({ size = 64, className = "" }: MascotSVGProps) {
   return (
-    <img
+    <Image
       src="/logo.svg"
       width={size}
+      height={size}
       style={{ height: "auto" }}
       className={className}
       aria-hidden="true"
       alt=""
+      unoptimized
     />
   );
 }

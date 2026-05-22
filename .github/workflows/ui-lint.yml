@@ -26,5 +26,14 @@ jobs:
             package-lock.json
             ui/package-lock.json
 
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run backend tests
+        run: npm run check
+
       - name: Run deterministic UI lint
         run: npm run lint:ui:ci
+
+      - name: Build UI
+        run: npm --prefix ui run build

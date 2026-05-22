@@ -81,6 +81,30 @@ test("keeps listings with missing optional metadata in recommendation output", (
   assert.ok(Number.isFinite(noPriceOffer.recommendationScore));
 });
 
+test("scores freshness from parsed relative dates instead of fixed calendar strings", () => {
+  const query = "Samsung Galaxy S23";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Samsung Galaxy S23 128GB",
+        price: "2500 lei",
+        condition: "folosit",
+        postedAt: "acum 120 zile",
+        url: "https://olx.ro/stale"
+      },
+      {
+        title: "Samsung Galaxy S23 128GB",
+        price: "2500 lei",
+        condition: "folosit",
+        postedAt: "acum 2 zile",
+        url: "https://olx.ro/recent"
+      }
+    ])
+  ]);
+
+  assert.equal(aggregated.bestOffer?.url, "https://olx.ro/recent");
+});
+
 test("does not surface recommendations when critical random tokens are missing", () => {
   const query = "asdf iphone 14";
   const aggregated = aggregateMarketplaceResults([

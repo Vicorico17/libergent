@@ -132,12 +132,6 @@ export function TrendsClient() {
           <Link href="/search" className="hidden sm:inline-flex text-sm font-semibold text-[#6B6B6B] hover:text-[#111111]">
             Căutare
           </Link>
-          <Link
-            href="/auth"
-            className="shrink-0 hidden sm:flex items-center px-4 py-2 rounded-lg bg-[#4F7CFF] text-white text-sm font-semibold hover:bg-[#3d6aec] transition-colors"
-          >
-            Cont
-          </Link>
         </div>
       </header>
 

@@ -8,6 +8,15 @@ import { buildHistoryPayload, logSearchEvent } from "./history.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { insertOfferFeedbackToSupabase, isSupabaseConfigured } from "./supabase.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
+import { buildAbortSignal } from "./abort.js";
+import {
+  IMAGE_PROXY_TIMEOUT_MS,
+  MAX_API_SEARCH_LIMIT,
+  MAX_API_SEARCH_PAGES,
+  MAX_IMAGE_PROXY_BYTES,
+  MAX_JSON_BODY_BYTES,
+  parseBoundedPositiveInteger
+} from "./api-params.js";
 
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -29,6 +38,7 @@ async function proxyImage(res, imageUrl) {
   }
 
   const response = await fetch(targetUrl, {
+    signal: buildAbortSignal({ timeoutMs: IMAGE_PROXY_TIMEOUT_MS }),
     headers: {
       "user-agent": "Mozilla/5.0 (compatible; libergent/0.1; +https://localhost)",
       accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -43,12 +53,58 @@ async function proxyImage(res, imageUrl) {
     return;
   }
 
+  const body = await readResponseBufferWithLimit(response, MAX_IMAGE_PROXY_BYTES);
   res.writeHead(200, {
     "content-type": contentType,
     "cache-control": "public, max-age=86400",
     "access-control-allow-origin": "*"
   });
-  res.end(Buffer.from(await response.arrayBuffer()));
+  res.end(body);
+}
+
+async function readResponseBufferWithLimit(response, maxBytes) {
+  const contentLength = Number.parseInt(response.headers.get("content-length") || "", 10);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new Error("Image response is too large.");
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > maxBytes) {
+      throw new Error("Image response is too large.");
+    }
+    return Buffer.from(arrayBuffer);
+  }
+
+  const chunks = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      try {
+        await reader.cancel();
+      } catch {
+        // Upstream body is already being discarded.
+      }
+      throw new Error("Image response is too large.");
+    }
+    chunks.push(value);
+  }
+
+  const output = Buffer.alloc(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output;
 }
 
 function sendFile(res, filePath) {
@@ -72,20 +128,33 @@ function sendFile(res, filePath) {
   }
 }
 
-function readJsonBody(req) {
+function readJsonBody(req, maxBytes = MAX_JSON_BODY_BYTES) {
   return new Promise((resolve) => {
     let body = "";
+    let bytes = 0;
+    let tooLarge = false;
+
     req.on("data", (chunk) => {
+      bytes += chunk.byteLength;
+      if (bytes > maxBytes) {
+        tooLarge = true;
+        return;
+      }
       body += chunk;
     });
     req.on("end", () => {
+      if (tooLarge) {
+        resolve({ error: "Request body is too large." });
+        return;
+      }
+
       try {
-        resolve(body ? JSON.parse(body) : null);
+        resolve({ data: body ? JSON.parse(body) : null });
       } catch {
-        resolve(null);
+        resolve({ error: "Request body is not valid JSON." });
       }
     });
-    req.on("error", () => resolve(null));
+    req.on("error", () => resolve({ error: "Request body could not be read." }));
   });
 }
 
@@ -96,7 +165,8 @@ const server = http.createServer(async (req, res) => {
     try {
       await proxyImage(res, url.searchParams.get("url") || "");
     } catch (error) {
-      sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
+      const message = error instanceof Error ? error.message : String(error);
+      sendJson(res, message.includes("too large") ? 413 : 500, { error: message });
     }
     return;
   }
@@ -108,8 +178,6 @@ const server = http.createServer(async (req, res) => {
     const site = url.searchParams.get("site") || "default";
     const limitParam = url.searchParams.get("limit");
     const pagesParam = url.searchParams.get("pages");
-    const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
-    const maxPages = pagesParam ? Number.parseInt(pagesParam, 10) : undefined;
 
     if (!query) {
       sendJson(res, 400, { error: "Missing q parameter" });
@@ -117,6 +185,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
+      const limit = parseBoundedPositiveInteger(limitParam, {
+        name: "limit",
+        max: MAX_API_SEARCH_LIMIT
+      });
+      const maxPages = parseBoundedPositiveInteger(pagesParam, {
+        name: "pages",
+        max: MAX_API_SEARCH_PAGES
+      });
       const siteKeys = site === "all"
         ? getSiteKeysForAllSearch(query)
         : site === "default"
@@ -126,7 +202,9 @@ const server = http.createServer(async (req, res) => {
       await logSearchEvent({ query, condition, provider, siteKeys, payload });
       sendJson(res, 200, payload);
     } catch (error) {
-      sendJson(res, 500, { error: error instanceof Error ? error.message : String(error) });
+      const message = error instanceof Error ? error.message : String(error);
+      const statusCode = message.startsWith("Expected ") || message.startsWith("Unsupported site") ? 400 : 500;
+      sendJson(res, statusCode, { error: message });
     }
     return;
   }
@@ -142,7 +220,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const body = await readJsonBody(req);
+    const parsedBody = await readJsonBody(req);
+    if (parsedBody.error) {
+      sendJson(res, parsedBody.error.includes("large") ? 413 : 400, { error: parsedBody.error });
+      return;
+    }
+
+    const body = parsedBody.data;
     const feedback = body?.feedback;
     if (feedback !== "like" && feedback !== "dislike") {
       sendJson(res, 400, { error: "Expected feedback to be like or dislike" });

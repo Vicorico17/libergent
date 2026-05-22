@@ -3,6 +3,15 @@ import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-bas
 import { insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
+import { buildAbortSignal } from "./abort.js";
+import {
+  IMAGE_PROXY_TIMEOUT_MS,
+  MAX_API_SEARCH_LIMIT,
+  MAX_API_SEARCH_PAGES,
+  MAX_IMAGE_PROXY_BYTES,
+  MAX_JSON_BODY_BYTES,
+  parseBoundedPositiveInteger
+} from "./api-params.js";
 
 function applyEnv(env = {}) {
   if (!globalThis.process) {
@@ -37,6 +46,7 @@ async function proxyImage(url) {
   }
 
   const response = await fetch(targetUrl, {
+    signal: buildAbortSignal({ timeoutMs: IMAGE_PROXY_TIMEOUT_MS }),
     headers: {
       "user-agent": "Mozilla/5.0 (compatible; libergent/0.1; +https://localhost)",
       accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
@@ -54,7 +64,12 @@ async function proxyImage(url) {
     return json({ error: "Upstream response is not an image" }, 502);
   }
 
-  return new Response(response.body, {
+  const contentLength = Number.parseInt(response.headers.get("content-length") || "", 10);
+  if (Number.isFinite(contentLength) && contentLength > MAX_IMAGE_PROXY_BYTES) {
+    return json({ error: "Image response is too large." }, 413);
+  }
+
+  return new Response(limitResponseBody(response.body, MAX_IMAGE_PROXY_BYTES), {
     status: 200,
     headers: {
       "content-type": contentType,
@@ -62,6 +77,23 @@ async function proxyImage(url) {
       "access-control-allow-origin": "*"
     }
   });
+}
+
+function limitResponseBody(body, maxBytes) {
+  if (!body) {
+    return body;
+  }
+
+  let totalBytes = 0;
+  return body.pipeThrough(new TransformStream({
+    transform(chunk, controller) {
+      totalBytes += chunk.byteLength || 0;
+      if (totalBytes > maxBytes) {
+        throw new Error("Image response is too large.");
+      }
+      controller.enqueue(chunk);
+    }
+  }));
 }
 
 function buildEmptyHistoryPayload() {
@@ -80,11 +112,48 @@ async function persistSearchEvent(entry, env) {
   }
 }
 
+async function readRequestTextWithLimit(request, maxBytes) {
+  const contentLength = Number.parseInt(request.headers.get("content-length") || "", 10);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new Error("Request body is too large.");
+  }
+
+  const reader = request.body?.getReader();
+  if (!reader) {
+    return "";
+  }
+
+  const decoder = new TextDecoder();
+  let text = "";
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      try {
+        await reader.cancel();
+      } catch {
+        // Request body is already being discarded.
+      }
+      throw new Error("Request body is too large.");
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+
+  return text + decoder.decode();
+}
+
 async function parseJsonRequest(request) {
   try {
-    return await request.json();
-  } catch {
-    return null;
+    const text = await readRequestTextWithLimit(request, MAX_JSON_BODY_BYTES);
+    return { data: text ? JSON.parse(text) : null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Request body is not valid JSON." };
   }
 }
 
@@ -104,14 +173,20 @@ async function handleApi(request, env) {
     const site = url.searchParams.get("site") || "default";
     const limitParam = url.searchParams.get("limit");
     const pagesParam = url.searchParams.get("pages");
-    const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
-    const maxPages = pagesParam ? Number.parseInt(pagesParam, 10) : undefined;
 
     if (!query) {
       return json({ error: "Missing q parameter" }, 400);
     }
 
     try {
+      const limit = parseBoundedPositiveInteger(limitParam, {
+        name: "limit",
+        max: MAX_API_SEARCH_LIMIT
+      });
+      const maxPages = parseBoundedPositiveInteger(pagesParam, {
+        name: "pages",
+        max: MAX_API_SEARCH_PAGES
+      });
       const siteKeys = site === "all"
         ? getSiteKeysForAllSearch(query)
         : site === "default"
@@ -130,7 +205,9 @@ async function handleApi(request, env) {
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider, siteKeys, payload }), env);
       return json(payload, 200);
     } catch (error) {
-      return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+      const message = error instanceof Error ? error.message : String(error);
+      const statusCode = message.startsWith("Expected ") || message.startsWith("Unsupported site") ? 400 : 500;
+      return json({ error: message }, statusCode);
     }
   }
 
@@ -157,7 +234,12 @@ async function handleApi(request, env) {
       return json({ error: "Method not allowed" }, 405);
     }
 
-    const body = await parseJsonRequest(request);
+    const parsedBody = await parseJsonRequest(request);
+    if (parsedBody.error) {
+      return json({ error: parsedBody.error }, parsedBody.error.includes("large") ? 413 : 400);
+    }
+
+    const body = parsedBody.data;
     const feedback = body?.feedback;
     if (feedback !== "like" && feedback !== "dislike") {
       return json({ error: "Expected feedback to be like or dislike" }, 400);
