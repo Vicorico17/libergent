@@ -17,7 +17,7 @@ export const FAQ_ITEMS = [
   },
   {
     q: "Este gratuit?",
-    a: "Da. Beta actuală este gratuită și permite căutări multi-platformă fără card. Funcțiile Premium, precum alerte inteligente și monitorizare salvată, vor fi lansate separat.",
+    a: "Da. Beta actuală este gratuită și permite căutări multi-platformă fără card. Funcțiile Premium vor fi lansate separat.",
   },
   {
     q: "În ce orașe din România funcționează?",

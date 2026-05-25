@@ -129,7 +129,7 @@ export function TrendsClient() {
             </span>
           </Link>
           <SearchBar size="normal" className="flex-1 max-w-2xl" />
-          <Link href="/search" className="hidden sm:inline-flex text-sm font-semibold text-[#6B6B6B] hover:text-[#111111]">
+          <Link href="/#cautare" className="hidden sm:inline-flex text-sm font-semibold text-[#6B6B6B] hover:text-[#111111]">
             Căutare
           </Link>
         </div>

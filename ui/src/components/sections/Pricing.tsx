@@ -52,12 +52,11 @@ function CrownIcon() {
 const BETA_FEATURES = [
   "Căutare unificată pe platforme active",
   "Rezultate normalizate și comparabile",
-  "Istoric de căutări și trenduri",
+  "Filtre și sortare rapidă",
   "Extindere graduală a acoperirii",
 ];
 
 const PREMIUM_FEATURES = [
-  "Alerte inteligente în timp real",
   "Monitorizare salvată pentru căutări",
   "Scor agent și recomandări prioritare",
   "Acces rapid la insight-uri și trenduri",
@@ -68,7 +67,7 @@ export function Pricing() {
   return (
     <section
       id="pricing"
-      className="px-6 py-16 lg:py-24"
+      className="px-6 py-16 lg:py-24 scroll-mt-24"
       style={{ background: BG, fontFamily: MONO }}
     >
       <div className="max-w-[1280px] mx-auto">
@@ -91,7 +90,7 @@ export function Pricing() {
 
           <p className="text-[14px] leading-relaxed" style={{ color: `${INK}99`, maxWidth: 480 }}>
             Beta actuală este gratuită pentru căutări second-hand multi-platformă în România.
-            Premium va adăuga monitorizare salvată și alerte pentru oferte noi.
+            Premium va adăuga monitorizare salvată și insight-uri suplimentare.
           </p>
         </div>
 
@@ -145,7 +144,7 @@ export function Pricing() {
             </ul>
 
             <Link
-              href="/search"
+              href="/#cautare"
               className="flex justify-center items-center gap-3 py-4 font-bold text-[11px] uppercase tracking-widest transition-all duration-150 hover:-translate-y-0.5 hover:-translate-x-0.5"
               style={{
                 border: `2px solid ${INK}`,
@@ -167,7 +166,7 @@ export function Pricing() {
                 el.style.boxShadow = `4px 4px 0 0 ${INK}`;
               }}
             >
-              Intră în beta →
+              Caută acum →
             </Link>
           </div>
 
@@ -202,7 +201,7 @@ export function Pricing() {
             </div>
 
             <p className="text-[13px] leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 44 }}>
-              Monitorizare avansată și alerte inteligente pentru decizii mai rapide.
+              Monitorizare avansată și insight-uri pentru decizii mai rapide.
             </p>
 
             <div

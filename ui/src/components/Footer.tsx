@@ -9,19 +9,19 @@ const MONO  = "var(--font-mono-var), monospace";
 const NAV_LINKS = {
   Produs: [
     { label: "Cum funcționează", href: "/#cum-functioneaza" },
-    { label: "Căutare", href: "/search" },
-    { label: "Prețuri și alerte", href: "/pricing" },
+    { label: "Căutare", href: "/#cautare" },
+    { label: "Prețuri", href: "/#pricing" },
     { label: "Trenduri", href: "/trenduri" },
   ],
   Companie: [
     { label: "Despre LiberGent", href: "/#cum-functioneaza" },
     { label: "Întrebări frecvente", href: "/#intrebari" },
-    { label: "Căutare live", href: "/search" },
+    { label: "Platforme active", href: "/#platforme" },
     { label: "Trenduri second-hand", href: "/trenduri" },
   ],
   Legal: [
-    { label: "Politică de confidențialitate", href: "#" },
-    { label: "Termeni", href: "#" },
+    { label: "Politică de confidențialitate", href: "/confidentialitate" },
+    { label: "Termeni", href: "/termeni" },
     { label: "Cookie-uri", href: "#" },
   ],
 };
@@ -35,9 +35,9 @@ export function Footer() {
     >
       <div className="max-w-[1280px] mx-auto">
 
-        {/* 5-column grid */}
+        {/* 4-column grid */}
         <div
-          className="grid grid-cols-1 md:grid-cols-5 gap-10 md:gap-0"
+          className="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-0"
           style={{ borderBottom: `1px solid ${CREAM}12` }}
         >
           {/* Col 1: Brand */}
@@ -86,35 +86,6 @@ export function Footer() {
               </ul>
             </div>
           ))}
-
-          {/* Col 5: Newsletter */}
-          <div className="flex flex-col gap-5 pb-10 md:pb-14 md:pl-8">
-            <div className="text-[10px] tracking-widest uppercase" style={{ color: `${CREAM}44` }}>
-              Newsletter
-            </div>
-            <p className="text-[12px] leading-relaxed" style={{ color: `${CREAM}55` }}>
-              Actualizări lunare. Fără spam.
-            </p>
-            <div className="flex" style={{ border: `1px solid ${CREAM}22` }}>
-              <input
-                type="email"
-                placeholder="email@exemplu.ro"
-                className="flex-1 bg-transparent text-[12px] px-3 py-2.5 outline-none placeholder:opacity-25"
-                style={{ color: CREAM, fontFamily: MONO }}
-              />
-              <button
-                type="button"
-                className="px-3.5 py-2.5 text-[14px] hover:-translate-y-px hover:-translate-x-px transition-transform duration-150"
-                style={{
-                  background: PINK,
-                  color: CREAM,
-                  boxShadow: `2px 2px 0 0 ${CREAM}33`,
-                }}
-              >
-                →
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Bottom strip */}

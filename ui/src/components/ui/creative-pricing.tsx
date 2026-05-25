@@ -117,7 +117,7 @@ export function CreativePricing({
                     : "bg-zinc-50 text-zinc-900 hover:bg-white"
                 )}
               >
-                <a href={tier.href ?? "/auth"}>{tier.cta ?? "Începe acum"}</a>
+                <a href={tier.href ?? "/#cautare"}>{tier.cta ?? "Începe acum"}</a>
               </Button>
             </div>
           </div>

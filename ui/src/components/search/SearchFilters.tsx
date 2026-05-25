@@ -145,7 +145,7 @@ export function SearchFilters({ filters, onChange }: SearchFiltersProps) {
   return (
     <>
       {/* Mobile filter toggle */}
-      <div className="lg:hidden mb-4">
+      <div className="lg:hidden mb-4 w-full">
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           className="flex items-center gap-2 text-sm font-medium text-[#111111] border border-[#D9D9D9] px-4 py-2 rounded-xl hover:border-[#4F7CFF] transition-colors"

@@ -78,6 +78,7 @@ export function Hero() {
 
   return (
     <section
+      id="cautare"
       className="pt-[108px] md:pt-[90px] min-h-screen flex items-center"
       style={{ background: CREAM, fontFamily: MONO }}
     >

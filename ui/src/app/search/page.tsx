@@ -41,6 +41,10 @@ const SEARCH_PAGE_LIMIT = 3
 const INITIAL_VISIBLE_RESULTS = 48
 const VISIBLE_RESULT_STEP = 48
 
+function shouldOpenFiltersByDefault() {
+  return typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
+}
+
 function formatSearchTime() {
   return new Date().toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })
 }
@@ -803,7 +807,7 @@ function SearchResultsContent() {
   const [totalListings, setTotalListings] = useState(0)
   const [marketplaceStatus, setMarketplaceStatus] = useState<MarketplaceStatus>({ successful: 0, total: 0, failed: [] })
   const [isLoading, setIsLoading]   = useState(false)
-  const [filtersOpen, setFiltersOpen] = useState(true)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchReportOpen, setSearchReportOpen] = useState(true)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS)
 
@@ -817,7 +821,7 @@ function SearchResultsContent() {
     const controller = new AbortController()
 
     const searchId = setTimeout(() => {
-      setFiltersOpen(true)
+      setFiltersOpen(shouldOpenFiltersByDefault())
       if (!query) {
         setResults([])
         setBestOffer(null)

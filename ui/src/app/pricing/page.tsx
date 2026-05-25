@@ -10,7 +10,7 @@ const MONO = "var(--font-mono-var), monospace";
 
 const NAV_LINKS = [
   { label: "Cum funcționează", href: "/#cum-functioneaza" },
-  { label: "Căutare",          href: "/search" },
+  { label: "Căutare",          href: "/#cautare" },
   { label: "Întrebări",        href: "/#intrebari" },
   { label: "Trenduri",         href: "/trenduri" },
 ];
@@ -234,7 +234,7 @@ export default function PricingPage() {
                 {[
                   "Căutare unificată pe platforme active",
                   "Rezultate normalizate și comparabile",
-                  "Istoric de căutări și trenduri",
+                  "Filtre și sortare rapidă",
                   "Extindere graduală a acoperirii",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3" style={{ color: INK }}>
@@ -245,7 +245,7 @@ export default function PricingPage() {
               </ul>
 
               <Link
-                href="/search"
+                href="/#cautare"
                 className="group flex justify-center items-center gap-3 py-4 font-bold text-[12px] uppercase tracking-widest transition-all duration-150 hover:-translate-y-0.5 hover:-translate-x-0.5"
                 style={{
                   border: `2px solid ${INK}`,
@@ -267,7 +267,7 @@ export default function PricingPage() {
                   el.style.boxShadow = `4px 4px 0 0 ${INK}`;
                 }}
               >
-                Intră în beta
+                Caută acum
                 <ArrowRight size={18} />
               </Link>
             </div>
@@ -308,7 +308,7 @@ export default function PricingPage() {
               </div>
 
               <p className="text-sm leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 48 }}>
-                Monitorizare avansată și alerte inteligente pentru decizii mai rapide.
+                Monitorizare avansată și insight-uri pentru decizii mai rapide.
               </p>
 
               {/* Locked notice */}
@@ -331,7 +331,6 @@ export default function PricingPage() {
 
               <ul className="flex flex-col gap-4 text-sm flex-grow mb-10">
                 {[
-                  "Alerte inteligente în timp real",
                   "Monitorizare salvată pentru căutări",
                   "Scor agent și recomandări prioritare",
                   "Acces rapid la insight-uri și trenduri",
@@ -368,7 +367,7 @@ export default function PricingPage() {
           {[
             {
               icon: <div className="w-5 h-5 rounded-full shrink-0" style={{ background: PINK, border: `2px solid ${INK}` }} />,
-              title: "Beta Live",
+              title: "Beta activă",
               sub: "Public & activ",
             },
             {

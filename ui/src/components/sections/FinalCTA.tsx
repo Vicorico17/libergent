@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LogoIcon } from "../LogoIcon";
 
 const BG   = "#F3F0E7";
@@ -161,8 +162,8 @@ export function FinalCTA() {
         </div>
 
         {/* CTA button */}
-        <a
-          href="/search"
+        <Link
+          href="/#cautare"
           className="hover:-translate-y-0.5 hover:-translate-x-0.5 transition-transform duration-150 text-[12px] tracking-widest uppercase px-8 py-3.5"
           style={{
             background: INK,
@@ -172,8 +173,8 @@ export function FinalCTA() {
             fontFamily: MONO,
           }}
         >
-          Caută acum – e gratuit →
-        </a>
+          Caută acum →
+        </Link>
 
       </div>
     </section>

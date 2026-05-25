@@ -33,7 +33,7 @@ export function AuthDisabled() {
         </div>
 
         <Link
-          href="/search"
+          href="/#cautare"
           className="inline-flex justify-center items-center px-5 py-3 text-[12px] font-bold uppercase"
           style={{ background: INK, color: "white", border: `2px solid ${INK}` }}
         >

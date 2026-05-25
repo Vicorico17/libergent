@@ -193,8 +193,8 @@ function PriceCard() {
   );
 }
 
-/* ── Card 04: Alerte & Monitorizare ── */
-function AlertCard() {
+/* ── Card 04: Filtrare ── */
+function FilterCard() {
   return (
     <div className="flex flex-col h-full">
       <div className="p-6 flex flex-col flex-grow">
@@ -204,14 +204,14 @@ function AlertCard() {
         </div>
 
         <h2 className="font-bold uppercase text-[14px] leading-snug mb-6" style={{ fontFamily: MONO }}>
-          ALERTE &<br />MONITORIZARE
+          FILTRARE &<br />SORTARE
         </h2>
         <DotSep />
 
-        <div className="text-[11px] font-bold uppercase mb-5" style={{ fontFamily: MONO }}>URMĂRIM:</div>
+        <div className="text-[11px] font-bold uppercase mb-5" style={{ fontFamily: MONO }}>AJUSTEZI:</div>
 
         <ul className="flex flex-col gap-4 flex-grow">
-          {["bmw seria 1", "iphone 13", "macbook air"].map((item) => (
+          {["surse active", "preț minim/maxim", "stare produs"].map((item) => (
             <li key={item} className="flex items-center gap-3 text-[13px] font-bold" style={{ fontFamily: MONO }}>
               <span style={{ color: PINK }}>{">"}</span>
               {item}
@@ -223,7 +223,7 @@ function AlertCard() {
       <div className="p-6 flex items-center gap-3" style={{ borderTop: `1px solid ${BLACK}` }}>
         <div className="soft-pulse rounded-full shrink-0" style={{ width: 10, height: 10, background: PINK }} />
         <div className="text-[11px] font-bold uppercase flex items-center" style={{ fontFamily: MONO }}>
-          AGENT ACTIVE
+          FILTRARE ACTIVĂ
           <span className="blink inline-block ml-1" style={{ width: 7, height: 15, background: BLACK }} />
         </div>
       </div>
@@ -231,7 +231,7 @@ function AlertCard() {
   );
 }
 
-const featureCards = [ScanCard, DuplicateCard, PriceCard, AlertCard];
+const featureCards = [ScanCard, DuplicateCard, PriceCard, FilterCard];
 
 export function FeatureCards() {
   return (

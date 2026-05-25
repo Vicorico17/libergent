@@ -18,7 +18,7 @@ const TESTIMONIALS = [
     name: "Mihai T.",
     city: "București",
     quote:
-      "Nu mai pierd vremea scrollând prin mii de anunțuri. LiberGent face asta pentru mine și îmi trimite direct ce e relevant.",
+      "Nu mai pierd vremea scrollând prin mii de anunțuri. LiberGent face asta pentru mine și îmi arată direct ce e relevant.",
   },
   {
     id: "03",
