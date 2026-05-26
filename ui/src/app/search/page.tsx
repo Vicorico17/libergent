@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import { CalendarDays, MapPin, Tag } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { mapBestOffer, mapSearchResults, type SearchPayload, type SearchResultItem } from "./search-data"
 
@@ -144,6 +145,35 @@ function AgentScoreBadge({ item, compact = false }: { item: SearchResultItem; co
     >
       Deal foarte bun
     </span>
+  )
+}
+
+function MetaChip({ children, icon, tone = "light" }: { children: ReactNode; icon?: ReactNode; tone?: "dark" | "light" | "muted" }) {
+  const isDark = tone === "dark"
+
+  return (
+    <span
+      className="inline-flex max-w-full min-w-0 items-center gap-1.5 px-2 py-1 text-[9px] font-bold uppercase leading-none"
+      style={{
+        background: isDark ? INK : tone === "muted" ? "#F1EEE6" : CREAM,
+        border: `1px solid ${isDark ? INK : `${INK}33`}`,
+        color: isDark ? "white" : tone === "muted" ? `${INK}77` : INK,
+        letterSpacing: 0,
+      }}
+    >
+      {icon && <span className="flex-none opacity-80">{icon}</span>}
+      <span className="truncate">{children}</span>
+    </span>
+  )
+}
+
+function ListingMetaChips({ item }: { item: SearchResultItem }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <MetaChip icon={<MapPin size={10} strokeWidth={2.2} />}>{item.city}</MetaChip>
+      <MetaChip tone="dark" icon={<Tag size={10} strokeWidth={2.2} />}>{item.condition}</MetaChip>
+      <MetaChip tone="muted" icon={<CalendarDays size={10} strokeWidth={2.2} />}>{item.postedDateLabel}</MetaChip>
+    </div>
   )
 }
 
@@ -584,7 +614,6 @@ function useListingImage(item: SearchResultItem) {
 function ResultCard({ item }: { item: ResultItem }) {
   const [hov, setHov] = useState(false)
   const { image, handleImageError } = useListingImage(item)
-  const scoreExplanation = getAgentScoreExplanation(item)
   const cardStyle = {
     border: `1px solid ${INK}`,
     background: "white",
@@ -626,19 +655,15 @@ function ResultCard({ item }: { item: ResultItem }) {
         </div>
         <div className="flex-1">
           <h4 className="text-[12px] font-bold uppercase leading-snug mb-2 line-clamp-2" style={{ color: INK }}>{item.title}</h4>
-          <p className="text-[10px] uppercase mb-2" style={{ color: `${INK}77` }}>{item.city}</p>
-          <p className="text-[10px] uppercase mb-3" style={{ color: `${INK}55` }}>{item.postedDateLabel} / {item.condition}</p>
+          <div className="mb-3">
+            <ListingMetaChips item={item} />
+          </div>
           <p className="text-[14px] font-bold" style={{ color: PINK }}>{formatRon(item.price)}</p>
         </div>
         <div className="flex items-center gap-2 text-[10px] uppercase font-bold pt-3" style={{ borderTop: `1px solid ${INK}22` }}>
           <span>Scor: <span style={{ color: `${INK}66` }}>{item.score}%</span></span>
           <ScoreBar score={item.score} total={8} />
         </div>
-        {isGreatAgentDeal(item) && (
-          <p className="text-[9px] uppercase font-bold leading-snug" style={{ color: `${INK}88` }}>
-            De ce: {scoreExplanation}
-          </p>
-        )}
         <span
           className="w-full py-2 text-[10px] font-bold uppercase flex justify-center items-center gap-1 transition-colors duration-150"
           style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO }}
@@ -686,7 +711,6 @@ function PanelHeader({ title }: { title: string }) {
 
 function RecommendationCard({ item }: { item: SearchResultItem }) {
   const { image, handleImageError } = useListingImage(item)
-  const scoreExplanation = getAgentScoreExplanation(item)
 
   return (
     <div
@@ -738,9 +762,10 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
                 <AgentScoreBadge item={item} />
                 <h3 className="text-[22px] font-bold uppercase tracking-tight">{item.title}</h3>
               </div>
-              <p className="text-[11px] uppercase font-bold mb-6" style={{ color: `${INK}55` }}>
-                {item.source} / {item.city}
-              </p>
+              <div className="mb-6 flex flex-wrap gap-2">
+                <MetaChip>{item.source}</MetaChip>
+                <MetaChip icon={<MapPin size={10} strokeWidth={2.2} />}>{item.city}</MetaChip>
+              </div>
               <div className="text-[22px] font-bold mb-8" style={{ color: PINK }}>{formatRon(item.price)}</div>
             </div>
             <div className="flex flex-col gap-4">
@@ -755,11 +780,6 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
                   {item.condition}
                 </span>
               </div>
-              {isGreatAgentDeal(item) && (
-                <div className="p-3 text-[11px] uppercase font-bold leading-relaxed" style={{ border: `1px solid ${INK}`, background: CREAM }}>
-                  Eu l-aș alege pe acesta pentru că are {scoreExplanation}.
-                </div>
-              )}
             </div>
             <div className="mt-8 flex justify-end">
               {item.url ? (
