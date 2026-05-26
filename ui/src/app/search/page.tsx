@@ -722,7 +722,7 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
       }}
     >
       <div style={{ background: CREAM }}>
-        <PanelHeader title="Agent Recommendation" />
+        <PanelHeader title="LiberGent Recommends" />
         <div className="flex flex-col md:flex-row">
           <div className="w-full md:w-2/5 relative overflow-hidden" style={{ minHeight: 256, background: "#DDD9CE", borderRight: `1px solid ${INK}` }}>
             {image ? (
@@ -748,9 +748,8 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
                 <line x1="209" y1="128" x2="250" y2="128" stroke={INK} strokeWidth="0.75" opacity="0.25" />
               </svg>
             )}
-            <div className="absolute top-4 left-4 flex flex-col px-3 py-1.5" style={{ background: PINK, color: "white", fontFamily: MONO }}>
-              <span className="text-[10px] font-bold tracking-widest">#01</span>
-              <span className="text-[13px] font-bold uppercase">Agent Pick</span>
+            <div className="absolute top-4 left-4 px-3 py-1.5" style={{ background: PINK, color: "white", fontFamily: MONO }}>
+              <span className="text-[13px] font-bold uppercase">#1</span>
             </div>
             <div className="absolute top-4 right-4">
               <AgentScoreBadge item={item} />
