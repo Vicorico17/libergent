@@ -302,9 +302,18 @@ export default function PricingPage() {
                 Premium
               </h2>
 
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className="font-bold tracking-tight" style={{ fontSize: 44, color: "#6B7280", fontFamily: MONO }}>29</span>
-                <span className="text-lg uppercase" style={{ color: "#6B7280" }}>RON / lună</span>
+              <div className="mb-4">
+                <div
+                  className="mb-2 inline-flex px-2 py-1 text-[10px] font-bold uppercase tracking-widest"
+                  style={{ background: "#FCE7F3", border: "1px solid #9CA3AF", color: PINK }}
+                >
+                  Launch offer
+                </div>
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span className="font-bold tracking-tight" style={{ fontSize: 44, color: "#6B7280", fontFamily: MONO }}>39</span>
+                  <span className="text-lg uppercase" style={{ color: "#6B7280" }}>RON / lună</span>
+                  <span className="text-sm uppercase line-through" style={{ color: "#9CA3AF" }}>99 RON / lună</span>
+                </div>
               </div>
 
               <p className="text-sm leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 48 }}>
