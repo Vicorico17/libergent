@@ -87,18 +87,34 @@ export const metadata: Metadata = {
     title: "LiberGent | Caută produse second-hand pe mai multe marketplace-uri",
     description:
       "Caută o singură dată și verifică rapid oferte second-hand din România pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit.",
+    images: [
+      {
+        url: "/og-logo.png",
+        width: 1200,
+        height: 630,
+        alt: "LiberGent logo",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "LiberGent | Căutare second-hand multi-platformă",
     description:
       "Găsește și compară oferte second-hand din România într-un singur loc.",
+    images: ["/og-logo.png"],
   },
   robots: {
     index: true,
     follow: true,
   },
-  icons: { icon: "/favicon.ico" },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon.png", type: "image/png", sizes: "256x256" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
