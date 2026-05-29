@@ -92,14 +92,14 @@ export function Hero() {
             className="font-semibold leading-[1.1]"
             style={{ fontFamily: MONO, fontSize: "clamp(40px, 5.5vw, 72px)", color: INK }}
           >
-            Caută second-hand<br />în România<span style={{ color: PINK }}>.</span>
+            Caută produse<br />oriunde în România<span style={{ color: PINK }}>.</span>
             <br />
             Compară ofertele<span style={{ color: PINK }}>.</span>
           </h1>
 
           {/* Body copy */}
           <p className="text-base lg:text-lg leading-relaxed max-w-lg" style={{ color: `${INK}E6` }}>
-            LiberGent caută produse second-hand pe OLX, Vinted, LaJumate,
+            LiberGent caută produse noi sau folosite pe OLX, Vinted, LaJumate,
             Okazii, Publi24 și Autovit, apoi grupează anunțurile relevante,
             prețurile și ofertele bune într-un singur loc.
           </p>
