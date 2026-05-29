@@ -1,11 +1,11 @@
 export const FAQ_ITEMS = [
   {
     q: "Cum funcționează LiberGent?",
-    a: "LiberGent caută produsul tău pe mai multe marketplace-uri second-hand din România, normalizează anunțurile și îți arată rezultate comparabile într-un singur flux. Nu trebuie să verifici manual fiecare platformă.",
+    a: "LiberGent caută produsul tău pe mai multe marketplace-uri din România, normalizează anunțurile și îți arată rezultate comparabile într-un singur flux. Nu trebuie să verifici manual fiecare platformă.",
   },
   {
     q: "Pe ce marketplace-uri caută LiberGent?",
-    a: "Căutarea activă acoperă OLX, Vinted, LaJumate, Okazii și Publi24. Pentru căutări auto, LiberGent include și Autovit, astfel încât mașinile second-hand să fie comparate cu sursele potrivite.",
+    a: "Căutarea activă acoperă OLX, Vinted, LaJumate, Okazii și Publi24. Pentru căutări auto, LiberGent include și Autovit, astfel încât anunțurile auto să fie comparate cu sursele potrivite.",
   },
   {
     q: "Ce pot căuta cu LiberGent?",
@@ -40,7 +40,7 @@ export function FAQ() {
             Întrebări frecvente.
           </h2>
           <p className="mt-4 text-sm text-[#6B6B6B] leading-relaxed">
-            Răspunsuri scurte despre căutarea second-hand multi-platformă,
+            Răspunsuri scurte despre căutarea de produse pe mai multe platforme,
             compararea prețurilor și marketplace-urile acoperite în România.
           </p>
         </div>

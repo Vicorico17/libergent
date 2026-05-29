@@ -93,8 +93,6 @@ export function Hero() {
             style={{ fontFamily: MONO, fontSize: "clamp(40px, 5.5vw, 72px)", color: INK }}
           >
             Caută produse<br />oriunde în România<span style={{ color: PINK }}>.</span>
-            <br />
-            Compară ofertele<span style={{ color: PINK }}>.</span>
           </h1>
 
           {/* Body copy */}

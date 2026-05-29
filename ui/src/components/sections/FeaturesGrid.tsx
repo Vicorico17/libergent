@@ -10,7 +10,7 @@ const TESTIMONIALS = [
     name: "Andreea M.",
     city: "Cluj-Napoca",
     quote:
-      "Am găsit exact ce căutam în 10 minute, în loc de 2 ore pe OLX. LiberGent a schimbat complet cum cumpăr second-hand.",
+      "Am găsit exact ce căutam în 10 minute, în loc de 2 ore pe OLX. LiberGent a schimbat complet cum caut produse.",
   },
   {
     id: "02",

@@ -17,7 +17,7 @@ const NAV_LINKS = {
     { label: "Despre LiberGent", href: "/#cum-functioneaza" },
     { label: "Întrebări frecvente", href: "/#intrebari" },
     { label: "Platforme active", href: "/#platforme" },
-    { label: "Trenduri second-hand", href: "/trenduri" },
+    { label: "Trenduri produse", href: "/trenduri" },
   ],
   Legal: [
     { label: "Politică de confidențialitate", href: "/confidentialitate" },
@@ -52,7 +52,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-[12px] leading-relaxed" style={{ color: `${CREAM}55` }}>
-              Motor de căutare pentru oferte second-hand din România: OLX, Vinted,
+              Motor de căutare pentru produse noi sau folosite din România: OLX, Vinted,
               LaJumate, Okazii, Publi24 și Autovit.
             </p>
             <div className="flex items-center gap-2 text-[10px] tracking-widest uppercase" style={{ color: `${CREAM}33` }}>
@@ -112,7 +112,7 @@ export function Footer() {
           {/* Right: tagline + dot */}
           <div className="flex items-center gap-2.5">
             <span className="text-[11px]" style={{ color: `${CREAM}2A` }}>
-              Caută second-hand. Compară oferte. Alege mai bine.
+              Caută produse. Compară oferte. Alege mai bine.
             </span>
             <div style={{ width: 4, height: 4, background: PINK, opacity: 0.5, flexShrink: 0 }} />
           </div>

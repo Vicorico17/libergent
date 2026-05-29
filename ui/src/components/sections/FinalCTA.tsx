@@ -144,7 +144,7 @@ export function FinalCTA() {
           className="font-bold leading-none tracking-tight"
           style={{ fontFamily: MONO, fontSize: "clamp(44px, 7vw, 96px)", color: INK }}
         >
-          Găsește oferta second-hand potrivită.
+          Găsește oferta potrivită.
         </h2>
 
         {/* Subtitle */}

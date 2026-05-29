@@ -252,12 +252,12 @@ export function FeatureCards() {
             style={{ fontFamily: MONO, fontSize: "clamp(40px, 5.5vw, 80px)", color: BLACK }}
           >
             Căutare<br />
-            second-hand completă<span style={{ color: PINK }}>.</span>
+            de produse completă<span style={{ color: PINK }}>.</span>
           </h2>
 
           <p className="text-[16px] font-medium max-w-2xl" style={{ color: `${BLACK}99`, fontFamily: MONO }}>
             Scrii produsul o singură dată. LiberGent verifică marketplace-urile active,
-            elimină duplicatele și compară prețurile pentru anunțuri second-hand din România.
+            elimină duplicatele și compară prețurile pentru produse noi sau folosite din România.
           </p>
         </div>
 

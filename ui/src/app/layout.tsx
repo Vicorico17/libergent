@@ -61,20 +61,20 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://libergent.ro";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "LiberGent | Căutare second-hand în România",
+    default: "LiberGent | Caută produse oriunde în România",
     template: "%s | LiberGent",
   },
   description:
-    "LiberGent caută produse second-hand în România pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit, compară prețuri și îți arată ofertele relevante într-un singur loc.",
+    "LiberGent caută produse noi sau folosite în România pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit, compară prețuri și îți arată ofertele relevante într-un singur loc.",
   keywords: [
     "LiberGent",
-    "produse second-hand",
+    "produse noi sau folosite",
     "cautare OLX",
     "cautare Vinted",
-    "comparare preturi second-hand",
-    "anunturi second-hand Romania",
+    "comparare preturi produse",
+    "anunturi Romania",
     "marketplace Romania",
-    "oferte second-hand",
+    "oferte produse",
   ],
   alternates: {
     canonical: "/",
@@ -84,9 +84,9 @@ export const metadata: Metadata = {
     locale: "ro_RO",
     url: "/",
     siteName: "LiberGent",
-    title: "LiberGent | Caută produse second-hand pe mai multe marketplace-uri",
+    title: "LiberGent | Caută produse pe mai multe marketplace-uri",
     description:
-      "Caută o singură dată și verifică rapid oferte second-hand din România pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit.",
+      "Caută o singură dată și verifică rapid oferte pentru produse noi sau folosite din România pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit.",
     images: [
       {
         url: "/og-logo.png",
@@ -98,9 +98,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "LiberGent | Căutare second-hand multi-platformă",
+    title: "LiberGent | Căutare multi-platformă în România",
     description:
-      "Găsește și compară oferte second-hand din România într-un singur loc.",
+      "Găsește și compară oferte pentru produse noi sau folosite din România într-un singur loc.",
     images: ["/og-logo.png"],
   },
   robots: {

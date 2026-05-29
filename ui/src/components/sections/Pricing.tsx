@@ -89,7 +89,7 @@ export function Pricing() {
           </div>
 
           <p className="text-[14px] leading-relaxed" style={{ color: `${INK}99`, maxWidth: 480 }}>
-            Beta actuală este gratuită pentru căutări second-hand multi-platformă în România.
+            Beta actuală este gratuită pentru căutări de produse pe mai multe platforme din România.
             Premium va adăuga monitorizare salvată și insight-uri suplimentare.
           </p>
         </div>
@@ -129,7 +129,7 @@ export function Pricing() {
             </div>
 
             <p className="text-[13px] leading-relaxed mb-6" style={{ color: `${INK}B3`, minHeight: 44 }}>
-              Acces gratuit la căutare second-hand pe platformele active și la compararea rapidă a ofertelor.
+              Acces gratuit la căutare de produse pe platformele active și la compararea rapidă a ofertelor.
             </p>
 
             <div style={{ borderTop: `1px dashed ${INK}`, marginBottom: "1.5rem" }} />
