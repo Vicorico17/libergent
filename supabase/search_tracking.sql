@@ -53,6 +53,8 @@ create table if not exists public.email_leads (
   updated_at timestamptz not null default now()
 );
 
+alter table public.email_leads enable row level security;
+
 create index if not exists search_events_searched_at_idx
   on public.search_events (searched_at desc);
 
@@ -162,6 +164,7 @@ grant all on table public.search_events to service_role;
 grant all on table public.search_query_stats to service_role;
 grant all on table public.keyword_stats to service_role;
 grant all on table public.offer_feedback to service_role;
+revoke all on table public.email_leads from anon, authenticated;
 grant all on table public.email_leads to service_role;
 grant execute on function public.log_search_event(
   text,

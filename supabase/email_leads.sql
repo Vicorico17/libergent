@@ -8,6 +8,8 @@ create table if not exists public.email_leads (
   updated_at timestamptz not null default now()
 );
 
+alter table public.email_leads enable row level security;
+
 create index if not exists email_leads_updated_at_idx
   on public.email_leads (updated_at desc);
 
@@ -15,6 +17,7 @@ create index if not exists email_leads_source_idx
   on public.email_leads (source);
 
 grant usage on schema public to anon, authenticated, service_role;
+revoke all on table public.email_leads from anon, authenticated;
 grant all on table public.email_leads to service_role;
 
 notify pgrst, 'reload schema';
