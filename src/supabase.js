@@ -16,14 +16,19 @@ function trimTrailingSlash(value = "") {
   return value.replace(/\/+$/, "");
 }
 
+function normalizePublicRestTableName(value, fallback) {
+  const tableName = String(value || fallback).trim();
+  return tableName.startsWith("public.") ? tableName.slice("public.".length) : tableName;
+}
+
 function getSupabaseConfig(env = process.env) {
   const url = trimTrailingSlash(env.SUPABASE_URL || "");
   const apiKey = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || "";
-  const table = env.SUPABASE_SEARCH_EVENTS_TABLE || DEFAULT_TABLE;
-  const queryStatsTable = env.SUPABASE_QUERY_STATS_TABLE || DEFAULT_QUERY_STATS_TABLE;
-  const keywordStatsTable = env.SUPABASE_KEYWORD_STATS_TABLE || DEFAULT_KEYWORD_STATS_TABLE;
-  const feedbackTable = env.SUPABASE_FEEDBACK_TABLE || DEFAULT_FEEDBACK_TABLE;
-  const emailLeadsTable = env.SUPABASE_EMAIL_LEADS_TABLE || DEFAULT_EMAIL_LEADS_TABLE;
+  const table = normalizePublicRestTableName(env.SUPABASE_SEARCH_EVENTS_TABLE, DEFAULT_TABLE);
+  const queryStatsTable = normalizePublicRestTableName(env.SUPABASE_QUERY_STATS_TABLE, DEFAULT_QUERY_STATS_TABLE);
+  const keywordStatsTable = normalizePublicRestTableName(env.SUPABASE_KEYWORD_STATS_TABLE, DEFAULT_KEYWORD_STATS_TABLE);
+  const feedbackTable = normalizePublicRestTableName(env.SUPABASE_FEEDBACK_TABLE, DEFAULT_FEEDBACK_TABLE);
+  const emailLeadsTable = normalizePublicRestTableName(env.SUPABASE_EMAIL_LEADS_TABLE, DEFAULT_EMAIL_LEADS_TABLE);
 
   if (!url || !apiKey) {
     return null;

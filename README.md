@@ -161,6 +161,8 @@ SUPABASE_SECRET_KEY=...
 SUPABASE_EMAIL_LEADS_TABLE=email_leads
 ```
 
+Use the unqualified public table name (`email_leads`), not `public.email_leads`, in `SUPABASE_EMAIL_LEADS_TABLE`. If the search tracking tables already exist but `/api/leads` returns `Could not find the table 'public.email_leads' in the schema cache`, run `supabase/email_leads.sql` in the Supabase SQL Editor. It creates the missing table and asks PostgREST to reload the schema cache.
+
 The lead endpoint normalizes email addresses to lowercase and upserts by email to avoid duplicate rows.
 
 ## Cloudflare deployment
