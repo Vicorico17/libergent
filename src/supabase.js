@@ -10,6 +10,7 @@ const DEFAULT_TABLE = "search_events";
 const DEFAULT_QUERY_STATS_TABLE = "search_query_stats";
 const DEFAULT_KEYWORD_STATS_TABLE = "keyword_stats";
 const DEFAULT_FEEDBACK_TABLE = "offer_feedback";
+const DEFAULT_EMAIL_LEADS_TABLE = "email_leads";
 
 function trimTrailingSlash(value = "") {
   return value.replace(/\/+$/, "");
@@ -22,12 +23,13 @@ function getSupabaseConfig(env = process.env) {
   const queryStatsTable = env.SUPABASE_QUERY_STATS_TABLE || DEFAULT_QUERY_STATS_TABLE;
   const keywordStatsTable = env.SUPABASE_KEYWORD_STATS_TABLE || DEFAULT_KEYWORD_STATS_TABLE;
   const feedbackTable = env.SUPABASE_FEEDBACK_TABLE || DEFAULT_FEEDBACK_TABLE;
+  const emailLeadsTable = env.SUPABASE_EMAIL_LEADS_TABLE || DEFAULT_EMAIL_LEADS_TABLE;
 
   if (!url || !apiKey) {
     return null;
   }
 
-  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable };
+  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable };
 }
 
 function getRequestHeaders(apiKey) {
@@ -215,6 +217,32 @@ export async function insertOfferFeedbackToSupabase(entry, env = process.env) {
       }))
     }, env);
   }
+
+  return true;
+}
+
+export async function insertEmailLeadToSupabase(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) {
+    return false;
+  }
+
+  const now = entry.updatedAt || new Date().toISOString();
+  const row = {
+    email: String(entry.email || "").trim().toLowerCase(),
+    source: entry.source || "search_results_popup",
+    query: entry.query || "",
+    page_path: entry.pagePath || "",
+    updated_at: now
+  };
+
+  await requestSupabase(`${config.emailLeadsTable}?on_conflict=email`, {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal"
+    },
+    body: JSON.stringify(row)
+  }, env);
 
   return true;
 }

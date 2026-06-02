@@ -4,11 +4,11 @@ import { Navbar } from "@/components/Navbar";
 const sections = [
   {
     title: "1. Ce date putem prelucra",
-    body: "Putem prelucra date introduse de tine, cum ar fi căutările efectuate, date de cont dacă alegi să te autentifici, feedback despre rezultate și date tehnice obișnuite precum adresa IP, tipul de browser, paginile accesate și evenimente de utilizare.",
+    body: "Putem prelucra date introduse de tine, cum ar fi căutările efectuate, adresa de email dacă o trimiți pentru alerte, date de cont dacă alegi să te autentifici, feedback despre rezultate și date tehnice obișnuite precum adresa IP, tipul de browser, paginile accesate și evenimente de utilizare.",
   },
   {
     title: "2. De ce folosim datele",
-    body: "Folosim datele pentru a furniza căutarea, a îmbunătăți relevanța rezultatelor, a proteja serviciul împotriva abuzului, a reține preferințe tehnice și a înțelege folosirea site-ului prin analytics.",
+    body: "Folosim datele pentru a furniza căutarea, a îmbunătăți relevanța rezultatelor, a trimite alerte sau update-uri dacă ai cerut asta, a proteja serviciul împotriva abuzului, a reține preferințe tehnice și a înțelege folosirea site-ului prin analytics.",
   },
   {
     title: "3. Google Analytics",

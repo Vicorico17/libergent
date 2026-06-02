@@ -43,6 +43,16 @@ create table if not exists public.offer_feedback (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.email_leads (
+  email text primary key check (email ~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'),
+  source text not null default 'search_results_popup',
+  query text not null default '',
+  page_path text not null default '',
+  consented_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists search_events_searched_at_idx
   on public.search_events (searched_at desc);
 
@@ -63,6 +73,12 @@ create index if not exists offer_feedback_query_idx
 
 create index if not exists offer_feedback_site_idx
   on public.offer_feedback (offer_site);
+
+create index if not exists email_leads_updated_at_idx
+  on public.email_leads (updated_at desc);
+
+create index if not exists email_leads_source_idx
+  on public.email_leads (source);
 
 create or replace function public.log_search_event(
   query_value text,
@@ -143,6 +159,7 @@ grant all on table public.search_events to service_role;
 grant all on table public.search_query_stats to service_role;
 grant all on table public.keyword_stats to service_role;
 grant all on table public.offer_feedback to service_role;
+grant all on table public.email_leads to service_role;
 grant execute on function public.log_search_event(
   text,
   text,

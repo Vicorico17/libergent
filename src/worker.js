@@ -1,6 +1,7 @@
 import { searchAcrossSites } from "./app.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
-import { insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
+import { normalizeLeadPayload } from "./leads.js";
+import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
@@ -255,6 +256,35 @@ async function handleApi(request, env) {
         feedback,
         offer: body.offer
       }, env);
+      return json({ ok: true }, 200);
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
+
+  if (url.pathname === "/api/leads") {
+    if (request.method !== "POST") {
+      return json({ error: "Method not allowed" }, 405);
+    }
+
+    const parsedBody = await parseJsonRequest(request);
+    if (parsedBody.error) {
+      return json({ error: parsedBody.error }, parsedBody.error.includes("large") ? 413 : 400);
+    }
+
+    let lead;
+    try {
+      lead = normalizeLeadPayload(parsedBody.data || {});
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+
+    if (!isSupabaseConfigured(env)) {
+      return json({ ok: false, error: "Supabase is not configured." }, 200);
+    }
+
+    try {
+      await insertEmailLeadToSupabase(lead, env);
       return json({ ok: true }, 200);
     } catch (error) {
       return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);

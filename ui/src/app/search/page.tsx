@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { CalendarDays, MapPin, Tag } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
+import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import { mapBestOffer, mapSearchResults, type SearchPayload, type SearchResultItem } from "./search-data"
 
 // — Constants —
@@ -1014,6 +1015,12 @@ function SearchResultsContent() {
 
       {/* Loading overlay — rendered above everything */}
       {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} />}
+      <EmailCapturePopup
+        enabled={Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
+        query={query}
+        resultCount={results.length}
+        bestOfferSource={shownBestOffer?.source}
+      />
 
       <SearchNav query={query} />
 

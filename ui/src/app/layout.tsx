@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Press_Start_2P, Inter, Caveat, Space_Mono, DotGothic16, VT323, JetBrains_Mono, Geist_Mono } from "next/font/google";
-import Script from "next/script";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import "./globals.css";
 
 const pixel = Press_Start_2P({
@@ -134,22 +134,7 @@ export default function RootLayout({
   return (
     <html lang="ro" className={`${pixel.variable} ${inter.variable} ${caveat.variable} ${spaceMono.variable} ${dotGothic.variable} ${vt323.variable} ${jetbrains.variable} ${geistMono.variable}`}>
       <body className="min-h-screen flex flex-col">
-        {googleAnalyticsId ? (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`}
-              strategy="afterInteractive"
-            />
-            <Script id="google-analytics" strategy="afterInteractive">
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${googleAnalyticsId}');
-              `}
-            </Script>
-          </>
-        ) : null}
+        <GoogleAnalytics measurementId={googleAnalyticsId} />
         {children}
       </body>
     </html>

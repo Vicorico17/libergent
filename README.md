@@ -143,6 +143,26 @@ If you already authenticated the Firecrawl CLI, you can usually pull the key loc
 firecrawl env
 ```
 
+## Analytics and email leads
+
+Google Analytics is enabled when the UI build has a public measurement ID:
+
+```bash
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
+```
+
+The app loads `gtag` only when that value is present and records client-side route changes in the Next.js app.
+
+Email capture from the search-results popup posts to `/api/leads` and stores rows in Supabase. Run `supabase/search_tracking.sql` before enabling this in production, and configure:
+
+```bash
+SUPABASE_URL=...
+SUPABASE_SECRET_KEY=...
+SUPABASE_EMAIL_LEADS_TABLE=email_leads
+```
+
+The lead endpoint normalizes email addresses to lowercase and upserts by email to avoid duplicate rows.
+
 ## Cloudflare deployment
 
 The app is wired for Cloudflare Workers through `wrangler.toml`.
