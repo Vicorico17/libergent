@@ -148,7 +148,7 @@ firecrawl env
 Google Analytics is enabled when the UI build has a public measurement ID:
 
 ```bash
-NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
+NEXT_PUBLIC_GA_MEASUREMENT_ID=G-R8P7G7PWR7
 ```
 
 The app loads `gtag` only when that value is present and records client-side route changes in the Next.js app.

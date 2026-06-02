@@ -57,6 +57,7 @@ const geistMono = Geist_Mono({
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://libergent.ro";
+const defaultGoogleAnalyticsId = "G-R8P7G7PWR7";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -129,7 +130,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const googleAnalyticsId =
-    process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID;
+    process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ||
+    process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID ||
+    defaultGoogleAnalyticsId;
 
   return (
     <html lang="ro" className={`${pixel.variable} ${inter.variable} ${caveat.variable} ${spaceMono.variable} ${dotGothic.variable} ${vt323.variable} ${jetbrains.variable} ${geistMono.variable}`}>
