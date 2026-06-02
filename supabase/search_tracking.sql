@@ -44,7 +44,7 @@ create table if not exists public.offer_feedback (
 );
 
 create table if not exists public.email_leads (
-  email text primary key check (email ~* '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'),
+  email text primary key,
   source text not null default 'search_results_popup',
   query text not null default '',
   page_path text not null default '',
@@ -52,6 +52,19 @@ create table if not exists public.email_leads (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.email_leads
+  drop constraint if exists email_leads_email_check,
+  drop constraint if exists email_leads_email_format_check;
+
+alter table public.email_leads
+  add constraint email_leads_email_format_check
+  check (
+    email = lower(btrim(email))
+    and position('@' in email) > 1
+    and position('.' in split_part(email, '@', 2)) > 1
+    and position(' ' in email) = 0
+  );
 
 alter table public.email_leads enable row level security;
 
