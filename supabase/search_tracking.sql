@@ -77,6 +77,9 @@ create index if not exists offer_feedback_site_idx
 create index if not exists email_leads_updated_at_idx
   on public.email_leads (updated_at desc);
 
+create index if not exists email_leads_created_at_idx
+  on public.email_leads (created_at desc);
+
 create index if not exists email_leads_source_idx
   on public.email_leads (source);
 
@@ -172,3 +175,5 @@ grant execute on function public.log_search_event(
   numeric,
   jsonb
 ) to service_role;
+
+notify pgrst, 'reload schema';

@@ -23,6 +23,7 @@ const PORT = Number.parseInt(process.env.PORT || "8787", 10);
 const HOST = process.env.HOST || "127.0.0.1";
 const ROOT = process.cwd();
 const ASSETS_DIR = path.join(ROOT, "ui", "out");
+const LEAD_API_PATHS = new Set(["/api/leads", "/api/lead", "/api/email-leads", "/api/email_leads", "/api/waitlist"]);
 
 loadEnv(ROOT);
 
@@ -215,6 +216,40 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (LEAD_API_PATHS.has(url.pathname)) {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+
+    const parsedBody = await readJsonBody(req);
+    if (parsedBody.error) {
+      sendJson(res, parsedBody.error.includes("large") ? 413 : 400, { error: parsedBody.error });
+      return;
+    }
+
+    let lead;
+    try {
+      lead = normalizeLeadPayload(parsedBody.data || {});
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+
+    if (!isSupabaseConfigured()) {
+      sendJson(res, 200, { ok: false, error: "Supabase is not configured." });
+      return;
+    }
+
+    try {
+      await insertEmailLeadToSupabase(lead);
+      sendJson(res, 200, { ok: true });
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
+    }
+    return;
+  }
+
   if (url.pathname === "/api/feedback") {
     if (req.method !== "POST") {
       sendJson(res, 405, { error: "Method not allowed" });
@@ -245,40 +280,6 @@ const server = http.createServer(async (req, res) => {
         feedback,
         offer: body.offer
       });
-      sendJson(res, 200, { ok: true });
-    } catch (error) {
-      sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
-    }
-    return;
-  }
-
-  if (url.pathname === "/api/leads") {
-    if (req.method !== "POST") {
-      sendJson(res, 405, { error: "Method not allowed" });
-      return;
-    }
-
-    const parsedBody = await readJsonBody(req);
-    if (parsedBody.error) {
-      sendJson(res, parsedBody.error.includes("large") ? 413 : 400, { error: parsedBody.error });
-      return;
-    }
-
-    let lead;
-    try {
-      lead = normalizeLeadPayload(parsedBody.data || {});
-    } catch (error) {
-      sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) });
-      return;
-    }
-
-    if (!isSupabaseConfigured()) {
-      sendJson(res, 200, { ok: false, error: "Supabase is not configured." });
-      return;
-    }
-
-    try {
-      await insertEmailLeadToSupabase(lead);
       sendJson(res, 200, { ok: true });
     } catch (error) {
       sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
