@@ -56,7 +56,7 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://libergent.ro";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://libergent.com";
 const defaultGoogleAnalyticsId = "G-R8P7G7PWR7";
 
 export const metadata: Metadata = {

@@ -9,7 +9,7 @@ import { Pricing } from "@/components/sections/Pricing";
 import { FAQ, FAQ_ITEMS } from "@/components/sections/FAQ";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://libergent.ro";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://libergent.com";
 
 export const metadata: Metadata = {
   title: "Caută produse oriunde în România",
