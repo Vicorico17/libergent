@@ -27,6 +27,10 @@ const LEAD_API_PATHS = new Set(["/api/leads", "/api/lead", "/api/email-leads", "
 
 loadEnv(ROOT);
 
+function normalizeApiPathname(pathname = "") {
+  return pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+}
+
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload, null, 2));
@@ -162,8 +166,9 @@ function readJsonBody(req, maxBytes = MAX_JSON_BODY_BYTES) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
+  const apiPath = normalizeApiPathname(url.pathname);
 
-  if (url.pathname === "/api/image") {
+  if (apiPath === "/api/image") {
     try {
       await proxyImage(res, url.searchParams.get("url") || "");
     } catch (error) {
@@ -173,7 +178,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === "/api/search") {
+  if (apiPath === "/api/search") {
     const query = url.searchParams.get("q")?.trim();
     const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
@@ -211,12 +216,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === "/api/history") {
+  if (apiPath === "/api/history") {
     sendJson(res, 200, await buildHistoryPayload());
     return;
   }
 
-  if (LEAD_API_PATHS.has(url.pathname)) {
+  if (LEAD_API_PATHS.has(apiPath)) {
     if (req.method !== "POST") {
       sendJson(res, 405, { error: "Method not allowed" });
       return;
@@ -250,7 +255,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === "/api/feedback") {
+  if (apiPath === "/api/feedback") {
     if (req.method !== "POST") {
       sendJson(res, 405, { error: "Method not allowed" });
       return;

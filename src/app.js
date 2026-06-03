@@ -7,6 +7,7 @@ const MAX_CREDITS_PER_SITE = 3;
 const DEFAULT_SITE_TIMEOUT_MS = 20000;
 const SERVERLESS_MAX_RESULTS_PER_SITE = 500;
 const SERVERLESS_SITE_TIMEOUT_MS = 30000;
+const CLOUDFLARE_WORKER_MAX_PAGES_PER_SITE = 1;
 const SITE_SEARCH_ATTEMPTS = 2;
 const SITE_RETRY_DELAY_MS = 300;
 const SITE_SEARCH_CONCURRENCY = 3;
@@ -17,6 +18,10 @@ function isServerlessRuntime() {
     process.env.CF_PAGES ||
     process.env.LIBERGENT_RUNTIME === "cloudflare-worker"
   );
+}
+
+function isCloudflareWorkerRuntime() {
+  return process.env.LIBERGENT_RUNTIME === "cloudflare-worker";
 }
 
 function isMockSearchEnabled() {
@@ -131,7 +136,10 @@ async function searchSiteOnce({ siteKey, query, condition, provider, limit, maxP
     site = getSite(siteKey);
     resolvedProvider = searchProvider === "auto" ? site.provider : searchProvider;
     const affordablePages = getMaxAffordablePages(site, searchProvider);
-    const desiredPages = Math.min(maxPages ?? affordablePages, affordablePages);
+    const runtimeMaxPages = isCloudflareWorkerRuntime()
+      ? Math.min(affordablePages, CLOUDFLARE_WORKER_MAX_PAGES_PER_SITE)
+      : affordablePages;
+    const desiredPages = Math.min(maxPages ?? runtimeMaxPages, runtimeMaxPages);
     const runtimeMaxResults = isServerlessRuntime()
       ? Math.min((site.pageSize || SERVERLESS_MAX_RESULTS_PER_SITE) * desiredPages, SERVERLESS_MAX_RESULTS_PER_SITE)
       : Number.POSITIVE_INFINITY;

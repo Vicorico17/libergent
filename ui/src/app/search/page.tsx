@@ -39,7 +39,7 @@ const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const MAIN_BLOCKS   = 15
 const SOURCE_BLOCKS = 10
 const SEARCH_RESULT_LIMIT = 180
-const SEARCH_PAGE_LIMIT = 3
+const SEARCH_PAGE_LIMIT = 1
 const INITIAL_VISIBLE_RESULTS = 48
 const VISIBLE_RESULT_STEP = 48
 
@@ -69,6 +69,22 @@ function compareByRank(a: SearchResultItem, b: SearchResultItem) {
   const aRank = typeof a.rank === "number" ? a.rank : Number.POSITIVE_INFINITY
   const bRank = typeof b.rank === "number" ? b.rank : Number.POSITIVE_INFINITY
   return aRank - bRank || b.score - a.score
+}
+
+async function readJsonResponse(response: Response): Promise<SearchPayload> {
+  const body = await response.text()
+  if (!body.trim()) return {}
+
+  try {
+    return JSON.parse(body) as SearchPayload
+  } catch {
+    const looksLikeHtml = /^\s*</.test(body)
+    throw new Error(
+      looksLikeHtml
+        ? "API-ul de căutare a returnat HTML în loc de JSON. Reîncarcă pagina și încearcă din nou."
+        : "API-ul de căutare a returnat un răspuns JSON invalid."
+    )
+  }
 }
 
 function isGreatAgentDeal(item: SearchResultItem) {
@@ -367,7 +383,7 @@ function SearchNav({ query }: { query: string }) {
 
   return (
     <nav
-      className="sticky top-0 z-50 px-6 py-4 flex items-center gap-5"
+      className="sticky top-0 z-50 px-4 py-3 sm:px-6 sm:py-4 flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-5"
       style={{ background: CREAM, borderBottom: `1px solid ${INK}`, fontFamily: MONO }}
     >
       <Link href="/" className="flex items-center gap-2.5 flex-none">
@@ -377,19 +393,19 @@ function SearchNav({ query }: { query: string }) {
 
       <form
         onSubmit={submit}
-        className="flex-1 max-w-2xl flex"
+        className="order-3 w-full max-w-none flex min-w-0 items-stretch sm:order-none sm:w-auto sm:flex-1 sm:max-w-2xl"
         style={{ border: `1px solid ${INK}` }}
       >
         <input
           type="text"
           value={val}
           onChange={(e) => setVal(e.target.value)}
-          className="flex-1 bg-white px-4 py-2.5 text-[13px] uppercase font-bold focus:outline-none"
+          className="h-11 min-w-0 flex-1 bg-white px-3 sm:px-4 text-[13px] uppercase font-bold focus:outline-none"
           style={{ color: INK, fontFamily: MONO }}
         />
         <button
           type="submit"
-          className="flex items-center gap-2 px-5 py-2.5 text-[12px] uppercase font-bold transition-colors duration-150"
+          className="flex h-11 shrink-0 items-center justify-center gap-1.5 px-3 sm:gap-2 sm:px-5 text-[12px] uppercase font-bold transition-colors duration-150"
           style={{ background: INK, color: CREAM, fontFamily: MONO, borderLeft: `1px solid ${INK}` }}
           onMouseEnter={(e) => (e.currentTarget.style.background = PINK)}
           onMouseLeave={(e) => (e.currentTarget.style.background = INK)}
@@ -883,7 +899,7 @@ function SearchResultsContent() {
 
       fetch(`/api/search?${params.toString()}`, { signal: controller.signal })
         .then(async (response) => {
-          const payload = (await response.json()) as SearchPayload
+          const payload = await readJsonResponse(response)
           if (!response.ok || payload.error) {
             throw new Error(payload.error || "Căutarea nu a putut fi finalizată.")
           }

@@ -138,7 +138,13 @@ function parseTotalResults(markdown) {
 }
 
 function parseHtmlTotalResults(html) {
-  const visibleCountMatch = stripTags(html).match(/Am găsit\s+([\d. ]+)\s+rezultate/i);
+  const markerMatch = html.match(/Am\s+g(?:ă|a)sit/i);
+  if (!markerMatch || !Number.isFinite(markerMatch.index)) {
+    return null;
+  }
+
+  const summaryText = stripTags(html.slice(markerMatch.index, markerMatch.index + 1000));
+  const visibleCountMatch = summaryText.match(/Am g(?:ă|a)sit\s+([\d. ]+)\s+rezultate/i);
   if (!visibleCountMatch) {
     return null;
   }
@@ -151,16 +157,30 @@ function hasNextPage(html) {
   return /href="[^"]*[?&]page=\d+/i.test(html) || /data-testid="pagination-forward"/i.test(html);
 }
 
-function splitListingCards(html) {
-  const matches = [...html.matchAll(/<div\b(?=[^>]*data-cy="l-card")(?=[^>]*data-testid="l-card")[^>]*>/gi)];
-  return matches.map((match, index) => {
+function collectListingCards(html, limit = Number.POSITIVE_INFINITY) {
+  const matches = [];
+  const cardStartPattern = /<div\b(?=[^>]*data-cy="l-card")(?=[^>]*data-testid="l-card")[^>]*>/gi;
+  let match;
+
+  while ((match = cardStartPattern.exec(html)) !== null) {
+    matches.push(match);
+    if (matches.length > limit) {
+      break;
+    }
+  }
+
+  return matches.slice(0, limit).map((match, index) => {
     const start = match.index;
     const end = matches[index + 1]?.index ?? html.length;
     return html.slice(start, end);
   });
 }
 
-function parseListingCard(card, embeddedImages = new Map()) {
+function countListingCards(html) {
+  return html.match(/<div\b(?=[^>]*data-cy="l-card")(?=[^>]*data-testid="l-card")[^>]*>/gi)?.length || 0;
+}
+
+function parseListingCard(card, getEmbeddedImages = () => new Map()) {
   const titleBlock =
     card.match(/data-testid="ad-card-title"[\s\S]*?<a[^>]+href="([^"]+)"[\s\S]*?<h4[^>]*>([\s\S]*?)<\/h4>/i) ||
     card.match(/<a[^>]+href="([^"]*\/d\/oferta\/[^"]+)"[^>]*>[\s\S]*?<h4[^>]*>([\s\S]*?)<\/h4>/i);
@@ -174,7 +194,7 @@ function parseListingCard(card, embeddedImages = new Map()) {
   if (!title || !url) {
     return null;
   }
-  const embeddedImageUrl = embeddedImages.get(listingPathKey(url)) || "";
+  const embeddedImageUrl = imageUrl ? "" : getEmbeddedImages().get(listingPathKey(url)) || "";
 
   const locationDate = stripTags(locationDateMatch?.[1] || "");
   const locationSplit = locationDate.split(" - ");
@@ -247,17 +267,21 @@ export function parseOlxMarkdown(markdown, limit) {
 }
 
 export function parseOlxHtml(html, limit) {
-  const blocks = splitListingCards(html);
-  const embeddedImages = extractEmbeddedOlxImages(html);
+  const blocks = collectListingCards(html, limit);
+  let embeddedImages;
+  const getEmbeddedImages = () => {
+    embeddedImages ??= extractEmbeddedOlxImages(html);
+    return embeddedImages;
+  };
   const items = blocks
-    .map((card) => parseListingCard(card, embeddedImages))
+    .map((card) => parseListingCard(card, getEmbeddedImages))
     .filter(Boolean)
     .slice(0, limit);
 
   return {
     items,
     totalResults: parseHtmlTotalResults(html),
-    rawItemCount: blocks.length,
+    rawItemCount: countListingCards(html),
     hasNextPage: hasNextPage(html)
   };
 }

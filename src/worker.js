@@ -16,6 +16,10 @@ import {
 
 const LEAD_API_PATHS = new Set(["/api/leads", "/api/lead", "/api/email-leads", "/api/email_leads", "/api/waitlist"]);
 
+function normalizeApiPathname(pathname = "") {
+  return pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+}
+
 function applyEnv(env = {}) {
   if (!globalThis.process) {
     globalThis.process = { env: {} };
@@ -164,12 +168,13 @@ async function handleApi(request, env) {
   applyEnv(env);
 
   const url = new URL(request.url);
+  const apiPath = normalizeApiPathname(url.pathname);
 
-  if (url.pathname === "/api/image") {
+  if (apiPath === "/api/image") {
     return proxyImage(url.searchParams.get("url") || "");
   }
 
-  if (url.pathname === "/api/search") {
+  if (apiPath === "/api/search") {
     const query = url.searchParams.get("q")?.trim();
     const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
@@ -214,7 +219,7 @@ async function handleApi(request, env) {
     }
   }
 
-  if (url.pathname === "/api/history") {
+  if (apiPath === "/api/history") {
     if (!isSupabaseConfigured(env)) {
       return json({
         ...buildEmptyHistoryPayload(),
@@ -232,7 +237,7 @@ async function handleApi(request, env) {
     }
   }
 
-  if (LEAD_API_PATHS.has(url.pathname)) {
+  if (LEAD_API_PATHS.has(apiPath)) {
     if (request.method !== "POST") {
       return json({ error: "Method not allowed" }, 405);
     }
@@ -261,7 +266,7 @@ async function handleApi(request, env) {
     }
   }
 
-  if (url.pathname === "/api/feedback") {
+  if (apiPath === "/api/feedback") {
     if (request.method !== "POST") {
       return json({ error: "Method not allowed" }, 405);
     }

@@ -79,12 +79,29 @@ function normalizeOfferImages(offer) {
   };
 }
 
-function splitListingBlocks(html) {
-  return html
-    .split(/<div class="lising-old-li\b[^>]*>/i)
-    .slice(1)
-    .map((block) => block.split(/<div class="lising-old-li\b[^>]*>/i)[0])
-    .filter((block) => block.includes('class="list-item'));
+const LISTING_BLOCK_PATTERN = /<div class="lising-old-li\b[^>]*>/gi;
+
+function collectListingBlocks(html, limit = Number.POSITIVE_INFINITY) {
+  const matches = [];
+  let match;
+
+  LISTING_BLOCK_PATTERN.lastIndex = 0;
+  while ((match = LISTING_BLOCK_PATTERN.exec(html)) !== null) {
+    matches.push(match);
+    if (matches.length > limit) {
+      break;
+    }
+  }
+
+  return matches.slice(0, limit).map((match, index) => {
+    const start = match.index;
+    const end = matches[index + 1]?.index ?? html.length;
+    return html.slice(start, end);
+  }).filter((block) => block.includes('class="list-item'));
+}
+
+function countListingBlocks(html) {
+  return html.match(/<div class="lising-old-li\b[^>]*>/gi)?.length || 0;
 }
 
 function parseListingCard(block) {
@@ -117,11 +134,11 @@ function parseListingCard(block) {
 }
 
 function parseSearchListingItems(html, limit) {
-  const items = splitListingBlocks(html)
+  const items = collectListingBlocks(html, limit)
     .map(parseListingCard)
     .filter(Boolean);
 
-  return items.slice(0, limit);
+  return items;
 }
 
 function parseSearchTotalResults(html) {
@@ -179,7 +196,7 @@ export function parseOkaziiHtml(html, limit) {
     return {
       items: searchItems,
       totalResults: parseSearchTotalResults(html),
-      rawItemCount: splitListingBlocks(html).length,
+      rawItemCount: countListingBlocks(html),
       hasNextPage: hasSearchNextPage(html)
     };
   }

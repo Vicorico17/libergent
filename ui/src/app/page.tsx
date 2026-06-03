@@ -6,7 +6,6 @@ import { FeatureCards } from "@/components/sections/FeatureCards";
 import { HowItWorks } from "@/components/sections/HowItWorks";
 import { FeaturesGrid } from "@/components/sections/FeaturesGrid";
 import { Pricing } from "@/components/sections/Pricing";
-import { FAQ, FAQ_ITEMS } from "@/components/sections/FAQ";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://libergent.com";
@@ -48,18 +47,6 @@ const structuredData = [
     description:
       "Motor de căutare care scanează mai multe marketplace-uri din România, normalizează anunțurile și compară prețurile pentru produse noi sau folosite.",
   },
-  {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: FAQ_ITEMS.map((item) => ({
-      "@type": "Question",
-      name: item.q,
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: item.a,
-      },
-    })),
-  },
 ];
 
 export default function Home() {
@@ -76,7 +63,6 @@ export default function Home() {
         <HowItWorks />
         <FeaturesGrid />
         <Pricing />
-        <FAQ />
         <FinalCTA />
       </main>
       <Footer />

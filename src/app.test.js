@@ -73,3 +73,58 @@ test("all requested marketplaces are represented even when individual providers 
     }
   }
 });
+
+test("Cloudflare Worker runtime caps marketplace searches to one page", async () => {
+  const previousRuntime = process.env.LIBERGENT_RUNTIME;
+  const previousMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
+  const previousFetch = globalThis.fetch;
+  const fetchedUrls = [];
+
+  try {
+    process.env.LIBERGENT_RUNTIME = "cloudflare-worker";
+    process.env.LIBERGENT_MOCK_SEARCH = "0";
+    globalThis.fetch = async (url) => {
+      fetchedUrls.push(String(url));
+      return new Response(`
+        <html>
+          <body>
+            <div data-cy="l-card" data-testid="l-card">
+              <a href="/d/oferta/iphone-14-IDtest.html"><h4>Iphone 14 128GB</h4></a>
+              <p data-testid="ad-price">1200 lei</p>
+              <p data-testid="location-date">Bucuresti - Azi la 12:00</p>
+            </div>
+            <a href="?page=2">next</a>
+          </body>
+        </html>
+      `, {
+        status: 200,
+        headers: { "content-type": "text/html" }
+      });
+    };
+
+    const payload = await searchAcrossSites({
+      query: "iphone 14",
+      provider: "auto",
+      siteKeys: ["olx.ro"],
+      limit: 50,
+      maxPages: 3
+    });
+
+    assert.equal(payload.results[0].ok, true);
+    assert.equal(payload.results[0].pagesUsed, 1);
+    assert.equal(fetchedUrls.length, 1);
+    assert.equal(fetchedUrls[0].includes("page=2"), false);
+  } finally {
+    if (previousRuntime === undefined) {
+      delete process.env.LIBERGENT_RUNTIME;
+    } else {
+      process.env.LIBERGENT_RUNTIME = previousRuntime;
+    }
+    if (previousMockSearch === undefined) {
+      delete process.env.LIBERGENT_MOCK_SEARCH;
+    } else {
+      process.env.LIBERGENT_MOCK_SEARCH = previousMockSearch;
+    }
+    globalThis.fetch = previousFetch;
+  }
+});
