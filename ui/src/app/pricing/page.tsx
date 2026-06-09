@@ -235,6 +235,8 @@ export default function PricingPage() {
                   "Căutare unificată pe platforme active",
                   "Rezultate normalizate și comparabile",
                   "Filtre și sortare rapidă",
+                  "Scor agent și recomandări prioritare",
+                  "Acces rapid la insight-uri și trenduri",
                   "Extindere graduală a acoperirii",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3" style={{ color: INK }}>
@@ -340,10 +342,8 @@ export default function PricingPage() {
 
               <ul className="flex flex-col gap-4 text-sm flex-grow mb-10">
                 {[
-                  "Monitorizare salvată pentru căutări",
-                  "Scor agent și recomandări prioritare",
-                  "Acces rapid la insight-uri și trenduri",
-                  "Suport prioritar",
+                  "Vorbește cu LiberGent direct pe WhatsApp",
+                  "Setează alerte pentru produse",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3" style={{ color: "#9CA3AF" }}>
                     <DotIcon />

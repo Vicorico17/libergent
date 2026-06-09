@@ -53,14 +53,14 @@ const BETA_FEATURES = [
   "Căutare unificată pe platforme active",
   "Rezultate normalizate și comparabile",
   "Filtre și sortare rapidă",
+  "Scor agent și recomandări prioritare",
+  "Acces rapid la insight-uri și trenduri",
   "Extindere graduală a acoperirii",
 ];
 
 const PREMIUM_FEATURES = [
-  "Monitorizare salvată pentru căutări",
-  "Scor agent și recomandări prioritare",
-  "Acces rapid la insight-uri și trenduri",
-  "Suport prioritar",
+  "Vorbește cu LiberGent direct pe WhatsApp",
+  "Setează alerte pentru produse",
 ];
 
 export function Pricing() {
