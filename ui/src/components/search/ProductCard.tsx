@@ -4,6 +4,7 @@ interface Product {
   id: string;
   title: string;
   price: number;
+  priceLabel?: string;
   platform: string;
   platformColor: string;
   condition: string;
@@ -20,7 +21,7 @@ interface ProductCardProps {
 export type { Product };
 
 export function ProductCard({ product }: ProductCardProps) {
-  const { title, price, platform, platformColor, condition, location, daysAgo } = product;
+  const { title, price, priceLabel, platform, platformColor, condition, location, daysAgo } = product;
 
   const conditionColor =
     condition === "Ca nou" || condition === "Nou cu etichetă"
@@ -78,7 +79,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
         <div className="flex items-center justify-between mt-auto pt-1">
           <span className="font-pixel text-[#111111]" style={{ fontSize: "14px" }}>
-            {price.toLocaleString("ro-RO")} RON
+            {priceLabel || `${price.toLocaleString("ro-RO")} RON`}
           </span>
           <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-[#F8F9FA]" style={{ color: conditionColor }}>
             {condition}

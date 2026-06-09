@@ -48,14 +48,19 @@ function ensureDirForFile(filePath) {
 }
 
 function formatPrice(item) {
-  if (item?.currency === "EUR" && item?.price) {
-    return item.price;
+  const rawPrice = String(item?.price || "").trim();
+  const currency = String(item?.currency || "").trim().toUpperCase();
+  if ((currency === "EUR" || /€|eur/i.test(rawPrice)) && rawPrice) {
+    return rawPrice;
+  }
+  if (currency === "EUR" && Number.isFinite(item?.numericPrice)) {
+    return `${item.numericPrice.toLocaleString("ro-RO")} EUR`;
   }
   if (Number.isFinite(item?.priceRon)) {
     return formatRon(item.priceRon);
   }
 
-  return item?.price || "Fara pret";
+  return rawPrice || "Fara pret";
 }
 
 function cleanDisplayText(value = "") {

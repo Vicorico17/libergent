@@ -380,6 +380,44 @@ test("car query rejects accessories and keeps complete vehicle listing as recomm
   assert.ok(vehicle.relevanceScore > accessory.relevanceScore);
 });
 
+test("Passat CC model query rejects parts and keeps complete vehicles", () => {
+  const query = "PASSAT CC";
+  const wheelLiner = classifyListingIntent(
+    {
+      title: "Carenaj roata mic stanga fata Volkswagen Passat CC facelift 3C8805911D",
+      price: "99 lei",
+      priceRon: 99
+    },
+    query
+  );
+  const floorMats = classifyListingIntent(
+    {
+      title: "Presuri Passat CC",
+      price: "70 lei",
+      priceRon: 70
+    },
+    query
+  );
+  const vehicle = classifyListingIntent(
+    {
+      title: "Vw Passat cc R line 2010 dsg",
+      description: "Autoturism 2.0 TDI, inmatriculat, acte la zi",
+      price: "35 913 lei",
+      priceRon: 35913
+    },
+    query
+  );
+
+  assert.notEqual(wheelLiner.listingType, "main_product");
+  assert.equal(wheelLiner.isRecommendedCandidate, false);
+  assert.ok(wheelLiner.rejectionReasons.includes("irrelevant:price_below_category_floor"));
+  assert.equal(floorMats.listingType, "accessory");
+  assert.equal(floorMats.isRecommendedCandidate, false);
+  assert.equal(vehicle.listingType, "main_product");
+  assert.equal(vehicle.isRecommendedCandidate, true);
+  assert.ok(vehicle.relevanceScore > wheelLiner.relevanceScore);
+});
+
 test("generic car make query rejects parts, toys, and apparel", () => {
   const query = "bmw";
   const vehicle = classifyListingIntent(

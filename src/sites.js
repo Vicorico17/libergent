@@ -118,7 +118,41 @@ const CAR_PART_KEYWORDS = [
   "ulei"
 ];
 
+const CAR_MODEL_PATH_ALIASES = [
+  {
+    patterns: [
+      /\bpassat\s+cc\b/,
+      /\bvw\s+passat\s+cc\b/,
+      /\bvolkswagen\s+passat\s+cc\b/
+    ],
+    slug: "volkswagen-passat-cc"
+  }
+];
+
+function normalizeCarText(value = "") {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getCarModelPathAlias(query) {
+  const normalized = normalizeCarText(query);
+  return CAR_MODEL_PATH_ALIASES.find((alias) =>
+    alias.patterns.some((pattern) => pattern.test(normalized))
+  )?.slug || "";
+}
+
 function slugifyCarPath(query) {
+  const modelAlias = getCarModelPathAlias(query);
+  if (modelAlias) {
+    return modelAlias;
+  }
+
   const tokens = query
     .trim()
     .toLowerCase()
@@ -157,6 +191,7 @@ export function isCarQuery(query = "") {
   const hasMileage = /\b\d{1,3}(?:[ .]\d{3})?\s*km\b/.test(normalized);
   const hasVariantCode = /\b([a-z]\d{1,2}|\d\.\d)\b/.test(normalized);
   const hasCarKeyword = CAR_KEYWORDS.some((keyword) => tokenSet.has(keyword) || joined.includes(keyword));
+  const hasCarModel = Boolean(getCarModelPathAlias(normalized));
 
   const hasCarMake = CAR_MAKES.some((make) => {
     if (make.includes("-")) {
@@ -165,7 +200,7 @@ export function isCarQuery(query = "") {
     return tokenSet.has(make);
   });
 
-  if (hasCarKeyword || hasCarMake || hasMileage) {
+  if (hasCarKeyword || hasCarMake || hasCarModel || hasMileage) {
     return true;
   }
 

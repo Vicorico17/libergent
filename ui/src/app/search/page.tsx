@@ -51,10 +51,6 @@ function formatSearchTime() {
   return new Date().toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })
 }
 
-function formatRon(price: number | null) {
-  return Number.isFinite(price) ? `${Number(price).toLocaleString("ro-RO")} RON` : "Preț n/a"
-}
-
 function formatDateTime(value = "") {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return "în timp real"
@@ -98,7 +94,7 @@ function getAgentScoreExplanation(item: SearchResultItem) {
     reasons.push(`top ${item.rank} în rezultate`)
   }
   if (item.price !== null) {
-    reasons.push(`preț valid: ${formatRon(item.price)}`)
+    reasons.push(`preț valid: ${item.priceLabel}`)
   }
   if (item.condition && item.condition.toLowerCase() !== "necunoscut") {
     reasons.push(`condiție ${item.condition.toLowerCase()}`)
@@ -675,7 +671,7 @@ function ResultCard({ item }: { item: ResultItem }) {
           <div className="mb-3">
             <ListingMetaChips item={item} />
           </div>
-          <p className="text-[14px] font-bold" style={{ color: PINK }}>{formatRon(item.price)}</p>
+          <p className="text-[14px] font-bold" style={{ color: PINK }}>{item.priceLabel}</p>
         </div>
         <div className="flex items-center gap-2 text-[10px] uppercase font-bold pt-3" style={{ borderTop: `1px solid ${INK}22` }}>
           <span>Scor: <span style={{ color: `${INK}66` }}>{item.score}%</span></span>
@@ -782,7 +778,7 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
                 <MetaChip>{item.source}</MetaChip>
                 <MetaChip icon={<MapPin size={10} strokeWidth={2.2} />}>{item.city}</MetaChip>
               </div>
-              <div className="text-[22px] font-bold mb-8" style={{ color: PINK }}>{formatRon(item.price)}</div>
+              <div className="text-[22px] font-bold mb-8" style={{ color: PINK }}>{item.priceLabel}</div>
             </div>
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-4">

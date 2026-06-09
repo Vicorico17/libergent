@@ -67,7 +67,7 @@ function parseCondition(label = "", fallback = "") {
 }
 
 function parsePriceFromLabel(label = "") {
-  const match = cleanText(label).match(/(\d[\d.,\s]*)\s*(Lei|RON|€|EUR)\b/i);
+  const match = cleanText(label).match(/(\d[\d.,\s]*)\s*(Lei|RON|EUR|€)(?:\b|$)/i);
   return match ? `${match[1].trim()} ${match[2]}` : "";
 }
 

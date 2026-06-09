@@ -214,6 +214,59 @@ test("generic car make search surfaces vehicles instead of parts and branded goo
   assert.equal(aggregated.summary.totalListings, 1);
 });
 
+test("Passat CC search surfaces cars and excludes marketplace accessories", () => {
+  const query = "PASSAT CC";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Carenaj roata mic stanga fata Volkswagen Passat CC facelift 3C8805911D",
+        price: "99 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://olx.ro/passat-part"
+      },
+      {
+        title: "Vw Passat cc R line 2010 dsg",
+        price: "35 913 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://olx.ro/passat-car"
+      }
+    ]),
+    makeResult("vinted.ro", query, [
+      {
+        title: "Presuri Passat CC",
+        price: "70 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://vinted.ro/passat-mats"
+      }
+    ]),
+    makeResult("autovit.ro", query, [
+      {
+        title: "Volkswagen Passat CC 2.0 TDI DSG",
+        price: "7 500 EUR",
+        currency: "EUR",
+        condition: "diesel • 2011",
+        postedAt: "Azi",
+        url: "https://autovit.ro/passat-car"
+      }
+    ])
+  ]);
+
+  const urls = aggregated.results.flatMap((result) => result.items.map((item) => item.url));
+  const autovitListing = aggregated.results
+    .find((result) => result.site === "autovit.ro")
+    ?.items.find((item) => item.url === "https://autovit.ro/passat-car");
+
+  assert.deepEqual(urls.sort(), ["https://autovit.ro/passat-car", "https://olx.ro/passat-car"].sort());
+  assert.notEqual(aggregated.bestOffer?.url, "https://olx.ro/passat-part");
+  assert.notEqual(aggregated.bestOffer?.url, "https://vinted.ro/passat-mats");
+  assert.equal(autovitListing?.price, "7 500 EUR");
+  assert.equal(autovitListing?.priceRon, 37500);
+  assert.equal(aggregated.summary.totalListings, 2);
+});
+
 test("vehicle part search surfaces tire listings instead of complete vehicles", () => {
   const query = "anvelope audi";
   const aggregated = aggregateMarketplaceResults([

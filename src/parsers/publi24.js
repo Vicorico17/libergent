@@ -50,7 +50,7 @@ function parsePrice(block) {
   const priceBlock = block.match(/<span[^>]+class="[^"]*\barticle-price\b[^"]*"[^>]*>([\s\S]*?)<\/span>\s*(?:<\/span>)?/i)?.[1] || "";
   const newPrice = priceBlock.match(/<span[^>]+class="[^"]*\bnew-price\b[^"]*"[^>]*>([\s\S]*?)<\/span>/i)?.[1];
   const rawPrice = stripTags(newPrice || priceBlock);
-  const match = rawPrice.match(/(\d[\d.,\s]*)\s*(RON|Lei|EUR|€)\b/i);
+  const match = rawPrice.match(/(\d[\d.,\s]*)\s*(RON|Lei|EUR|€)(?:\b|$)/i);
   return match ? `${match[1].trim()} ${match[2]}` : rawPrice;
 }
 

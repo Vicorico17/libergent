@@ -1,6 +1,9 @@
 export type ApiListing = {
   title?: string;
+  price?: number | string | null;
   priceRon?: number | string | null;
+  numericPrice?: number | string | null;
+  currency?: string | null;
   site?: string;
   condition?: string;
   location?: string;
@@ -39,6 +42,7 @@ export type SearchResultItem = {
   id: string;
   title: string;
   price: number | null;
+  priceLabel: string;
   source: string;
   city: string;
   condition: string;
@@ -97,12 +101,13 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
   const url = item.url?.trim();
   const images = pickListingImages(item);
   const score = pickRecommendationScore(item);
-  const priceRon = parseApiNumber(item.priceRon);
+  const priceRon = getPriceRon(item);
 
   return {
     id: url || `${idPrefix || platform}-${index}-${item.title || "listing"}`,
     title: item.title || "Anunț fără titlu",
-    price: Number.isFinite(priceRon) ? Number(priceRon) : null,
+    price: isFiniteNumber(priceRon) ? priceRon : null,
+    priceLabel: formatPriceLabel(item, priceRon),
     source: platform,
     city: item.location || "România",
     condition: normalizeCondition(item.condition),
@@ -114,6 +119,78 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     rank: typeof item.rank === "number" && Number.isFinite(item.rank) ? item.rank : undefined,
     score,
   };
+}
+
+function normalizeCurrency(value: number | string | null | undefined, priceText = "") {
+  const raw = String(value || "").trim().toUpperCase();
+  const text = priceText.toLowerCase();
+  if (raw === "LEI" || raw === "LEU" || raw === "RON" || text.includes("lei") || text.includes("ron")) {
+    return "RON";
+  }
+  if (raw === "€" || raw === "EUR" || text.includes("€") || text.includes("eur")) {
+    return "EUR";
+  }
+  return raw || null;
+}
+
+function formatNumber(value: number) {
+  return Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 2 });
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function getRawPriceText(item: ApiListing) {
+  if (typeof item.price === "string" && item.price.trim()) {
+    return item.price.trim();
+  }
+  if (typeof item.price === "number" && Number.isFinite(item.price)) {
+    return formatNumber(item.price);
+  }
+  return "";
+}
+
+function getPriceRon(item: ApiListing) {
+  const explicitPriceRon = parseApiNumber(item.priceRon);
+  if (isFiniteNumber(explicitPriceRon)) {
+    return explicitPriceRon;
+  }
+
+  const rawPrice = getRawPriceText(item);
+  const currency = normalizeCurrency(item.currency, rawPrice);
+  const numericPrice = parseApiNumber(item.numericPrice) ?? parseApiNumber(rawPrice);
+
+  if (!isFiniteNumber(numericPrice)) {
+    return null;
+  }
+  if (currency === "RON") {
+    return numericPrice;
+  }
+  if (currency === "EUR") {
+    return numericPrice * 5;
+  }
+  return null;
+}
+
+function formatPriceLabel(item: ApiListing, priceRon: number | null) {
+  const rawPrice = getRawPriceText(item);
+  const currency = normalizeCurrency(item.currency, rawPrice);
+  const numericPrice = parseApiNumber(item.numericPrice) ?? parseApiNumber(rawPrice);
+
+  if (rawPrice && (currency === "EUR" || /€|eur/i.test(rawPrice))) {
+    return rawPrice;
+  }
+  if (currency === "EUR" && isFiniteNumber(numericPrice)) {
+    return `${formatNumber(numericPrice)} EUR`;
+  }
+  if (isFiniteNumber(priceRon)) {
+    return `${formatNumber(priceRon)} RON`;
+  }
+  if (rawPrice) {
+    return rawPrice;
+  }
+  return "Preț n/a";
 }
 
 function parseApiNumber(value: number | string | null | undefined) {

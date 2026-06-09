@@ -228,6 +228,47 @@ const VEHICLE_PART_HEADS = [
   "stopuri"
 ];
 
+const VEHICLE_PART_EXCLUSION_HEADS = [
+  ...VEHICLE_PART_HEADS,
+  "airbag",
+  "airbaguri",
+  "blocator",
+  "buton",
+  "butoane",
+  "carenaj",
+  "ceasuri",
+  "clima",
+  "compresor",
+  "conducta",
+  "cotiera",
+  "deflector",
+  "eleron",
+  "emblema",
+  "haion",
+  "intercooler",
+  "lampa",
+  "lampi",
+  "led",
+  "maner",
+  "manere",
+  "manson",
+  "navigatie",
+  "nuca",
+  "padele",
+  "panou",
+  "plafon",
+  "radio",
+  "schimbator",
+  "suporti",
+  "tavita",
+  "tavite",
+  "teava",
+  "tubulatura",
+  "turbina",
+  "vas",
+  "volan"
+];
+
 const VEHICLE_NON_VEHICLE_TERMS = [
   "adidasi",
   "altaya",
@@ -258,12 +299,18 @@ const VEHICLE_NON_VEHICLE_TERMS = [
 ];
 
 const VEHICLE_ACCESSORY_HEADS = [
+  "bari transversale",
   "covoare",
   "covoras",
   "covorase",
+  "pres",
   "presuri",
+  "suport",
   "suport telefon",
-  "suport telefoane"
+  "suport telefoane",
+  "suporturi",
+  "tavita",
+  "tavite"
 ];
 
 const SPARE_PART_HEADS = [
@@ -325,7 +372,14 @@ const PRODUCT_TAXONOMY = {
     aliases: ["jeep compass"],
     tokens: ["jeep", "compass"],
     accessories: [...VEHICLE_ACCESSORY_HEADS, "husa", "huse", "jante", "anvelope", "cauciucuri"],
-    parts: VEHICLE_PART_HEADS
+    parts: VEHICLE_PART_EXCLUSION_HEADS
+  },
+  passat_cc: {
+    category: "vehicle",
+    aliases: ["passat cc", "vw passat cc", "volkswagen passat cc"],
+    tokens: ["passat", "cc"],
+    accessories: [...VEHICLE_ACCESSORY_HEADS, "husa", "huse", "bare", "portbagaj"],
+    parts: VEHICLE_PART_EXCLUSION_HEADS
   },
   table_tennis_table: {
     category: "sport",
@@ -501,6 +555,11 @@ const QUERY_ALIASES = [
     tokens: PRODUCT_TAXONOMY.jeep_compass.tokens
   },
   {
+    category: "vehicle",
+    patterns: PRODUCT_TAXONOMY.passat_cc.aliases,
+    tokens: PRODUCT_TAXONOMY.passat_cc.tokens
+  },
+  {
     category: "sport",
     patterns: PRODUCT_TAXONOMY.table_tennis_table.aliases,
     tokens: PRODUCT_TAXONOMY.table_tennis_table.tokens
@@ -586,9 +645,8 @@ const CATEGORY_EXCLUSIONS = {
     ...PRODUCT_TAXONOMY.trumpet.accessories
   ],
   vehicle: [
-    ...PRODUCT_TAXONOMY.jeep_compass.accessories,
-    ...PRODUCT_TAXONOMY.jeep_compass.parts,
-    ...VEHICLE_PART_HEADS,
+    ...VEHICLE_ACCESSORY_HEADS,
+    ...VEHICLE_PART_EXCLUSION_HEADS,
     ...VEHICLE_NON_VEHICLE_TERMS,
     "bot complet",
     "fata completa"
@@ -864,6 +922,9 @@ function getQueryProfile(query) {
   }
   for (const token of brandTerms) {
     expandedTokens.add(token);
+  }
+  if (taxonomy?.category) {
+    categories.add(taxonomy.category);
   }
   if (hasVehicleBrand) {
     categories.add("vehicle");
