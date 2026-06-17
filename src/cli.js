@@ -5,15 +5,15 @@ import path from "node:path";
 import { loadEnv } from "./env.js";
 import { searchAcrossSites } from "./app.js";
 import { getSite, getSiteKeysForAllSearch, SITES } from "./sites.js";
-import { runSearch } from "./search.js";
 import { formatRon } from "./normalize.js";
+import { SEARCH_PROVIDERS, normalizeSearchProvider } from "./provider-options.js";
 
 function printHelp() {
   console.log(`libergent
 
 Usage:
-  node src/cli.js search --site <site> --query "<text>" [--provider auto|direct] [--limit 150] [--pages 3] [--out results/file.json]
-  node src/cli.js search --site all --query "<text>" [--provider auto|direct] [--limit 150] [--pages 3] [--out results/file.json]
+  node src/cli.js search --site <site> --query "<text>" [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 150] [--pages 3] [--out results/file.json]
+  node src/cli.js search --site all --query "<text>" [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 150] [--pages 3] [--out results/file.json]
   npm run search:live -- --query "<text>"
 
 Supported sites:
@@ -261,7 +261,7 @@ async function main() {
 
   const siteArg = args.site;
   const query = args.query;
-  const provider = args.provider || "auto";
+  const provider = normalizeSearchProvider(args.provider || "auto");
   const limit = Number.parseInt(args.limit || "150", 10);
   const maxPages = Number.parseInt(args.pages || "3", 10);
 
@@ -271,9 +271,6 @@ async function main() {
   if (!query) {
     throw new Error("Missing --query");
   }
-  if (!["auto", "direct"].includes(provider)) {
-    throw new Error(`Unsupported provider "${provider}"`);
-  }
   if (!Number.isFinite(limit) || limit <= 0) {
     throw new Error("Expected --limit to be a positive integer");
   }
@@ -281,24 +278,17 @@ async function main() {
     throw new Error("Expected --pages to be a positive integer");
   }
 
-  const siteKeys = siteArg === "all" ? getSiteKeysForAllSearch(query) : [siteArg];
-  const payload =
-    siteArg === "all"
-      ? await searchAcrossSites({ query, provider, limit, maxPages, siteKeys })
-      : await (async () => {
-          const site = getSite(siteKeys[0]);
-          try {
-            return { ok: true, ...(await runSearch({ provider, site, query, limit, maxPages })) };
-          } catch (error) {
-            return {
-              ok: false,
-              site: siteKeys[0],
-              query,
-              provider,
-              error: error instanceof Error ? error.message : String(error)
-            };
-          }
-        })();
+  const siteKeys = siteArg === "all" ? getSiteKeysForAllSearch(query) : [getSite(siteArg).key];
+  const aggregatePayload = await searchAcrossSites({ query, provider, limit, maxPages, siteKeys });
+  const payload = siteArg === "all"
+    ? aggregatePayload
+    : aggregatePayload.results?.[0] || {
+        ok: false,
+        site: siteKeys[0],
+        query,
+        provider,
+        error: "Marketplace search did not return a result."
+      };
   const outputPayload = shapeCliPayload(payload, siteArg);
   const output = JSON.stringify(outputPayload, null, 2);
   const pretty = args.pretty || args.format === "pretty";

@@ -10,6 +10,10 @@ import { parseAutovitHtml } from "./parsers/autovit.js";
 import { getQueryBrandTerms } from "./relevance.js";
 import { buildAbortSignal } from "./abort.js";
 import { normalizeMarketplaceQuery } from "./query-normalization.js";
+import { normalizeSearchProvider } from "./provider-options.js";
+
+const DESKTOP_BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+const MOBILE_BROWSER_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
 function tokenize(value = "") {
   return value
@@ -118,21 +122,73 @@ function filterRelevantItems(items, query) {
   });
 }
 
-async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
-  const response = await fetch(url, {
-    signal: buildAbortSignal({ timeoutMs, signal }),
-    headers: {
-      "user-agent": "Mozilla/5.0 (compatible; libergent/0.1; +https://localhost)",
-      accept: "text/html,application/xhtml+xml"
-    },
-    redirect: "follow"
-  });
+function getDirectFetchHeaderProfiles(url) {
+  const origin = new URL(url).origin;
+  const commonHeaders = {
+    accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "accept-language": "ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7",
+    "cache-control": "no-cache",
+    pragma: "no-cache",
+    "upgrade-insecure-requests": "1"
+  };
 
-  if (!response.ok) {
-    throw new Error(`Direct fetch failed (${response.status}) for ${url}`);
+  return [
+    {
+      ...commonHeaders,
+      "user-agent": DESKTOP_BROWSER_USER_AGENT,
+      referer: `${origin}/`,
+      "sec-fetch-dest": "document",
+      "sec-fetch-mode": "navigate",
+      "sec-fetch-site": "same-origin",
+      "sec-fetch-user": "?1"
+    },
+    {
+      ...commonHeaders,
+      "user-agent": MOBILE_BROWSER_USER_AGENT,
+      referer: "https://www.google.com/",
+      "sec-fetch-dest": "document",
+      "sec-fetch-mode": "navigate",
+      "sec-fetch-site": "cross-site",
+      "sec-fetch-user": "?1"
+    }
+  ];
+}
+
+function shouldRetryDirectFetchStatus(status) {
+  return [403, 406, 408, 425, 429, 500, 502, 503, 504].includes(status);
+}
+
+async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
+  const headerProfiles = getDirectFetchHeaderProfiles(url);
+  let lastError = null;
+
+  for (const [index, headers] of headerProfiles.entries()) {
+    let response;
+    try {
+      response = await fetch(url, {
+        signal: buildAbortSignal({ timeoutMs, signal }),
+        headers,
+        redirect: "follow"
+      });
+    } catch (error) {
+      lastError = error;
+      if (signal?.aborted || index === headerProfiles.length - 1) {
+        throw error;
+      }
+      continue;
+    }
+
+    if (response.ok) {
+      return response.text();
+    }
+
+    lastError = new Error(`Direct fetch failed (${response.status}) for ${url}`);
+    if (!shouldRetryDirectFetchStatus(response.status) || index === headerProfiles.length - 1) {
+      throw lastError;
+    }
   }
 
-  return response.text();
+  throw lastError || new Error(`Direct fetch failed for ${url}`);
 }
 
 function dedupeItems(items) {
@@ -153,6 +209,13 @@ function dedupeItems(items) {
 
 function getRawItemCount(parsed, items) {
   return Number.isFinite(parsed.rawItemCount) ? parsed.rawItemCount : items.length;
+}
+
+function resolveProvider(provider, site) {
+  const normalizedProvider = normalizeSearchProvider(provider);
+  return normalizedProvider === "auto"
+    ? normalizeSearchProvider(site.provider || "direct")
+    : normalizedProvider;
 }
 
 function extractCloudflareCrawlItems(raw) {
@@ -176,7 +239,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
   const url = typeof site.pagedSearchUrl === "function" ? site.pagedSearchUrl(query, page) : site.searchUrl(query);
   const schema = buildListingSchema(limit);
   const prompt = site.prompt(query, limit);
-  const resolvedProvider = provider === "auto" ? site.provider : provider;
+  const resolvedProvider = resolveProvider(provider, site);
 
   let raw;
   let items;
@@ -184,15 +247,11 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
   let rawItemCount = 0;
   let hasNextPage = null;
 
-  if (resolvedProvider === "cloudflare" && site.strategy === "crawl-seed") {
-    raw = await crawlWithCloudflare({
-      crawlConfig: site.crawlConfig(query),
-      schema,
-      timeoutMs: site.timeoutMs,
-      signal
-    });
-    items = extractCloudflareCrawlItems(raw);
-  } else if (site.strategy === "direct-html-local") {
+  if (resolvedProvider === "direct") {
+    if (site.strategy !== "direct-html-local") {
+      throw new Error(`Direct provider is not configured for ${site.key}`);
+    }
+
     raw = await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs, signal });
 
     if (site.key === "lajumate.ro") {
@@ -234,10 +293,18 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
     } else {
       throw new Error(`No direct HTML parser configured for ${site.key}`);
     }
+  } else if (resolvedProvider === "cloudflare" && site.strategy === "crawl-seed") {
+    raw = await crawlWithCloudflare({
+      crawlConfig: site.crawlConfig(query),
+      schema,
+      timeoutMs: site.timeoutMs,
+      signal
+    });
+    items = extractCloudflareCrawlItems(raw);
   } else if (resolvedProvider === "cloudflare") {
     raw = await scrapeWithCloudflare({ url, prompt, schema, timeoutMs: site.timeoutMs, signal });
     items = Array.isArray(raw?.items) ? raw.items : [];
-  } else if (site.strategy === "firecrawl-markdown-local") {
+  } else if (resolvedProvider === "firecrawl" && site.strategy === "firecrawl-markdown-local") {
     raw = await scrapeMarkdownWithFirecrawl({
       url,
       waitForMs: site.waitForMs,
@@ -250,7 +317,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
     totalResults = parsed.totalResults;
     rawItemCount = getRawItemCount(parsed, items);
     hasNextPage = parsed.hasNextPage ?? null;
-  } else {
+  } else if (resolvedProvider === "firecrawl") {
     raw = await scrapeWithFirecrawl({
       url,
       prompt,
@@ -260,6 +327,8 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
       signal
     });
     items = Array.isArray(raw?.items) ? raw.items : [];
+  } else {
+    throw new Error(`Unsupported provider "${resolvedProvider}"`);
   }
 
   const unfilteredItems = items;
@@ -267,7 +336,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
   if (site.key === "autovit.ro" && items.length === 0 && unfilteredItems.length > 0) {
     items = unfilteredItems.slice(0, limit);
   }
-  rawItemCount = rawItemCount || items.length;
+  rawItemCount = rawItemCount || unfilteredItems.length || items.length;
 
   return {
     provider: resolvedProvider,
@@ -313,9 +382,10 @@ function shouldStopAfterPage(pageResult, nextItems, currentItems, pageSize) {
 
 export async function runSearch({ provider, site, query, limit, maxPages, signal }) {
   const marketplaceQuery = normalizeMarketplaceQuery(query);
+  const requestedProvider = normalizeSearchProvider(provider);
 
   if (site.strategy === "crawl-seed") {
-    const result = await runSinglePageSearch({ provider, site, query: marketplaceQuery, limit, page: 1, signal });
+    const result = await runSinglePageSearch({ provider: requestedProvider, site, query: marketplaceQuery, limit, page: 1, signal });
     return {
       ...result,
       pagesUsed: 1,
@@ -328,7 +398,7 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
   const cappedMaxPages = Math.min(maxPages ?? site.defaultMaxPages ?? site.maxPages ?? 1, site.maxPages ?? 1);
 
   const firstPage = await runSinglePageSearch({
-    provider,
+    provider: requestedProvider,
     site,
     query: marketplaceQuery,
     limit: Math.min(pageSize, effectiveLimit),
@@ -352,7 +422,7 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
     let pageResult;
     try {
       pageResult = await runSinglePageSearch({
-        provider,
+        provider: requestedProvider,
         site,
         query: marketplaceQuery,
         limit: Math.min(pageSize, effectiveLimit),
@@ -389,12 +459,15 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
   }
 
   return {
-    provider: results[0]?.provider ?? (provider === "auto" ? site.provider : provider),
+    provider: results[0]?.provider ?? resolveProvider(requestedProvider, site),
     strategy: `${site.strategy}:${results.length}-pages`,
     site: site.key,
     url: site.searchUrl(marketplaceQuery),
     query: marketplaceQuery,
     itemCount: items.length,
+    rawItemCount: results.reduce((sum, result) => sum + (
+      Number.isFinite(result.rawItemCount) ? result.rawItemCount : result.itemCount || 0
+    ), 0),
     items,
     totalResults: results[0]?.totalResults ?? null,
     pagesUsed: results.length,

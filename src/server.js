@@ -210,7 +210,11 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, payload);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const statusCode = message.startsWith("Expected ") || message.startsWith("Unsupported site") ? 400 : 500;
+      const statusCode = message.startsWith("Expected ") ||
+        message.startsWith("Unsupported site") ||
+        message.startsWith("Unsupported provider")
+        ? 400
+        : 500;
       sendJson(res, statusCode, { error: message });
     }
     return;

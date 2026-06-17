@@ -214,7 +214,11 @@ async function handleApi(request, env) {
       return json(payload, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const statusCode = message.startsWith("Expected ") || message.startsWith("Unsupported site") ? 400 : 500;
+      const statusCode = message.startsWith("Expected ") ||
+        message.startsWith("Unsupported site") ||
+        message.startsWith("Unsupported provider")
+        ? 400
+        : 500;
       return json({ error: message }, statusCode);
     }
   }

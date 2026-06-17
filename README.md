@@ -124,7 +124,7 @@ cd /Users/alex/libergent
 cp .env.example .env
 ```
 
-Normal search now uses direct scraping and does not require Firecrawl. Add provider keys only if you want to run explicit fallback providers:
+Normal search now uses direct scraping and does not require Firecrawl or Cloudflare. Add provider keys if you want `provider=auto` to escalate blocked or blank direct marketplace searches to remote rendering, or if you want to run those providers explicitly:
 
 ```bash
 FIRECRAWL_API_KEY=fc-your-key
@@ -227,6 +227,7 @@ The `search:live` command:
 - disables mock mode for that run
 - searches all marketplaces
 - uses one page per marketplace with site-specific default limits
+- tries direct browser-like fetch profiles first, then configured remote providers when `provider=auto` cannot get listings
 - prints a readable report with offers from each marketplace
 - prints one recommended `bestOffer` across all marketplaces
 

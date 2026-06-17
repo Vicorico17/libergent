@@ -2,6 +2,11 @@ import { getDefaultSiteKeys, getSite } from "./sites.js";
 import { runSearch } from "./search.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildMockSearchResult } from "./mock.js";
+import {
+  REMOTE_PROVIDER_FALLBACK_ORDER,
+  isProviderConfigured,
+  normalizeSearchProvider
+} from "./provider-options.js";
 
 const MAX_CREDITS_PER_SITE = 3;
 const DEFAULT_SITE_TIMEOUT_MS = 20000;
@@ -26,10 +31,6 @@ function isCloudflareWorkerRuntime() {
 
 function isMockSearchEnabled() {
   return process.env.LIBERGENT_MOCK_SEARCH === "1";
-}
-
-function normalizeProvider(provider) {
-  return provider === "auto" ? "auto" : "direct";
 }
 
 function delay(ms) {
@@ -84,6 +85,31 @@ function getCreditsPerPage(site, provider) {
   return Math.max(1, site.estimatedCreditsPerPage || 0);
 }
 
+function supportsDirectProvider(site) {
+  return site.strategy === "direct-html-local";
+}
+
+function getProviderCandidates(site, requestedProvider) {
+  if (requestedProvider !== "auto") {
+    return [requestedProvider];
+  }
+
+  const primaryProvider = normalizeSearchProvider(site.provider || "direct");
+  const candidates = [primaryProvider];
+
+  if (primaryProvider !== "direct" && supportsDirectProvider(site)) {
+    candidates.push("direct");
+  }
+
+  for (const fallbackProvider of REMOTE_PROVIDER_FALLBACK_ORDER) {
+    if (!candidates.includes(fallbackProvider) && isProviderConfigured(fallbackProvider)) {
+      candidates.push(fallbackProvider);
+    }
+  }
+
+  return candidates;
+}
+
 function getMaxAffordablePages(site, provider) {
   const creditsPerPage = getCreditsPerPage(site, provider);
   const siteMaxPages = site.maxPages ?? site.defaultMaxPages ?? 1;
@@ -129,7 +155,7 @@ function getDefaultLimit(site, pages, provider) {
 
 async function searchSiteOnce({ siteKey, query, condition, provider, limit, maxPages, attempt }) {
   let site;
-  let searchProvider = normalizeProvider(provider);
+  let searchProvider = normalizeSearchProvider(provider);
   let resolvedProvider = searchProvider;
 
   try {
@@ -175,10 +201,41 @@ function isRetryableResult(result) {
     return !/Missing environment variables|Unsupported site/i.test(result.error || "");
   }
 
-  return result.itemCount === 0 && (result.rawItemCount || 0) === 0 && result.totalResults !== 0;
+  const rawItemCount = Number.isFinite(result.rawItemCount) ? result.rawItemCount : result.itemCount || 0;
+  return result.itemCount === 0 && rawItemCount === 0 && result.totalResults !== 0;
 }
 
-async function searchSite({ siteKey, query, condition, provider, limit, maxPages }) {
+function shouldTryNextProvider(result, providerIndex, providerCandidates, requestedProvider) {
+  if (requestedProvider !== "auto" || providerIndex >= providerCandidates.length - 1) {
+    return false;
+  }
+
+  if (!result.ok) {
+    return !/Unsupported site|Unsupported provider/i.test(result.error || "");
+  }
+
+  const rawItemCount = Number.isFinite(result.rawItemCount) ? result.rawItemCount : result.itemCount || 0;
+  return result.itemCount === 0 && rawItemCount === 0;
+}
+
+function buildProviderFallbackEntry(result) {
+  return {
+    provider: result.provider,
+    ok: result.ok,
+    attempts: result.attempts,
+    itemCount: result.ok ? result.itemCount : 0,
+    rawItemCount: result.ok ? result.rawItemCount ?? null : null,
+    reason: result.ok ? "empty response" : result.error
+  };
+}
+
+function attachProviderFallbacks(result, providerFallbacks) {
+  return providerFallbacks.length
+    ? { ...result, providerFallbacks }
+    : result;
+}
+
+async function searchSiteWithProvider({ siteKey, query, condition, provider, limit, maxPages }) {
   const errors = [];
 
   for (let attempt = 1; attempt <= SITE_SEARCH_ATTEMPTS; attempt += 1) {
@@ -205,6 +262,56 @@ async function searchSite({ siteKey, query, condition, provider, limit, maxPages
     attempts: SITE_SEARCH_ATTEMPTS,
     error: "Marketplace search did not complete."
   });
+}
+
+async function searchSite({ siteKey, query, condition, provider, limit, maxPages }) {
+  let site;
+  let requestedProvider;
+
+  try {
+    site = getSite(siteKey);
+    requestedProvider = normalizeSearchProvider(provider);
+  } catch (error) {
+    return buildSiteFailureResult({
+      siteKey,
+      query,
+      condition,
+      provider,
+      attempts: SITE_SEARCH_ATTEMPTS,
+      error
+    });
+  }
+
+  const providerCandidates = getProviderCandidates(site, requestedProvider);
+  const providerFallbacks = [];
+  let lastResult = null;
+
+  for (const [providerIndex, providerCandidate] of providerCandidates.entries()) {
+    const result = await searchSiteWithProvider({
+      siteKey,
+      query,
+      condition,
+      provider: providerCandidate,
+      limit,
+      maxPages
+    });
+
+    lastResult = result;
+    if (!shouldTryNextProvider(result, providerIndex, providerCandidates, requestedProvider)) {
+      return attachProviderFallbacks(result, providerFallbacks);
+    }
+
+    providerFallbacks.push(buildProviderFallbackEntry(result));
+  }
+
+  return attachProviderFallbacks(lastResult || buildSiteFailureResult({
+    siteKey,
+    query,
+    condition,
+    provider: requestedProvider,
+    attempts: SITE_SEARCH_ATTEMPTS,
+    error: "Marketplace search did not complete."
+  }), providerFallbacks);
 }
 
 async function settleWithConcurrency(items, concurrency, mapper) {
@@ -261,8 +368,9 @@ export async function searchAcrossSites({
   maxPages,
   siteKeys = getDefaultSiteKeys()
 }) {
+  const requestedProvider = normalizeSearchProvider(provider);
   const orderedSiteKeys = [...new Set(siteKeys)].sort((a, b) => getSite(a).priority - getSite(b).priority);
-  const creditBudget = getCreditBudget(orderedSiteKeys, provider);
+  const creditBudget = getCreditBudget(orderedSiteKeys, requestedProvider);
 
   if (isMockSearchEnabled()) {
     return aggregateMarketplaceResults(
@@ -281,7 +389,7 @@ export async function searchAcrossSites({
     orderedSiteKeys,
     query,
     condition,
-    provider,
+    provider: requestedProvider,
     limit,
     maxPages
   });
