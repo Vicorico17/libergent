@@ -198,6 +198,10 @@ async function searchSiteOnce({ siteKey, query, condition, provider, limit, maxP
 
 function isRetryableResult(result) {
   if (!result.ok) {
+    if (/Cloudflare challenge/i.test(result.error || "")) {
+      return false;
+    }
+
     return !/Missing environment variables|Unsupported site/i.test(result.error || "");
   }
 

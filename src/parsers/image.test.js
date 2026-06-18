@@ -62,6 +62,32 @@ test("parseOlxHtml keeps image when card uses lazy-loaded img attributes", () =>
   assert.equal(parsed.items[1].imageUrl, "https://images.olxcdn.com/item2-800.webp");
 });
 
+test("parseOlxHtml infers RON currency for bare numeric OLX prices", () => {
+  const html = `
+    <div data-cy="l-card" data-testid="l-card">
+      <a href="/d/oferta/test-price">
+        <h4>Telefon Apple iPhone</h4>
+      </a>
+      <p data-testid="ad-price">849</p>
+      <p data-testid="location-date">Timisoara - Azi</p>
+    </div>
+    <div data-cy="l-card" data-testid="l-card">
+      <a href="/d/oferta/test-swap">
+        <h4>Schimb iPhone</h4>
+      </a>
+      <p data-testid="ad-price">Schimb</p>
+      <p data-testid="location-date">Bucuresti - Azi</p>
+    </div>
+  `;
+
+  const parsed = parseOlxHtml(html, 5);
+  assert.equal(parsed.items.length, 2);
+  assert.equal(parsed.items[0].price, "849");
+  assert.equal(parsed.items[0].currency, "lei");
+  assert.equal(parsed.items[1].price, "Schimb");
+  assert.equal(parsed.items[1].currency, "");
+});
+
 test("parseOlxHtml recovers OLX images from embedded config when card has no thumbnail", () => {
   const html = String.raw`
     <script id="olx-init-config">

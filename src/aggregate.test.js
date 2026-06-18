@@ -124,6 +124,43 @@ test("does not surface recommendations when critical random tokens are missing",
   assert.equal(aggregated.bestOffer, null);
 });
 
+test("preserves parsed and filtered listing counts after aggregation", () => {
+  const query = "bmw";
+  const aggregated = aggregateMarketplaceResults([
+    {
+      ...makeResult("olx.ro", query, [
+        {
+          title: "BMW Seria 3 320d 2015",
+          price: "35000 lei",
+          condition: "folosit",
+          postedAt: "Azi",
+          url: "https://olx.ro/bmw-car"
+        },
+        {
+          title: "Caseta Directie Bmw E65/E66 Volan Stanga",
+          price: "800 lei",
+          condition: "folosit",
+          postedAt: "Azi",
+          url: "https://olx.ro/bmw-part"
+        }
+      ]),
+      rawItemCount: 8
+    }
+  ]);
+
+  const [result] = aggregated.results;
+  assert.equal(result.rawItemCount, 8);
+  assert.equal(result.parsedItemCount, 8);
+  assert.equal(result.matchedItemCount, 2);
+  assert.equal(result.includedItemCount, 1);
+  assert.equal(result.excludedItemCount, 1);
+  assert.equal(aggregated.summary.parsedListings, 8);
+  assert.equal(aggregated.summary.matchedListings, 2);
+  assert.equal(aggregated.summary.includedListings, 1);
+  assert.equal(aggregated.summary.excludedListings, 1);
+  assert.equal(aggregated.summary.totalListings, 1);
+});
+
 test("surfaces matching accessories for accessory searches", () => {
   const query = "husa iphone";
   const aggregated = aggregateMarketplaceResults([

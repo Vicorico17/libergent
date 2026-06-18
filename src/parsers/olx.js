@@ -127,6 +127,16 @@ function parsePrice(line = "") {
   return match ? `${match[1].trim()} ${match[2] || ""}`.trim() : line.trim();
 }
 
+function inferOlxCurrency(price = "") {
+  if (/€|eur/i.test(price)) {
+    return "EUR";
+  }
+  if (/\blei\b|\bron\b/i.test(price) || /\d/.test(price)) {
+    return "lei";
+  }
+  return "";
+}
+
 function parseTotalResults(markdown) {
   const match = markdown.match(/Am găsit\s+([\d. ]+)\s+rezultate/i);
   if (!match) {
@@ -205,7 +215,7 @@ function parseListingCard(card, getEmbeddedImages = () => new Map()) {
   return {
     title,
     price,
-    currency: /€|eur/i.test(price) ? "EUR" : /\blei\b/i.test(price) ? "lei" : "",
+    currency: inferOlxCurrency(price),
     location,
     postedAt,
     condition: stripTags(conditionMatch?.[1] || ""),

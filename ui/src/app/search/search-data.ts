@@ -23,6 +23,11 @@ export type ApiResult = {
   ok: boolean;
   site?: string;
   items?: ApiListing[];
+  rawItemCount?: number;
+  parsedItemCount?: number;
+  matchedItemCount?: number;
+  includedItemCount?: number;
+  excludedItemCount?: number;
   error?: string;
 };
 
@@ -33,6 +38,12 @@ export type SearchPayload = {
     searchedAt?: string;
     marketplaces?: number;
     successfulMarketplaces?: number;
+    parsedListings?: number;
+    matchedListings?: number;
+    includedListings?: number;
+    excludedListings?: number;
+    blockedMarketplaces?: string[];
+    failedMarketplaces?: Array<{ site?: string; provider?: string; error?: string }>;
     bestOffer?: ApiListing | null;
   };
   error?: string;

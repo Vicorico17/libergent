@@ -158,6 +158,18 @@ function shouldRetryDirectFetchStatus(status) {
   return [403, 406, 408, 425, 429, 500, 502, 503, 504].includes(status);
 }
 
+function isCloudflareChallengeResponse(response) {
+  return response.headers.get("cf-mitigated")?.toLowerCase() === "challenge";
+}
+
+function buildDirectFetchError(response, url) {
+  if (isCloudflareChallengeResponse(response)) {
+    return new Error(`Direct fetch blocked by Cloudflare challenge (${response.status}) for ${url}`);
+  }
+
+  return new Error(`Direct fetch failed (${response.status}) for ${url}`);
+}
+
 async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
   const headerProfiles = getDirectFetchHeaderProfiles(url);
   let lastError = null;
@@ -182,7 +194,10 @@ async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
       return response.text();
     }
 
-    lastError = new Error(`Direct fetch failed (${response.status}) for ${url}`);
+    lastError = buildDirectFetchError(response, url);
+    if (isCloudflareChallengeResponse(response)) {
+      throw lastError;
+    }
     if (!shouldRetryDirectFetchStatus(response.status) || index === headerProfiles.length - 1) {
       throw lastError;
     }

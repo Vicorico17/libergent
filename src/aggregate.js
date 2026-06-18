@@ -341,12 +341,30 @@ function splitClassifiedItems(items) {
   };
 }
 
+function isBlockedMarketplaceResult(result) {
+  const messages = [
+    result?.error,
+    ...(Array.isArray(result?.previousErrors) ? result.previousErrors : []),
+    ...(Array.isArray(result?.providerFallbacks)
+      ? result.providerFallbacks.map((fallback) => fallback?.reason)
+      : [])
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return /cloudflare challenge|anti-bot|blocked/i.test(messages);
+}
+
 export function aggregateMarketplaceResults(results, { condition = "any", creditBudget = null, creditsUsed = null } = {}) {
   const normalizedResults = results.map((result) => {
     if (!result.ok) {
       return result;
     }
 
+    const parsedItemCount = Number.isFinite(result.rawItemCount)
+      ? result.rawItemCount
+      : result.itemCount ?? result.items.length;
+    const matchedItemCount = result.itemCount ?? result.items.length;
     const classifiedItems = sortItemsByFreshness(
       result.items
         .map(normalizeListing)
@@ -384,7 +402,10 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
 
     return {
       ...result,
-      rawItemCount: result.itemCount,
+      rawItemCount: parsedItemCount,
+      parsedItemCount,
+      matchedItemCount,
+      includedItemCount: scoredItems.length,
       itemCount: scoredItems.length,
       items: scoredItems,
       relatedAccessories,
@@ -446,6 +467,12 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   });
   const bestOffer = rankedCandidates[0] || null;
   const recommendedOffers = pickTopRecommendationsByMarketplace(rankedCandidates);
+  const successfulResults = normalizedResults.filter((result) => result.ok);
+  const failedResults = normalizedResults.filter((result) => !result.ok);
+  const parsedListings = successfulResults.reduce((sum, result) => sum + (result.parsedItemCount ?? result.rawItemCount ?? 0), 0);
+  const matchedListings = successfulResults.reduce((sum, result) => sum + (result.matchedItemCount ?? result.itemCount ?? 0), 0);
+  const includedListings = successfulResults.reduce((sum, result) => sum + result.items.length, 0);
+  const excludedListings = successfulResults.reduce((sum, result) => sum + (result.excludedItemCount || 0), 0);
 
   return {
     results: rankedResults,
@@ -457,10 +484,20 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       creditBudget,
       creditsUsed,
       marketplaces: normalizedResults.length,
-      successfulMarketplaces: normalizedResults.filter((result) => result.ok).length,
-      totalListings: normalizedResults
-        .filter((result) => result.ok)
-        .reduce((sum, result) => sum + result.items.length, 0),
+      successfulMarketplaces: successfulResults.length,
+      failedMarketplaces: failedResults.map((result) => ({
+        site: result.site,
+        provider: result.provider,
+        error: result.error || "Marketplace search failed."
+      })),
+      blockedMarketplaces: failedResults
+        .filter(isBlockedMarketplaceResult)
+        .map((result) => result.site),
+      parsedListings,
+      matchedListings,
+      includedListings,
+      excludedListings,
+      totalListings: includedListings,
       pricedListingsRon: allPricedItems.length,
       averagePriceRon,
       bestOffer,

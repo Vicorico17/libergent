@@ -233,6 +233,63 @@ test("direct search retries with an alternate browser profile before remote fall
   }
 });
 
+test("Cloudflare challenge direct failures are reported without retrying the same blocked page", async () => {
+  const envKeys = [
+    "LIBERGENT_MOCK_SEARCH",
+    "LIBERGENT_MOCK_PROVIDER",
+    "CLOUDFLARE_ACCOUNT_ID",
+    "CLOUDFLARE_API_TOKEN",
+    "FIRECRAWL_API_KEY"
+  ];
+  const previousEnv = new Map(envKeys.map((key) => [key, process.env[key]]));
+  const previousFetch = globalThis.fetch;
+  let directCalls = 0;
+
+  try {
+    process.env.LIBERGENT_MOCK_SEARCH = "0";
+    process.env.LIBERGENT_MOCK_PROVIDER = "0";
+    delete process.env.CLOUDFLARE_ACCOUNT_ID;
+    delete process.env.CLOUDFLARE_API_TOKEN;
+    delete process.env.FIRECRAWL_API_KEY;
+
+    globalThis.fetch = async () => {
+      directCalls += 1;
+      return new Response("<html>challenge</html>", {
+        status: 403,
+        headers: {
+          "content-type": "text/html",
+          "cf-mitigated": "challenge"
+        }
+      });
+    };
+
+    const payload = await searchAcrossSites({
+      query: "iphone",
+      provider: "auto",
+      siteKeys: ["lajumate.ro"],
+      limit: 1,
+      maxPages: 1
+    });
+
+    const [result] = payload.results;
+    assert.equal(result.ok, false);
+    assert.equal(result.attempts, 1);
+    assert.match(result.error, /Cloudflare challenge/);
+    assert.deepEqual(payload.summary.blockedMarketplaces, ["lajumate.ro"]);
+    assert.equal(directCalls, 1);
+  } finally {
+    globalThis.fetch = previousFetch;
+    for (const key of envKeys) {
+      const previous = previousEnv.get(key);
+      if (previous === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = previous;
+      }
+    }
+  }
+});
+
 test("Cloudflare Worker runtime caps marketplace searches to one page", async () => {
   const previousRuntime = process.env.LIBERGENT_RUNTIME;
   const previousMockSearch = process.env.LIBERGENT_MOCK_SEARCH;

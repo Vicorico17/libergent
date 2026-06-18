@@ -24,6 +24,7 @@ type MarketplaceStatus = {
   successful: number
   total: number
   failed: string[]
+  blocked: string[]
 }
 
 // — Loader config —
@@ -39,7 +40,7 @@ const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const MAIN_BLOCKS   = 15
 const SOURCE_BLOCKS = 10
 const SEARCH_RESULT_LIMIT = 180
-const SEARCH_PAGE_LIMIT = 1
+const SEARCH_PAGE_LIMIT = 2
 const INITIAL_VISIBLE_RESULTS = 48
 const VISIBLE_RESULT_STEP = 48
 
@@ -837,7 +838,9 @@ function SearchResultsContent() {
   const [error, setError]           = useState("")
   const [searchedAt, setSearchedAt] = useState("")
   const [totalListings, setTotalListings] = useState(0)
-  const [marketplaceStatus, setMarketplaceStatus] = useState<MarketplaceStatus>({ successful: 0, total: 0, failed: [] })
+  const [parsedListings, setParsedListings] = useState(0)
+  const [excludedListings, setExcludedListings] = useState(0)
+  const [marketplaceStatus, setMarketplaceStatus] = useState<MarketplaceStatus>({ successful: 0, total: 0, failed: [], blocked: [] })
   const [isLoading, setIsLoading]   = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchReportOpen, setSearchReportOpen] = useState(true)
@@ -860,7 +863,9 @@ function SearchResultsContent() {
         setError("")
         setSearchedAt("")
         setTotalListings(0)
-        setMarketplaceStatus({ successful: 0, total: 0, failed: [] })
+        setParsedListings(0)
+        setExcludedListings(0)
+        setMarketplaceStatus({ successful: 0, total: 0, failed: [], blocked: [] })
         setIsLoading(false)
         setShowLoader(false)
         setLoaderProgress(0)
@@ -905,12 +910,15 @@ function SearchResultsContent() {
           setBestOffer(mapBestOffer(payload, mapped))
           setSearchedAt(payload.summary?.searchedAt || "")
           setTotalListings(payload.summary?.totalListings ?? mapped.length)
+          setParsedListings(payload.summary?.parsedListings ?? payload.summary?.totalListings ?? mapped.length)
+          setExcludedListings(payload.summary?.excludedListings ?? 0)
           setMarketplaceStatus({
             successful: payload.summary?.successfulMarketplaces ?? (payload.results || []).filter((result) => result.ok).length,
             total: payload.summary?.marketplaces ?? (payload.results || []).length,
             failed: (payload.results || [])
               .filter((result) => !result.ok)
               .map((result) => (result.site || "marketplace").toUpperCase()),
+            blocked: (payload.summary?.blockedMarketplaces || []).map((site) => site.toUpperCase()),
           })
         })
         .catch((searchError) => {
@@ -919,8 +927,10 @@ function SearchResultsContent() {
           setBestOffer(null)
           setSearchedAt("")
           setTotalListings(0)
+          setParsedListings(0)
+          setExcludedListings(0)
           setError(searchError instanceof Error ? searchError.message : String(searchError))
-          setMarketplaceStatus({ successful: 0, total: 0, failed: [] })
+          setMarketplaceStatus({ successful: 0, total: 0, failed: [], blocked: [] })
         })
         .finally(() => {
           if (controller.signal.aborted) return
@@ -1005,19 +1015,23 @@ function SearchResultsContent() {
   const updatedLabel = searchedAt ? formatDateTime(searchedAt) : "în timp real"
   const statusLabel = !query ? "Introduceți o căutare" : isLoading ? "Search Session Running" : error ? "Search Session Failed" : "Search Session Complete"
   const canCloseFilters = Boolean(query) && !isLoading && !showLoader
-  const duplicateCount = Math.max(0, totalListings - results.length)
+  const filteredOutCount = Math.max(0, (parsedListings || totalListings) - results.length)
+  const blockedLabel = marketplaceStatus.blocked.length ? marketplaceStatus.blocked.join(", ") : ""
   const agentNotes = [
     { text: error || `${results.length} rezultate normalizate`, pulse: false },
-    { text: marketplaceStatus.total ? `${marketplaceValue} marketplace-uri au răspuns` : "marketplace-uri în așteptare", pulse: isLoading },
+    { text: marketplaceStatus.total ? `${marketplaceValue} marketplace-uri au returnat date` : "marketplace-uri în așteptare", pulse: isLoading },
     {
       text: marketplaceStatus.total
-        ? marketplaceStatus.failed.length
+        ? marketplaceStatus.blocked.length
+          ? `blocate de anti-bot: ${blockedLabel}`
+          : marketplaceStatus.failed.length
           ? `erori marketplace: ${marketplaceStatus.failed.join(", ")}`
           : "toate marketplace-urile cerute au fost încercate"
         : "niciun marketplace pornit încă",
       pulse: false
     },
-    { text: duplicateCount ? `${duplicateCount} duplicate eliminate` : "duplicate verificate", pulse: false },
+    { text: filteredOutCount ? `${filteredOutCount} rezultate filtrate` : "filtre de calitate aplicate", pulse: false },
+    { text: excludedListings ? `${excludedListings} accesorii/piese excluse` : "clasificare rezultate aplicată", pulse: false },
     { text: shownBestOffer ? `Best price detected on ${shownBestOffer.source}` : "Best offer în așteptare", pulse: false },
     { text: isLoading ? "Recommendation updating live" : "Recommendation updated live", pulse: isLoading },
   ]
@@ -1099,12 +1113,13 @@ function SearchResultsContent() {
                 <ChevronDown size={14} />
               </button>
             </div>
-            <div className={`${searchReportOpen ? "grid" : "hidden md:grid"} grid-cols-2 md:grid-cols-5`} style={{ background: "white" }}>
+            <div className={`${searchReportOpen ? "grid" : "hidden md:grid"} grid-cols-2 md:grid-cols-6`} style={{ background: "white" }}>
               {[
                 { value: String(filteredResults.length), label: "Results" },
+                { value: String(parsedListings || totalListings), label: "Parsed" },
                 { value: `${averageScore}%`, label: "Avg Score" },
                 { value: marketplaceValue, label: "Marketplaces" },
-                { value: String(duplicateCount), label: "Duplicates Removed" },
+                { value: String(filteredOutCount), label: "Filtered" },
               ].map(({ value, label }) => (
                 <div key={label} className="p-4 flex flex-col items-center justify-center gap-1" style={{ borderRight: `1px solid ${INK}` }}>
                   <span className="text-[20px] font-bold" style={{ color: PINK }}>{value}</span>
