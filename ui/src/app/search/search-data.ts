@@ -67,6 +67,7 @@ export type SearchResultItem = {
 };
 
 const platformLabels: Record<string, string> = {
+  "anuntul.ro": "ANUNTUL",
   "autovit.ro": "AUTOVIT",
   "lajumate.ro": "LAJUMATE",
   "okazii.ro": "OKAZII",

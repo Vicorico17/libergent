@@ -14,7 +14,8 @@ test("detects common car searches and routes all-search to Autovit first", () =>
     "lajumate.ro",
     "vinted.ro",
     "okazii.ro",
-    "publi24.ro"
+    "publi24.ro",
+    "anuntul.ro"
   ]);
   assert.deepEqual(getSiteKeysForAllSearch("PASSAT CC"), [
     "autovit.ro",
@@ -22,7 +23,8 @@ test("detects common car searches and routes all-search to Autovit first", () =>
     "lajumate.ro",
     "vinted.ro",
     "okazii.ro",
-    "publi24.ro"
+    "publi24.ro",
+    "anuntul.ro"
   ]);
   assert.equal(
     SITES["autovit.ro"].searchUrl("PASSAT CC"),
@@ -42,6 +44,7 @@ test("does not classify non-car terms as car searches", () => {
     "lajumate.ro",
     "vinted.ro",
     "okazii.ro",
-    "publi24.ro"
+    "publi24.ro",
+    "anuntul.ro"
   ]);
 });

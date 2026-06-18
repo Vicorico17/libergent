@@ -399,6 +399,36 @@ export const SITES = {
         "Results appear as article-item classified cards. Keep only product or service listings that match the query."
       );
     }
+  },
+  "anuntul.ro": {
+    key: "anuntul.ro",
+    label: "Anuntul",
+    priority: 6,
+    defaultEnabled: true,
+    provider: "direct",
+    strategy: "direct-html-local",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 12000,
+    pageSize: 50,
+    maxPages: 8,
+    defaultLimit: 50,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.anuntul.ro/anunturi/?q=${encodeSearchText(query).replace(/%20/g, "+")}`;
+    },
+    pagedSearchUrl(query, page) {
+      const base = this.searchUrl(query);
+      return page <= 1 ? base : `${base}&page=${page}`;
+    },
+    prompt(query, limit) {
+      return buildBasePrompt(
+        "Anuntul",
+        query,
+        limit,
+        "Results appear as Anuntul classified cards. Keep only visible marketplace offers that match the query."
+      );
+    }
   }
 };
 

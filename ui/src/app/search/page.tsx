@@ -16,7 +16,7 @@ const GREEN  = "#22C55E"
 const MONO   = "var(--font-mono-var), monospace"
 const MODAL_BG = "#FDFAF3"
 
-const SOURCES_LIST = ["OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "AUTOVIT"]
+const SOURCES_LIST = ["OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT"]
 const SORT_OPTIONS = ["relevanță", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
 const COND_OPTIONS = ["nou", "folosit", "ca nou", "bun", "acceptabil"]
 
@@ -29,12 +29,13 @@ type MarketplaceStatus = {
 
 // — Loader config —
 const SOURCE_TIMING = [
-  { name: "OLX",      start: 0,  end: 25 },
-  { name: "VINTED",   start: 5,  end: 40 },
-  { name: "OKAZII",   start: 15, end: 55 },
-  { name: "PUBLI24",  start: 30, end: 70 },
-  { name: "LAJUMATE", start: 45, end: 85 },
-  { name: "AUTOVIT",  start: 60, end: 100 },
+  { name: "OLX",      start: 0,  end: 22 },
+  { name: "VINTED",   start: 4,  end: 36 },
+  { name: "OKAZII",   start: 12, end: 50 },
+  { name: "PUBLI24",  start: 24, end: 63 },
+  { name: "ANUNTUL",  start: 36, end: 76 },
+  { name: "LAJUMATE", start: 48, end: 88 },
+  { name: "AUTOVIT",  start: 62, end: 100 },
 ]
 const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const MAIN_BLOCKS   = 15
