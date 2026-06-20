@@ -33,6 +33,8 @@ The product direction is intentionally simple in the UI:
 - the output should be structured per marketplace with links
 - the app should surface a quality-checked best offer, not just the raw cheapest item
 
+The current product focus is classified marketplace search: real Romanian listings, strong keyword matching, price comparison, and fast seller contact. See [docs/classified-marketplace-feature-plan.md](docs/classified-marketplace-feature-plan.md) for the image-search and seller-messaging roadmap.
+
 The quality-check layer exists because the lowest price is often misleading. Extremely cheap listings can be:
 
 - broken

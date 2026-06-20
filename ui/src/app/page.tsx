@@ -11,9 +11,9 @@ import { FinalCTA } from "@/components/sections/FinalCTA";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://libergent.com";
 
 export const metadata: Metadata = {
-  title: "Caută produse oriunde în România",
+  title: "Caută anunțuri clasificate din România",
   description:
-    "LiberGent este un motor de căutare pentru produse din România. Caută pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit, compară prețuri și găsește oferte relevante mai repede.",
+    "LiberGent este un motor de căutare pentru anunțuri clasificate din România. Caută pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit, compară prețuri și contactează sellerii mai repede.",
   alternates: {
     canonical: "/",
   },
@@ -26,7 +26,7 @@ const structuredData = [
     name: "LiberGent",
     url: siteUrl,
     description:
-      "LiberGent ajută cumpărătorii din România să găsească produse relevante pe marketplace-uri precum OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit.",
+      "LiberGent ajută cumpărătorii din România să găsească anunțuri clasificate relevante pe marketplace-uri precum OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit.",
   },
   {
     "@context": "https://schema.org",
@@ -45,7 +45,7 @@ const structuredData = [
       priceCurrency: "RON",
     },
     description:
-      "Motor de căutare care scanează mai multe marketplace-uri din România, normalizează anunțurile și compară prețurile pentru produse noi sau folosite.",
+      "Motor de căutare pentru anunțuri clasificate care scanează mai multe marketplace-uri din România, normalizează anunțurile și compară prețurile pentru produse noi sau folosite.",
   },
 ];
 

@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { CalendarDays, MapPin, Tag } from "lucide-react"
+import { CalendarDays, Copy, ExternalLink, MapPin, MessageSquare, Tag } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import { mapBestOffer, mapSearchResults, type SearchPayload, type SearchResultItem } from "./search-data"
@@ -17,7 +17,7 @@ const MONO   = "var(--font-mono-var), monospace"
 const MODAL_BG = "#FDFAF3"
 
 const SOURCES_LIST = ["OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT"]
-const SORT_OPTIONS = ["relevanță", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
+const SORT_OPTIONS = ["relevanță", "potrivire cuvinte cheie", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
 const COND_OPTIONS = ["nou", "folosit", "ca nou", "bun", "acceptabil"]
 
 type MarketplaceStatus = {
@@ -67,6 +67,43 @@ function compareByRank(a: SearchResultItem, b: SearchResultItem) {
   const aRank = typeof a.rank === "number" ? a.rank : Number.POSITIVE_INFINITY
   const bRank = typeof b.rank === "number" ? b.rank : Number.POSITIVE_INFINITY
   return aRank - bRank || b.score - a.score
+}
+
+function normalizeKeywordText(value = "") {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+}
+
+function tokenizeKeywords(value = "") {
+  return normalizeKeywordText(value)
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length > 1 || /^\d+$/.test(token))
+}
+
+function getKeywordMatchScore(item: SearchResultItem, query: string) {
+  const queryTokens = tokenizeKeywords(query)
+  if (!queryTokens.length) return item.score
+
+  const titleTokens = new Set(tokenizeKeywords(item.title))
+  const metaTokens = new Set(tokenizeKeywords([item.city, item.condition, item.source].join(" ")))
+  const matched = queryTokens.reduce((score, token) => {
+    if (titleTokens.has(token)) return score + 2
+    if (metaTokens.has(token)) return score + 1
+    return score
+  }, 0)
+
+  return Math.round((matched / (queryTokens.length * 2)) * 100)
+}
+
+function buildSellerMessage(item: SearchResultItem, query: string) {
+  const product = query || item.title
+  return [
+    `Bună! Am văzut anunțul pentru ${product} pe ${item.source}.`,
+    `Mai este disponibil? Prețul este ${item.priceLabel}.`,
+    "Pot să primesc, te rog, câteva detalii despre stare și livrare?",
+  ].join(" ")
 }
 
 async function readJsonResponse(response: Response): Promise<SearchPayload> {
@@ -626,9 +663,61 @@ function useListingImage(item: SearchResultItem) {
   }
 }
 
-function ResultCard({ item }: { item: ResultItem }) {
+function SellerMessageActions({ item, query, compact = false }: { item: SearchResultItem; query: string; compact?: boolean }) {
+  const [copied, setCopied] = useState(false)
+  const message = buildSellerMessage(item, query)
+
+  async function copyMessage() {
+    try {
+      await navigator.clipboard.writeText(message)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  return (
+    <div className={`flex ${compact ? "flex-col sm:flex-row" : "flex-col sm:flex-row"} gap-2`}>
+      <button
+        type="button"
+        onClick={copyMessage}
+        className="flex min-h-10 flex-1 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase transition-colors duration-150"
+        style={{ border: `1px solid ${INK}`, background: copied ? GREEN : "white", color: INK, fontFamily: MONO }}
+        title={message}
+      >
+        <Copy size={13} strokeWidth={2.2} />
+        {copied ? "Mesaj copiat" : "Copiază mesaj"}
+      </button>
+      {item.url ? (
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex min-h-10 flex-1 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase transition-colors duration-150"
+          style={{ border: `1px solid ${INK}`, background: INK, color: "white", fontFamily: MONO }}
+        >
+          <MessageSquare size={13} strokeWidth={2.2} />
+          Contactează sellerul
+        </a>
+      ) : (
+        <span
+          aria-disabled="true"
+          className="flex min-h-10 flex-1 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase opacity-60"
+          style={{ border: `1px solid ${INK}`, background: INK, color: "white", fontFamily: MONO }}
+        >
+          <MessageSquare size={13} strokeWidth={2.2} />
+          Fără contact
+        </span>
+      )}
+    </div>
+  )
+}
+
+function ResultCard({ item, query }: { item: ResultItem; query: string }) {
   const [hov, setHov] = useState(false)
   const { image, handleImageError } = useListingImage(item)
+  const keywordScore = getKeywordMatchScore(item, query)
   const cardStyle = {
     border: `1px solid ${INK}`,
     background: "white",
@@ -679,40 +768,24 @@ function ResultCard({ item }: { item: ResultItem }) {
           <span>Scor: <span style={{ color: `${INK}66` }}>{item.score}%</span></span>
           <ScoreBar score={item.score} total={8} />
         </div>
-        <span
-          className="w-full py-2 text-[10px] font-bold uppercase flex justify-center items-center gap-1 transition-colors duration-150"
-          style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO }}
-        >
-          Vezi Oferta <Arrow size={10} />
-        </span>
+        <div className="flex items-center justify-between gap-2 text-[10px] uppercase font-bold">
+          <span style={{ color: `${INK}66` }}>Keywords</span>
+          <span style={{ color: keywordScore >= 70 ? GREEN : PINK }}>{keywordScore}%</span>
+        </div>
+        <SellerMessageActions item={item} query={query} compact />
       </div>
     </>
   )
 
-  if (!item.url) {
-    return (
-      <div
-        aria-disabled="true"
-        className="flex flex-col overflow-hidden opacity-70"
-        style={cardStyle}
-      >
-        {content}
-      </div>
-    )
-  }
-
   return (
-    <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <article
       className="flex flex-col overflow-hidden"
       style={cardStyle}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
     >
       {content}
-    </a>
+    </article>
   )
 }
 
@@ -724,8 +797,9 @@ function PanelHeader({ title }: { title: string }) {
   )
 }
 
-function RecommendationCard({ item }: { item: SearchResultItem }) {
+function RecommendationCard({ item, query }: { item: SearchResultItem; query: string }) {
   const { image, handleImageError } = useListingImage(item)
+  const keywordScore = getKeywordMatchScore(item, query)
 
   return (
     <div
@@ -794,9 +868,15 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
                   {item.condition}
                 </span>
               </div>
+              <div className="flex items-center gap-4">
+                <span className="text-[11px] uppercase font-bold w-24">Keywords:</span>
+                <span className="text-[13px] font-bold" style={{ color: keywordScore >= 70 ? GREEN : PINK }}>{keywordScore}%</span>
+              </div>
             </div>
-            <div className="mt-8 flex justify-end">
-              {item.url ? (
+            <div className="mt-8 flex flex-col gap-3">
+              <SellerMessageActions item={item} query={query} />
+              <div className="flex justify-end">
+                {item.url ? (
                 <a
                   href={item.url}
                   target="_blank"
@@ -804,9 +884,9 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
                   className="flex items-center gap-2 px-6 py-3 text-[12px] font-bold uppercase transition-all duration-150"
                   style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO, boxShadow: `2px 2px 0px ${INK}` }}
                 >
-                  Vezi Oferta <Arrow size={16} />
+                  Vezi Oferta <ExternalLink size={14} strokeWidth={2.2} />
                 </a>
-              ) : (
+                ) : (
                 <span
                   aria-disabled="true"
                   className="flex items-center gap-2 px-6 py-3 text-[12px] font-bold uppercase opacity-60"
@@ -814,7 +894,8 @@ function RecommendationCard({ item }: { item: SearchResultItem }) {
                 >
                   Fără link direct
                 </span>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -985,9 +1066,10 @@ function SearchResultsContent() {
       if (sort === "preț descrescător") return priceForSort(b, Number.NEGATIVE_INFINITY) - priceForSort(a, Number.NEGATIVE_INFINITY)
       if (sort === "cel mai recent") return a.daysAgo - b.daysAgo
       if (sort === "scor agent") return b.score - a.score || compareByRank(a, b)
+      if (sort === "potrivire cuvinte cheie") return getKeywordMatchScore(b, query) - getKeywordMatchScore(a, query) || compareByRank(a, b)
       return compareByRank(a, b)
     })
-  }, [conditions, priceMax, priceMin, results, sort, sources])
+  }, [conditions, priceMax, priceMin, query, results, sort, sources])
 
   const shownBestOffer = useMemo(() => {
     if (!bestOffer) return null
@@ -1033,6 +1115,7 @@ function SearchResultsContent() {
     },
     { text: filteredOutCount ? `${filteredOutCount} rezultate filtrate` : "filtre de calitate aplicate", pulse: false },
     { text: excludedListings ? `${excludedListings} accesorii/piese excluse` : "clasificare rezultate aplicată", pulse: false },
+    { text: "focus: anunțuri clasificate + potrivire strictă pe cuvinte cheie", pulse: false },
     { text: shownBestOffer ? `Best price detected on ${shownBestOffer.source}` : "Best offer în așteptare", pulse: false },
     { text: isLoading ? "Recommendation updating live" : "Recommendation updated live", pulse: isLoading },
   ]
@@ -1143,7 +1226,7 @@ function SearchResultsContent() {
             </section>
           )}
 
-          {shownBestOffer && <RecommendationCard item={shownBestOffer} />}
+          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} />}
 
           {/* Results + Insights */}
           <div className="flex flex-col xl:flex-row gap-6 items-start">
@@ -1160,7 +1243,7 @@ function SearchResultsContent() {
               {regularResults.length ? (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {visibleRegularResults.map((item) => <ResultCard key={item.id} item={item} />)}
+                    {visibleRegularResults.map((item) => <ResultCard key={item.id} item={item} query={query} />)}
                   </div>
                   {visibleRegularResults.length < regularResults.length && (
                     <div className="mt-5 flex justify-center">
