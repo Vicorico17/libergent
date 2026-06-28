@@ -166,6 +166,69 @@ function clampScore(value) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function getListingText(item) {
+  return [
+    item.title,
+    item.description,
+    item.condition,
+    item.sellerType
+  ].filter(Boolean).join(" ");
+}
+
+function extractPhoneSpecs(item) {
+  const text = getListingText(item);
+  const normalized = stripDiacritics(text.toLowerCase());
+  const hasPhoneSignal = /\b(iphone|samsung|galaxy|telefon|smartphone)\b/.test(normalized);
+  if (!hasPhoneSignal) {
+    return null;
+  }
+
+  const storageMatch = normalized.match(/\b(64|128|256|512|1024)\s*(?:gb|g\b)/);
+  const batteryMatch = normalized.match(/\b(?:baterie|battery|bh|akku|acumulator)[^\d]{0,12}(\d{2,3})\s*%|\b(\d{2,3})\s*%\s*(?:baterie|battery|bh|akku|acumulator)/);
+  const batteryHealthPct = batteryMatch
+    ? Number.parseInt(batteryMatch[1] || batteryMatch[2], 10)
+    : null;
+  const warranty = /\b(garantie|garanție|warranty)\b/.test(normalized);
+  const invoice = /\b(factura|factură|invoice)\b/.test(normalized);
+  const lockedRisk = /\b(icloud|blocat|locked|cont blocat|sim lock|simlock)\b/.test(normalized);
+  const neverlocked = /\b(neverlocked|never locked|liber de retea|liber retea|deblocat)\b/.test(normalized);
+  const refurbished = /\b(refurbished|reconditionat|recondiționat)\b/.test(normalized);
+  const serviceHistory = /\b(schimbat|inlocuit|înlocuit|service|reparat)\b/.test(normalized);
+  const cracked = /\b(spart|fisurat|crapat|crăpat|display spart|ecran spart)\b/.test(normalized);
+  const modelMatch = normalized.match(/\biphone\s*(\d{2})(?:\s*(pro max|pro|plus|mini|max))?\b/) ||
+    normalized.match(/\bgalaxy\s*(s\d{2}|a\d{2}|z\s*flip\s*\d|z\s*fold\s*\d)(?:\s*(ultra|plus|\+))?\b/);
+  const brand =
+    normalized.includes("iphone") ? "Apple" :
+    normalized.includes("samsung") || normalized.includes("galaxy") ? "Samsung" :
+    null;
+  const model = modelMatch ? modelMatch[0].replace(/\s+/g, " ").trim() : null;
+  const variant = modelMatch?.[2] ? modelMatch[2].replace(/\s+/g, " ").trim() : null;
+
+  return {
+    isPhone: true,
+    brand,
+    model,
+    variant,
+    storageGb: storageMatch ? Number.parseInt(storageMatch[1], 10) : null,
+    batteryHealthPct: Number.isFinite(batteryHealthPct) ? batteryHealthPct : null,
+    warranty,
+    invoice,
+    lockedRisk,
+    neverlocked,
+    refurbished,
+    serviceHistory,
+    cracked,
+    conditionSignals: [
+      warranty ? "garanție" : null,
+      invoice ? "factură" : null,
+      neverlocked ? "neverlocked" : null,
+      refurbished ? "refurbished" : null,
+      serviceHistory ? "istoric service" : null,
+      cracked ? "ecran/carcasa deteriorată" : null
+    ].filter(Boolean)
+  };
+}
+
 function buildPriceInsight(item, medianPriceRon) {
   if (!Number.isFinite(item.priceRon) || !Number.isFinite(medianPriceRon) || medianPriceRon <= 0) {
     return {
@@ -251,6 +314,16 @@ function buildRiskFlags(item, medianPriceRon) {
   if (!item.imageUrl && !item.image && !item.thumbnailUrl && !item.images?.length && !item.imageUrls?.length) {
     flags.push({ code: "no_image", label: "fără poză", severity: "warning" });
   }
+  const phoneSpecs = extractPhoneSpecs(item);
+  if (phoneSpecs?.lockedRisk) {
+    flags.push({ code: "phone_locked", label: "risc iCloud/SIM lock", severity: "bad" });
+  }
+  if (phoneSpecs?.cracked) {
+    flags.push({ code: "phone_damage", label: "posibil ecran/carcasa spartă", severity: "bad" });
+  }
+  if (Number.isFinite(phoneSpecs?.batteryHealthPct) && phoneSpecs.batteryHealthPct < 80) {
+    flags.push({ code: "low_battery_health", label: "battery health sub 80%", severity: "warning" });
+  }
 
   return flags;
 }
@@ -268,7 +341,7 @@ function scoreRisk(flags) {
 }
 
 function buildDealQuality(item, medianPriceRon, condition) {
-  const riskFlags = buildRiskFlags(item, medianPriceRon);
+  const riskFlags = item.riskFlags || buildRiskFlags(item, medianPriceRon);
   const productMatch = clampScore(Number.isFinite(item.relevanceScore) ? item.relevanceScore : 50);
   const price = clampScore(priceValueScore(item.priceRon, medianPriceRon));
   const conditionScore =
@@ -304,6 +377,46 @@ function buildDealQuality(item, medianPriceRon, condition) {
       `risc ${risk}%`
     ]
   };
+}
+
+function buildWhyThisDeal(item) {
+  const reasons = [];
+  const priceInsight = item.priceInsight;
+  const phoneSpecs = item.phoneSpecs;
+
+  if (item.dealQuality?.productMatch >= 90) {
+    reasons.push("Potrivire foarte bună cu produsul căutat.");
+  } else if (item.dealQuality?.productMatch >= 70) {
+    reasons.push("Potrivire bună cu termenii principali.");
+  }
+  if (priceInsight?.priceDeltaPct !== null && Number.isFinite(priceInsight?.priceDeltaPct)) {
+    if (priceInsight.priceDeltaPct < -10) {
+      reasons.push(`Preț cu ${Math.abs(priceInsight.priceDeltaPct)}% sub mediana rezultatelor.`);
+    } else if (priceInsight.priceDeltaPct > 15) {
+      reasons.push(`Preț cu ${priceInsight.priceDeltaPct}% peste mediana rezultatelor.`);
+    } else {
+      reasons.push("Preț în zona pieței pentru rezultatele găsite.");
+    }
+  }
+  if (item.dealQuality?.risk >= 80) {
+    reasons.push("Nu apar semnale majore de risc în titlu sau metadate.");
+  } else if (item.riskFlags?.length) {
+    reasons.push(`Verifică: ${item.riskFlags.slice(0, 2).map((flag) => flag.label).join(", ")}.`);
+  }
+  if (phoneSpecs?.storageGb) {
+    reasons.push(`Storage detectat: ${phoneSpecs.storageGb}GB.`);
+  }
+  if (phoneSpecs?.batteryHealthPct) {
+    reasons.push(`Battery health detectat: ${phoneSpecs.batteryHealthPct}%.`);
+  }
+  if (phoneSpecs?.warranty || phoneSpecs?.invoice) {
+    reasons.push([phoneSpecs.warranty ? "garanție" : null, phoneSpecs.invoice ? "factură" : null].filter(Boolean).join(" + "));
+  }
+  if (recencyScore(item.postedAt) >= 14) {
+    reasons.push("Anunț recent.");
+  }
+
+  return reasons.slice(0, 6);
 }
 
 function safePriceForTieBreak(priceRon) {
@@ -444,14 +557,20 @@ function scoreGlobalRecommendation(item, medianPriceRon, condition) {
 
 function enrichItemWithDealIntelligence(item, medianPriceRon, condition) {
   const priceInsight = buildPriceInsight(item, medianPriceRon);
+  const phoneSpecs = extractPhoneSpecs(item);
   const riskFlags = buildRiskFlags(item, medianPriceRon);
-  const dealQuality = buildDealQuality(item, medianPriceRon, condition);
-
-  return {
+  const dealQuality = buildDealQuality({ ...item, riskFlags }, medianPriceRon, condition);
+  const enrichedItem = {
     ...item,
     priceInsight,
     riskFlags,
-    dealQuality
+    dealQuality,
+    phoneSpecs
+  };
+
+  return {
+    ...enrichedItem,
+    whyThisDeal: buildWhyThisDeal(enrichedItem)
   };
 }
 

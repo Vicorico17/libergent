@@ -155,6 +155,51 @@ test("flags suspiciously cheap listings even when they match the product", () =>
   assert.ok(cheap.dealQuality.risk < 100);
 });
 
+test("extracts phone-specific signals and why-this-deal explanations", () => {
+  const query = "iPhone 15 Pro";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "iPhone 15 Pro 256GB neverlocked baterie 91% factura garantie",
+        price: "2500 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        image: "https://example.test/iphone.jpg",
+        url: "https://olx.ro/iphone"
+      },
+      {
+        title: "iPhone 15 Pro 128GB iCloud blocat display spart",
+        price: "1200 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        image: "https://example.test/locked.jpg",
+        url: "https://olx.ro/locked"
+      },
+      {
+        title: "iPhone 15 Pro 128GB baterie 77%",
+        price: "2300 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        image: "https://example.test/battery.jpg",
+        url: "https://olx.ro/battery"
+      }
+    ])
+  ]);
+
+  const good = aggregated.results[0].items.find((item) => item.url === "https://olx.ro/iphone");
+  const lowBattery = aggregated.results[0].items.find((item) => item.url === "https://olx.ro/battery");
+  const locked = aggregated.results[0].partsAndRepair.find((item) => item.url === "https://olx.ro/locked");
+
+  assert.equal(good.phoneSpecs.brand, "Apple");
+  assert.equal(good.phoneSpecs.storageGb, 256);
+  assert.equal(good.phoneSpecs.batteryHealthPct, 91);
+  assert.equal(good.phoneSpecs.invoice, true);
+  assert.equal(good.phoneSpecs.warranty, true);
+  assert.ok(good.whyThisDeal.some((reason) => reason.includes("Battery health")));
+  assert.ok(lowBattery.riskFlags.some((flag) => flag.code === "low_battery_health"));
+  assert.equal(locked.listingType, "broken_or_for_parts");
+});
+
 
 test("keeps listings with missing optional metadata in recommendation output", () => {
   const query = "Samsung Galaxy S23";

@@ -802,7 +802,7 @@ function FilterPanel({ sort, setSort, sources, toggleSource, conditions, toggleC
 // — ResultCard —
 type ResultItem = SearchResultItem
 
-function useListingImage(item: SearchResultItem) {
+function useListingImage(item: Pick<SearchResultItem, "id" | "image" | "images">) {
   const images = useMemo(() => {
     const values = item.images.length ? item.images : item.image ? [item.image] : []
     return [...new Set(values.filter(Boolean))]
@@ -862,7 +862,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
   )
 }
 
-function ResultCard({ item, query }: { item: ResultItem; query: string }) {
+function ResultCard({ item, query, onInspect }: { item: ResultItem; query: string; onInspect: (item: SearchResultItem) => void }) {
   const [hov, setHov] = useState(false)
   const { image, handleImageError } = useListingImage(item)
   const keywordScore = getKeywordMatchScore(item, query)
@@ -922,6 +922,14 @@ function ResultCard({ item, query }: { item: ResultItem; query: string }) {
           <span style={{ color: keywordScore >= 70 ? GREEN : PINK }}>{keywordScore}%</span>
         </div>
         <KeywordSignalChips item={item} compact />
+        <button
+          type="button"
+          onClick={() => onInspect(item)}
+          className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
+          style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
+        >
+          Detalii Libergent
+        </button>
         <SellerMessageActions item={item} query={query} compact />
       </div>
     </>
@@ -947,7 +955,7 @@ function PanelHeader({ title }: { title: string }) {
   )
 }
 
-function RecommendationCard({ item, query }: { item: SearchResultItem; query: string }) {
+function RecommendationCard({ item, query, onInspect }: { item: SearchResultItem; query: string; onInspect: (item: SearchResultItem) => void }) {
   const { image, handleImageError } = useListingImage(item)
   const keywordScore = getKeywordMatchScore(item, query)
 
@@ -1030,6 +1038,14 @@ function RecommendationCard({ item, query }: { item: SearchResultItem; query: st
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => onInspect(item)}
+                className="flex min-h-11 items-center justify-center px-4 py-3 text-[11px] font-bold uppercase"
+                style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
+              >
+                Vezi analiza Libergent
+              </button>
               <SellerMessageActions item={item} query={query} />
               <div className="flex justify-end">
                 {item.url ? (
@@ -1060,6 +1076,143 @@ function RecommendationCard({ item, query }: { item: SearchResultItem; query: st
   )
 }
 
+function DetailMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1 p-3" style={{ border: `1px solid ${INK}22`, background: CREAM }}>
+      <span className="text-[9px] font-bold uppercase" style={{ color: `${INK}66` }}>{label}</span>
+      <span className="truncate text-[12px] font-bold uppercase">{value}</span>
+    </div>
+  )
+}
+
+function ListingDetailDrawer({ item, query, onClose }: { item: SearchResultItem | null; query: string; onClose: () => void }) {
+  const { image, handleImageError } = useListingImage(item || {
+    id: "empty",
+    images: [],
+    image: undefined,
+  })
+
+  if (!item) return null
+
+  const phone = item.phoneSpecs
+  const phoneRows = phone ? [
+    ["Brand", phone.brand || "n/a"],
+    ["Model", phone.model || "n/a"],
+    ["Storage", phone.storageGb ? `${phone.storageGb}GB` : "n/a"],
+    ["Battery", phone.batteryHealthPct ? `${phone.batteryHealthPct}%` : "n/a"],
+    ["Garanție", phone.warranty ? "da" : "n/a"],
+    ["Factură", phone.invoice ? "da" : "n/a"],
+  ] : []
+
+  return (
+    <div className="fixed inset-0 z-[120] flex justify-end" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        aria-label="Close listing details"
+        className="absolute inset-0 cursor-default"
+        style={{ background: "rgba(0,0,0,0.36)" }}
+        onClick={onClose}
+      />
+      <aside
+        className="relative flex h-full w-full max-w-2xl flex-col overflow-y-auto"
+        style={{ background: "white", borderLeft: `1px solid ${INK}`, fontFamily: MONO, color: INK }}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-4 p-4" style={{ background: "white", borderBottom: `1px solid ${INK}` }}>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase" style={{ color: `${INK}66` }}>Analiză listing</p>
+            <h2 className="truncate text-[16px] font-bold uppercase">{item.title}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 flex-none items-center justify-center"
+            style={{ border: `1px solid ${INK}`, background: CREAM }}
+            aria-label="Close"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-5 p-5">
+          <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+            <div className="relative aspect-[4/3] overflow-hidden" style={{ border: `1px solid ${INK}`, background: "#DDD9CE" }}>
+              {image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={image} alt={item.title} className="h-full w-full object-cover" onError={handleImageError} />
+              ) : (
+                <div className="flex h-full items-center justify-center text-[10px] font-bold uppercase" style={{ color: `${INK}66` }}>fără imagine</div>
+              )}
+            </div>
+            <div className="flex flex-col gap-3">
+              <div className="text-[24px] font-bold" style={{ color: PINK }}>{item.priceLabel}</div>
+              <ListingMetaChips item={item} />
+              <DealQualitySummary item={item} />
+              <SellerMessageActions item={item} query={query} />
+            </div>
+          </div>
+
+          <section className="flex flex-col gap-3">
+            <PanelHeader title="Why This Deal" />
+            <ul className="grid gap-2">
+              {(item.whyThisDeal.length ? item.whyThisDeal : item.dealQuality.reasons).map((reason) => (
+                <li key={reason} className="flex gap-2 text-[11px] font-bold uppercase">
+                  <span style={{ color: PINK }}>&gt;</span>
+                  <span>{reason}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {phone && (
+            <section className="flex flex-col gap-3">
+              <PanelHeader title="Phone Signals" />
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                {phoneRows.map(([label, value]) => <DetailMetric key={label} label={label} value={value} />)}
+              </div>
+              {phone.conditionSignals.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {phone.conditionSignals.map((signal) => <MetaChip key={signal}>{signal}</MetaChip>)}
+                </div>
+              )}
+            </section>
+          )}
+
+          <section className="flex flex-col gap-3">
+            <PanelHeader title="Risk Flags" />
+            <RiskFlagChips item={item} />
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <PanelHeader title="Keyword Match" />
+            <KeywordSignalChips item={item} />
+          </section>
+
+          <section className="grid grid-cols-2 gap-2">
+            <DetailMetric label="Piață mediană" value={formatRon(item.priceInsight.marketMedianRon)} />
+            <DetailMetric label="Interval fair" value={`${formatRon(item.priceInsight.fairLowRon)} - ${formatRon(item.priceInsight.fairHighRon)}`} />
+            <DetailMetric label="Scor produs" value={`${item.dealQuality.productMatch}%`} />
+            <DetailMetric label="Scor risc" value={`${item.dealQuality.risk}%`} />
+          </section>
+
+          {item.url && (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-11 items-center justify-center gap-2 px-4 py-3 text-[11px] font-bold uppercase"
+              style={{ border: `1px solid ${INK}`, background: INK, color: "white", fontFamily: MONO }}
+            >
+              Deschide marketplace <ExternalLink size={14} strokeWidth={2.2} />
+            </a>
+          )}
+        </div>
+      </aside>
+    </div>
+  )
+}
+
 // — Main search results —
 function SearchResultsContent() {
   const searchParams = useSearchParams()
@@ -1083,6 +1236,7 @@ function SearchResultsContent() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchReportOpen, setSearchReportOpen] = useState(true)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS)
+  const [selectedListing, setSelectedListing] = useState<SearchResultItem | null>(null)
 
   // Loader state
   const [showLoader, setShowLoader]       = useState(false)
@@ -1104,6 +1258,7 @@ function SearchResultsContent() {
         setParsedListings(0)
         setExcludedListings(0)
         setMarketplaceStatus({ successful: 0, total: 0, failed: [], blocked: [] })
+        setSelectedListing(null)
         setIsLoading(false)
         setShowLoader(false)
         setLoaderProgress(0)
@@ -1281,6 +1436,7 @@ function SearchResultsContent() {
 
       {/* Loading overlay — rendered above everything */}
       {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} />}
+      <ListingDetailDrawer item={selectedListing} query={query} onClose={() => setSelectedListing(null)} />
       <EmailCapturePopup
         enabled={Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
         query={query}
@@ -1382,7 +1538,7 @@ function SearchResultsContent() {
             </section>
           )}
 
-          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} />}
+          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} onInspect={setSelectedListing} />}
 
           {/* Results + Insights */}
           <div className="flex flex-col xl:flex-row gap-6 items-start">
@@ -1399,7 +1555,7 @@ function SearchResultsContent() {
               {regularResults.length ? (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {visibleRegularResults.map((item) => <ResultCard key={item.id} item={item} query={query} />)}
+                    {visibleRegularResults.map((item) => <ResultCard key={item.id} item={item} query={query} onInspect={setSelectedListing} />)}
                   </div>
                   {visibleRegularResults.length < regularResults.length && (
                     <div className="mt-5 flex justify-center">

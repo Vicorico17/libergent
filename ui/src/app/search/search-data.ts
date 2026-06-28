@@ -40,6 +40,23 @@ export type ApiListing = {
     fairHighRon?: number | null;
     priceDeltaPct?: number | null;
   };
+  phoneSpecs?: {
+    isPhone?: boolean;
+    brand?: string | null;
+    model?: string | null;
+    variant?: string | null;
+    storageGb?: number | null;
+    batteryHealthPct?: number | null;
+    warranty?: boolean;
+    invoice?: boolean;
+    lockedRisk?: boolean;
+    neverlocked?: boolean;
+    refurbished?: boolean;
+    serviceHistory?: boolean;
+    cracked?: boolean;
+    conditionSignals?: string[];
+  } | null;
+  whyThisDeal?: string[];
   relevanceScore?: number;
   listingType?: string;
   queryType?: string;
@@ -130,6 +147,23 @@ export type SearchResultItem = {
     fairHighRon: number | null;
     priceDeltaPct: number | null;
   };
+  phoneSpecs: {
+    isPhone: boolean;
+    brand: string | null;
+    model: string | null;
+    variant: string | null;
+    storageGb: number | null;
+    batteryHealthPct: number | null;
+    warranty: boolean;
+    invoice: boolean;
+    lockedRisk: boolean;
+    neverlocked: boolean;
+    refurbished: boolean;
+    serviceHistory: boolean;
+    cracked: boolean;
+    conditionSignals: string[];
+  } | null;
+  whyThisDeal: string[];
   relevanceScore: number;
   listingType: string;
   queryType: string;
@@ -213,6 +247,8 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     dealQuality: normalizeDealQuality(item.dealQuality, score),
     riskFlags: normalizeRiskFlags(item.riskFlags),
     priceInsight: normalizePriceInsight(item.priceInsight),
+    phoneSpecs: normalizePhoneSpecs(item.phoneSpecs),
+    whyThisDeal: normalizeStringList(item.whyThisDeal),
     relevanceScore: pickRelevanceScore(item),
     listingType: item.listingType || "main_product",
     queryType: item.queryType || "main_product",
@@ -261,6 +297,37 @@ function normalizePriceInsight(value: ApiListing["priceInsight"]): SearchResultI
     fairLowRon: typeof value?.fairLowRon === "number" && Number.isFinite(value.fairLowRon) ? value.fairLowRon : null,
     fairHighRon: typeof value?.fairHighRon === "number" && Number.isFinite(value.fairHighRon) ? value.fairHighRon : null,
     priceDeltaPct: typeof value?.priceDeltaPct === "number" && Number.isFinite(value.priceDeltaPct) ? value.priceDeltaPct : null,
+  };
+}
+
+function normalizeNullableNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function normalizeNullableString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizePhoneSpecs(value: ApiListing["phoneSpecs"]): SearchResultItem["phoneSpecs"] {
+  if (!value?.isPhone) {
+    return null;
+  }
+
+  return {
+    isPhone: true,
+    brand: normalizeNullableString(value.brand),
+    model: normalizeNullableString(value.model),
+    variant: normalizeNullableString(value.variant),
+    storageGb: normalizeNullableNumber(value.storageGb),
+    batteryHealthPct: normalizeNullableNumber(value.batteryHealthPct),
+    warranty: Boolean(value.warranty),
+    invoice: Boolean(value.invoice),
+    lockedRisk: Boolean(value.lockedRisk),
+    neverlocked: Boolean(value.neverlocked),
+    refurbished: Boolean(value.refurbished),
+    serviceHistory: Boolean(value.serviceHistory),
+    cracked: Boolean(value.cracked),
+    conditionSignals: normalizeStringList(value.conditionSignals),
   };
 }
 

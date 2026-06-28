@@ -952,6 +952,14 @@ function includesToken(tokens, term) {
   return tokenSetHasTerm(tokens, term);
 }
 
+function isPhoneBatteryHealthSignal(text, queryProfile, term) {
+  if (!queryProfile.categories.includes("phone") || !["baterie", "battery", "acumulator"].includes(normalizeText(term))) {
+    return false;
+  }
+
+  return /\b(?:baterie|battery|bh|akku|acumulator)[^\d]{0,12}\d{2,3}\s*%?|\b\d{2,3}\s*%?\s*(?:baterie|battery|bh|akku|acumulator)/i.test(text);
+}
+
 function findNegativeMatches(text, queryProfile) {
   const queryTokenSet = new Set(queryProfile.expandedTokens);
   const textTokens = new Set(tokenize(text));
@@ -960,6 +968,9 @@ function findNegativeMatches(text, queryProfile) {
   for (const [intent, terms] of Object.entries(NEGATIVE_INTENTS)) {
     for (const term of terms) {
       if (includesToken(queryTokenSet, term)) {
+        continue;
+      }
+      if (isPhoneBatteryHealthSignal(text, queryProfile, term)) {
         continue;
       }
       if (includesToken(textTokens, term)) {
@@ -1143,7 +1154,10 @@ function getListingType({ title, text, queryProfile, negativeMatches }) {
   const productAnchors = queryAnchors.filter((token) => !brandAnchorSet.has(token));
   const hasAnchor = queryAnchors.some((token) => textHasTerm(titleText, textTokens, token));
   const hasAccessoryHead = allAccessoryHeads.some((term) => textHasTerm(titleText, textTokens, term));
-  const hasSparePartHead = allSparePartHeads.some((term) => textHasTerm(titleText, textTokens, term)) ||
+  const hasSparePartHead = allSparePartHeads.some((term) =>
+    textHasTerm(titleText, textTokens, term) &&
+    !isPhoneBatteryHealthSignal(titleText, queryProfile, term)
+  ) ||
     includesAnyPhrase(titleText, CONTEXTUAL_SPARE_PART_PHRASES);
   const startsWithProductAnchor = productAnchors.some((anchor) => textStartsWithTerm(titleText, anchor));
   const startsWithAccessory = allAccessoryHeads.some((term) => textStartsWithTerm(titleText, term));
