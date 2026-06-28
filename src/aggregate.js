@@ -162,6 +162,150 @@ function priceValueScore(priceRon, medianPriceRon) {
   return 25;
 }
 
+function clampScore(value) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function buildPriceInsight(item, medianPriceRon) {
+  if (!Number.isFinite(item.priceRon) || !Number.isFinite(medianPriceRon) || medianPriceRon <= 0) {
+    return {
+      label: "preț necunoscut",
+      severity: "neutral",
+      marketMedianRon: Number.isFinite(medianPriceRon) ? medianPriceRon : null,
+      fairLowRon: Number.isFinite(medianPriceRon) ? Math.round(medianPriceRon * 0.75) : null,
+      fairHighRon: Number.isFinite(medianPriceRon) ? Math.round(medianPriceRon * 1.15) : null,
+      priceDeltaPct: null
+    };
+  }
+
+  const ratio = item.priceRon / medianPriceRon;
+  const priceDeltaPct = Math.round((ratio - 1) * 100);
+  let label = "preț corect";
+  let severity = "neutral";
+
+  if (ratio < 0.45) {
+    label = "foarte ieftin, verifică atent";
+    severity = "warning";
+  } else if (ratio < 0.75) {
+    label = "sub piață";
+    severity = "good";
+  } else if (ratio <= 1.15) {
+    label = "în zona pieței";
+    severity = "neutral";
+  } else if (ratio <= 1.35) {
+    label = "peste medie";
+    severity = "warning";
+  } else {
+    label = "scump";
+    severity = "bad";
+  }
+
+  return {
+    label,
+    severity,
+    marketMedianRon: Math.round(medianPriceRon),
+    fairLowRon: Math.round(medianPriceRon * 0.75),
+    fairHighRon: Math.round(medianPriceRon * 1.15),
+    priceDeltaPct
+  };
+}
+
+function buildRiskFlags(item, medianPriceRon) {
+  const flags = [];
+  const reasons = item.rejectionReasons || [];
+  const missingKeywords = item.keywordSignals?.missingKeywords || [];
+  const negativeKeywords = item.keywordSignals?.negativeKeywords || [];
+
+  if (item.keywordSignals?.variantMismatch || reasons.some((reason) => reason.startsWith("variant_mismatch:"))) {
+    flags.push({ code: "variant_mismatch", label: "variantă diferită", severity: "bad" });
+  }
+  if (missingKeywords.length || reasons.includes("missing_critical_query_tokens")) {
+    flags.push({ code: "missing_keywords", label: "cuvinte cheie lipsă", severity: "warning" });
+  }
+  if (negativeKeywords.length) {
+    flags.push({ code: "negative_terms", label: "termeni penalizați", severity: "warning" });
+  }
+  if (item.listingType === "accessory") {
+    flags.push({ code: "accessory", label: "pare accesoriu", severity: "warning" });
+  }
+  if (item.listingType === "spare_part") {
+    flags.push({ code: "spare_part", label: "pare piesă", severity: "bad" });
+  }
+  if (item.listingType === "broken_or_for_parts") {
+    flags.push({ code: "broken", label: "defect/pentru piese", severity: "bad" });
+  }
+  if (item.listingType === "wanted") {
+    flags.push({ code: "wanted", label: "anunț de cumpărare", severity: "bad" });
+  }
+  if ((item.intentType === "commercial" || reasons.includes("commercial")) && !flags.some((flag) => flag.code === "commercial")) {
+    flags.push({ code: "commercial", label: "anunț stoc/catalog", severity: "warning" });
+  }
+  if (Number.isFinite(item.priceRon) && Number.isFinite(medianPriceRon) && medianPriceRon > 0) {
+    const ratio = item.priceRon / medianPriceRon;
+    if (ratio < 0.45) {
+      flags.push({ code: "very_low_price", label: "preț neobișnuit de mic", severity: "warning" });
+    } else if (ratio > 1.35) {
+      flags.push({ code: "high_price", label: "preț peste piață", severity: "warning" });
+    }
+  }
+  if (!item.imageUrl && !item.image && !item.thumbnailUrl && !item.images?.length && !item.imageUrls?.length) {
+    flags.push({ code: "no_image", label: "fără poză", severity: "warning" });
+  }
+
+  return flags;
+}
+
+function scoreRisk(flags) {
+  return clampScore(100 - flags.reduce((sum, flag) => {
+    if (flag.severity === "bad") {
+      return sum + 35;
+    }
+    if (flag.severity === "warning") {
+      return sum + 18;
+    }
+    return sum + 8;
+  }, 0));
+}
+
+function buildDealQuality(item, medianPriceRon, condition) {
+  const riskFlags = buildRiskFlags(item, medianPriceRon);
+  const productMatch = clampScore(Number.isFinite(item.relevanceScore) ? item.relevanceScore : 50);
+  const price = clampScore(priceValueScore(item.priceRon, medianPriceRon));
+  const conditionScore =
+    condition === "any" ? 70 :
+    matchesCondition(item, condition) ? 100 :
+    25;
+  const freshness = clampScore(Math.min(100, recencyScore(item.postedAt) * 5));
+  const risk = scoreRisk(riskFlags);
+  const score = clampScore(
+    (productMatch * 0.34) +
+    (price * 0.26) +
+    (conditionScore * 0.14) +
+    (freshness * 0.10) +
+    (risk * 0.16)
+  );
+  const label =
+    score >= 86 ? "deal foarte bun" :
+    score >= 72 ? "deal bun" :
+    score >= 55 ? "verifică detaliile" :
+    "risc ridicat";
+
+  return {
+    score,
+    label,
+    productMatch,
+    price,
+    condition: clampScore(conditionScore),
+    freshness,
+    risk,
+    reasons: [
+      `potrivire produs ${productMatch}%`,
+      `preț ${price}%`,
+      `risc ${risk}%`
+    ]
+  };
+}
+
 function safePriceForTieBreak(priceRon) {
   return Number.isFinite(priceRon) ? priceRon : Number.POSITIVE_INFINITY;
 }
@@ -296,6 +440,19 @@ function scoreGlobalRecommendation(item, medianPriceRon, condition) {
   }
 
   return Math.max(0, Math.min(100, score));
+}
+
+function enrichItemWithDealIntelligence(item, medianPriceRon, condition) {
+  const priceInsight = buildPriceInsight(item, medianPriceRon);
+  const riskFlags = buildRiskFlags(item, medianPriceRon);
+  const dealQuality = buildDealQuality(item, medianPriceRon, condition);
+
+  return {
+    ...item,
+    priceInsight,
+    riskFlags,
+    dealQuality
+  };
 }
 
 function pickTopRecommendationsByMarketplace(items, limit = 4) {
@@ -448,10 +605,13 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     ? allPricedItems.reduce((sum, item) => sum + item.priceRon, 0) / allPricedItems.length
     : null;
   const globalMedianPriceRon = median(allScoredItems.map((item) => item.priceRon).filter((value) => Number.isFinite(value)));
-  const allBestCandidates = allScoredItems.map((item) => ({
-    ...item,
-    recommendationScore: scoreGlobalRecommendation(item, globalMedianPriceRon, condition)
-  }));
+  const allBestCandidates = allScoredItems.map((item) => {
+    const enrichedItem = enrichItemWithDealIntelligence(item, globalMedianPriceRon, condition);
+    return {
+      ...enrichedItem,
+      recommendationScore: scoreGlobalRecommendation(enrichedItem, globalMedianPriceRon, condition)
+    };
+  });
   const rankedCandidates = allBestCandidates
     .sort((a, b) => {
       if (b.recommendationScore !== a.recommendationScore) {
@@ -488,6 +648,12 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const matchedListings = successfulResults.reduce((sum, result) => sum + (result.matchedItemCount ?? result.itemCount ?? 0), 0);
   const includedListings = successfulResults.reduce((sum, result) => sum + result.items.length, 0);
   const excludedListings = successfulResults.reduce((sum, result) => sum + (result.excludedItemCount || 0), 0);
+  const priceIntelligence = {
+    medianRon: Number.isFinite(globalMedianPriceRon) ? Math.round(globalMedianPriceRon) : null,
+    fairLowRon: Number.isFinite(globalMedianPriceRon) ? Math.round(globalMedianPriceRon * 0.75) : null,
+    fairHighRon: Number.isFinite(globalMedianPriceRon) ? Math.round(globalMedianPriceRon * 1.15) : null,
+    pricedListingsRon: allPricedItems.length
+  };
 
   return {
     results: rankedResults,
@@ -515,6 +681,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       totalListings: includedListings,
       pricedListingsRon: allPricedItems.length,
       averagePriceRon,
+      priceIntelligence,
       bestOffer,
       recommendedOffers
     }

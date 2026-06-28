@@ -114,6 +114,23 @@ function formatSignalLabel(value = "") {
   return value.replace(/_/g, " ")
 }
 
+function formatSignedPercent(value: number | null) {
+  if (value === null) return ""
+  if (value > 0) return `+${value}%`
+  return `${value}%`
+}
+
+function formatRon(value: number | null) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "n/a"
+  return `${value.toLocaleString("ro-RO", { maximumFractionDigits: 0 })} RON`
+}
+
+function severityColor(severity = "neutral") {
+  if (severity === "good") return GREEN
+  if (severity === "bad" || severity === "warning") return PINK
+  return `${INK}99`
+}
+
 function buildSellerMessage(item: SearchResultItem, query: string) {
   const product = query || item.title
   return [
@@ -299,6 +316,83 @@ function KeywordSignalChips({ item, compact = false }: { item: SearchResultItem;
           <span className="truncate">variantă: {formatSignalLabel(variantMismatch)}</span>
         </span>
       )}
+    </div>
+  )
+}
+
+function RiskFlagChips({ item, compact = false }: { item: SearchResultItem; compact?: boolean }) {
+  const flags = item.riskFlags.slice(0, compact ? 2 : 4)
+
+  if (!flags.length) {
+    return (
+      <span className="text-[10px] font-bold uppercase" style={{ color: GREEN }}>
+        risc redus
+      </span>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {flags.map((flag) => (
+        <span
+          key={`${flag.code}-${flag.label}`}
+          className="inline-flex max-w-full items-center px-2 py-1 text-[9px] font-bold uppercase leading-none"
+          style={{
+            border: `1px solid ${severityColor(flag.severity)}`,
+            background: flag.severity === "bad" || flag.severity === "warning" ? "#FFF1F4" : "#F1EEE6",
+            color: INK,
+          }}
+        >
+          <span className="truncate">! {flag.label}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function DealQualitySummary({ item, compact = false }: { item: SearchResultItem; compact?: boolean }) {
+  const insight = item.priceInsight
+  const delta = formatSignedPercent(insight.priceDeltaPct)
+
+  return (
+    <div className="flex flex-col gap-2 text-[10px] uppercase font-bold">
+      <div className="flex items-center justify-between gap-2">
+        <span style={{ color: `${INK}66` }}>Deal</span>
+        <span style={{ color: item.dealQuality.score >= 72 ? GREEN : PINK }}>
+          {item.dealQuality.label} · {item.dealQuality.score}%
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {[
+          { label: "produs", score: item.dealQuality.productMatch },
+          { label: "preț", score: item.dealQuality.price },
+          { label: "risc", score: item.dealQuality.risk },
+        ].map(({ label, score }) => (
+          <div key={label} className="min-w-0">
+            <div className="mb-1 flex items-center justify-between gap-1">
+              <span className="truncate" style={{ color: `${INK}66` }}>{label}</span>
+              <span>{score}%</span>
+            </div>
+            <div className="h-1.5 w-full" style={{ background: "#E4E2DA" }}>
+              <div className="h-full" style={{ width: `${score}%`, background: score >= 70 ? GREEN : PINK }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <span style={{ color: `${INK}66` }}>Preț piață</span>
+          <span style={{ color: severityColor(insight.severity) }}>
+            {insight.label}{delta ? ` (${delta})` : ""}
+          </span>
+        </div>
+        {!compact && (
+          <span style={{ color: `${INK}66` }}>
+            interval: {formatRon(insight.fairLowRon)} - {formatRon(insight.fairHighRon)} · mediană {formatRon(insight.marketMedianRon)}
+          </span>
+        )}
+      </div>
+      <RiskFlagChips item={item} compact={compact} />
     </div>
   )
 }
@@ -822,6 +916,7 @@ function ResultCard({ item, query }: { item: ResultItem; query: string }) {
           <span>Scor: <span style={{ color: `${INK}66` }}>{item.score}%</span></span>
           <ScoreBar score={item.score} total={8} />
         </div>
+        <DealQualitySummary item={item} compact />
         <div className="flex items-center justify-between gap-2 text-[10px] uppercase font-bold">
           <span style={{ color: `${INK}66` }}>Keywords</span>
           <span style={{ color: keywordScore >= 70 ? GREEN : PINK }}>{keywordScore}%</span>
@@ -929,6 +1024,9 @@ function RecommendationCard({ item, query }: { item: SearchResultItem; query: st
               </div>
               <div className="pl-0 md:pl-[7rem]">
                 <KeywordSignalChips item={item} />
+              </div>
+              <div className="pt-2">
+                <DealQualitySummary item={item} />
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3">

@@ -17,6 +17,29 @@ export type ApiListing = {
   rank?: number;
   offerScore?: number;
   recommendationScore?: number;
+  dealQuality?: {
+    score?: number;
+    label?: string;
+    productMatch?: number;
+    price?: number;
+    condition?: number;
+    freshness?: number;
+    risk?: number;
+    reasons?: string[];
+  };
+  riskFlags?: Array<{
+    code?: string;
+    label?: string;
+    severity?: string;
+  }>;
+  priceInsight?: {
+    label?: string;
+    severity?: string;
+    marketMedianRon?: number | null;
+    fairLowRon?: number | null;
+    fairHighRon?: number | null;
+    priceDeltaPct?: number | null;
+  };
   relevanceScore?: number;
   listingType?: string;
   queryType?: string;
@@ -58,6 +81,12 @@ export type SearchPayload = {
     excludedListings?: number;
     blockedMarketplaces?: string[];
     failedMarketplaces?: Array<{ site?: string; provider?: string; error?: string }>;
+    priceIntelligence?: {
+      medianRon?: number | null;
+      fairLowRon?: number | null;
+      fairHighRon?: number | null;
+      pricedListingsRon?: number;
+    };
     bestOffer?: ApiListing | null;
   };
   error?: string;
@@ -78,6 +107,29 @@ export type SearchResultItem = {
   url?: string;
   rank?: number;
   score: number;
+  dealQuality: {
+    score: number;
+    label: string;
+    productMatch: number;
+    price: number;
+    condition: number;
+    freshness: number;
+    risk: number;
+    reasons: string[];
+  };
+  riskFlags: Array<{
+    code: string;
+    label: string;
+    severity: string;
+  }>;
+  priceInsight: {
+    label: string;
+    severity: string;
+    marketMedianRon: number | null;
+    fairLowRon: number | null;
+    fairHighRon: number | null;
+    priceDeltaPct: number | null;
+  };
   relevanceScore: number;
   listingType: string;
   queryType: string;
@@ -158,11 +210,57 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     url: url || undefined,
     rank: typeof item.rank === "number" && Number.isFinite(item.rank) ? item.rank : undefined,
     score,
+    dealQuality: normalizeDealQuality(item.dealQuality, score),
+    riskFlags: normalizeRiskFlags(item.riskFlags),
+    priceInsight: normalizePriceInsight(item.priceInsight),
     relevanceScore: pickRelevanceScore(item),
     listingType: item.listingType || "main_product",
     queryType: item.queryType || "main_product",
     rejectionReasons: Array.isArray(item.rejectionReasons) ? item.rejectionReasons : [],
     keywordSignals: normalizeKeywordSignals(item.keywordSignals),
+  };
+}
+
+function normalizeScore(value: unknown, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.min(100, Math.round(value)))
+    : fallback;
+}
+
+function normalizeDealQuality(value: ApiListing["dealQuality"], fallbackScore: number): SearchResultItem["dealQuality"] {
+  const score = normalizeScore(value?.score, fallbackScore);
+  return {
+    score,
+    label: value?.label || (score >= 80 ? "deal bun" : "verifică detaliile"),
+    productMatch: normalizeScore(value?.productMatch, score),
+    price: normalizeScore(value?.price, 50),
+    condition: normalizeScore(value?.condition, 70),
+    freshness: normalizeScore(value?.freshness, 0),
+    risk: normalizeScore(value?.risk, 70),
+    reasons: normalizeStringList(value?.reasons),
+  };
+}
+
+function normalizeRiskFlags(value: ApiListing["riskFlags"]): SearchResultItem["riskFlags"] {
+  return Array.isArray(value)
+    ? value
+      .map((flag) => ({
+        code: String(flag?.code || "").trim(),
+        label: String(flag?.label || "").trim(),
+        severity: String(flag?.severity || "neutral").trim(),
+      }))
+      .filter((flag) => flag.code && flag.label)
+    : [];
+}
+
+function normalizePriceInsight(value: ApiListing["priceInsight"]): SearchResultItem["priceInsight"] {
+  return {
+    label: value?.label || "preț necunoscut",
+    severity: value?.severity || "neutral",
+    marketMedianRon: typeof value?.marketMedianRon === "number" && Number.isFinite(value.marketMedianRon) ? value.marketMedianRon : null,
+    fairLowRon: typeof value?.fairLowRon === "number" && Number.isFinite(value.fairLowRon) ? value.fairLowRon : null,
+    fairHighRon: typeof value?.fairHighRon === "number" && Number.isFinite(value.fairHighRon) ? value.fairHighRon : null,
+    priceDeltaPct: typeof value?.priceDeltaPct === "number" && Number.isFinite(value.priceDeltaPct) ? value.priceDeltaPct : null,
   };
 }
 

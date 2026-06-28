@@ -91,6 +91,70 @@ test("keeps exact tech product matches ahead of accessories and wrong variants",
   assert.equal(result.secondaryMatches[0].keywordSignals.variantMismatch, "pro_vs_pro_max");
 });
 
+test("adds deal quality, risk flags, and price intelligence to returned listings", () => {
+  const query = "Samsung Galaxy S23";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Samsung Galaxy S23 128GB",
+        price: "2500 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        image: "https://example.test/s23.jpg",
+        url: "https://olx.ro/s23"
+      },
+      {
+        title: "Samsung Galaxy S23 128GB sigilat",
+        price: "4200 lei",
+        condition: "nou",
+        postedAt: "Azi",
+        image: "https://example.test/s23-new.jpg",
+        url: "https://olx.ro/s23-new"
+      }
+    ])
+  ]);
+
+  const [result] = aggregated.results;
+  const [first] = result.items;
+
+  assert.ok(Number.isFinite(first.dealQuality.score));
+  assert.ok(first.dealQuality.reasons.some((reason) => reason.includes("potrivire produs")));
+  assert.equal(first.priceInsight.marketMedianRon, aggregated.summary.priceIntelligence.medianRon);
+  assert.equal(aggregated.summary.priceIntelligence.pricedListingsRon, 2);
+  assert.ok(aggregated.summary.priceIntelligence.fairLowRon < aggregated.summary.priceIntelligence.fairHighRon);
+  assert.ok(result.items.some((item) => item.priceInsight.label === "peste medie" || item.priceInsight.label === "scump"));
+});
+
+test("flags suspiciously cheap listings even when they match the product", () => {
+  const query = "iPhone 14 Pro";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Apple iPhone 14 Pro 128GB impecabil",
+        price: "2900 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        image: "https://example.test/good.jpg",
+        url: "https://olx.ro/good"
+      },
+      {
+        title: "Apple iPhone 14 Pro 128GB",
+        price: "700 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        image: "https://example.test/cheap.jpg",
+        url: "https://olx.ro/cheap"
+      }
+    ])
+  ]);
+
+  const cheap = aggregated.results[0].items.find((item) => item.url === "https://olx.ro/cheap");
+
+  assert.ok(cheap.riskFlags.some((flag) => flag.code === "very_low_price"));
+  assert.equal(cheap.priceInsight.severity, "warning");
+  assert.ok(cheap.dealQuality.risk < 100);
+});
+
 
 test("keeps listings with missing optional metadata in recommendation output", () => {
   const query = "Samsung Galaxy S23";
