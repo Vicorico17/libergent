@@ -182,6 +182,7 @@ function scoreOffer(item, query, medianPriceRon, condition) {
   const matches = queryTokens.filter((token) => titleTokens.has(token)).length;
   const brandTokens = getQueryBrandTerms(query);
   const brandMatches = brandTokens.filter((token) => titleTokens.has(token)).length;
+  const relevance = Number.isFinite(item.relevanceScore) ? item.relevanceScore : 60;
 
   const badKeywords = [
     "piese",
@@ -197,7 +198,7 @@ function scoreOffer(item, query, medianPriceRon, condition) {
     "placa"
   ];
 
-  let score = 60;
+  let score = Math.round(relevance * 0.62);
   score += Math.min(matches * 8, 24);
   if (brandTokens.length) {
     score += brandMatches ? 18 : 0;
@@ -218,6 +219,20 @@ function scoreOffer(item, query, medianPriceRon, condition) {
   }
   if (condition !== "any" && !matchesCondition(item, condition)) {
     score -= 28;
+  }
+  if (item.keywordSignals?.missingKeywords?.length) {
+    score -= Math.min(35, item.keywordSignals.missingKeywords.length * 12);
+  }
+  if (item.keywordSignals?.negativeKeywords?.length) {
+    score -= Math.min(35, item.keywordSignals.negativeKeywords.length * 10);
+  }
+  if (item.keywordSignals?.variantMismatch) {
+    score -= 30;
+  }
+  if (item.listingType === "accessory") {
+    score -= 20;
+  } else if (item.listingType === "spare_part" || item.listingType === "broken_or_for_parts" || item.listingType === "wanted" || item.listingType === "service") {
+    score -= 35;
   }
 
   if (Number.isFinite(item.priceRon) && Number.isFinite(medianPriceRon)) {

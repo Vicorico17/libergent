@@ -17,6 +17,20 @@ export type ApiListing = {
   rank?: number;
   offerScore?: number;
   recommendationScore?: number;
+  relevanceScore?: number;
+  listingType?: string;
+  queryType?: string;
+  rejectionReasons?: string[];
+  keywordSignals?: {
+    queryKeywords?: string[];
+    expandedKeywords?: string[];
+    brandKeywords?: string[];
+    matchedKeywords?: string[];
+    matchedTitleKeywords?: string[];
+    missingKeywords?: string[];
+    negativeKeywords?: string[];
+    variantMismatch?: string | null;
+  };
 };
 
 export type ApiResult = {
@@ -64,6 +78,20 @@ export type SearchResultItem = {
   url?: string;
   rank?: number;
   score: number;
+  relevanceScore: number;
+  listingType: string;
+  queryType: string;
+  rejectionReasons: string[];
+  keywordSignals: {
+    queryKeywords: string[];
+    expandedKeywords: string[];
+    brandKeywords: string[];
+    matchedKeywords: string[];
+    matchedTitleKeywords: string[];
+    missingKeywords: string[];
+    negativeKeywords: string[];
+    variantMismatch: string | null;
+  };
 };
 
 const platformLabels: Record<string, string> = {
@@ -130,6 +158,30 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     url: url || undefined,
     rank: typeof item.rank === "number" && Number.isFinite(item.rank) ? item.rank : undefined,
     score,
+    relevanceScore: pickRelevanceScore(item),
+    listingType: item.listingType || "main_product",
+    queryType: item.queryType || "main_product",
+    rejectionReasons: Array.isArray(item.rejectionReasons) ? item.rejectionReasons : [],
+    keywordSignals: normalizeKeywordSignals(item.keywordSignals),
+  };
+}
+
+function normalizeStringList(value: unknown) {
+  return Array.isArray(value)
+    ? [...new Set(value.map((entry) => String(entry || "").trim()).filter(Boolean))]
+    : [];
+}
+
+function normalizeKeywordSignals(value: ApiListing["keywordSignals"]): SearchResultItem["keywordSignals"] {
+  return {
+    queryKeywords: normalizeStringList(value?.queryKeywords),
+    expandedKeywords: normalizeStringList(value?.expandedKeywords),
+    brandKeywords: normalizeStringList(value?.brandKeywords),
+    matchedKeywords: normalizeStringList(value?.matchedKeywords),
+    matchedTitleKeywords: normalizeStringList(value?.matchedTitleKeywords),
+    missingKeywords: normalizeStringList(value?.missingKeywords),
+    negativeKeywords: normalizeStringList(value?.negativeKeywords),
+    variantMismatch: value?.variantMismatch ? String(value.variantMismatch) : null,
   };
 }
 
@@ -245,6 +297,13 @@ function pickRecommendationScore(item: ApiListing) {
     return Math.max(1, Math.min(100, 100 - item.rank));
   }
   return 50;
+}
+
+function pickRelevanceScore(item: ApiListing) {
+  if (typeof item.relevanceScore === "number" && Number.isFinite(item.relevanceScore)) {
+    return Math.round(item.relevanceScore);
+  }
+  return pickRecommendationScore(item);
 }
 
 function pickListingImages(item: ApiListing) {

@@ -1064,6 +1064,58 @@ function detectModelVariantMismatch({ title, text, queryProfile }) {
   return { mismatch: false, reason: "" };
 }
 
+function detectCatalogListingMismatch({ title, queryProfile }) {
+  if (!queryProfile.categories.includes("phone")) {
+    return { mismatch: false, reason: "" };
+  }
+
+  const queryModelNumbers = queryProfile.tokens.filter((token) => /^\d{2}$/.test(token));
+  if (!queryModelNumbers.length || !queryProfile.tokens.includes("iphone")) {
+    return { mismatch: false, reason: "" };
+  }
+
+  const titleText = normalizeText(title);
+  const listingModelNumbers = [...titleText.matchAll(/\biphone\s*(\d{2})(?:e)?\b/g)]
+    .map((match) => match[1]);
+  const distinctListingModels = [...new Set(listingModelNumbers)];
+  const distinctOtherModels = distinctListingModels.filter((model) => !queryModelNumbers.includes(model));
+
+  if (distinctListingModels.length >= 2 && distinctOtherModels.length) {
+    return { mismatch: true, reason: "multi_model_catalog" };
+  }
+
+  return { mismatch: false, reason: "" };
+}
+
+function buildKeywordSignals({ queryProfile, matchStats, negativeMatches, variantMatch }) {
+  const matchedTitleKeywords = [
+    ...matchStats.titleMatches,
+    ...matchStats.brandTitleMatches
+  ];
+  const matchedTextKeywords = [
+    ...matchStats.textMatches,
+    ...matchStats.brandTextMatches,
+    ...matchStats.expandedMatches
+  ];
+  const matchedKeywords = [...new Set([...matchedTitleKeywords, ...matchedTextKeywords])];
+  const missingKeywords = [...new Set([
+    ...matchStats.missingRequiredTokens,
+    ...matchStats.missingCriticalTokens
+  ])];
+  const negativeKeywords = [...new Set(negativeMatches.map((match) => match.term).filter(Boolean))];
+
+  return {
+    queryKeywords: queryProfile.tokens,
+    expandedKeywords: queryProfile.expandedTokens,
+    brandKeywords: queryProfile.brandTerms,
+    matchedKeywords,
+    matchedTitleKeywords: [...new Set(matchedTitleKeywords)],
+    missingKeywords,
+    negativeKeywords,
+    variantMismatch: variantMatch.mismatch ? variantMatch.reason : null
+  };
+}
+
 function getIntentType(negativeMatches, matchStats) {
   if (!matchStats.requiredCount || (matchStats.textMatches.length === 0 && matchStats.expandedMatches.length === 0)) {
     return "weak_match";
@@ -1305,6 +1357,10 @@ export function classifyListingIntent(item, query) {
   }
   const matchStats = getMatchStats(title, text, queryProfile);
   const variantMatch = detectModelVariantMismatch({ title, text, queryProfile });
+  const catalogMismatch = detectCatalogListingMismatch({ title, queryProfile });
+  if (catalogMismatch.mismatch) {
+    negativeMatches.push({ intent: "commercial", term: catalogMismatch.reason });
+  }
   const listingType = getListingType({ title, text, queryProfile, negativeMatches });
   if (queryProfile.taxonomy === PRODUCT_TAXONOMY.basketball_hoop && listingType === "main_product") {
     negativeMatches = negativeMatches.filter((match) => !["plasa", "plase", "net", "set"].includes(match.term));
@@ -1351,14 +1407,22 @@ export function classifyListingIntent(item, query) {
   if (variantMatch.mismatch) {
     rejectionReasons.push(`variant_mismatch:${variantMatch.reason}`);
   }
+  const keywordSignals = buildKeywordSignals({
+    queryProfile,
+    matchStats,
+    negativeMatches,
+    variantMatch
+  });
 
   const uniqueRejectionReasons = [...new Set(rejectionReasons)];
   const hasHardRejection = uniqueRejectionReasons.some((reason) =>
     reason === "missing_brand" ||
     reason.startsWith("type_mismatch:") ||
+    reason.startsWith("variant_mismatch:") ||
     reason.startsWith("wanted") ||
     reason.startsWith("service") ||
-    reason.startsWith("broken")
+    reason.startsWith("broken") ||
+    reason.startsWith("commercial")
   );
 
   return {
@@ -1368,6 +1432,7 @@ export function classifyListingIntent(item, query) {
     productHead: queryProfile.productHead,
     anchorTerms: queryProfile.expandedTokens,
     brandTerms: queryProfile.brandTerms,
+    keywordSignals,
     typeCompatibilityScore,
     intentType,
     relevanceScore: Math.max(0, Math.min(100, relevanceScore)),

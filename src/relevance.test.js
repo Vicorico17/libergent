@@ -64,6 +64,51 @@ test("requires exact model and variant tokens for technical product searches", (
   assert.ok(wrongBrand.rejectionReasons.includes("missing_brand"));
 });
 
+test("exposes matched, missing, negative, and variant keyword signals", () => {
+  const exact = classifyListingIntent(
+    { title: "Apple iPhone 15 Pro 128GB", price: "2500 lei", priceRon: 2500 },
+    "iphone 15 pro"
+  );
+  const accessory = classifyListingIntent(
+    { title: "Husa iPhone 15 Pro Max silicon", price: "35 lei", priceRon: 35 },
+    "iphone 15 pro"
+  );
+
+  assert.deepEqual(exact.keywordSignals.queryKeywords, ["iphone", "15", "pro"]);
+  assert.ok(exact.keywordSignals.matchedKeywords.includes("iphone"));
+  assert.ok(exact.keywordSignals.matchedKeywords.includes("15"));
+  assert.ok(exact.keywordSignals.matchedKeywords.includes("pro"));
+  assert.equal(exact.keywordSignals.missingKeywords.length, 0);
+  assert.equal(accessory.isRecommendedCandidate, false);
+  assert.ok(accessory.keywordSignals.negativeKeywords.includes("price_below_category_floor"));
+  assert.equal(accessory.keywordSignals.variantMismatch, "pro_vs_pro_max");
+});
+
+test("rejects multi-model phone stock ads for exact iPhone searches", () => {
+  const stockAd = classifyListingIntent(
+    {
+      title: "Stoc iPhone 16, iPhone 16 Pro, Sony PS5, iPhone 16e, iPhone 15, iPhone 17",
+      price: "300 euro",
+      priceRon: 1500
+    },
+    "iphone 15 pro"
+  );
+  const exact = classifyListingIntent(
+    {
+      title: "iPhone 15 Pro 128GB impecabil",
+      price: "2500 lei",
+      priceRon: 2500
+    },
+    "iphone 15 pro"
+  );
+
+  assert.equal(stockAd.isRecommendedCandidate, false);
+  assert.ok(stockAd.rejectionReasons.includes("commercial"));
+  assert.ok(stockAd.keywordSignals.negativeKeywords.includes("multi_model_catalog"));
+  assert.equal(exact.isRecommendedCandidate, true);
+});
+
+
 test("requires structured size and spec tokens when they are part of the query", () => {
   const r16 = classifyListingIntent(
     { title: "Vand 4 cauciucuri iarna 205/55/R16", price: "500 lei", priceRon: 500 },

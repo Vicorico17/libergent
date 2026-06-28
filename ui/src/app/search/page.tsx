@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { CalendarDays, Copy, ExternalLink, MapPin, MessageSquare, Tag } from "lucide-react"
+import { CalendarDays, ExternalLink, MapPin, MessageSquare, Tag } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import { mapBestOffer, mapSearchResults, type SearchPayload, type SearchResultItem } from "./search-data"
@@ -83,6 +83,19 @@ function tokenizeKeywords(value = "") {
 }
 
 function getKeywordMatchScore(item: SearchResultItem, query: string) {
+  const signals = item.keywordSignals
+  const signalKeywords = signals.queryKeywords.length ? signals.queryKeywords : tokenizeKeywords(query)
+  if (signalKeywords.length) {
+    const matched = new Set(signals.matchedKeywords)
+    const missing = new Set(signals.missingKeywords)
+    const positive = signalKeywords.reduce((score, token) => score + (matched.has(token) ? 1 : 0), 0)
+    const penalty = Math.min(missing.size * 12, 45) +
+      Math.min(signals.negativeKeywords.length * 10, 35) +
+      (signals.variantMismatch ? 30 : 0)
+    const rawScore = Math.round((positive / signalKeywords.length) * 100) - penalty
+    return Math.max(0, Math.min(100, rawScore))
+  }
+
   const queryTokens = tokenizeKeywords(query)
   if (!queryTokens.length) return item.score
 
@@ -95,6 +108,10 @@ function getKeywordMatchScore(item: SearchResultItem, query: string) {
   }, 0)
 
   return Math.round((matched / (queryTokens.length * 2)) * 100)
+}
+
+function formatSignalLabel(value = "") {
+  return value.replace(/_/g, " ")
 }
 
 function buildSellerMessage(item: SearchResultItem, query: string) {
@@ -225,6 +242,63 @@ function ListingMetaChips({ item }: { item: SearchResultItem }) {
       <MetaChip icon={<MapPin size={10} strokeWidth={2.2} />}>{item.city}</MetaChip>
       <MetaChip tone="dark" icon={<Tag size={10} strokeWidth={2.2} />}>{item.condition}</MetaChip>
       <MetaChip tone="muted" icon={<CalendarDays size={10} strokeWidth={2.2} />}>{item.postedDateLabel}</MetaChip>
+    </div>
+  )
+}
+
+function KeywordSignalChips({ item, compact = false }: { item: SearchResultItem; compact?: boolean }) {
+  const matched = item.keywordSignals.matchedKeywords.slice(0, compact ? 4 : 6)
+  const missing = item.keywordSignals.missingKeywords.slice(0, compact ? 3 : 5)
+  const negative = item.keywordSignals.negativeKeywords.slice(0, compact ? 2 : 4)
+  const variantMismatch = item.keywordSignals.variantMismatch
+
+  if (!matched.length && !missing.length && !negative.length && !variantMismatch) {
+    return null
+  }
+
+  const chipClass = "inline-flex max-w-full items-center px-2 py-1 text-[9px] font-bold uppercase leading-none"
+
+  return (
+    <div className="flex flex-wrap gap-1.5" aria-label="Keyword matching signals">
+      {matched.map((keyword) => (
+        <span
+          key={`match-${keyword}`}
+          className={chipClass}
+          title="Cuvânt cheie potrivit"
+          style={{ border: `1px solid ${GREEN}`, background: "#ECFDF3", color: INK }}
+        >
+          <span className="truncate">+ {keyword}</span>
+        </span>
+      ))}
+      {missing.map((keyword) => (
+        <span
+          key={`missing-${keyword}`}
+          className={chipClass}
+          title="Cuvânt cheie lipsă"
+          style={{ border: `1px solid ${PINK}`, background: "#FFF1F4", color: INK }}
+        >
+          <span className="truncate">- {keyword}</span>
+        </span>
+      ))}
+      {negative.map((keyword) => (
+        <span
+          key={`negative-${keyword}`}
+          className={chipClass}
+          title="Semnal penalizat"
+          style={{ border: `1px solid ${INK}`, background: "#F1EEE6", color: `${INK}CC` }}
+        >
+          <span className="truncate">! {formatSignalLabel(keyword)}</span>
+        </span>
+      ))}
+      {variantMismatch && (
+        <span
+          className={chipClass}
+          title="Variantă diferită față de căutare"
+          style={{ border: `1px solid ${PINK}`, background: "#FFF1F4", color: INK }}
+        >
+          <span className="truncate">variantă: {formatSignalLabel(variantMismatch)}</span>
+        </span>
+      )}
     </div>
   )
 }
@@ -664,31 +738,10 @@ function useListingImage(item: SearchResultItem) {
 }
 
 function SellerMessageActions({ item, query, compact = false }: { item: SearchResultItem; query: string; compact?: boolean }) {
-  const [copied, setCopied] = useState(false)
   const message = buildSellerMessage(item, query)
-
-  async function copyMessage() {
-    try {
-      await navigator.clipboard.writeText(message)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1800)
-    } catch {
-      setCopied(false)
-    }
-  }
 
   return (
     <div className={`flex ${compact ? "flex-col sm:flex-row" : "flex-col sm:flex-row"} gap-2`}>
-      <button
-        type="button"
-        onClick={copyMessage}
-        className="flex min-h-10 flex-1 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase transition-colors duration-150"
-        style={{ border: `1px solid ${INK}`, background: copied ? GREEN : "white", color: INK, fontFamily: MONO }}
-        title={message}
-      >
-        <Copy size={13} strokeWidth={2.2} />
-        {copied ? "Mesaj copiat" : "Copiază mesaj"}
-      </button>
       {item.url ? (
         <a
           href={item.url}
@@ -696,6 +749,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
           rel="noopener noreferrer"
           className="flex min-h-10 flex-1 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase transition-colors duration-150"
           style={{ border: `1px solid ${INK}`, background: INK, color: "white", fontFamily: MONO }}
+          title={message}
         >
           <MessageSquare size={13} strokeWidth={2.2} />
           Contactează sellerul
@@ -772,6 +826,7 @@ function ResultCard({ item, query }: { item: ResultItem; query: string }) {
           <span style={{ color: `${INK}66` }}>Keywords</span>
           <span style={{ color: keywordScore >= 70 ? GREEN : PINK }}>{keywordScore}%</span>
         </div>
+        <KeywordSignalChips item={item} compact />
         <SellerMessageActions item={item} query={query} compact />
       </div>
     </>
@@ -871,6 +926,9 @@ function RecommendationCard({ item, query }: { item: SearchResultItem; query: st
               <div className="flex items-center gap-4">
                 <span className="text-[11px] uppercase font-bold w-24">Keywords:</span>
                 <span className="text-[13px] font-bold" style={{ color: keywordScore >= 70 ? GREEN : PINK }}>{keywordScore}%</span>
+              </div>
+              <div className="pl-0 md:pl-[7rem]">
+                <KeywordSignalChips item={item} />
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3">

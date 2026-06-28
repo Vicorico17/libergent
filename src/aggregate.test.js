@@ -53,6 +53,45 @@ test("prefers trusted complete offer over suspiciously cheap defective listing",
   assert.equal(topOlxRecommendation?.url, "https://olx.ro/good");
 });
 
+test("keeps exact tech product matches ahead of accessories and wrong variants", () => {
+  const query = "iphone 15 pro";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Husa iPhone 15 Pro Max silicon",
+        price: "35 lei",
+        condition: "nou",
+        postedAt: "Azi",
+        url: "https://olx.ro/case"
+      },
+      {
+        title: "Apple iPhone 15 Pro 128GB impecabil",
+        price: "2500 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://olx.ro/exact"
+      },
+      {
+        title: "Apple iPhone 15 Pro Max 256GB",
+        price: "3300 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        url: "https://olx.ro/pro-max"
+      }
+    ])
+  ]);
+
+  const [result] = aggregated.results;
+
+  assert.deepEqual(result.items.map((item) => item.url), ["https://olx.ro/exact"]);
+  assert.equal(result.relatedAccessories.length, 1);
+  assert.equal(result.secondaryMatches.length, 1);
+  assert.equal(aggregated.bestOffer?.url, "https://olx.ro/exact");
+  assert.ok(result.items[0].keywordSignals.matchedKeywords.includes("iphone"));
+  assert.equal(result.secondaryMatches[0].keywordSignals.variantMismatch, "pro_vs_pro_max");
+});
+
+
 test("keeps listings with missing optional metadata in recommendation output", () => {
   const query = "Samsung Galaxy S23";
   const aggregated = aggregateMarketplaceResults([
