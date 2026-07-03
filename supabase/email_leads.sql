@@ -8,6 +8,20 @@ create table if not exists public.email_leads (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.saved_searches (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  query text not null,
+  source text not null default 'search_results_save',
+  page_path text not null default '',
+  notifications_enabled boolean not null default true,
+  last_checked_at timestamptz,
+  last_notified_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (email, query)
+);
+
 alter table public.email_leads
   drop constraint if exists email_leads_email_check,
   drop constraint if exists email_leads_email_format_check;
@@ -22,6 +36,7 @@ alter table public.email_leads
   );
 
 alter table public.email_leads enable row level security;
+alter table public.saved_searches enable row level security;
 
 create index if not exists email_leads_updated_at_idx
   on public.email_leads (updated_at desc);
@@ -29,8 +44,16 @@ create index if not exists email_leads_updated_at_idx
 create index if not exists email_leads_source_idx
   on public.email_leads (source);
 
+create index if not exists saved_searches_updated_at_idx
+  on public.saved_searches (updated_at desc);
+
+create index if not exists saved_searches_notifications_idx
+  on public.saved_searches (notifications_enabled, last_checked_at);
+
 grant usage on schema public to anon, authenticated, service_role;
 revoke all on table public.email_leads from anon, authenticated;
 grant all on table public.email_leads to service_role;
+revoke all on table public.saved_searches from anon, authenticated;
+grant all on table public.saved_searches to service_role;
 
 notify pgrst, 'reload schema';

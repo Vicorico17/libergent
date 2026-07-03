@@ -1,9 +1,9 @@
 "use client"
 
-import { Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
+import { Suspense, useState, useEffect, useMemo, useRef, type FormEvent, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { CalendarDays, ExternalLink, MapPin, MessageSquare, Tag } from "lucide-react"
+import { Bookmark, CalendarDays, Copy, ExternalLink, EyeOff, MapPin, MessageSquare, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import { mapBestOffer, mapSearchResults, type SearchPayload, type SearchResultItem } from "./search-data"
@@ -44,6 +44,9 @@ const SEARCH_RESULT_LIMIT = 180
 const SEARCH_PAGE_LIMIT = 2
 const INITIAL_VISIBLE_RESULTS = 48
 const VISIBLE_RESULT_STEP = 48
+const SAVED_LISTINGS_STORAGE_KEY = "libergent-saved-listings-v1"
+const HIDDEN_LISTINGS_STORAGE_KEY = "libergent-hidden-listings-v1"
+const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v1"
 
 function shouldOpenFiltersByDefault() {
   return typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
@@ -138,6 +141,72 @@ function buildSellerMessage(item: SearchResultItem, query: string) {
     `Mai este disponibil? Prețul este ${item.priceLabel}.`,
     "Pot să primesc, te rog, câteva detalii despre stare și livrare?",
   ].join(" ")
+}
+
+function trackSearchEvent(eventName: string, params: Record<string, string | number | boolean | undefined | null> = {}) {
+  if (typeof window === "undefined") return
+
+  const analytics = window as Window & {
+    gtag?: (event: "event", eventName: string, params?: Record<string, string | number | boolean | undefined | null>) => void
+  }
+  analytics.gtag?.("event", eventName, params)
+}
+
+function listingStorageId(item: Pick<SearchResultItem, "id" | "url" | "title" | "source">) {
+  return item.url || `${item.source}:${item.title}:${item.id}`
+}
+
+function readStringSetStorage(key: string) {
+  if (typeof window === "undefined") return new Set<string>()
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || "[]")
+    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [])
+  } catch {
+    window.localStorage.removeItem(key)
+    return new Set<string>()
+  }
+}
+
+function writeStringSetStorage(key: string, values: Set<string>) {
+  if (typeof window === "undefined") return
+  window.localStorage.setItem(key, JSON.stringify([...values]))
+}
+
+function readSearchFiltersStorage(): {
+  sort: string
+  sources: Set<string>
+  conditions: Set<string>
+  priceMin: string
+  priceMax: string
+} {
+  const fallback = {
+    sort: SORT_OPTIONS[0],
+    sources: new Set<string>(SOURCES_LIST),
+    conditions: new Set<string>(),
+    priceMin: "",
+    priceMax: "",
+  }
+
+  if (typeof window === "undefined") return fallback
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SEARCH_FILTERS_STORAGE_KEY) || "{}")
+    return {
+      sort: typeof parsed.sort === "string" && SORT_OPTIONS.includes(parsed.sort) ? parsed.sort : fallback.sort,
+      sources: Array.isArray(parsed.sources)
+        ? new Set<string>(parsed.sources.filter((value: unknown): value is string => typeof value === "string"))
+        : fallback.sources,
+      conditions: Array.isArray(parsed.conditions)
+        ? new Set<string>(parsed.conditions.filter((value: unknown): value is string => typeof value === "string"))
+        : fallback.conditions,
+      priceMin: typeof parsed.priceMin === "string" ? parsed.priceMin : fallback.priceMin,
+      priceMax: typeof parsed.priceMax === "string" ? parsed.priceMax : fallback.priceMax,
+    }
+  } catch {
+    window.localStorage.removeItem(SEARCH_FILTERS_STORAGE_KEY)
+    return fallback
+  }
 }
 
 async function readJsonResponse(response: Response): Promise<SearchPayload> {
@@ -833,14 +902,49 @@ function useListingImage(item: Pick<SearchResultItem, "id" | "image" | "images">
 
 function SellerMessageActions({ item, query, compact = false }: { item: SearchResultItem; query: string; compact?: boolean }) {
   const message = buildSellerMessage(item, query)
+  const [copied, setCopied] = useState(false)
+
+  async function copyMessage() {
+    try {
+      await navigator.clipboard.writeText(message)
+      setCopied(true)
+      trackSearchEvent("copy_seller_message", {
+        search_term: query,
+        marketplace: item.source,
+        listing_title: item.title,
+      })
+      window.setTimeout(() => setCopied(false), 1400)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  function trackOpenContact() {
+    trackSearchEvent("open_seller_contact", {
+      search_term: query,
+      marketplace: item.source,
+      listing_title: item.title,
+    })
+  }
 
   return (
     <div className={`flex ${compact ? "flex-col sm:flex-row" : "flex-col sm:flex-row"} gap-2`}>
+      <button
+        type="button"
+        onClick={copyMessage}
+        className="flex min-h-10 flex-1 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase transition-colors duration-150"
+        style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
+        title={message}
+      >
+        <Copy size={13} strokeWidth={2.2} />
+        {copied ? "Copiat" : "Copiază mesaj"}
+      </button>
       {item.url ? (
         <a
           href={item.url}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={trackOpenContact}
           className="flex min-h-10 flex-1 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase transition-colors duration-150"
           style={{ border: `1px solid ${INK}`, background: INK, color: "white", fontFamily: MONO }}
           title={message}
@@ -862,7 +966,159 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
   )
 }
 
-function ResultCard({ item, query, onInspect }: { item: ResultItem; query: string; onInspect: (item: SearchResultItem) => void }) {
+function OfferFeedbackActions({ item, query }: { item: SearchResultItem; query: string }) {
+  const [selected, setSelected] = useState<"like" | "dislike" | null>(null)
+  const [pending, setPending] = useState(false)
+
+  async function sendFeedback(feedback: "like" | "dislike") {
+    setSelected(feedback)
+    setPending(true)
+    trackSearchEvent("offer_feedback", {
+      search_term: query,
+      marketplace: item.source,
+      feedback,
+      listing_title: item.title,
+    })
+
+    try {
+      await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query,
+          feedback,
+          offer: {
+            title: item.title,
+            url: item.url,
+            site: item.source,
+            priceRon: item.price,
+            score: item.score,
+            rank: item.rank,
+          },
+        }),
+      })
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-[10px] font-bold uppercase" style={{ color: `${INK}66` }}>
+        Ajută rankingul:
+      </span>
+      {[
+        { value: "like" as const, label: "Bun", icon: <ThumbsUp size={13} strokeWidth={2.2} /> },
+        { value: "dislike" as const, label: "Slab", icon: <ThumbsDown size={13} strokeWidth={2.2} /> },
+      ].map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          disabled={pending}
+          onClick={() => sendFeedback(option.value)}
+          className="inline-flex min-h-8 items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase disabled:opacity-60"
+          style={{
+            border: `1px solid ${INK}`,
+            background: selected === option.value ? INK : "white",
+            color: selected === option.value ? "white" : INK,
+            fontFamily: MONO,
+          }}
+        >
+          {option.icon}
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function SaveSearchPanel({ query }: { query: string }) {
+  const [email, setEmail] = useState("")
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle")
+  const [message, setMessage] = useState("")
+
+  async function saveSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail || !query) return
+
+    setStatus("submitting")
+    setMessage("")
+
+    try {
+      const response = await fetch("/api/saved-searches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          query,
+          source: "search_results_sidebar",
+          pagePath: window.location.pathname + window.location.search,
+          notificationsEnabled: true,
+        }),
+      })
+      const payload = (await response.json()) as { ok?: boolean; error?: string }
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || "Căutarea nu a putut fi salvată.")
+      }
+      setStatus("success")
+      setMessage("Căutare salvată. O vom folosi pentru update-uri când activăm notificările.")
+      trackSearchEvent("save_search", { search_term: query })
+    } catch (error) {
+      setStatus("error")
+      setMessage(error instanceof Error ? error.message : "Căutarea nu a putut fi salvată.")
+    }
+  }
+
+  return (
+    <div style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
+      <PanelHeader title="Salvează Căutarea" />
+      <form onSubmit={saveSearch} className="flex flex-col gap-3 p-4" style={{ background: CREAM }}>
+        <p className="text-[11px] font-bold uppercase leading-relaxed" style={{ color: `${INK}99` }}>
+          Păstrăm căutarea pe email. Notificările de oferte vor porni după ce activăm jobul de verificare.
+        </p>
+        <input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="email@exemplu.ro"
+          className="min-h-10 bg-white px-3 text-[11px] font-bold outline-none"
+          style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO }}
+          required
+        />
+        <button
+          type="submit"
+          disabled={!query || status === "submitting" || status === "success"}
+          className="min-h-10 px-3 py-2 text-[10px] font-bold uppercase disabled:opacity-60"
+          style={{ border: `1px solid ${INK}`, background: INK, color: "white", fontFamily: MONO }}
+        >
+          {status === "submitting" ? "Salvez..." : status === "success" ? "Salvată" : "Salvează"}
+        </button>
+        {message && (
+          <p className="text-[10px] font-bold uppercase leading-relaxed" style={{ color: status === "error" ? PINK : GREEN }}>
+            {message}
+          </p>
+        )}
+      </form>
+    </div>
+  )
+}
+
+function ResultCard({
+  item,
+  query,
+  onInspect,
+  isSaved,
+  onToggleSaved,
+  onHide,
+}: {
+  item: ResultItem
+  query: string
+  onInspect: (item: SearchResultItem) => void
+  isSaved: boolean
+  onToggleSaved: (item: SearchResultItem) => void
+  onHide: (item: SearchResultItem) => void
+}) {
   const [hov, setHov] = useState(false)
   const { image, handleImageError } = useListingImage(item)
   const keywordScore = getKeywordMatchScore(item, query)
@@ -930,6 +1186,31 @@ function ResultCard({ item, query, onInspect }: { item: ResultItem; query: strin
         >
           Detalii Libergent
         </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onToggleSaved(item)}
+            className="flex min-h-9 items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-bold uppercase"
+            style={{
+              border: `1px solid ${INK}`,
+              background: isSaved ? INK : "white",
+              color: isSaved ? "white" : INK,
+              fontFamily: MONO,
+            }}
+          >
+            <Bookmark size={12} strokeWidth={2.2} />
+            {isSaved ? "Salvat" : "Salvează"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onHide(item)}
+            className="flex min-h-9 items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-bold uppercase"
+            style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
+          >
+            <EyeOff size={12} strokeWidth={2.2} />
+            Ascunde
+          </button>
+        </div>
         <SellerMessageActions item={item} query={query} compact />
       </div>
     </>
@@ -1047,6 +1328,7 @@ function RecommendationCard({ item, query, onInspect }: { item: SearchResultItem
                 Vezi analiza Libergent
               </button>
               <SellerMessageActions item={item} query={query} />
+              <OfferFeedbackActions item={item} query={query} />
               <div className="flex justify-end">
                 {item.url ? (
                 <a
@@ -1150,6 +1432,7 @@ function ListingDetailDrawer({ item, query, onClose }: { item: SearchResultItem 
               <ListingMetaChips item={item} />
               <DealQualitySummary item={item} />
               <SellerMessageActions item={item} query={query} />
+              <OfferFeedbackActions item={item} query={query} />
             </div>
           </div>
 
@@ -1218,11 +1501,11 @@ function SearchResultsContent() {
   const searchParams = useSearchParams()
   const query = String(searchParams.get("q") || "").trim()
 
-  const [sort, setSort]             = useState(SORT_OPTIONS[0])
-  const [sources, setSources]       = useState(() => new Set(SOURCES_LIST))
-  const [conditions, setConditions] = useState<Set<string>>(() => new Set())
-  const [priceMin, setPriceMin]     = useState("")
-  const [priceMax, setPriceMax]     = useState("")
+  const [sort, setSort]             = useState(() => readSearchFiltersStorage().sort)
+  const [sources, setSources]       = useState<Set<string>>(() => readSearchFiltersStorage().sources)
+  const [conditions, setConditions] = useState<Set<string>>(() => readSearchFiltersStorage().conditions)
+  const [priceMin, setPriceMin]     = useState(() => readSearchFiltersStorage().priceMin)
+  const [priceMax, setPriceMax]     = useState(() => readSearchFiltersStorage().priceMax)
   const [time, setTime]             = useState(() => formatSearchTime())
   const [results, setResults]       = useState<SearchResultItem[]>([])
   const [bestOffer, setBestOffer]   = useState<SearchResultItem | null>(null)
@@ -1237,12 +1520,33 @@ function SearchResultsContent() {
   const [searchReportOpen, setSearchReportOpen] = useState(true)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS)
   const [selectedListing, setSelectedListing] = useState<SearchResultItem | null>(null)
+  const [savedListings, setSavedListings] = useState<Set<string>>(() => readStringSetStorage(SAVED_LISTINGS_STORAGE_KEY))
+  const [hiddenListings, setHiddenListings] = useState<Set<string>>(() => readStringSetStorage(HIDDEN_LISTINGS_STORAGE_KEY))
 
   // Loader state
   const [showLoader, setShowLoader]       = useState(false)
   const [loaderProgress, setLoaderProgress] = useState(0)
   const [loaderDone, setLoaderDone]       = useState(false)
   const loaderTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    writeStringSetStorage(SAVED_LISTINGS_STORAGE_KEY, savedListings)
+  }, [savedListings])
+
+  useEffect(() => {
+    writeStringSetStorage(HIDDEN_LISTINGS_STORAGE_KEY, hiddenListings)
+  }, [hiddenListings])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(SEARCH_FILTERS_STORAGE_KEY, JSON.stringify({
+      sort,
+      sources: [...sources],
+      conditions: [...conditions],
+      priceMin,
+      priceMax,
+    }))
+  }, [conditions, priceMax, priceMin, sort, sources])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -1362,9 +1666,47 @@ function SearchResultsContent() {
   const toggleSource    = (s: string) => { setSources(prev => { const n = new Set(prev); if (n.has(s)) n.delete(s); else n.add(s); return n }); resetVisibleResults() }
   const toggleCondition = (c: string) => { setConditions(prev => { const n = new Set(prev); if (n.has(c)) n.delete(c); else n.add(c); return n }); resetVisibleResults() }
   const resetFilters    = () => { setSort(SORT_OPTIONS[0]); setSources(new Set(SOURCES_LIST)); setConditions(new Set()); setPriceMin(""); setPriceMax(""); resetVisibleResults() }
+  const toggleSavedListing = (item: SearchResultItem) => {
+    const id = listingStorageId(item)
+    setSavedListings((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+        trackSearchEvent("save_listing", {
+          search_term: query,
+          marketplace: item.source,
+          listing_title: item.title,
+        })
+      }
+      return next
+    })
+  }
+  const hideListing = (item: SearchResultItem) => {
+    const id = listingStorageId(item)
+    setHiddenListings((current) => new Set(current).add(id))
+    setSavedListings((current) => {
+      if (!current.has(id)) return current
+      const next = new Set(current)
+      next.delete(id)
+      return next
+    })
+    trackSearchEvent("hide_listing", {
+      search_term: query,
+      marketplace: item.source,
+      listing_title: item.title,
+    })
+    resetVisibleResults()
+  }
+  const clearHiddenListings = () => {
+    setHiddenListings(new Set())
+    resetVisibleResults()
+  }
 
   const filteredResults = useMemo(() => {
     const base = results.filter((item) => {
+      if (hiddenListings.has(listingStorageId(item))) return false
       if (sources.size > 0 && !sources.has(item.source)) return false
       if (conditions.size > 0 && !conditions.has(item.condition.toLowerCase())) return false
       if (priceMin && priceForSort(item, Number.NEGATIVE_INFINITY) < Number(priceMin)) return false
@@ -1380,12 +1722,13 @@ function SearchResultsContent() {
       if (sort === "potrivire cuvinte cheie") return getKeywordMatchScore(b, query) - getKeywordMatchScore(a, query) || compareByRank(a, b)
       return compareByRank(a, b)
     })
-  }, [conditions, priceMax, priceMin, query, results, sort, sources])
+  }, [conditions, hiddenListings, priceMax, priceMin, query, results, sort, sources])
 
   const shownBestOffer = useMemo(() => {
     if (!bestOffer) return null
+    if (hiddenListings.has(listingStorageId(bestOffer))) return null
     return filteredResults.find((item) => item.id === bestOffer.id) || bestOffer
-  }, [bestOffer, filteredResults])
+  }, [bestOffer, filteredResults, hiddenListings])
 
   const regularResults = useMemo(() => {
     if (!shownBestOffer) return filteredResults
@@ -1393,6 +1736,8 @@ function SearchResultsContent() {
   }, [filteredResults, shownBestOffer])
 
   const visibleRegularResults = regularResults.slice(0, visibleCount)
+  const savedVisibleCount = results.filter((item) => savedListings.has(listingStorageId(item))).length
+  const hiddenVisibleCount = results.filter((item) => hiddenListings.has(listingStorageId(item))).length
 
   const sourceBreakdown = useMemo(() => {
     const total = Math.max(results.length, 1)
@@ -1426,6 +1771,8 @@ function SearchResultsContent() {
     },
     { text: filteredOutCount ? `${filteredOutCount} rezultate filtrate` : "filtre de calitate aplicate", pulse: false },
     { text: excludedListings ? `${excludedListings} accesorii/piese excluse` : "clasificare rezultate aplicată", pulse: false },
+    { text: savedVisibleCount ? `${savedVisibleCount} rezultate salvate local` : "niciun rezultat salvat local", pulse: false },
+    { text: hiddenVisibleCount ? `${hiddenVisibleCount} rezultate ascunse local` : "niciun rezultat ascuns", pulse: false },
     { text: "focus: anunțuri clasificate + potrivire strictă pe cuvinte cheie", pulse: false },
     { text: shownBestOffer ? `Best price detected on ${shownBestOffer.source}` : "Best offer în așteptare", pulse: false },
     { text: isLoading ? "Recommendation updating live" : "Recommendation updated live", pulse: isLoading },
@@ -1555,7 +1902,17 @@ function SearchResultsContent() {
               {regularResults.length ? (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {visibleRegularResults.map((item) => <ResultCard key={item.id} item={item} query={query} onInspect={setSelectedListing} />)}
+                    {visibleRegularResults.map((item) => (
+                      <ResultCard
+                        key={item.id}
+                        item={item}
+                        query={query}
+                        onInspect={setSelectedListing}
+                        isSaved={savedListings.has(listingStorageId(item))}
+                        onToggleSaved={toggleSavedListing}
+                        onHide={hideListing}
+                      />
+                    ))}
                   </div>
                   {visibleRegularResults.length < regularResults.length && (
                     <div className="mt-5 flex justify-center">
@@ -1578,6 +1935,8 @@ function SearchResultsContent() {
             </div>
 
             <aside className="w-full xl:w-72 flex-none flex flex-col gap-6">
+              {query && <SaveSearchPanel query={query} />}
+
               <div style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
                 <PanelHeader title="Agent Notes" />
                 <ul className="p-4 flex flex-col gap-4" style={{ background: CREAM }}>
@@ -1608,6 +1967,29 @@ function SearchResultsContent() {
                 <div className="p-3 flex justify-between items-center" style={{ borderTop: `1px solid ${INK}`, background: "white" }}>
                   <span className="text-[11px] uppercase font-bold">Total</span>
                   <span className="text-[14px] font-bold" style={{ color: PINK }}>{results.length}</span>
+                </div>
+              </div>
+
+              <div style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
+                <PanelHeader title="Listă locală" />
+                <div className="flex flex-col gap-3 p-4 text-[11px] font-bold uppercase" style={{ background: CREAM }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Salvate</span>
+                    <span style={{ color: PINK }}>{savedVisibleCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Ascunse</span>
+                    <span style={{ color: PINK }}>{hiddenVisibleCount}</span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!hiddenVisibleCount}
+                    onClick={clearHiddenListings}
+                    className="mt-1 min-h-9 px-3 py-2 text-[10px] font-bold uppercase disabled:opacity-50"
+                    style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
+                  >
+                    Arată ascunsele
+                  </button>
                 </div>
               </div>
             </aside>

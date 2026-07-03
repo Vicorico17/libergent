@@ -141,7 +141,7 @@ export function EmailCapturePopup({
 
       setCaptureStorageFlag(STORAGE_KEYS.submitted);
       setStatus("success");
-      setMessage("Gata. Îți trimitem alerte când apar oferte mai bune.");
+      setMessage("Gata. Ești pe lista LiberGent pentru update-uri și teste noi.");
       trackLeadEvent("generate_lead", query);
       window.setTimeout(() => setVisible(false), 1400);
     } catch (error) {
@@ -172,7 +172,7 @@ export function EmailCapturePopup({
         >
           <div className="flex items-center gap-2 text-[12px] font-bold uppercase">
             <Mail size={16} strokeWidth={2} aria-hidden="true" />
-            Alertă rezultate
+            Lista LiberGent
           </div>
           <button
             type="button"
@@ -191,10 +191,10 @@ export function EmailCapturePopup({
               {resultCount} rezultate găsite{bestOfferSource ? ` / best pick pe ${bestOfferSource}` : ""}
             </p>
             <h2 id="email-capture-title" className="text-[24px] font-bold uppercase leading-tight" style={{ color: INK }}>
-              Primește alerte când apare o ofertă mai bună.
+              Intră pe lista pentru update-uri LiberGent.
             </h2>
             <p className="text-[12px] font-bold uppercase leading-relaxed" style={{ color: `${INK}AA` }}>
-              Pentru „{query}”, îți putem trimite pe email update-uri când găsim rezultate relevante sau prețuri mai bune.
+              Pentru „{query}”, îți putem trimite update-uri despre produs, funcții noi și, când activăm fluxul, notificări despre oferte relevante.
             </p>
           </div>
 

@@ -1,7 +1,10 @@
 import { searchAcrossSites } from "./app.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
+import { runMarketplaceHealthChecks } from "./health.js";
+import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
 import { normalizeLeadPayload } from "./leads.js";
-import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
+import { normalizeSavedSearchPayload } from "./saved-searches.js";
+import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
@@ -220,6 +223,68 @@ async function handleApi(request, env) {
         ? 400
         : 500;
       return json({ error: message }, statusCode);
+    }
+  }
+
+  if (apiPath === "/api/saved-searches" || apiPath === "/api/saved_searches") {
+    if (request.method !== "POST") {
+      return json({ error: "Method not allowed" }, 405);
+    }
+
+    const parsedBody = await parseJsonRequest(request);
+    if (parsedBody.error) {
+      return json({ error: parsedBody.error }, parsedBody.error.includes("large") ? 413 : 400);
+    }
+
+    let savedSearch;
+    try {
+      savedSearch = normalizeSavedSearchPayload(parsedBody.data || {});
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+
+    if (!isSupabaseConfigured(env)) {
+      return json({ ok: false, error: "Supabase is not configured." }, 200);
+    }
+
+    try {
+      await insertSavedSearchToSupabase(savedSearch, env);
+      return json({ ok: true }, 200);
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
+
+  if (apiPath === "/api/health/sources") {
+    if (url.searchParams.get("live") !== "1") {
+      return json({ error: "Add live=1 to run marketplace health checks." }, 400);
+    }
+
+    try {
+      const query = url.searchParams.get("q") || undefined;
+      const provider = url.searchParams.get("provider") || "auto";
+      return json(await runMarketplaceHealthChecks({ query, provider }), 200);
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
+
+  if (apiPath === "/api/image-search") {
+    if (request.method !== "POST") {
+      return json({ error: "Method not allowed" }, 405);
+    }
+
+    try {
+      validateImageSearchRequest({
+        contentType: request.headers.get("content-type") || "",
+        contentLength: Number.parseInt(request.headers.get("content-length") || "0", 10)
+      });
+      await extractImageSearchIntent();
+      return json({ ok: true }, 200);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const statusCode = message.includes("not configured") ? 501 : message.includes("large") ? 413 : 400;
+      return json({ ok: false, error: message }, statusCode);
     }
   }
 

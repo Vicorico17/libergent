@@ -11,6 +11,7 @@ const DEFAULT_QUERY_STATS_TABLE = "search_query_stats";
 const DEFAULT_KEYWORD_STATS_TABLE = "keyword_stats";
 const DEFAULT_FEEDBACK_TABLE = "offer_feedback";
 const DEFAULT_EMAIL_LEADS_TABLE = "email_leads";
+const DEFAULT_SAVED_SEARCHES_TABLE = "saved_searches";
 
 function trimTrailingSlash(value = "") {
   return value.replace(/\/+$/, "");
@@ -29,12 +30,13 @@ function getSupabaseConfig(env = process.env) {
   const keywordStatsTable = normalizePublicRestTableName(env.SUPABASE_KEYWORD_STATS_TABLE, DEFAULT_KEYWORD_STATS_TABLE);
   const feedbackTable = normalizePublicRestTableName(env.SUPABASE_FEEDBACK_TABLE, DEFAULT_FEEDBACK_TABLE);
   const emailLeadsTable = normalizePublicRestTableName(env.SUPABASE_EMAIL_LEADS_TABLE, DEFAULT_EMAIL_LEADS_TABLE);
+  const savedSearchesTable = normalizePublicRestTableName(env.SUPABASE_SAVED_SEARCHES_TABLE, DEFAULT_SAVED_SEARCHES_TABLE);
 
   if (!url || !apiKey) {
     return null;
   }
 
-  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable };
+  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable };
 }
 
 function getRequestHeaders(apiKey) {
@@ -242,6 +244,34 @@ export async function insertEmailLeadToSupabase(entry, env = process.env) {
   };
 
   await requestSupabase(`${config.emailLeadsTable}?on_conflict=email`, {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal"
+    },
+    body: JSON.stringify(row)
+  }, env);
+
+  return true;
+}
+
+export async function insertSavedSearchToSupabase(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) {
+    return false;
+  }
+
+  const now = entry.updatedAt || new Date().toISOString();
+  const row = {
+    email: String(entry.email || "").trim().toLowerCase(),
+    query: entry.query || "",
+    source: entry.source || "search_results_save",
+    page_path: entry.pagePath || "",
+    notifications_enabled: entry.notificationsEnabled !== false,
+    created_at: entry.createdAt || now,
+    updated_at: now
+  };
+
+  await requestSupabase(`${config.savedSearchesTable}?on_conflict=email,query`, {
     method: "POST",
     headers: {
       Prefer: "resolution=merge-duplicates,return=minimal"

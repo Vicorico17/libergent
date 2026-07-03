@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { loadEnv } from "./env.js";
+import { runMarketplaceHealthChecks } from "./health.js";
 import { searchAcrossSites } from "./app.js";
 import { getSite, getSiteKeysForAllSearch, SITES } from "./sites.js";
 import { formatRon } from "./normalize.js";
@@ -14,6 +15,7 @@ function printHelp() {
 Usage:
   node src/cli.js search --site <site> --query "<text>" [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 150] [--pages 3] [--out results/file.json]
   node src/cli.js search --site all --query "<text>" [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 150] [--pages 3] [--out results/file.json]
+  node src/cli.js health --query "iphone 15 pro" [--provider ${SEARCH_PROVIDERS.join("|")}]
   npm run search:live -- --query "<text>"
 
 Supported sites:
@@ -252,6 +254,14 @@ async function main() {
 
   if (!command || command === "--help" || args.help) {
     printHelp();
+    return;
+  }
+
+  if (command === "health") {
+    const query = args.query || "iphone 15 pro";
+    const provider = normalizeSearchProvider(args.provider || "auto");
+    const payload = await runMarketplaceHealthChecks({ query, provider });
+    console.log(JSON.stringify(payload, null, 2));
     return;
   }
 
