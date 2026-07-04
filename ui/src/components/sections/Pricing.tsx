@@ -59,8 +59,8 @@ const BETA_FEATURES = [
 ];
 
 const PREMIUM_FEATURES = [
-  "Vorbește cu LiberGent direct pe WhatsApp",
-  "Setează alerte pentru produse",
+  "Monitorizare salvată pentru căutări",
+  "Notificări email după activarea jobului de verificare",
 ];
 
 export function Pricing() {
@@ -90,7 +90,7 @@ export function Pricing() {
 
           <p className="text-[14px] leading-relaxed" style={{ color: `${INK}99`, maxWidth: 480 }}>
             Beta actuală este gratuită pentru căutări de produse pe mai multe platforme din România.
-            Premium va adăuga monitorizare salvată și insight-uri suplimentare.
+            Funcțiile avansate sunt pe roadmap și vor fi lansate doar după ce infrastructura este activă.
           </p>
         </div>
 
@@ -200,17 +200,15 @@ export function Pricing() {
                 className="mb-2 inline-flex px-2 py-1 text-[10px] font-bold uppercase tracking-widest"
                 style={{ background: "#FCE7F3", border: "1px solid #9CA3AF", color: PINK }}
               >
-                Launch offer
+                În pregătire
               </div>
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="font-bold" style={{ fontSize: 44, color: "#6B7280" }}>39</span>
-                <span className="text-lg uppercase" style={{ color: "#6B7280" }}>RON / lună</span>
-                <span className="text-sm uppercase line-through" style={{ color: "#9CA3AF" }}>99 RON / lună</span>
+                <span className="font-bold uppercase" style={{ fontSize: 32, color: "#6B7280" }}>În curând</span>
               </div>
             </div>
 
             <p className="text-[13px] leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 44 }}>
-              Monitorizare avansată și insight-uri pentru decizii mai rapide.
+              Căutări salvate, notificări și insight-uri după ce activăm joburile de verificare.
             </p>
 
             <div
@@ -224,7 +222,7 @@ export function Pricing() {
                 <LockIcon />
               </div>
               <p className="text-[11px] leading-snug" style={{ color: "#6B7280" }}>
-                Premium nu este disponibil încă.<br />Va fi disponibil în curând.
+                Premium nu este disponibil încă.<br />Nu există plată sau abonament activ.
               </p>
             </div>
 

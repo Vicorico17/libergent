@@ -39,6 +39,20 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload, null, 2));
 }
 
+function getAdminTokenFromRequest(req, url) {
+  const authorization = String(req.headers.authorization || "");
+  if (authorization.toLowerCase().startsWith("bearer ")) {
+    return authorization.slice("bearer ".length).trim();
+  }
+
+  return String(req.headers["x-libergent-admin-token"] || url.searchParams.get("token") || "").trim();
+}
+
+function isAuthorizedAdminRequest(req, url) {
+  const expectedToken = process.env.LIBERGENT_ADMIN_TOKEN || "";
+  return Boolean(expectedToken) && getAdminTokenFromRequest(req, url) === expectedToken;
+}
+
 async function proxyImage(res, imageUrl) {
   const targetUrl = getMarketplaceImageProxyTarget(imageUrl);
   if (!targetUrl) {
@@ -258,6 +272,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (apiPath === "/api/health/sources") {
+    if (!isAuthorizedAdminRequest(req, url)) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
     if (url.searchParams.get("live") !== "1") {
       sendJson(res, 400, { error: "Add live=1 to run marketplace health checks." });
       return;

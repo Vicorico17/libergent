@@ -1,10 +1,11 @@
 const platforms = [
   { name: "OLX", color: "#0047AB" },
   { name: "Vinted", color: "#09B1BA" },
-  { name: "Facebook\nMarketplace", color: "#1877F2" },
+  { name: "LaJumate", color: "#F97316" },
+  { name: "Okazii", color: "#2563EB" },
   { name: "Publi24", color: "#E84C0C" },
-  { name: "Storia", color: "#7B3FBE" },
-  { name: "MerXu", color: "#0066CC" },
+  { name: "Anunțul", color: "#D97706" },
+  { name: "Autovit\nauto", color: "#111111" },
 ];
 
 export function Platforms() {
@@ -19,10 +20,10 @@ export function Platforms() {
             className="font-pixel text-[#111111] mb-4"
             style={{ fontSize: "clamp(16px, 3vw, 32px)", lineHeight: 1.2 }}
           >
-            Găsim pe toate platformele.
+            Căutăm pe sursele active.
           </h2>
           <p className="text-[#6B6B6B] text-base max-w-md mx-auto">
-            Tu nu trebuie să verifici fiecare în parte. Noi o facem pentru tine.
+            Verificăm marketplace-urile conectate acum și adăugăm surse noi doar când returnează rezultate fiabile.
           </p>
         </div>
 
@@ -42,7 +43,7 @@ export function Platforms() {
           ))}
 
           <div className="flex items-center justify-center rounded-xl px-6 py-3 bg-[#F8F9FA] border border-dashed border-[#D9D9D9] min-w-[120px]">
-            <span className="text-sm text-[#6B6B6B] font-medium">+ mai multe...</span>
+            <span className="text-sm text-[#6B6B6B] font-medium">+ surse verificate în curând</span>
           </div>
         </div>
       </div>

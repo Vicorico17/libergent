@@ -49,6 +49,20 @@ function json(payload, status = 200) {
   });
 }
 
+function getAdminTokenFromRequest(request, url) {
+  const authorization = request.headers.get("authorization") || "";
+  if (authorization.toLowerCase().startsWith("bearer ")) {
+    return authorization.slice("bearer ".length).trim();
+  }
+
+  return String(request.headers.get("x-libergent-admin-token") || url.searchParams.get("token") || "").trim();
+}
+
+function isAuthorizedAdminRequest(request, url, env = {}) {
+  const expectedToken = env.LIBERGENT_ADMIN_TOKEN || "";
+  return Boolean(expectedToken) && getAdminTokenFromRequest(request, url) === expectedToken;
+}
+
 async function proxyImage(url) {
   const targetUrl = getMarketplaceImageProxyTarget(url);
   if (!targetUrl) {
@@ -256,6 +270,10 @@ async function handleApi(request, env) {
   }
 
   if (apiPath === "/api/health/sources") {
+    if (!isAuthorizedAdminRequest(request, url, env)) {
+      return json({ error: "Unauthorized" }, 401);
+    }
+
     if (url.searchParams.get("live") !== "1") {
       return json({ error: "Add live=1 to run marketplace health checks." }, 400);
     }
