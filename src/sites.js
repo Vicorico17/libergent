@@ -8,6 +8,16 @@ function encodeSearchText(value) {
   return encodeURIComponent(value.trim());
 }
 
+function slugifyRetailSearchPath(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function buildBasePrompt(siteLabel, query, limit, extra = "") {
   return [
     `You are extracting marketplace search results from ${siteLabel}.`,
@@ -429,7 +439,197 @@ export const SITES = {
         "Results appear as Anuntul classified cards. Keep only visible marketplace offers that match the query."
       );
     }
+  },
+  "price.ro": {
+    key: "price.ro",
+    label: "Price.ro",
+    priority: 7,
+    defaultEnabled: true,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "price_aggregator",
+    defaultCondition: "Nou",
+    defaultSellerType: "Aggregator",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 16000,
+    pageSize: 24,
+    maxPages: 1,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.price.ro/index.php?action=q&text=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) {
+      return this.searchUrl(query);
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("Price.ro", query, limit, "This is a Romanian price comparison site. Keep product result cards and starting-price offers from stores.");
+    }
+  },
+  "compari.ro": {
+    key: "compari.ro",
+    label: "Compari.ro",
+    priority: 8,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "price_aggregator",
+    defaultCondition: "Nou",
+    defaultSellerType: "Aggregator",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 24,
+    maxPages: 1,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.compari.ro/CategorySearch.php?st=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) {
+      return this.searchUrl(query);
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("Compari.ro", query, limit, "This is a Romanian price comparison site. Keep product cards and offer summaries, not store reviews or navigation.");
+    }
+  },
+  "shopmania.ro": {
+    key: "shopmania.ro",
+    label: "ShopMania",
+    priority: 9,
+    defaultEnabled: true,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "price_aggregator",
+    defaultCondition: "Nou",
+    defaultSellerType: "Aggregator",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 16000,
+    pageSize: 24,
+    maxPages: 1,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.shopmania.ro/shopping?q=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) {
+      return this.searchUrl(query);
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("ShopMania Romania", query, limit, "This is a price comparison site. Keep product cards with price and shop information.");
+    }
+  },
+  "emag.ro": {
+    key: "emag.ro",
+    label: "eMAG",
+    priority: 10,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer_marketplace",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer / marketplace",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 30,
+    maxPages: 1,
+    defaultLimit: 30,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.emag.ro/search/${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) {
+      return this.searchUrl(query);
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("eMAG Romania", query, limit, "This is a retailer and marketplace search page. Keep product result cards with prices and seller/store info if visible.");
+    }
+  },
+  "altex.ro": {
+    key: "altex.ro",
+    label: "Altex",
+    priority: 11,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 16000,
+    pageSize: 24,
+    maxPages: 1,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://altex.ro/cauta/?q=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) {
+      return this.searchUrl(query);
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("Altex", query, limit, "This is a retailer search page. Keep only product cards with visible prices.");
+    }
+  },
+  "flanco.ro": {
+    key: "flanco.ro",
+    label: "Flanco",
+    priority: 12,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 16000,
+    pageSize: 24,
+    maxPages: 1,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.flanco.ro/catalogsearch/result/?q=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) {
+      return this.searchUrl(query);
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("Flanco", query, limit, "This is a retailer search page. Keep only product cards with visible prices.");
+    }
+  },
+  "cel.ro": {
+    key: "cel.ro",
+    label: "CEL.ro",
+    priority: 13,
+    defaultEnabled: true,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 16000,
+    pageSize: 24,
+    maxPages: 1,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.cel.ro/cauta/${slugifyRetailSearchPath(query)}/`;
+    },
+    pagedSearchUrl(query) {
+      return this.searchUrl(query);
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("CEL.ro", query, limit, "This is a retailer search page. Keep only product cards with visible prices.");
+    }
   }
+
 };
 
 export function getSite(siteKey) {

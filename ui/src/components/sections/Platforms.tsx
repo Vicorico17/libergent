@@ -23,7 +23,7 @@ export function Platforms() {
             Căutăm pe sursele active.
           </h2>
           <p className="text-[#6B6B6B] text-base max-w-md mx-auto">
-            Verificăm marketplace-urile conectate acum și adăugăm surse noi doar când returnează rezultate fiabile.
+            Comparăm anunțuri second-hand cu prețuri noi din agregatoare și retaileri care returnează rezultate fiabile.
           </p>
         </div>
 

@@ -8,6 +8,7 @@ import { parsePubli24Html } from "./parsers/publi24.js";
 import { parseVintedHtml, parseVintedMarkdown } from "./parsers/vinted.js";
 import { parseAutovitHtml } from "./parsers/autovit.js";
 import { parseAnuntulHtml } from "./parsers/anuntul.js";
+import { parseRetailHtml } from "./parsers/retail.js";
 import { getQueryBrandTerms } from "./relevance.js";
 import { buildAbortSignal } from "./abort.js";
 import { normalizeMarketplaceQuery } from "./query-normalization.js";
@@ -227,6 +228,15 @@ function getRawItemCount(parsed, items) {
   return Number.isFinite(parsed.rawItemCount) ? parsed.rawItemCount : items.length;
 }
 
+function applySiteMetadata(items, site) {
+  return items.map((item) => ({
+    ...item,
+    sourceType: item.sourceType || site.sourceType || "classifieds",
+    condition: item.condition || site.defaultCondition || "",
+    sellerType: item.sellerType || site.defaultSellerType || ""
+  }));
+}
+
 function resolveProvider(provider, site) {
   const normalizedProvider = normalizeSearchProvider(provider);
   return normalizedProvider === "auto"
@@ -264,7 +274,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
   let hasNextPage = null;
 
   if (resolvedProvider === "direct") {
-    if (site.strategy !== "direct-html-local") {
+    if (!["direct-html-local", "direct-html-retail"].includes(site.strategy)) {
       throw new Error(`Direct provider is not configured for ${site.key}`);
     }
 
@@ -312,6 +322,12 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
       totalResults = parsed.totalResults;
       rawItemCount = getRawItemCount(parsed, items);
       hasNextPage = parsed.hasNextPage ?? null;
+    } else if (site.strategy === "direct-html-retail") {
+      const parsed = parseRetailHtml(raw, limit, { origin: new URL(url).origin });
+      items = parsed.items;
+      totalResults = parsed.totalResults;
+      rawItemCount = getRawItemCount(parsed, items);
+      hasNextPage = parsed.hasNextPage ?? null;
     } else {
       throw new Error(`No direct HTML parser configured for ${site.key}`);
     }
@@ -353,6 +369,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
     throw new Error(`Unsupported provider "${resolvedProvider}"`);
   }
 
+  items = applySiteMetadata(items, site);
   const unfilteredItems = items;
   items = site.disableQueryFilter ? items : filterRelevantItems(items, query);
   if (site.key === "autovit.ro" && items.length === 0 && unfilteredItems.length > 0) {
