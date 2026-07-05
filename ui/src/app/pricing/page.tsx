@@ -301,7 +301,7 @@ export default function PricingPage() {
               </div>
 
               <h2 className="font-bold text-3xl tracking-tight mb-2" style={{ color: "#6B7280", fontFamily: MONO }}>
-                Premium
+                LiberGent Premium
               </h2>
 
               <div className="mb-4">
@@ -319,7 +319,7 @@ export default function PricingPage() {
               </div>
 
               <p className="text-sm leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 48 }}>
-                Monitorizare avansată și insight-uri pentru decizii mai rapide.
+                Alerts, WhatsApp și postarea unui singur anunț de produs pe toate website-urile ca să economisești timp.
               </p>
 
               {/* Locked notice */}
@@ -342,8 +342,9 @@ export default function PricingPage() {
 
               <ul className="flex flex-col gap-4 text-sm flex-grow mb-10">
                 {[
-                  "Vorbește cu LiberGent direct pe WhatsApp",
-                  "Setează alerte pentru produse",
+                  "Alerts",
+                  "WhatsApp",
+                  "Post one product announcement on all websites to save time",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3" style={{ color: "#9CA3AF" }}>
                     <DotIcon />

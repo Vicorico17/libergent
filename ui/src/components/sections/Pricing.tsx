@@ -59,8 +59,9 @@ const BETA_FEATURES = [
 ];
 
 const PREMIUM_FEATURES = [
-  "Monitorizare salvată pentru căutări",
-  "Notificări email după activarea jobului de verificare",
+  "Alerts",
+  "WhatsApp",
+  "Post one product announcement on all websites to save time",
 ];
 
 export function Pricing() {
@@ -193,7 +194,7 @@ export function Pricing() {
               </div>
             </div>
 
-            <h3 className="font-bold text-3xl tracking-tight mb-2" style={{ color: "#6B7280" }}>Premium</h3>
+            <h3 className="font-bold text-3xl tracking-tight mb-2" style={{ color: "#6B7280" }}>LiberGent Premium</h3>
 
             <div className="mb-4">
               <div
@@ -208,7 +209,7 @@ export function Pricing() {
             </div>
 
             <p className="text-[13px] leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 44 }}>
-              Căutări salvate, notificări și insight-uri după ce activăm joburile de verificare.
+              Alerts, WhatsApp și postarea unui singur anunț de produs pe toate website-urile ca să economisești timp.
             </p>
 
             <div
