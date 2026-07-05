@@ -6,6 +6,8 @@ const platforms = [
   { name: "Publi24", color: "#E84C0C" },
   { name: "Anunțul", color: "#D97706" },
   { name: "Autovit\nauto", color: "#111111" },
+  { name: "Price.ro", color: "#0F766E" },
+  { name: "ShopMania", color: "#7C3AED" },
 ];
 
 export function Platforms() {

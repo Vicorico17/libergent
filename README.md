@@ -13,7 +13,6 @@ Supported marketplaces:
 - `anuntul.ro`
 - `price.ro` for new-product price benchmarks
 - `shopmania.ro` for new-product price benchmarks
-- `cel.ro` for new-product retail benchmarks
 
 Supported providers:
 
@@ -84,7 +83,14 @@ Current strategy:
 - `anuntul.ro`: direct HTML fetch + local parser
 - `price.ro`: direct HTML fetch + local retail parser
 - `shopmania.ro`: direct HTML fetch + local retail parser
-- `cel.ro`: direct HTML fetch + local retail parser
+
+Registered but not searched by default until the blocked-source/provider work is handled:
+
+- `cel.ro`
+- `compari.ro`
+- `emag.ro`
+- `altex.ro`
+- `flanco.ro`
 
 Target strategy:
 

@@ -58,7 +58,6 @@ const SOURCES = [
   { code: "A",  name: "AUTOVIT", delay: "0.5s" },
   { code: "PR", name: "PRICE.RO", delay: "0.3s" },
   { code: "SM", name: "SHOPMANIA", delay: "0.6s" },
-  { code: "CE", name: "CEL.RO", delay: "0.7s" },
 ];
 
 /* ── Checklist ── */
@@ -101,7 +100,7 @@ export function Hero() {
           {/* Body copy */}
           <p className="text-base lg:text-lg leading-relaxed max-w-lg" style={{ color: `${INK}E6` }}>
             LiberGent caută anunțuri second-hand pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit,
-            apoi le compară cu prețuri noi din Price.ro, ShopMania și CEL.ro ca să vezi rapid
+            apoi le compară cu prețuri noi din Price.ro și ShopMania ca să vezi rapid
             dacă o ofertă folosită chiar merită.
           </p>
 

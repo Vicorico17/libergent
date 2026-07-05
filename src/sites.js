@@ -606,7 +606,7 @@ export const SITES = {
     key: "cel.ro",
     label: "CEL.ro",
     priority: 13,
-    defaultEnabled: true,
+    defaultEnabled: false,
     provider: "direct",
     strategy: "direct-html-retail",
     sourceType: "retailer",

@@ -47,7 +47,6 @@ This file tracks marketplaces we still need to add or harden before advertising 
 - Anuntul
 - Price.ro as a new-price aggregator benchmark
 - ShopMania as a new-price aggregator benchmark
-- CEL.ro as a direct retail benchmark
 
 ## Add Next: Classified and Used Sources
 
@@ -67,6 +66,11 @@ This file tracks marketplaces we still need to add or harden before advertising 
   - Needed: add only behind a provider that can fetch consistently, then route it only for car-like queries.
 
 ## Add Later: Retail Benchmark Sources
+
+- CEL.ro
+  - Goal: direct retail benchmark where aggregators are not enough.
+  - Current status: local direct fetch can work, but deployed Cloudflare Worker requests returned 522/timeouts.
+  - Needed: handle under the blocked-source/provider workstream before making it default-active.
 
 - Compari.ro
   - Goal: new-product price benchmark coverage, useful as market-price context rather than second-hand listings.

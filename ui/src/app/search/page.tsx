@@ -16,7 +16,7 @@ const GREEN  = "#22C55E"
 const MONO   = "var(--font-mono-var), monospace"
 const MODAL_BG = "#FDFAF3"
 
-const SOURCES_LIST = ["OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT", "PRICE.RO", "SHOPMANIA", "CEL.RO"]
+const SOURCES_LIST = ["OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT", "PRICE.RO", "SHOPMANIA"]
 const SORT_OPTIONS = ["relevanță", "potrivire cuvinte cheie", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
 const SOURCE_TYPE_OPTIONS = [
   { value: "classifieds", label: "second-hand" },
@@ -45,7 +45,6 @@ const SOURCE_TIMING = [
   { name: "AUTOVIT",  start: 56, end: 82 },
   { name: "PRICE.RO", start: 64, end: 90 },
   { name: "SHOPMANIA", start: 72, end: 96 },
-  { name: "CEL.RO", start: 80, end: 100 },
 ]
 const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const MAIN_BLOCKS   = 15

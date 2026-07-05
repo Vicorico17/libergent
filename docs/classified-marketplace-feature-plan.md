@@ -6,7 +6,7 @@ Libergent should find real Romanian second-hand listings and compare them agains
 
 - Primary niche: Romanian products with both second-hand availability and new-price comparables.
 - Active used sources: OLX, Vinted, Lajumate, Okazii, Publi24, Anuntul, and Autovit for car-like searches.
-- Active new benchmark sources: Price.ro, ShopMania, and CEL.ro.
+- Active new benchmark sources: Price.ro and ShopMania. CEL.ro is registered but disabled by default until deployed-worker fetch reliability is solved.
 - Keep used listings and new benchmarks visually and analytically separate.
 - Treat blocked sources such as eMAG, Compari, Altex, and Flanco as future integration work until they return reliable results.
 
