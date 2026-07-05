@@ -103,7 +103,7 @@ function parseJsonLdProducts(html, origin, limit) {
 
 function findPrice(block) {
   const text = stripTags(block);
-  const pattern = /(?:de la|pret de la|preț de la)?\s*(\d{1,3}(?:[.\s]\d{3})*(?:\s*,\s*\d{2})?|\d+(?:[,.]\d{2})?)\s*(lei|ron|€|eur)(?:\b|$)/gi;
+  const pattern = /(?:de la|pret de la|preț de la)?\s*(\d{1,3}(?:(?:[.\s]\d{3})+|(?:,\d{3})+)(?:[,.]\d{2})?|\d+(?:[,.]\d{2})?)\s*(lei|ron|€|eur)(?:\b|$)/gi;
   const matches = [...text.matchAll(pattern)];
   const match = matches[0];
   return match ? match[1].trim() + " " + match[2] : "";
@@ -223,6 +223,113 @@ function parseProductListBlocks(html, origin, limit) {
     .map((block) => parseProductListBlock(block, origin))
     .filter(Boolean)
     .slice(0, limit);
+}
+
+function parseDataProductJson(value = "") {
+  const decoded = decodeHtmlEntities(value);
+  try {
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+function parseEmagProductBlock(block, origin) {
+  const product = parseDataProductJson(block.match(/data-product=["']([^"']+)["']/i)?.[1] || "");
+  const title =
+    cleanText(product?.product_name || "") ||
+    normalizeTitle(block.match(/class=["'][^"']*card-v2-title[^"']*["'][^>]*>([\s\S]*?)<\/a>/i)?.[1] || "") ||
+    normalizeTitle(block.match(/aria-label=["']([^"']+)["']/i)?.[1] || "");
+  const url = toAbsoluteUrl(
+    block.match(/<a\b[^>]+class=["'][^"']*js-product-url[^"']*["'][^>]+href=["']([^"']+)["']/i)?.[1] ||
+    block.match(/<a\b[^>]+href=["']([^"']+)["'][^>]+class=["'][^"']*js-product-url/i)?.[1] ||
+    "",
+    origin
+  );
+  const numericPrice = Number(product?.price);
+  const currency = cleanText(product?.currency || "RON");
+  const price = Number.isFinite(numericPrice) ? String(numericPrice) + " " + currency : findPrice(block);
+
+  if (!title || !url || !price) {
+    return null;
+  }
+
+  return {
+    title,
+    price,
+    currency,
+    location: "",
+    postedAt: "",
+    condition: "Nou",
+    sellerType: "Retailer / marketplace",
+    url,
+    imageUrl: toAbsoluteUrl(block.match(/<img\b[^>]+src=["']([^"']+)["']/i)?.[1] || "", origin)
+  };
+}
+
+function parseEmagBlocks(html, origin, limit) {
+  return splitClassBlocks(html, "card-v2")
+    .map((block) => parseEmagProductBlock(block, origin))
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+function parseEvomagProducts(html, origin, limit) {
+  const matches = [...html.matchAll(/<a\b[^>]*href=["']([^"']+\.html)["'][^>]*>([\s\S]*?)<\/a>/gi)];
+  const items = [];
+  const seen = new Set();
+
+  for (const match of matches) {
+    if (items.length >= limit) break;
+    const url = toAbsoluteUrl(match[1], origin);
+    if (!url || seen.has(url) || !isLikelyProductUrl(url, origin)) continue;
+
+    const start = Math.max(0, match.index - 300);
+    const end = Math.min(html.length, match.index + match[0].length + 1200);
+    const block = html.slice(start, end);
+    const title =
+      normalizeTitle(match[0].match(/\btitle=["']([^"']+)["']/i)?.[1] || "") ||
+      normalizeTitle(match[2].match(/\balt=["']([^"']+)["']/i)?.[1] || "") ||
+      normalizeTitle(match[2]);
+    const price = findPrice(block);
+
+    if (!title || title.length < 8 || !price) continue;
+
+    seen.add(url);
+    items.push({
+      title,
+      price,
+      currency: /\b(?:lei|ron)\b/i.test(price) ? "RON" : /€|eur/i.test(price) ? "EUR" : "",
+      location: "",
+      postedAt: "",
+      condition: "Nou",
+      sellerType: "Retailer",
+      url,
+      imageUrl: toAbsoluteUrl(extractImageCandidate(block), origin)
+    });
+  }
+
+  return items;
+}
+
+export function parseEmagHtml(html, limit, { origin }) {
+  const items = dedupeItems(parseEmagBlocks(html, origin, limit)).slice(0, limit);
+  return {
+    items,
+    totalResults: null,
+    rawItemCount: items.length,
+    hasNextPage: null
+  };
+}
+
+export function parseEvomagHtml(html, limit, { origin }) {
+  const items = dedupeItems(parseEvomagProducts(html, origin, limit)).slice(0, limit);
+  return {
+    items,
+    totalResults: null,
+    rawItemCount: items.length,
+    hasNextPage: null
+  };
 }
 
 function dedupeItems(items) {

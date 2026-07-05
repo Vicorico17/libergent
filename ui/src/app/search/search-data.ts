@@ -211,6 +211,8 @@ const platformLabels: Record<string, string> = {
   "cel.ro": "CEL.RO",
   "compari.ro": "COMPARI.RO",
   "emag.ro": "EMAG",
+  "evomag.ro": "EVOMAG",
+  "pcgarage.ro": "PC GARAGE",
   "altex.ro": "ALTEX",
   "flanco.ro": "FLANCO",
 };

@@ -548,10 +548,64 @@ export const SITES = {
       return buildBasePrompt("eMAG Romania", query, limit, "This is a retailer and marketplace search page. Keep product result cards with prices and seller/store info if visible.");
     }
   },
+  "evomag.ro": {
+    key: "evomag.ro",
+    label: "evoMAG",
+    priority: 11,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 24,
+    maxPages: 1,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.evomag.ro/?searchString=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) {
+      return this.searchUrl(query);
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("evoMAG", query, limit, "This is a retailer search page. Keep only product cards with visible prices.");
+    }
+  },
+  "pcgarage.ro": {
+    key: "pcgarage.ro",
+    label: "PC Garage",
+    priority: 14,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 24,
+    maxPages: 1,
+    defaultLimit: 24,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.pcgarage.ro/cauta/${encodeSearchText(query)}/`;
+    },
+    pagedSearchUrl(query) {
+      return this.searchUrl(query);
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("PC Garage", query, limit, "This is a retailer search page. Keep only product cards with visible prices.");
+    }
+  },
   "altex.ro": {
     key: "altex.ro",
     label: "Altex",
-    priority: 11,
+    priority: 15,
     defaultEnabled: false,
     provider: "direct",
     strategy: "direct-html-retail",

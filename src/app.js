@@ -289,6 +289,7 @@ async function searchSite({ siteKey, query, condition, provider, limit, maxPages
   const providerCandidates = getProviderCandidates(site, requestedProvider);
   const providerFallbacks = [];
   let lastResult = null;
+  let lastSuccessfulResult = null;
 
   for (const [providerIndex, providerCandidate] of providerCandidates.entries()) {
     const result = await searchSiteWithProvider({
@@ -301,7 +302,18 @@ async function searchSite({ siteKey, query, condition, provider, limit, maxPages
     });
 
     lastResult = result;
+    if (result.ok) {
+      lastSuccessfulResult = result;
+    }
+
     if (!shouldTryNextProvider(result, providerIndex, providerCandidates, requestedProvider)) {
+      if (!result.ok && lastSuccessfulResult) {
+        return attachProviderFallbacks(lastSuccessfulResult, [
+          ...providerFallbacks,
+          buildProviderFallbackEntry(result)
+        ]);
+      }
+
       return attachProviderFallbacks(result, providerFallbacks);
     }
 

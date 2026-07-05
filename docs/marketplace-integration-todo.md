@@ -62,8 +62,23 @@ This file tracks marketplaces we still need to add or harden before advertising 
 
 - BestAuto.ro
   - Goal: expand vehicle coverage beyond Autovit for car searches.
-  - Current status: direct requests hit anti-bot protection.
+  - Research: Publi24 network partner; homepage confirms auto/moto categories, but live search probes returned 504 from this environment.
   - Needed: add only behind a provider that can fetch consistently, then route it only for car-like queries.
+
+- BestBike.ro
+  - Goal: expand motorcycle, scooter, ATV, and moto accessories coverage.
+  - Research: Publi24 network partner; homepage confirms moto/accessory categories, but live search probes returned 504 from this environment.
+  - Needed: stable search URL/provider before default-active search.
+
+- Animalutul.ro
+  - Goal: pet and animal-related listings, including accessories.
+  - Research: Publi24 network partner; homepage confirms animal/accessory categories, but live search probes returned 504 from this environment.
+  - Needed: stable search URL/provider before default-active search.
+
+- PCGarage.ro
+  - Goal: direct electronics/PC retail benchmark.
+  - Research: registered in API, but direct probes returned Cloudflare challenge pages.
+  - Needed: blocked-source/provider work before default-active search.
 
 ## Add Later: Retail Benchmark Sources
 
@@ -74,14 +89,43 @@ This file tracks marketplaces we still need to add or harden before advertising 
 
 - Compari.ro
   - Goal: new-product price benchmark coverage, useful as market-price context rather than second-hand listings.
-  - Current status: direct requests hit anti-bot protection.
-  - Needed: decide whether this belongs in listing results or a separate "retail benchmark" panel.
+  - Current status: registered in API, but direct requests hit anti-bot protection.
+  - Needed: provider work before making it default-active.
+
+- evoMAG
+  - Goal: direct retail benchmark.
+  - Current status: registered in API, but the static route currently returns homepage promo modules rather than trustworthy query-specific results.
+  - Needed: find a stable query endpoint or add a stricter parser before default-active search.
 
 
 - eMAG
   - Goal: retail benchmark prices for common products.
-  - Current status: guessed search route did not expose a usable direct result page.
-  - Needed: find a stable integration route before adding it to the search pipeline.
+  - Current status: registered in API with a parser that extracts prices from embedded product metadata, but Node/Worker fetch receives 511 while curl succeeds locally.
+  - Needed: provider/fetch reliability work before making it default-active.
+
+## Researched But Not Active
+
+- Flip.ro
+  - Fit: refurbished / used phones and tech.
+  - Probe result: Node fetch returned HTML, but the generic retail parser grabbed financing/promotional prices instead of final product prices.
+  - Needed: dedicated parser for product cards and final prices before API activation.
+
+- Mobexpert.ro
+  - Fit: furniture retail benchmark.
+  - Probe result: Node fetch returned HTML, but generic parsing grabbed navigation/category links with unrelated nearby prices.
+  - Needed: dedicated parser before API activation.
+
+- Dedeman.ro
+  - Fit: DIY/home/garden retail benchmark.
+  - Probe result: candidate search URL returned 404-like HTML; needs correct stable search endpoint.
+
+- Decathlon.ro
+  - Fit: sports retail benchmark.
+  - Probe result: candidate search URL returned 403 from Node fetch.
+
+- FashionDays.ro
+  - Fit: fashion retail benchmark.
+  - Probe result: candidate search URL returned 404-like HTML; needs correct stable search endpoint.
 
 ## Reliability Work
 

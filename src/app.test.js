@@ -344,3 +344,72 @@ test("Cloudflare Worker runtime caps marketplace searches to one page", async ()
     globalThis.fetch = previousFetch;
   }
 });
+
+
+test("auto provider keeps an empty direct success when a remote fallback fails", async () => {
+  const envKeys = [
+    "LIBERGENT_MOCK_SEARCH",
+    "LIBERGENT_MOCK_PROVIDER",
+    "CLOUDFLARE_ACCOUNT_ID",
+    "CLOUDFLARE_API_TOKEN"
+  ];
+  const previousEnv = new Map(envKeys.map((key) => [key, process.env[key]]));
+  const previousFetch = globalThis.fetch;
+  let cloudflareCalls = 0;
+
+  try {
+    process.env.LIBERGENT_MOCK_SEARCH = "0";
+    process.env.LIBERGENT_MOCK_PROVIDER = "0";
+    process.env.CLOUDFLARE_ACCOUNT_ID = "account";
+    process.env.CLOUDFLARE_API_TOKEN = "bad-token";
+
+    globalThis.fetch = async (url) => {
+      const requestUrl = String(url);
+      if (requestUrl.startsWith("https://api.cloudflare.com/")) {
+        cloudflareCalls += 1;
+        return new Response(JSON.stringify({
+          result: null,
+          success: false,
+          errors: [{ code: 10000, message: "Authentication error" }],
+          messages: []
+        }), {
+          status: 401,
+          headers: { "content-type": "application/json" }
+        });
+      }
+
+      return new Response("<html><body>No products found</body></html>", {
+        status: 200,
+        headers: { "content-type": "text/html" }
+      });
+    };
+
+    const payload = await searchAcrossSites({
+      query: "gisou",
+      provider: "auto",
+      siteKeys: ["price.ro"],
+      limit: 5,
+      maxPages: 1
+    });
+
+    const [result] = payload.results;
+    assert.equal(result.ok, true);
+    assert.equal(result.provider, "direct");
+    assert.equal(result.itemCount, 0);
+    assert.equal(payload.summary.failedMarketplaces.length, 0);
+    assert.equal(payload.summary.successfulMarketplaces, 1);
+    assert.equal(cloudflareCalls, 2);
+    assert.equal(result.providerFallbacks.at(-1).provider, "cloudflare");
+    assert.match(result.providerFallbacks.at(-1).reason, /Authentication error/);
+  } finally {
+    globalThis.fetch = previousFetch;
+    for (const key of envKeys) {
+      const previous = previousEnv.get(key);
+      if (previous === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = previous;
+      }
+    }
+  }
+});

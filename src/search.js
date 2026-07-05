@@ -8,7 +8,7 @@ import { parsePubli24Html } from "./parsers/publi24.js";
 import { parseVintedHtml, parseVintedMarkdown } from "./parsers/vinted.js";
 import { parseAutovitHtml } from "./parsers/autovit.js";
 import { parseAnuntulHtml } from "./parsers/anuntul.js";
-import { parseRetailHtml } from "./parsers/retail.js";
+import { parseEmagHtml, parseEvomagHtml, parseRetailHtml } from "./parsers/retail.js";
 import { getQueryBrandTerms } from "./relevance.js";
 import { buildAbortSignal } from "./abort.js";
 import { normalizeMarketplaceQuery } from "./query-normalization.js";
@@ -318,6 +318,18 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
       hasNextPage = parsed.hasNextPage ?? null;
     } else if (site.key === "anuntul.ro") {
       const parsed = parseAnuntulHtml(raw, limit);
+      items = parsed.items;
+      totalResults = parsed.totalResults;
+      rawItemCount = getRawItemCount(parsed, items);
+      hasNextPage = parsed.hasNextPage ?? null;
+    } else if (site.key === "emag.ro") {
+      const parsed = parseEmagHtml(raw, limit, { origin: new URL(url).origin });
+      items = parsed.items;
+      totalResults = parsed.totalResults;
+      rawItemCount = getRawItemCount(parsed, items);
+      hasNextPage = parsed.hasNextPage ?? null;
+    } else if (site.key === "evomag.ro") {
+      const parsed = parseEvomagHtml(raw, limit, { origin: new URL(url).origin });
       items = parsed.items;
       totalResults = parsed.totalResults;
       rawItemCount = getRawItemCount(parsed, items);
