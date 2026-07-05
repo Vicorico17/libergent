@@ -1,13 +1,14 @@
-# Classified Marketplace Feature Plan
+# Used + New Product Search Feature Plan
 
-Libergent should focus on classified marketplace search first. The product should be excellent at finding real Romanian listings, filtering weak matches, comparing prices, and helping the buyer contact the seller quickly.
+Libergent should find real Romanian second-hand listings and compare them against reliable new-product price benchmarks. The product should filter weak matches, avoid duplicate retail benchmarks, compare used price versus new price, and help the buyer contact second-hand sellers quickly.
 
 ## Product Focus
 
-- Primary niche: Romanian classified listings for second-hand and local-market products.
-- Active sources: OLX, Vinted, Lajumate, Okazii, Publi24, Anuntul, and Autovit for car-like searches.
-- Avoid broad retail comparison as the main product until classified search quality is consistently strong.
-- Treat eMAG, Compari, Flip, or retailer data as optional benchmark context, not the core result list.
+- Primary niche: Romanian products with both second-hand availability and new-price comparables.
+- Active used sources: OLX, Vinted, Lajumate, Okazii, Publi24, Anuntul, and Autovit for car-like searches.
+- Active new benchmark sources: Price.ro, ShopMania, and CEL.ro.
+- Keep used listings and new benchmarks visually and analytically separate.
+- Treat blocked sources such as eMAG, Compari, Altex, and Flanco as future integration work until they return reliable results.
 
 ## Keyword Focus
 
@@ -55,8 +56,9 @@ Future direct messaging:
 
 ## Next Implementation Order
 
-1. Harden keyword scoring and add tests for the chosen classified niche.
-2. Add event tracking for `copy_seller_message` and `open_seller_contact`.
-3. Add image upload endpoint that returns editable extracted keywords.
-4. Connect image search to the existing search page.
-5. Investigate compliant seller-contact integrations per marketplace.
+1. Harden keyword scoring and add tests for the chosen product niche.
+2. Keep used/new medians and savings-versus-new visible in search results.
+3. Add event tracking for `copy_seller_message`, `open_seller_contact`, and retail benchmark opens.
+4. Add image upload endpoint that returns editable extracted keywords.
+5. Connect image search to the existing search page.
+6. Investigate compliant seller-contact integrations per marketplace.

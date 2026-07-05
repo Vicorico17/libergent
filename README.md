@@ -1,6 +1,6 @@
 # libergent
 
-Cloudflare Worker app for searching Romanian second-hand marketplaces with direct HTML parsing by default and optional remote rendering fallbacks.
+Cloudflare Worker app for searching Romanian second-hand marketplaces and comparing them with new-product price benchmarks from Romanian aggregators/retailers.
 
 Supported marketplaces:
 
@@ -10,6 +10,10 @@ Supported marketplaces:
 - `lajumate.ro`
 - `okazii.ro`
 - `publi24.ro`
+- `anuntul.ro`
+- `price.ro` for new-product price benchmarks
+- `shopmania.ro` for new-product price benchmarks
+- `cel.ro` for new-product retail benchmarks
 
 Supported providers:
 
@@ -33,7 +37,7 @@ The product direction is intentionally simple in the UI:
 - the output should be structured per marketplace with links
 - the app should surface a quality-checked best offer, not just the raw cheapest item
 
-The current product focus is classified marketplace search: real Romanian listings, strong keyword matching, price comparison, and fast seller contact. See [docs/classified-marketplace-feature-plan.md](docs/classified-marketplace-feature-plan.md) for the image-search and seller-messaging roadmap.
+The current product focus is mixed Romanian product search: real second-hand listings, strict keyword matching, deduplication, and a separate new-price benchmark so buyers can see whether a used offer is actually below retail. See [docs/classified-marketplace-feature-plan.md](docs/classified-marketplace-feature-plan.md) for the image-search and seller-messaging roadmap.
 
 The quality-check layer exists because the lowest price is often misleading. Extremely cheap listings can be:
 
@@ -46,7 +50,8 @@ The quality-check layer exists because the lowest price is often misleading. Ext
 libergent therefore keeps both ideas:
 
 - cheapest visible offer
-- AI-checked best offer
+- AI-checked best used offer
+- lowest new-price benchmark
 
 The best-offer score currently uses lightweight heuristics so the app can stay cheap:
 
@@ -76,13 +81,17 @@ Current strategy:
 - `lajumate.ro`: direct HTML fetch + local parser
 - `okazii.ro`: direct HTML fetch + local parser
 - `publi24.ro`: direct HTML fetch + local parser
+- `anuntul.ro`: direct HTML fetch + local parser
+- `price.ro`: direct HTML fetch + local retail parser
+- `shopmania.ro`: direct HTML fetch + local retail parser
+- `cel.ro`: direct HTML fetch + local retail parser
 
 Target strategy:
 
 1. fetch the maximum useful number of listings from one search page
 2. paginate only when necessary
-3. dedupe locally by URL
-4. compute lowest price, average price, and best offer locally
+3. dedupe locally by URL and normalized product identity
+4. compute used median, new benchmark, savings, and best offers locally
 
 This is the reason libergent should move toward "close to one scrape for all results" where the marketplace allows it. In practice, that means:
 
@@ -198,11 +207,11 @@ Then open `http://localhost:8787`.
 
 The UI lets you type only a product name and shows:
 
-- AI-checked best offer on each marketplace
-- direct listing link for that best offer
+- AI-checked best second-hand offer
+- a separate new-price benchmark from aggregators/retailers
+- source-type filters for second-hand, aggregators, and retailers
 - extracted listings per marketplace
-- average price across parsed RON listings
-- one global best offer across marketplaces
+- used and new price intelligence with savings versus the lowest new price
 
 CLI:
 

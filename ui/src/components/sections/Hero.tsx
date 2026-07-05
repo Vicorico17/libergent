@@ -56,6 +56,9 @@ const SOURCES = [
   { code: "OK", name: "OKAZII",  delay: "0.4s" },
   { code: "P",  name: "PUBLI24", delay: "0.1s" },
   { code: "A",  name: "AUTOVIT", delay: "0.5s" },
+  { code: "PR", name: "PRICE.RO", delay: "0.3s" },
+  { code: "SM", name: "SHOPMANIA", delay: "0.6s" },
+  { code: "CE", name: "CEL.RO", delay: "0.7s" },
 ];
 
 /* ── Checklist ── */
@@ -92,14 +95,14 @@ export function Hero() {
             className="font-semibold leading-[1.1]"
             style={{ fontFamily: MONO, fontSize: "clamp(40px, 5.5vw, 72px)", color: INK }}
           >
-            Caută anunțuri<br />clasificate din România<span style={{ color: PINK }}>.</span>
+            Caută produse noi<br />și second-hand în România<span style={{ color: PINK }}>.</span>
           </h1>
 
           {/* Body copy */}
           <p className="text-base lg:text-lg leading-relaxed max-w-lg" style={{ color: `${INK}E6` }}>
-            LiberGent caută produse noi sau folosite în anunțuri de pe OLX, Vinted, LaJumate,
-            Okazii, Publi24 și Autovit, apoi grupează anunțurile relevante,
-            prețurile, cuvintele cheie și mesajele către selleri într-un singur loc.
+            LiberGent caută anunțuri second-hand pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit,
+            apoi le compară cu prețuri noi din Price.ro, ShopMania și CEL.ro ca să vezi rapid
+            dacă o ofertă folosită chiar merită.
           </p>
 
           {/* Search form with gradient hover border */}
@@ -157,7 +160,7 @@ export function Hero() {
               <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke={PINK} strokeWidth="2" strokeLinejoin="round" />
             </svg>
             <span style={{ fontFamily: MONO }}>
-              Agentul este <span style={{ color: PINK }}>activ</span>. Verifică marketplace-uri din București, Cluj, Iași, Timișoara și restul României.
+              Agentul este <span style={{ color: PINK }}>activ</span>. Verifică marketplace-uri, agregatoare de preț și retaileri din România.
             </span>
           </div>
         </div>

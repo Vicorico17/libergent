@@ -485,3 +485,84 @@ test("vehicle part search surfaces tire listings instead of complete vehicles", 
   assert.deepEqual(urls.sort(), ["https://publi24.ro/audi-tires", "https://publi24.ro/audi-wheels"].sort());
   assert.equal(aggregated.summary.totalListings, 2);
 });
+
+
+test("separates used price intelligence from new retail benchmarks", () => {
+  const query = "iphone 15";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Apple iPhone 15 128GB impecabil",
+        price: "2500 lei",
+        condition: "folosit",
+        sourceType: "classifieds",
+        postedAt: "Azi",
+        url: "https://olx.ro/iphone-15-used"
+      },
+      {
+        title: "Apple iPhone 15 128GB ca nou",
+        price: "2600 lei",
+        condition: "folosit",
+        sourceType: "classifieds",
+        postedAt: "Azi",
+        url: "https://olx.ro/iphone-15-used-2"
+      }
+    ]),
+    makeResult("price.ro", query, [
+      {
+        title: "Apple iPhone 15 128GB Black",
+        price: "4000 lei",
+        condition: "Nou",
+        sourceType: "price_aggregator",
+        postedAt: "",
+        url: "https://price.ro/iphone-15-new"
+      }
+    ])
+  ]);
+
+  const used = aggregated.results.find((result) => result.site === "olx.ro").items[0];
+  const retail = aggregated.results.find((result) => result.site === "price.ro").items[0];
+
+  assert.equal(used.priceInsight.marketMedianRon, 2550);
+  assert.equal(retail.priceInsight.marketMedianRon, 4000);
+  assert.equal(aggregated.summary.priceIntelligence.usedMedianRon, 2550);
+  assert.equal(aggregated.summary.priceIntelligence.newLowestRon, 4000);
+  assert.equal(aggregated.summary.priceIntelligence.savingsVsNewPct, 38);
+  assert.equal(aggregated.summary.bestUsedOffer.sourceType, "classifieds");
+  assert.equal(aggregated.summary.bestNewBenchmark.sourceType, "price_aggregator");
+});
+
+test("dedupes equivalent new benchmark products across retail sources", () => {
+  const query = "iphone 15";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("price.ro", query, [
+      { title: "Apple iPhone 15 128GB", price: "3300 lei", condition: "Nou", sourceType: "price_aggregator", url: "https://price.ro/a" }
+    ]),
+    makeResult("shopmania.ro", query, [
+      { title: "iPhone 15 128GB", price: "3200 lei", condition: "Nou", sourceType: "price_aggregator", url: "https://shopmania.ro/a" }
+    ]),
+    makeResult("cel.ro", query, [
+      { title: "Apple iPhone 15 128GB", price: "3400 lei", condition: "Nou", sourceType: "retailer", url: "https://cel.ro/a" }
+    ])
+  ]);
+
+  assert.equal(aggregated.summary.totalListings, 1);
+  assert.equal(aggregated.summary.duplicateListings, 2);
+  assert.equal(aggregated.summary.bestNewBenchmark.url, "https://shopmania.ro/a");
+  assert.equal(aggregated.summary.priceIntelligence.newLowestRon, 3200);
+});
+
+test("rejects phone variants when the query asks for the base model", () => {
+  const query = "iphone 15 128GB";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("price.ro", query, [
+      { title: "Apple iPhone 15 Pro 128GB", price: "4500 lei", condition: "Nou", sourceType: "price_aggregator", url: "https://price.ro/pro" },
+      { title: "Apple iPhone 15 128GB", price: "3500 lei", condition: "Nou", sourceType: "price_aggregator", url: "https://price.ro/base" }
+    ])
+  ]);
+
+  const urls = aggregated.results[0].items.map((item) => item.url);
+
+  assert.deepEqual(urls, ["https://price.ro/base"]);
+  assert.equal(aggregated.results[0].secondaryMatches[0].keywordSignals.variantMismatch, "extra_pro");
+});

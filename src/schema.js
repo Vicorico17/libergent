@@ -17,6 +17,7 @@ export function buildListingSchema(limit) {
             postedAt: { type: "string" },
             condition: { type: "string" },
             sellerType: { type: "string" },
+            sourceType: { type: "string" },
             url: { type: "string" },
             imageUrl: { type: "string" },
             imageUrls: {

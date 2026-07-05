@@ -1055,11 +1055,45 @@ function detectModelVariantMismatch({ title, text, queryProfile }) {
   const queryTokens = new Set(queryProfile.tokens);
   const titleTokens = new Set(tokenize(normalizedTitle));
   const textTokens = new Set(tokenize(normalizedText));
+  const listingTokens = new Set([...titleTokens, ...textTokens]);
+
+  function findStorageGb(value) {
+    return [...value.matchAll(/\b(64|128|256|512|1024)\s*(?:gb|g)\b/g)]
+      .map((match) => Number.parseInt(match[1], 10));
+  }
+
+  function findIphoneModels(value) {
+    return [...value.matchAll(/\biphone\s*(\d{2})(?:e)?\b/g)]
+      .map((match) => match[1]);
+  }
+
+  function findGalaxyModels(value) {
+    return [...value.matchAll(/\b(?:samsung\s*)?galaxy\s*(s\d{2}|a\d{2}|z\s*flip\s*\d|z\s*fold\s*\d)\b/g)]
+      .map((match) => normalizeText(match[1]));
+  }
+
+  const queryStorage = findStorageGb(queryProfile.normalized);
+  const listingStorage = findStorageGb(normalizedText);
+  if (queryStorage.length && listingStorage.length && !listingStorage.some((value) => queryStorage.includes(value))) {
+    return { mismatch: true, reason: "storage_mismatch" };
+  }
+
+  const queryIphoneModels = findIphoneModels(queryProfile.normalized);
+  const listingIphoneModels = findIphoneModels(normalizedText);
+  if (queryIphoneModels.length && listingIphoneModels.length && !listingIphoneModels.some((model) => queryIphoneModels.includes(model))) {
+    return { mismatch: true, reason: "iphone_model_mismatch" };
+  }
+
+  const queryGalaxyModels = findGalaxyModels(queryProfile.normalized);
+  const listingGalaxyModels = findGalaxyModels(normalizedText);
+  if (queryGalaxyModels.length && listingGalaxyModels.length && !listingGalaxyModels.some((model) => queryGalaxyModels.includes(model))) {
+    return { mismatch: true, reason: "galaxy_model_mismatch" };
+  }
 
   const queryHasPro = queryTokens.has("pro");
   const queryHasMax = queryTokens.has("max");
-  const titleHasPro = titleTokens.has("pro") || textTokens.has("pro");
-  const titleHasMax = titleTokens.has("max") || textTokens.has("max");
+  const titleHasPro = listingTokens.has("pro");
+  const titleHasMax = listingTokens.has("max");
 
   const queryWantsProOnly = queryHasPro && !queryHasMax;
   const queryWantsProMax = queryHasPro && queryHasMax;
@@ -1072,6 +1106,20 @@ function detectModelVariantMismatch({ title, text, queryProfile }) {
   if (queryWantsProMax && titleIsProOnly) {
     return { mismatch: true, reason: "pro_max_vs_pro" };
   }
+
+  const strictVariantTokens = ["mini", "plus", "ultra"];
+  for (const variant of strictVariantTokens) {
+    const queryHasVariant = queryTokens.has(variant);
+    const listingHasVariant = listingTokens.has(variant);
+    if (queryHasVariant !== listingHasVariant && (queryIphoneModels.length || queryGalaxyModels.length)) {
+      return { mismatch: true, reason: queryHasVariant ? "missing_" + variant : "extra_" + variant };
+    }
+  }
+
+  if ((queryIphoneModels.length || queryGalaxyModels.length) && !queryHasPro && titleHasPro) {
+    return { mismatch: true, reason: "extra_pro" };
+  }
+
   return { mismatch: false, reason: "" };
 }
 

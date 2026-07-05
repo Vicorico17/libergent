@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Bookmark, CalendarDays, Copy, ExternalLink, EyeOff, MapPin, MessageSquare, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
-import { mapBestOffer, mapSearchResults, type SearchPayload, type SearchResultItem } from "./search-data"
+import { mapOffer, mapSearchResults, type SearchPayload, type SearchResultItem } from "./search-data"
 
 // — Constants —
 const CREAM  = "#F5F3EE"
@@ -16,8 +16,13 @@ const GREEN  = "#22C55E"
 const MONO   = "var(--font-mono-var), monospace"
 const MODAL_BG = "#FDFAF3"
 
-const SOURCES_LIST = ["OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT"]
+const SOURCES_LIST = ["OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT", "PRICE.RO", "SHOPMANIA", "CEL.RO"]
 const SORT_OPTIONS = ["relevanță", "potrivire cuvinte cheie", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
+const SOURCE_TYPE_OPTIONS = [
+  { value: "classifieds", label: "second-hand" },
+  { value: "price_aggregator", label: "agregatoare" },
+  { value: "retailer", label: "retaileri" },
+]
 const COND_OPTIONS = ["nou", "folosit", "ca nou", "bun", "acceptabil"]
 
 type MarketplaceStatus = {
@@ -27,6 +32,8 @@ type MarketplaceStatus = {
   blocked: string[]
 }
 
+type PriceBenchmark = NonNullable<NonNullable<SearchPayload["summary"]>["priceIntelligence"]>
+
 // — Loader config —
 const SOURCE_TIMING = [
   { name: "OLX",      start: 0,  end: 22 },
@@ -35,7 +42,10 @@ const SOURCE_TIMING = [
   { name: "PUBLI24",  start: 24, end: 63 },
   { name: "ANUNTUL",  start: 36, end: 76 },
   { name: "LAJUMATE", start: 48, end: 88 },
-  { name: "AUTOVIT",  start: 62, end: 100 },
+  { name: "AUTOVIT",  start: 56, end: 82 },
+  { name: "PRICE.RO", start: 64, end: 90 },
+  { name: "SHOPMANIA", start: 72, end: 96 },
+  { name: "CEL.RO", start: 80, end: 100 },
 ]
 const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const MAIN_BLOCKS   = 15
@@ -46,7 +56,7 @@ const INITIAL_VISIBLE_RESULTS = 48
 const VISIBLE_RESULT_STEP = 48
 const SAVED_LISTINGS_STORAGE_KEY = "libergent-saved-listings-v1"
 const HIDDEN_LISTINGS_STORAGE_KEY = "libergent-hidden-listings-v1"
-const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v1"
+const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v2"
 
 function shouldOpenFiltersByDefault() {
   return typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
@@ -176,6 +186,7 @@ function writeStringSetStorage(key: string, values: Set<string>) {
 function readSearchFiltersStorage(): {
   sort: string
   sources: Set<string>
+  sourceTypes: Set<string>
   conditions: Set<string>
   priceMin: string
   priceMax: string
@@ -183,6 +194,7 @@ function readSearchFiltersStorage(): {
   const fallback = {
     sort: SORT_OPTIONS[0],
     sources: new Set<string>(SOURCES_LIST),
+    sourceTypes: new Set<string>(SOURCE_TYPE_OPTIONS.map((option) => option.value)),
     conditions: new Set<string>(),
     priceMin: "",
     priceMax: "",
@@ -197,6 +209,9 @@ function readSearchFiltersStorage(): {
       sources: Array.isArray(parsed.sources)
         ? new Set<string>(parsed.sources.filter((value: unknown): value is string => typeof value === "string"))
         : fallback.sources,
+      sourceTypes: Array.isArray(parsed.sourceTypes)
+        ? new Set<string>(parsed.sourceTypes.filter((value: unknown): value is string => typeof value === "string"))
+        : fallback.sourceTypes,
       conditions: Array.isArray(parsed.conditions)
         ? new Set<string>(parsed.conditions.filter((value: unknown): value is string => typeof value === "string"))
         : fallback.conditions,
@@ -327,6 +342,7 @@ function ListingMetaChips({ item }: { item: SearchResultItem }) {
     <div className="flex flex-wrap gap-1.5">
       <MetaChip icon={<MapPin size={10} strokeWidth={2.2} />}>{item.city}</MetaChip>
       <MetaChip tone="dark" icon={<Tag size={10} strokeWidth={2.2} />}>{item.condition}</MetaChip>
+      <MetaChip tone="muted">{item.sourceKindLabel}</MetaChip>
       <MetaChip tone="muted" icon={<CalendarDays size={10} strokeWidth={2.2} />}>{item.postedDateLabel}</MetaChip>
     </div>
   )
@@ -741,6 +757,7 @@ function BottomBar() {
 interface FilterPanelProps {
   sort: string; setSort: (v: string) => void
   sources: Set<string>; toggleSource: (v: string) => void
+  sourceTypes: Set<string>; toggleSourceType: (v: string) => void
   conditions: Set<string>; toggleCondition: (v: string) => void
   priceMin: string; setPriceMin: (v: string) => void
   priceMax: string; setPriceMax: (v: string) => void
@@ -753,7 +770,7 @@ function FilterLabel({ children }: { children: ReactNode }) {
   return <h3 className="text-[10px] uppercase font-bold pb-1.5" style={{ borderBottom: `1px dashed ${INK}` }}>{children}</h3>
 }
 
-function FilterPanel({ sort, setSort, sources, toggleSource, conditions, toggleCondition, priceMin, setPriceMin, priceMax, setPriceMax, onReset, canClose, onClose }: FilterPanelProps) {
+function FilterPanel({ sort, setSort, sources, toggleSource, sourceTypes, toggleSourceType, conditions, toggleCondition, priceMin, setPriceMin, priceMax, setPriceMax, onReset, canClose, onClose }: FilterPanelProps) {
   return (
     <aside className="w-full lg:w-64 flex-none flex flex-col" style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
       <div className="flex justify-between items-center p-3" style={{ background: "white", borderBottom: `1px solid ${INK}` }}>
@@ -811,6 +828,26 @@ function FilterPanel({ sort, setSort, sources, toggleSource, conditions, toggleC
                   {sources.has(src) && <div style={{ width: 7, height: 7, background: INK }} />}
                 </div>
                 <span className="text-[11px] uppercase font-bold">{src}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <FilterLabel>Tip sursă</FilterLabel>
+          <div className="flex flex-col gap-2.5">
+            {SOURCE_TYPE_OPTIONS.map((option) => (
+              <label key={option.value} className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sourceTypes.has(option.value)}
+                  onChange={() => toggleSourceType(option.value)}
+                  className="sr-only"
+                />
+                <div className="w-3.5 h-3.5 border flex-none flex items-center justify-center" style={{ borderColor: INK, background: "white" }}>
+                  {sourceTypes.has(option.value) && <div style={{ width: 7, height: 7, background: INK }} />}
+                </div>
+                <span className="text-[11px] uppercase font-bold">{option.label}</span>
               </label>
             ))}
           </div>
@@ -925,6 +962,31 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
       marketplace: item.source,
       listing_title: item.title,
     })
+  }
+
+  if (item.sourceKind === "new") {
+    return item.url ? (
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={trackOpenContact}
+        className="flex min-h-10 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase transition-colors duration-150"
+        style={{ border: "1px solid " + INK, background: INK, color: "white", fontFamily: MONO }}
+      >
+        <ExternalLink size={13} strokeWidth={2.2} />
+        Deschide oferta
+      </a>
+    ) : (
+      <span
+        aria-disabled="true"
+        className="flex min-h-10 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase opacity-60"
+        style={{ border: "1px solid " + INK, background: INK, color: "white", fontFamily: MONO }}
+      >
+        <ExternalLink size={13} strokeWidth={2.2} />
+        Fără link
+      </span>
+    )
   }
 
   return (
@@ -1250,7 +1312,7 @@ function RecommendationCard({ item, query, onInspect }: { item: SearchResultItem
       }}
     >
       <div style={{ background: CREAM }}>
-        <PanelHeader title="LiberGent Recommends" />
+        <PanelHeader title="Best Used Deal" />
         <div className="flex flex-col md:flex-row">
           <div className="w-full md:w-2/5 relative overflow-hidden" style={{ minHeight: 256, background: "#DDD9CE", borderRight: `1px solid ${INK}` }}>
             {image ? (
@@ -1355,6 +1417,59 @@ function RecommendationCard({ item, query, onInspect }: { item: SearchResultItem
         </div>
       </div>
     </div>
+  )
+}
+
+function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: SearchResultItem; usedItem: SearchResultItem | null; priceBenchmark?: PriceBenchmark; onInspect: (item: SearchResultItem) => void }) {
+  const savings = priceBenchmark?.savingsVsNewPct
+  const usedPrice = usedItem?.price ?? null
+
+  return (
+    <section style={{ border: "1px solid " + INK, background: "white", fontFamily: MONO }}>
+      <PanelHeader title="New Price Benchmark" />
+      <div className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center" style={{ background: CREAM }}>
+        <div className="min-w-0">
+          <div className="mb-3 flex flex-wrap gap-2">
+            <MetaChip tone="dark">preț nou</MetaChip>
+            <MetaChip>{item.source}</MetaChip>
+            <MetaChip tone="muted">{item.sourceKindLabel}</MetaChip>
+          </div>
+          <h3 className="mb-2 text-[16px] font-bold uppercase leading-snug">{item.title}</h3>
+          <p className="text-[22px] font-bold" style={{ color: PINK }}>{item.priceLabel}</p>
+          <div className="mt-3 grid gap-2 text-[10px] font-bold uppercase sm:grid-cols-3">
+            <span>nou minim: {formatRon(priceBenchmark?.newLowestRon ?? item.price)}</span>
+            <span>nou median: {formatRon(priceBenchmark?.newMedianRon ?? null)}</span>
+            <span>used median: {formatRon(priceBenchmark?.usedMedianRon ?? null)}</span>
+          </div>
+          {typeof savings === "number" && usedPrice !== null && (
+            <p className="mt-3 text-[11px] font-bold uppercase" style={{ color: savings > 0 ? GREEN : PINK }}>
+              Best used este {Math.abs(savings)}% {savings >= 0 ? "sub" : "peste"} cel mai mic preț nou găsit.
+            </p>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 md:w-48">
+          <button
+            type="button"
+            onClick={() => onInspect(item)}
+            className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
+            style={{ border: "1px solid " + INK, background: "white", color: INK, fontFamily: MONO }}
+          >
+            Vezi analiza
+          </button>
+          {item.url && (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-10 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase"
+              style={{ border: "1px solid " + INK, background: INK, color: "white", fontFamily: MONO }}
+            >
+              Deschide sursa <ExternalLink size={13} strokeWidth={2.2} />
+            </a>
+          )}
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -1503,12 +1618,16 @@ function SearchResultsContent() {
 
   const [sort, setSort]             = useState(() => readSearchFiltersStorage().sort)
   const [sources, setSources]       = useState<Set<string>>(() => readSearchFiltersStorage().sources)
+  const [sourceTypes, setSourceTypes] = useState<Set<string>>(() => readSearchFiltersStorage().sourceTypes)
   const [conditions, setConditions] = useState<Set<string>>(() => readSearchFiltersStorage().conditions)
   const [priceMin, setPriceMin]     = useState(() => readSearchFiltersStorage().priceMin)
   const [priceMax, setPriceMax]     = useState(() => readSearchFiltersStorage().priceMax)
   const [time, setTime]             = useState(() => formatSearchTime())
   const [results, setResults]       = useState<SearchResultItem[]>([])
-  const [bestOffer, setBestOffer]   = useState<SearchResultItem | null>(null)
+  const [bestUsedOffer, setBestUsedOffer] = useState<SearchResultItem | null>(null)
+  const [bestNewBenchmark, setBestNewBenchmark] = useState<SearchResultItem | null>(null)
+  const [duplicateListings, setDuplicateListings] = useState(0)
+  const [priceBenchmark, setPriceBenchmark] = useState<PriceBenchmark | undefined>()
   const [error, setError]           = useState("")
   const [searchedAt, setSearchedAt] = useState("")
   const [totalListings, setTotalListings] = useState(0)
@@ -1542,11 +1661,12 @@ function SearchResultsContent() {
     window.localStorage.setItem(SEARCH_FILTERS_STORAGE_KEY, JSON.stringify({
       sort,
       sources: [...sources],
+      sourceTypes: [...sourceTypes],
       conditions: [...conditions],
       priceMin,
       priceMax,
     }))
-  }, [conditions, priceMax, priceMin, sort, sources])
+  }, [conditions, priceMax, priceMin, sort, sourceTypes, sources])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -1555,7 +1675,10 @@ function SearchResultsContent() {
       setFiltersOpen(shouldOpenFiltersByDefault())
       if (!query) {
         setResults([])
-        setBestOffer(null)
+        setBestUsedOffer(null)
+        setBestNewBenchmark(null)
+        setDuplicateListings(0)
+        setPriceBenchmark(undefined)
         setError("")
         setSearchedAt("")
         setTotalListings(0)
@@ -1604,7 +1727,10 @@ function SearchResultsContent() {
 
           const mapped = mapSearchResults(payload).slice(0, SEARCH_RESULT_LIMIT)
           setResults(mapped)
-          setBestOffer(mapBestOffer(payload, mapped))
+          setBestUsedOffer(mapOffer(payload.summary?.bestUsedOffer, mapped) || mapped.find((item) => item.sourceKind === "used") || null)
+          setBestNewBenchmark(mapOffer(payload.summary?.bestNewBenchmark, mapped) || mapped.find((item) => item.sourceKind === "new") || null)
+          setDuplicateListings(payload.summary?.duplicateListings ?? 0)
+          setPriceBenchmark(payload.summary?.priceIntelligence)
           setSearchedAt(payload.summary?.searchedAt || "")
           setTotalListings(payload.summary?.totalListings ?? mapped.length)
           setParsedListings(payload.summary?.parsedListings ?? payload.summary?.totalListings ?? mapped.length)
@@ -1621,7 +1747,10 @@ function SearchResultsContent() {
         .catch((searchError) => {
           if (controller.signal.aborted) return
           setResults([])
-          setBestOffer(null)
+          setBestUsedOffer(null)
+          setBestNewBenchmark(null)
+          setDuplicateListings(0)
+          setPriceBenchmark(undefined)
           setSearchedAt("")
           setTotalListings(0)
           setParsedListings(0)
@@ -1664,8 +1793,9 @@ function SearchResultsContent() {
   const updatePriceMin = (value: string) => { setPriceMin(value); resetVisibleResults() }
   const updatePriceMax = (value: string) => { setPriceMax(value); resetVisibleResults() }
   const toggleSource    = (s: string) => { setSources(prev => { const n = new Set(prev); if (n.has(s)) n.delete(s); else n.add(s); return n }); resetVisibleResults() }
+  const toggleSourceType = (s: string) => { setSourceTypes(prev => { const n = new Set(prev); if (n.has(s)) n.delete(s); else n.add(s); return n }); resetVisibleResults() }
   const toggleCondition = (c: string) => { setConditions(prev => { const n = new Set(prev); if (n.has(c)) n.delete(c); else n.add(c); return n }); resetVisibleResults() }
-  const resetFilters    = () => { setSort(SORT_OPTIONS[0]); setSources(new Set(SOURCES_LIST)); setConditions(new Set()); setPriceMin(""); setPriceMax(""); resetVisibleResults() }
+  const resetFilters    = () => { setSort(SORT_OPTIONS[0]); setSources(new Set(SOURCES_LIST)); setSourceTypes(new Set(SOURCE_TYPE_OPTIONS.map((option) => option.value))); setConditions(new Set()); setPriceMin(""); setPriceMax(""); resetVisibleResults() }
   const toggleSavedListing = (item: SearchResultItem) => {
     const id = listingStorageId(item)
     setSavedListings((current) => {
@@ -1708,6 +1838,7 @@ function SearchResultsContent() {
     const base = results.filter((item) => {
       if (hiddenListings.has(listingStorageId(item))) return false
       if (sources.size > 0 && !sources.has(item.source)) return false
+      if (sourceTypes.size > 0 && !sourceTypes.has(item.sourceGroup)) return false
       if (conditions.size > 0 && !conditions.has(item.condition.toLowerCase())) return false
       if (priceMin && priceForSort(item, Number.NEGATIVE_INFINITY) < Number(priceMin)) return false
       if (priceMax && priceForSort(item, Number.POSITIVE_INFINITY) > Number(priceMax)) return false
@@ -1722,20 +1853,30 @@ function SearchResultsContent() {
       if (sort === "potrivire cuvinte cheie") return getKeywordMatchScore(b, query) - getKeywordMatchScore(a, query) || compareByRank(a, b)
       return compareByRank(a, b)
     })
-  }, [conditions, hiddenListings, priceMax, priceMin, query, results, sort, sources])
+  }, [conditions, hiddenListings, priceMax, priceMin, query, results, sort, sourceTypes, sources])
 
   const shownBestOffer = useMemo(() => {
-    if (!bestOffer) return null
-    if (hiddenListings.has(listingStorageId(bestOffer))) return null
-    return filteredResults.find((item) => item.id === bestOffer.id) || bestOffer
-  }, [bestOffer, filteredResults, hiddenListings])
+    if (!bestUsedOffer) return null
+    if (hiddenListings.has(listingStorageId(bestUsedOffer))) return null
+    return filteredResults.find((item) => item.id === bestUsedOffer.id) || bestUsedOffer
+  }, [bestUsedOffer, filteredResults, hiddenListings])
+
+  const shownNewBenchmark = useMemo(() => {
+    if (!bestNewBenchmark) return null
+    if (hiddenListings.has(listingStorageId(bestNewBenchmark))) return null
+    return filteredResults.find((item) => item.id === bestNewBenchmark.id) || bestNewBenchmark
+  }, [bestNewBenchmark, filteredResults, hiddenListings])
 
   const regularResults = useMemo(() => {
-    if (!shownBestOffer) return filteredResults
-    return filteredResults.filter((item) => item.id !== shownBestOffer.id)
-  }, [filteredResults, shownBestOffer])
+    return filteredResults.filter((item) =>
+      item.id !== shownBestOffer?.id && item.id !== shownNewBenchmark?.id
+    )
+  }, [filteredResults, shownBestOffer, shownNewBenchmark])
 
-  const visibleRegularResults = regularResults.slice(0, visibleCount)
+  const usedRegularResults = regularResults.filter((item) => item.sourceKind === "used")
+  const newBenchmarkResults = regularResults.filter((item) => item.sourceKind === "new")
+  const visibleUsedResults = usedRegularResults.slice(0, visibleCount)
+  const visibleNewBenchmarkResults = newBenchmarkResults.slice(0, Math.max(12, Math.floor(visibleCount / 2)))
   const savedVisibleCount = results.filter((item) => savedListings.has(listingStorageId(item))).length
   const hiddenVisibleCount = results.filter((item) => hiddenListings.has(listingStorageId(item))).length
 
@@ -1746,6 +1887,8 @@ function SearchResultsContent() {
       return { name, count, pct: Math.round((count / total) * 100) }
     }).filter((entry) => entry.count > 0)
   }, [results])
+
+  const visibleRegularResults = [...visibleUsedResults, ...visibleNewBenchmarkResults]
 
   const averageScore = results.length
     ? Math.round(results.reduce((sum, item) => sum + item.score, 0) / results.length)
@@ -1770,11 +1913,13 @@ function SearchResultsContent() {
       pulse: false
     },
     { text: filteredOutCount ? `${filteredOutCount} rezultate filtrate` : "filtre de calitate aplicate", pulse: false },
+    { text: duplicateListings ? `${duplicateListings} duplicate eliminate` : "deduplicare cross-source aplicată", pulse: false },
     { text: excludedListings ? `${excludedListings} accesorii/piese excluse` : "clasificare rezultate aplicată", pulse: false },
     { text: savedVisibleCount ? `${savedVisibleCount} rezultate salvate local` : "niciun rezultat salvat local", pulse: false },
     { text: hiddenVisibleCount ? `${hiddenVisibleCount} rezultate ascunse local` : "niciun rezultat ascuns", pulse: false },
-    { text: "focus: anunțuri clasificate + potrivire strictă pe cuvinte cheie", pulse: false },
-    { text: shownBestOffer ? `Best price detected on ${shownBestOffer.source}` : "Best offer în așteptare", pulse: false },
+    { text: "focus: second-hand + benchmark de preț nou", pulse: false },
+    { text: shownBestOffer ? `Best used deal on ${shownBestOffer.source}` : "Best used deal în așteptare", pulse: false },
+    { text: shownNewBenchmark ? `New benchmark on ${shownNewBenchmark.source}` : "New benchmark în așteptare", pulse: false },
     { text: isLoading ? "Recommendation updating live" : "Recommendation updated live", pulse: isLoading },
   ]
 
@@ -1816,6 +1961,7 @@ function SearchResultsContent() {
           <FilterPanel
             sort={sort} setSort={updateSort}
             sources={sources} toggleSource={toggleSource}
+            sourceTypes={sourceTypes} toggleSourceType={toggleSourceType}
             conditions={conditions} toggleCondition={toggleCondition}
             priceMin={priceMin} setPriceMin={updatePriceMin}
             priceMax={priceMax} setPriceMax={updatePriceMax}
@@ -1886,23 +2032,24 @@ function SearchResultsContent() {
           )}
 
           {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} onInspect={setSelectedListing} />}
+          {shownNewBenchmark && <BenchmarkCard item={shownNewBenchmark} usedItem={shownBestOffer} priceBenchmark={priceBenchmark} onInspect={setSelectedListing} />}
 
           {/* Results + Insights */}
           <div className="flex flex-col xl:flex-row gap-6 items-start">
             <div className="flex-1 w-full min-w-0">
               <div className="flex justify-between items-end mb-4 px-1">
-                <h2 className="text-[14px] font-bold uppercase">Top Results</h2>
+                <h2 className="text-[14px] font-bold uppercase">Second-hand deals</h2>
                 <div className="flex items-center gap-2 text-[11px]">
-                  <span style={{ color: `${INK}66` }}>Sortare după:</span>
+                  <span style={{ color: INK + "66" }}>Sortare după:</span>
                   <button className="font-bold uppercase flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity" style={{ color: INK }}>
                     {sort} <ChevronDown />
                   </button>
                 </div>
               </div>
-              {regularResults.length ? (
+              {usedRegularResults.length ? (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {visibleRegularResults.map((item) => (
+                    {visibleUsedResults.map((item) => (
                       <ResultCard
                         key={item.id}
                         item={item}
@@ -1914,22 +2061,47 @@ function SearchResultsContent() {
                       />
                     ))}
                   </div>
-                  {visibleRegularResults.length < regularResults.length && (
-                    <div className="mt-5 flex justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setVisibleCount((count) => count + VISIBLE_RESULT_STEP)}
-                        className="px-5 py-3 text-[11px] font-bold uppercase"
-                        style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
-                      >
-                        Arată mai multe ({regularResults.length - visibleRegularResults.length})
-                      </button>
-                    </div>
-                  )}
                 </>
               ) : (
-                <div className="p-6 text-[12px] uppercase font-bold" style={{ border: `1px solid ${INK}`, background: "white", color: `${INK}99` }}>
-                  {query ? "Nu există rezultate pentru filtrele curente." : "Caută un produs ca să vezi rezultate live."}
+                <div className="p-6 text-[12px] uppercase font-bold" style={{ border: "1px solid " + INK, background: "white", color: INK + "99" }}>
+                  {query ? "Nu există rezultate second-hand pentru filtrele curente." : "Caută un produs ca să vezi rezultate live."}
+                </div>
+              )}
+
+              {newBenchmarkResults.length > 0 && (
+                <section className="mt-8">
+                  <div className="mb-4 flex items-end justify-between px-1">
+                    <h2 className="text-[14px] font-bold uppercase">New price benchmarks</h2>
+                    <span className="text-[11px] font-bold uppercase" style={{ color: INK + "66" }}>
+                      agregatoare + retaileri
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {visibleNewBenchmarkResults.map((item) => (
+                      <ResultCard
+                        key={item.id}
+                        item={item}
+                        query={query}
+                        onInspect={setSelectedListing}
+                        isSaved={savedListings.has(listingStorageId(item))}
+                        onToggleSaved={toggleSavedListing}
+                        onHide={hideListing}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {visibleRegularResults.length < regularResults.length && (
+                <div className="mt-5 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((count) => count + VISIBLE_RESULT_STEP)}
+                    className="px-5 py-3 text-[11px] font-bold uppercase"
+                    style={{ border: "1px solid " + INK, background: "white", color: INK, fontFamily: MONO }}
+                  >
+                    Arată mai multe ({regularResults.length - visibleRegularResults.length})
+                  </button>
                 </div>
               )}
             </div>

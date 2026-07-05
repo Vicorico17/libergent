@@ -11,10 +11,10 @@ This file tracks marketplaces we still need to add or harden before advertising 
   - Penalize accessories, spare parts, wanted ads, services, damaged items, broken/for-parts items, and unrelated variants when the user searches for a main product.
   - Add regression tests for the first niche so weak matches cannot quietly return to the top of results.
 
-- Classified marketplace first
-  - Focus Libergent on classified marketplace search before broad retail comparison.
-  - Prioritize real second-hand and local-market listings over generic new-product price feeds.
-  - Treat retail sources such as eMAG, Compari, or Price.ro as optional benchmark context, not the core result list.
+- Used + new benchmark search
+  - Keep second-hand listings as the primary buying surface.
+  - Treat aggregators and retailers as a separate new-price benchmark, not as seller-contact listings.
+  - Show savings versus the lowest reliable new price when both used and new results exist.
 
 - Focus on one niche until it is excellent
   - Pick a narrow first niche, then tune parsing, keyword scoring, filtering, and result ranking around it.
@@ -45,6 +45,9 @@ This file tracks marketplaces we still need to add or harden before advertising 
 - Publi24
 - Autovit for car-like searches
 - Anuntul
+- Price.ro as a new-price aggregator benchmark
+- ShopMania as a new-price aggregator benchmark
+- CEL.ro as a direct retail benchmark
 
 ## Add Next: Classified and Used Sources
 
@@ -70,10 +73,6 @@ This file tracks marketplaces we still need to add or harden before advertising 
   - Current status: direct requests hit anti-bot protection.
   - Needed: decide whether this belongs in listing results or a separate "retail benchmark" panel.
 
-- Price.ro
-  - Goal: new-product price benchmark coverage for Romanian retail offers.
-  - Current status: not integrated.
-  - Needed: investigate stable search/feed options and keep results separate from classified listings.
 
 - eMAG
   - Goal: retail benchmark prices for common products.
@@ -100,6 +99,7 @@ This file tracks marketplaces we still need to add or harden before advertising 
 
 ## UI Requirements
 
-- Only list a marketplace as "searched" when it is active in `src/sites.js` and has a parser/provider path in `src/search.js`.
+- Only list a marketplace/source as "searched" when it is active in `src/sites.js` and has a parser/provider path in `src/search.js`.
 - Show unavailable future sources separately if we want product messaging around "coming soon".
-- Keep the search report honest: successful count, blocked count, parsed count, and filtered count should stay visible.
+- Keep the search report honest: successful count, blocked count, parsed count, filtered count, and duplicate count should stay visible.
+- Keep second-hand and new-price benchmark results visually separate.

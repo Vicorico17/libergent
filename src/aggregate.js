@@ -13,6 +13,76 @@ function median(values) {
     : sorted[middle];
 }
 
+const NEW_SOURCE_TYPES = new Set([
+  "price_aggregator",
+  "retailer",
+  "retailer_marketplace"
+]);
+
+function getSourceType(item = {}) {
+  return String(item.sourceType || "classifieds").trim().toLowerCase() || "classifieds";
+}
+
+function isNewProductSource(item = {}) {
+  return NEW_SOURCE_TYPES.has(getSourceType(item));
+}
+
+function normalizeIdentityText(value = "") {
+  return stripDiacritics(String(value || "").toLowerCase())
+    .replace(/\b(?:apple|telefon|telefoane|mobile|smartphone|mobil|nou|sigilat|original)\b/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function roundedPriceBucket(value) {
+  return Number.isFinite(value) ? String(Math.round(value / 10) * 10) : "no-price";
+}
+
+function dedupeCandidateKey(item = {}) {
+  const normalizedTitle = normalizeIdentityText(item.title);
+  if (!normalizedTitle) {
+    return item.url || "";
+  }
+
+  if (isNewProductSource(item)) {
+    return "new:" + normalizedTitle;
+  }
+
+  return [
+    "used",
+    normalizedTitle,
+    roundedPriceBucket(item.priceRon),
+    normalizeIdentityText(item.location || "")
+  ].join(":");
+}
+
+function compareDuplicateCandidates(candidate, current) {
+  if (!current) {
+    return candidate;
+  }
+
+  const candidateScore = Number.isFinite(candidate.offerScore) ? candidate.offerScore : 0;
+  const currentScore = Number.isFinite(current.offerScore) ? current.offerScore : 0;
+  if (candidateScore !== currentScore) {
+    return candidateScore > currentScore ? candidate : current;
+  }
+
+  const candidatePrice = safePriceForTieBreak(candidate.priceRon);
+  const currentPrice = safePriceForTieBreak(current.priceRon);
+  if (candidatePrice !== currentPrice) {
+    return candidatePrice < currentPrice ? candidate : current;
+  }
+
+  const candidateHasImage = Boolean(candidate.imageUrl || candidate.image || candidate.thumbnailUrl || candidate.images?.length || candidate.imageUrls?.length);
+  const currentHasImage = Boolean(current.imageUrl || current.image || current.thumbnailUrl || current.images?.length || current.imageUrls?.length);
+  if (candidateHasImage !== currentHasImage) {
+    return candidateHasImage ? candidate : current;
+  }
+
+  return current;
+}
+
 function matchesCondition(item, condition) {
   const normalized = (item.condition || "").toLowerCase();
   if (condition === "new") {
@@ -602,6 +672,94 @@ function pickTopRecommendationsByMarketplace(items, limit = 4) {
     .slice(0, limit);
 }
 
+function getCandidateDuplicateKey(item = {}) {
+  if (isNewProductSource(item)) {
+    return dedupeCandidateKey(item);
+  }
+
+  return item.url ? "url:" + item.url : dedupeCandidateKey(item);
+}
+
+function dedupeNormalizedResults(results) {
+  const bestByDuplicateKey = new Map();
+  let originalItemCount = 0;
+
+  for (const result of results) {
+    if (!result.ok) {
+      continue;
+    }
+
+    for (const item of result.items) {
+      originalItemCount += 1;
+      const itemWithSite = { ...item, site: result.site };
+      const duplicateKey = getCandidateDuplicateKey(itemWithSite);
+      if (!duplicateKey) {
+        continue;
+      }
+      bestByDuplicateKey.set(
+        duplicateKey,
+        compareDuplicateCandidates(itemWithSite, bestByDuplicateKey.get(duplicateKey))
+      );
+    }
+  }
+
+  const survivorKeys = new Set(
+    [...bestByDuplicateKey.values()].map((item) => itemRankKey(item))
+  );
+  const dedupedResults = results.map((result) => {
+    if (!result.ok) {
+      return result;
+    }
+
+    const items = result.items.filter((item) => survivorKeys.has(itemRankKey({ ...item, site: result.site })));
+    return {
+      ...result,
+      includedItemCount: items.length,
+      itemCount: items.length,
+      items
+    };
+  });
+  const dedupedItemCount = dedupedResults
+    .filter((result) => result.ok)
+    .reduce((sum, result) => sum + result.items.length, 0);
+
+  return {
+    results: dedupedResults,
+    duplicateListings: Math.max(0, originalItemCount - dedupedItemCount)
+  };
+}
+
+function getReferenceMedianForItem(item, { usedMedianPriceRon, newMedianPriceRon, globalMedianPriceRon }) {
+  if (isNewProductSource(item)) {
+    return Number.isFinite(newMedianPriceRon) ? newMedianPriceRon : globalMedianPriceRon;
+  }
+  return Number.isFinite(usedMedianPriceRon) ? usedMedianPriceRon : globalMedianPriceRon;
+}
+
+function buildPriceIntelligence({ usedMedianPriceRon, newMedianPriceRon, globalMedianPriceRon, usedPricedItems, newPricedItems, allPricedItems, bestUsedOffer, bestNewBenchmark }) {
+  const benchmarkPriceRon = Number.isFinite(bestNewBenchmark?.priceRon) ? bestNewBenchmark.priceRon : null;
+  const usedBestPriceRon = Number.isFinite(bestUsedOffer?.priceRon) ? bestUsedOffer.priceRon : null;
+  const savingsVsNewPct = Number.isFinite(usedBestPriceRon) && Number.isFinite(benchmarkPriceRon) && benchmarkPriceRon > 0
+    ? Math.round((1 - (usedBestPriceRon / benchmarkPriceRon)) * 100)
+    : null;
+  const primaryMedian = Number.isFinite(usedMedianPriceRon) ? usedMedianPriceRon : globalMedianPriceRon;
+
+  return {
+    medianRon: Number.isFinite(primaryMedian) ? Math.round(primaryMedian) : null,
+    fairLowRon: Number.isFinite(primaryMedian) ? Math.round(primaryMedian * 0.75) : null,
+    fairHighRon: Number.isFinite(primaryMedian) ? Math.round(primaryMedian * 1.15) : null,
+    pricedListingsRon: allPricedItems.length,
+    usedMedianRon: Number.isFinite(usedMedianPriceRon) ? Math.round(usedMedianPriceRon) : null,
+    usedFairLowRon: Number.isFinite(usedMedianPriceRon) ? Math.round(usedMedianPriceRon * 0.75) : null,
+    usedFairHighRon: Number.isFinite(usedMedianPriceRon) ? Math.round(usedMedianPriceRon * 1.15) : null,
+    usedPricedListingsRon: usedPricedItems.length,
+    newMedianRon: Number.isFinite(newMedianPriceRon) ? Math.round(newMedianPriceRon) : null,
+    newLowestRon: Number.isFinite(benchmarkPriceRon) ? Math.round(benchmarkPriceRon) : null,
+    newPricedListingsRon: newPricedItems.length,
+    savingsVsNewPct
+  };
+}
+
 function splitClassifiedItems(items) {
   const productMatches = [];
   const relatedAccessories = [];
@@ -709,26 +867,33 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     };
   });
 
-  const allPricedItems = normalizedResults
+  const { results: dedupedResults, duplicateListings } = dedupeNormalizedResults(normalizedResults);
+  const allPricedItems = dedupedResults
     .filter((result) => result.ok)
     .flatMap((result) => result.items)
     .filter((item) => Number.isFinite(item.priceRon));
-  const allScoredItems = normalizedResults
+  const allScoredItems = dedupedResults
     .filter((result) => result.ok)
     .flatMap((result) => result.items.map((item) => ({
       ...item,
       site: result.site
     })));
+  const usedPricedItems = allPricedItems.filter((item) => !isNewProductSource(item));
+  const newPricedItems = allPricedItems.filter((item) => isNewProductSource(item));
 
   const averagePriceRon = allPricedItems.length
     ? allPricedItems.reduce((sum, item) => sum + item.priceRon, 0) / allPricedItems.length
     : null;
-  const globalMedianPriceRon = median(allScoredItems.map((item) => item.priceRon).filter((value) => Number.isFinite(value)));
+  const globalMedianPriceRon = median(allPricedItems.map((item) => item.priceRon));
+  const usedMedianPriceRon = median(usedPricedItems.map((item) => item.priceRon));
+  const newMedianPriceRon = median(newPricedItems.map((item) => item.priceRon));
+  const medianContext = { usedMedianPriceRon, newMedianPriceRon, globalMedianPriceRon };
   const allBestCandidates = allScoredItems.map((item) => {
-    const enrichedItem = enrichItemWithDealIntelligence(item, globalMedianPriceRon, condition);
+    const referenceMedianRon = getReferenceMedianForItem(item, medianContext);
+    const enrichedItem = enrichItemWithDealIntelligence(item, referenceMedianRon, condition);
     return {
       ...enrichedItem,
-      recommendationScore: scoreGlobalRecommendation(enrichedItem, globalMedianPriceRon, condition)
+      recommendationScore: scoreGlobalRecommendation(enrichedItem, referenceMedianRon, condition)
     };
   });
   const rankedCandidates = allBestCandidates
@@ -743,7 +908,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       rank: index + 1
     }));
   const rankByKey = new Map(rankedCandidates.map((item) => [itemRankKey(item), item]));
-  const rankedResults = normalizedResults.map((result) => {
+  const rankedResults = dedupedResults.map((result) => {
     if (!result.ok) {
       return result;
     }
@@ -760,19 +925,27 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     };
   });
   const bestOffer = rankedCandidates[0] || null;
+  const bestUsedOffer = rankedCandidates.find((item) => !isNewProductSource(item)) || null;
+  const bestNewBenchmark = rankedCandidates
+    .filter((item) => isNewProductSource(item))
+    .sort((a, b) => safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon) || b.recommendationScore - a.recommendationScore)[0] || null;
   const recommendedOffers = pickTopRecommendationsByMarketplace(rankedCandidates);
-  const successfulResults = normalizedResults.filter((result) => result.ok);
-  const failedResults = normalizedResults.filter((result) => !result.ok);
+  const successfulResults = rankedResults.filter((result) => result.ok);
+  const failedResults = rankedResults.filter((result) => !result.ok);
   const parsedListings = successfulResults.reduce((sum, result) => sum + (result.parsedItemCount ?? result.rawItemCount ?? 0), 0);
   const matchedListings = successfulResults.reduce((sum, result) => sum + (result.matchedItemCount ?? result.itemCount ?? 0), 0);
   const includedListings = successfulResults.reduce((sum, result) => sum + result.items.length, 0);
   const excludedListings = successfulResults.reduce((sum, result) => sum + (result.excludedItemCount || 0), 0);
-  const priceIntelligence = {
-    medianRon: Number.isFinite(globalMedianPriceRon) ? Math.round(globalMedianPriceRon) : null,
-    fairLowRon: Number.isFinite(globalMedianPriceRon) ? Math.round(globalMedianPriceRon * 0.75) : null,
-    fairHighRon: Number.isFinite(globalMedianPriceRon) ? Math.round(globalMedianPriceRon * 1.15) : null,
-    pricedListingsRon: allPricedItems.length
-  };
+  const priceIntelligence = buildPriceIntelligence({
+    usedMedianPriceRon,
+    newMedianPriceRon,
+    globalMedianPriceRon,
+    usedPricedItems,
+    newPricedItems,
+    allPricedItems,
+    bestUsedOffer,
+    bestNewBenchmark
+  });
 
   return {
     results: rankedResults,
@@ -783,7 +956,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       conditionLabel: condition === "new" ? "Nou" : condition === "used" ? "Folosit" : "Oricare",
       creditBudget,
       creditsUsed,
-      marketplaces: normalizedResults.length,
+      marketplaces: rankedResults.length,
       successfulMarketplaces: successfulResults.length,
       failedMarketplaces: failedResults.map((result) => ({
         site: result.site,
@@ -797,11 +970,14 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       matchedListings,
       includedListings,
       excludedListings,
+      duplicateListings,
       totalListings: includedListings,
       pricedListingsRon: allPricedItems.length,
       averagePriceRon,
       priceIntelligence,
       bestOffer,
+      bestUsedOffer,
+      bestNewBenchmark,
       recommendedOffers
     }
   };

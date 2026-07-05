@@ -5,6 +5,8 @@ export type ApiListing = {
   numericPrice?: number | string | null;
   currency?: string | null;
   site?: string;
+  sourceType?: string | null;
+  sellerType?: string | null;
   condition?: string;
   location?: string;
   postedAt?: string;
@@ -103,8 +105,19 @@ export type SearchPayload = {
       fairLowRon?: number | null;
       fairHighRon?: number | null;
       pricedListingsRon?: number;
+      usedMedianRon?: number | null;
+      usedFairLowRon?: number | null;
+      usedFairHighRon?: number | null;
+      usedPricedListingsRon?: number;
+      newMedianRon?: number | null;
+      newLowestRon?: number | null;
+      newPricedListingsRon?: number;
+      savingsVsNewPct?: number | null;
     };
+    duplicateListings?: number;
     bestOffer?: ApiListing | null;
+    bestUsedOffer?: ApiListing | null;
+    bestNewBenchmark?: ApiListing | null;
   };
   error?: string;
 };
@@ -115,6 +128,11 @@ export type SearchResultItem = {
   price: number | null;
   priceLabel: string;
   source: string;
+  sourceType: string;
+  sourceGroup: string;
+  sourceKind: "used" | "new";
+  sourceKindLabel: string;
+  sellerType: string;
   city: string;
   condition: string;
   daysAgo: number;
@@ -188,6 +206,13 @@ const platformLabels: Record<string, string> = {
   "olx.ro": "OLX",
   "publi24.ro": "PUBLI24",
   "vinted.ro": "VINTED",
+  "price.ro": "PRICE.RO",
+  "shopmania.ro": "SHOPMANIA",
+  "cel.ro": "CEL.RO",
+  "compari.ro": "COMPARI.RO",
+  "emag.ro": "EMAG",
+  "altex.ro": "ALTEX",
+  "flanco.ro": "FLANCO",
 };
 
 export function mapSearchResults(payload: SearchPayload): SearchResultItem[] {
@@ -201,8 +226,12 @@ export function mapSearchResults(payload: SearchPayload): SearchResultItem[] {
 }
 
 export function mapBestOffer(payload: SearchPayload, results: SearchResultItem[]): SearchResultItem | null {
-  const bestOffer = payload.summary?.bestOffer;
-  if (!bestOffer) return results[0] || null;
+  return mapOffer(payload.summary?.bestOffer, results) || results[0] || null;
+}
+
+export function mapOffer(offer: ApiListing | null | undefined, results: SearchResultItem[]): SearchResultItem | null {
+  const bestOffer = offer;
+  if (!bestOffer) return null;
 
   const bestOfferUrl = bestOffer.url?.trim();
   if (bestOfferUrl) {
@@ -228,6 +257,10 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
   const images = pickListingImages(item);
   const score = pickRecommendationScore(item);
   const priceRon = getPriceRon(item);
+  const sourceType = normalizeSourceType(item.sourceType);
+  const sourceGroup = getSourceGroup(sourceType);
+  const sourceKind = getSourceKind(sourceType);
+  const sellerType = String(item.sellerType || "").trim();
 
   return {
     id: url || `${idPrefix || platform}-${index}-${item.title || "listing"}`,
@@ -235,8 +268,13 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     price: isFiniteNumber(priceRon) ? priceRon : null,
     priceLabel: formatPriceLabel(item, priceRon),
     source: platform,
+    sourceType,
+    sourceGroup,
+    sourceKind,
+    sourceKindLabel: getSourceKindLabel(sourceKind, sourceGroup),
+    sellerType,
     city: item.location || "România",
-    condition: normalizeCondition(item.condition),
+    condition: normalizeCondition(item.condition, sourceType),
     daysAgo: estimateDaysAgo(item.postedAt),
     postedDateLabel: formatPostedDateLabel(item.postedAt),
     image: images[0],
@@ -255,6 +293,29 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     rejectionReasons: Array.isArray(item.rejectionReasons) ? item.rejectionReasons : [],
     keywordSignals: normalizeKeywordSignals(item.keywordSignals),
   };
+}
+
+const NEW_SOURCE_TYPES = new Set(["price_aggregator", "retailer", "retailer_marketplace"]);
+
+function normalizeSourceType(value: unknown) {
+  const normalized = String(value || "classifieds").trim().toLowerCase();
+  return normalized || "classifieds";
+}
+
+function getSourceGroup(sourceType: string) {
+  if (sourceType === "price_aggregator") return "price_aggregator";
+  if (sourceType === "retailer" || sourceType === "retailer_marketplace") return "retailer";
+  return "classifieds";
+}
+
+function getSourceKind(sourceType: string): "used" | "new" {
+  return NEW_SOURCE_TYPES.has(sourceType) ? "new" : "used";
+}
+
+function getSourceKindLabel(sourceKind: "used" | "new", sourceGroup: string) {
+  if (sourceKind === "used") return "second-hand";
+  if (sourceGroup === "price_aggregator") return "preț nou · agregator";
+  return "preț nou · retailer";
 }
 
 function normalizeScore(value: unknown, fallback = 0) {
@@ -566,8 +627,9 @@ function getPlatformLabel(site: string) {
   return platformLabels[site] || site.toUpperCase();
 }
 
-function normalizeCondition(condition = "") {
+function normalizeCondition(condition = "", sourceType = "classifieds") {
   const value = condition.trim().toLowerCase();
+  if (!value && getSourceKind(sourceType) === "new") return "nou";
   if (!value) return "acceptabil";
   if (value.includes("ca nou")) return "ca nou";
   if (value.includes("nou") || value.includes("new")) return "nou";
