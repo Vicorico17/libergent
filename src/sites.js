@@ -614,7 +614,7 @@ export const SITES = {
     defaultSellerType: "Retailer",
     estimatedCreditsPerPage: 0,
     waitForMs: 0,
-    timeoutMs: 16000,
+    timeoutMs: 24000,
     pageSize: 24,
     maxPages: 1,
     defaultLimit: 24,
