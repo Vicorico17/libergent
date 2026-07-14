@@ -18,6 +18,7 @@ export function buildListingSchema(limit) {
             condition: { type: "string" },
             sellerType: { type: "string" },
             sourceType: { type: "string" },
+            marketType: { type: "string", enum: ["retail", "secondary", "mixed"] },
             url: { type: "string" },
             imageUrl: { type: "string" },
             imageUrls: {

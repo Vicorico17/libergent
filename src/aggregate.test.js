@@ -195,6 +195,8 @@ test("extracts phone-specific signals and why-this-deal explanations", () => {
   assert.equal(good.phoneSpecs.batteryHealthPct, 91);
   assert.equal(good.phoneSpecs.invoice, true);
   assert.equal(good.phoneSpecs.warranty, true);
+  assert.ok(good.whyThisDeal.some((reason) => reason.includes("Se potrivește prin")));
+  assert.ok(good.whyThisDeal.some((reason) => reason.includes("Condiție declarată")));
   assert.ok(good.whyThisDeal.some((reason) => reason.includes("Battery health")));
   assert.ok(lowBattery.riskFlags.some((flag) => flag.code === "low_battery_health"));
   assert.equal(locked.listingType, "broken_or_for_parts");

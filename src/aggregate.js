@@ -1,5 +1,6 @@
 import { normalizeListing } from "./normalize.js";
 import { classifyListingIntent, getQueryBrandTerms, tokenize } from "./relevance.js";
+import { classifyMarketSegment } from "./market-segment.js";
 
 function median(values) {
   if (!values.length) {
@@ -13,18 +14,8 @@ function median(values) {
     : sorted[middle];
 }
 
-const NEW_SOURCE_TYPES = new Set([
-  "price_aggregator",
-  "retailer",
-  "retailer_marketplace"
-]);
-
-function getSourceType(item = {}) {
-  return String(item.sourceType || "classifieds").trim().toLowerCase() || "classifieds";
-}
-
 function isNewProductSource(item = {}) {
-  return NEW_SOURCE_TYPES.has(getSourceType(item));
+  return classifyMarketSegment(item) === "retail";
 }
 
 function normalizeIdentityText(value = "") {
@@ -453,9 +444,24 @@ function buildWhyThisDeal(item) {
   const reasons = [];
   const priceInsight = item.priceInsight;
   const phoneSpecs = item.phoneSpecs;
+  const keywordSignals = item.keywordSignals || {};
+  const matchedKeywords = Array.isArray(keywordSignals.matchedKeywords)
+    ? keywordSignals.matchedKeywords
+    : [];
+  const missingKeywords = Array.isArray(keywordSignals.missingKeywords)
+    ? keywordSignals.missingKeywords
+    : [];
+
+  if (matchedKeywords.length) {
+    const visibleKeywords = matchedKeywords.slice(0, 5).join(", ");
+    reasons.push(`Se potrivește prin: ${visibleKeywords}.`);
+  }
+  if (missingKeywords.length) {
+    reasons.push(`De verificat, lipsesc: ${missingKeywords.slice(0, 3).join(", ")}.`);
+  }
 
   if (item.dealQuality?.productMatch >= 90) {
-    reasons.push("Potrivire foarte bună cu produsul căutat.");
+    reasons.push("Potrivire foarte bună cu produsul căutat, fără nepotrivire critică detectată.");
   } else if (item.dealQuality?.productMatch >= 70) {
     reasons.push("Potrivire bună cu termenii principali.");
   }
@@ -468,22 +474,30 @@ function buildWhyThisDeal(item) {
       reasons.push("Preț în zona pieței pentru rezultatele găsite.");
     }
   }
-  if (item.dealQuality?.risk >= 80) {
-    reasons.push("Nu apar semnale majore de risc în titlu sau metadate.");
+  if (item.condition) reasons.push(`Condiție declarată: ${item.condition}.`);
+  if (item.dealQuality?.risk >= 80 && item.riskFlags?.length === 0) {
+    reasons.push("Nu apar semnale majore de risc în datele disponibile.");
   } else if (item.riskFlags?.length) {
     reasons.push(`Verifică: ${item.riskFlags.slice(0, 2).map((flag) => flag.label).join(", ")}.`);
   }
-  if (phoneSpecs?.storageGb) {
-    reasons.push(`Storage detectat: ${phoneSpecs.storageGb}GB.`);
-  }
-  if (phoneSpecs?.batteryHealthPct) {
-    reasons.push(`Battery health detectat: ${phoneSpecs.batteryHealthPct}%.`);
+  const phoneEvidence = [
+    phoneSpecs?.storageGb ? `storage ${phoneSpecs.storageGb}GB` : null,
+    phoneSpecs?.batteryHealthPct ? `Battery health ${phoneSpecs.batteryHealthPct}%` : null
+  ].filter(Boolean);
+  if (phoneEvidence.length) {
+    reasons.push(`Specificații detectate: ${phoneEvidence.join(" + ")}.`);
   }
   if (phoneSpecs?.warranty || phoneSpecs?.invoice) {
     reasons.push([phoneSpecs.warranty ? "garanție" : null, phoneSpecs.invoice ? "factură" : null].filter(Boolean).join(" + "));
   }
   if (recencyScore(item.postedAt) >= 14) {
     reasons.push("Anunț recent.");
+  } else if (!item.postedAt) {
+    reasons.push("Data publicării nu este disponibilă; verifică actualitatea anunțului.");
+  }
+
+  if (!Number.isFinite(item.priceRon)) {
+    reasons.push("Prețul nu a putut fi comparat cu piața.");
   }
 
   return reasons.slice(0, 6);
@@ -817,6 +831,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     const classifiedItems = sortItemsByFreshness(
       result.items
         .map(normalizeListing)
+        .map((item) => ({ ...item, marketType: classifyMarketSegment(item) }))
         .map((item) => classifyListingIntent(item, result.query))
         .filter((item) => matchesCondition(item, condition))
     );
@@ -878,8 +893,9 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       ...item,
       site: result.site
     })));
-  const usedPricedItems = allPricedItems.filter((item) => !isNewProductSource(item));
-  const newPricedItems = allPricedItems.filter((item) => isNewProductSource(item));
+  const usedPricedItems = allPricedItems.filter((item) => item.marketType === "secondary");
+  const newPricedItems = allPricedItems.filter((item) => item.marketType === "retail");
+  const mixedPricedItems = allPricedItems.filter((item) => item.marketType === "mixed");
 
   const averagePriceRon = allPricedItems.length
     ? allPricedItems.reduce((sum, item) => sum + item.priceRon, 0) / allPricedItems.length
@@ -972,7 +988,10 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       excludedListings,
       duplicateListings,
       totalListings: includedListings,
-      pricedListingsRon: allPricedItems.length,
+    pricedListingsRon: allPricedItems.length,
+    secondaryMarketListingsRon: usedPricedItems.length,
+    retailMarketListingsRon: newPricedItems.length,
+    mixedMarketListingsRon: mixedPricedItems.length,
       averagePriceRon,
       priceIntelligence,
       bestOffer,

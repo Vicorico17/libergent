@@ -6,6 +6,7 @@ export type ApiListing = {
   currency?: string | null;
   site?: string;
   sourceType?: string | null;
+  marketType?: "retail" | "secondary" | "mixed" | null;
   sellerType?: string | null;
   condition?: string;
   location?: string;
@@ -271,6 +272,9 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     priceLabel: formatPriceLabel(item, priceRon),
     source: platform,
     sourceType,
+    marketType: item.marketType === "retail" || item.marketType === "secondary" || item.marketType === "mixed"
+      ? item.marketType
+      : null,
     sourceGroup,
     sourceKind,
     sourceKindLabel: getSourceKindLabel(sourceKind, sourceGroup),
