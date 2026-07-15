@@ -144,7 +144,7 @@ function severityColor(severity = "neutral") {
 }
 
 function buildSellerMessage(item: SearchResultItem, query: string) {
-  const product = query || item.title
+  const product = item.title || query || "produsul din anunț"
   return [
     `Bună! Sunt un asistent AI LiberGent și am văzut anunțul pentru ${product} pe ${item.source}.`,
     `Mai este disponibil? Prețul este ${item.priceLabel}.`,
