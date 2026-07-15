@@ -1,11 +1,11 @@
-import { normalizeRomanianPhone } from "../phone-numbers.js";
+import { normalizeRomanianMobilePhone } from "../phone-numbers.js";
 
 export async function sendWhatsAppViaOpenClaw({ target, message, media, replyTo, env = process.env, fetchImpl = fetch } = {}) {
   const bridgeUrl = String(env.OPENCLAW_BRIDGE_URL || "").replace(/\/+$/, "");
   const token = String(env.OPENCLAW_BRIDGE_TOKEN || "");
-  const phone = normalizeRomanianPhone(target);
+  const phone = normalizeRomanianMobilePhone(target);
   if (!bridgeUrl || !token) throw new Error("OpenClaw bridge is not configured.");
-  if (!phone) throw new Error("Expected a valid Romanian phone number.");
+  if (!phone) throw new Error("Expected a valid Romanian mobile phone number.");
   if (!String(message || "").trim()) throw new Error("WhatsApp message cannot be empty.");
 
   const response = await fetchImpl(`${bridgeUrl}/whatsapp/send`, {

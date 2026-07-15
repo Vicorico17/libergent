@@ -29,6 +29,11 @@ export function normalizeRomanianPhone(value) {
   return `+${digits}`;
 }
 
+export function normalizeRomanianMobilePhone(value) {
+  const phone = normalizeRomanianPhone(value);
+  return phone && /^\+407\d{8}$/.test(phone) ? phone : null;
+}
+
 /** Extract plausible Romanian phone numbers from HTML or plain text. */
 export function extractRomanianPhones(value) {
   const text = String(value || "")
@@ -38,7 +43,11 @@ export function extractRomanianPhones(value) {
   return [...new Set(candidates.map(normalizeRomanianPhone).filter(Boolean))];
 }
 
+export function extractRomanianMobilePhones(value) {
+  return extractRomanianPhones(value).filter((phone) => normalizeRomanianMobilePhone(phone));
+}
+
 export function extractPhonesFromListing(listing = {}) {
   const values = [listing.phone, listing.phoneNumber, listing.telephone, listing.description, listing.content, listing.html];
-  return [...new Set(values.flatMap(extractRomanianPhones))];
+  return [...new Set(values.flatMap(extractRomanianMobilePhones))];
 }

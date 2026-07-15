@@ -8,7 +8,7 @@ import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSe
 import { SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
-import { extractPhonesFromListing, normalizeRomanianPhone } from "./phone-numbers.js";
+import { extractPhonesFromListing, normalizeRomanianMobilePhone } from "./phone-numbers.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -429,10 +429,10 @@ async function handleApi(request, env) {
     }
 
     const body = parsedBody.data || {};
-    const target = normalizeRomanianPhone(body.target);
+    const target = normalizeRomanianMobilePhone(body.target);
     const message = String(body.message || "").trim().slice(0, 2000);
     if (!target) {
-      return json({ ok: false, error: "Enter a valid Romanian seller phone number." }, 400);
+      return json({ ok: false, error: "Enter a valid Romanian mobile seller phone number." }, 400);
     }
     if (!message) {
       return json({ ok: false, error: "Message cannot be empty." }, 400);
