@@ -146,9 +146,9 @@ function severityColor(severity = "neutral") {
 function buildSellerMessage(item: SearchResultItem, query: string) {
   const product = query || item.title
   return [
-    `Bună! Am văzut anunțul pentru ${product} pe ${item.source}.`,
+    `Bună! Sunt un asistent AI LiberGent și am văzut anunțul pentru ${product} pe ${item.source}.`,
     `Mai este disponibil? Prețul este ${item.priceLabel}.`,
-    "Pot să primesc, te rog, câteva detalii despre stare și livrare?",
+    "Dacă da, răspunde DA pentru a continua discuția aici sau STOP dacă nu dorești alte mesaje.",
   ].join(" ")
 }
 
@@ -939,6 +939,8 @@ function useListingImage(item: Pick<SearchResultItem, "id" | "image" | "images">
 function SellerMessageActions({ item, query, compact = false }: { item: SearchResultItem; query: string; compact?: boolean }) {
   const message = buildSellerMessage(item, query)
   const [copied, setCopied] = useState(false)
+  const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle")
+  const [sendError, setSendError] = useState("")
 
   async function copyMessage() {
     try {
@@ -961,6 +963,35 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
       marketplace: item.source,
       listing_title: item.title,
     })
+  }
+
+  async function sendWhatsApp() {
+    const phone = window.prompt("Numărul WhatsApp al sellerului (ex. 07xx xxx xxx):", item.sellerPhone || "")?.trim()
+    if (!phone) return
+    if (!window.confirm("Trimiți acest mesaj pe WhatsApp?\n\n" + message)) return
+
+    setSendState("sending")
+    setSendError("")
+    try {
+      const response = await fetch("/api/whatsapp/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ target: phone, message }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.ok === false) {
+        throw new Error(payload.error || "Mesajul nu a putut fi trimis.")
+      }
+      setSendState("sent")
+      trackSearchEvent("whatsapp_message_sent", {
+        search_term: query,
+        marketplace: item.source,
+        listing_title: item.title,
+      })
+    } catch (error) {
+      setSendState("error")
+      setSendError(error instanceof Error ? error.message : "Mesajul nu a putut fi trimis.")
+    }
   }
 
   if (item.sourceKind === "new") {
@@ -1001,18 +1032,16 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
         {copied ? "Copiat" : "Copiază mesaj"}
       </button>
       {item.url ? (
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={trackOpenContact}
+        <button
+          type="button"
+          onClick={sendWhatsApp}
           className="flex min-h-10 flex-1 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase transition-colors duration-150"
           style={{ border: `1px solid ${INK}`, background: INK, color: "white", fontFamily: MONO }}
           title={message}
         >
           <MessageSquare size={13} strokeWidth={2.2} />
-          Contactează sellerul
-        </a>
+          {sendState === "sending" ? "Se trimite..." : sendState === "sent" ? "Trimis pe WhatsApp" : "Contactează sellerul"}
+        </button>
       ) : (
         <span
           aria-disabled="true"
@@ -1023,6 +1052,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
           Fără contact
         </span>
       )}
+      {sendState === "error" && <p className="basis-full text-[10px] text-[#FF3366]" style={{ fontFamily: MONO }}>{sendError}</p>}
     </div>
   )
 }

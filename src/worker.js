@@ -8,6 +8,7 @@ import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSe
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
+import { normalizeRomanianPhone } from "./phone-numbers.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -350,6 +351,50 @@ async function handleApi(request, env) {
       return json({ ok: true }, 200);
     } catch (error) {
       return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
+
+  if (apiPath === "/api/whatsapp/send") {
+    if (request.method !== "POST") {
+      return json({ error: "Method not allowed" }, 405);
+    }
+
+    if (!env.OPENCLAW_BRIDGE_URL || !env.OPENCLAW_BRIDGE_TOKEN) {
+      return json({ ok: false, error: "WhatsApp bridge is not configured." }, 503);
+    }
+
+    const parsedBody = await parseJsonRequest(request);
+    if (parsedBody.error) {
+      return json({ error: parsedBody.error }, parsedBody.error.includes("large") ? 413 : 400);
+    }
+
+    const body = parsedBody.data || {};
+    const target = normalizeRomanianPhone(body.target);
+    const message = String(body.message || "").trim().slice(0, 2000);
+    if (!target) {
+      return json({ ok: false, error: "Enter a valid Romanian seller phone number." }, 400);
+    }
+    if (!message) {
+      return json({ ok: false, error: "Message cannot be empty." }, 400);
+    }
+
+    try {
+      const bridgeUrl = String(env.OPENCLAW_BRIDGE_URL).replace(/\/+$/, "");
+      const response = await fetch(`${bridgeUrl}/whatsapp/send`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${env.OPENCLAW_BRIDGE_TOKEN}`
+        },
+        body: JSON.stringify({ target, message })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return json({ ok: false, error: payload.error || `WhatsApp bridge failed (${response.status}).` }, 502);
+      }
+      return json({ ok: true, target, messageId: payload.messageId || null }, 200);
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 502);
     }
   }
 

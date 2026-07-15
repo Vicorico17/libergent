@@ -17,6 +17,7 @@ export type ApiListing = {
   images?: Array<string | { url?: string; src?: string }>;
   thumbnailUrl?: string;
   url?: string;
+  phone?: string | null;
   rank?: number;
   offerScore?: number;
   recommendationScore?: number;
@@ -142,6 +143,7 @@ export type SearchResultItem = {
   image?: string;
   images: string[];
   url?: string;
+  sellerPhone?: string;
   rank?: number;
   score: number;
   dealQuality: {
@@ -287,6 +289,7 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     image: images[0],
     images,
     url: url || undefined,
+    sellerPhone: typeof item.phone === "string" ? item.phone.trim() : undefined,
     rank: typeof item.rank === "number" && Number.isFinite(item.rank) ? item.rank : undefined,
     score,
     dealQuality: normalizeDealQuality(item.dealQuality, score),
