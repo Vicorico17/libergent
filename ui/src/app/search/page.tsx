@@ -941,6 +941,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
   const [copied, setCopied] = useState(false)
   const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle")
   const [sendError, setSendError] = useState("")
+  const [sentTarget, setSentTarget] = useState("")
 
   async function copyMessage() {
     try {
@@ -966,8 +967,8 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
   }
 
   async function sendWhatsApp() {
-    let phone = item.sellerPhone || ""
-    if (!phone && item.url) {
+    let phone = ""
+    if (item.url) {
       setSendState("sending")
       try {
         const response = await fetch(`/api/marketplace/contact?url=${encodeURIComponent(item.url)}`)
@@ -977,6 +978,9 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
         phone = ""
       }
       setSendState("idle")
+    }
+    if (!phone) {
+      phone = item.sellerPhone || ""
     }
     if (!phone) {
       phone = window.prompt("Numărul WhatsApp al sellerului (ex. 07xx xxx xxx):", "")?.trim() || ""
@@ -996,11 +1000,13 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
       if (!response.ok || payload.ok === false) {
         throw new Error(payload.error || "Mesajul nu a putut fi trimis.")
       }
+      setSentTarget(String(payload.target || phone))
       setSendState("sent")
       trackSearchEvent("whatsapp_message_sent", {
         search_term: query,
         marketplace: item.source,
         listing_title: item.title,
+        target: String(payload.target || phone),
       })
     } catch (error) {
       setSendState("error")
@@ -1066,6 +1072,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
           Fără contact
         </span>
       )}
+      {sendState === "sent" && sentTarget && <p className="basis-full text-[10px] text-[#22C55E]" style={{ fontFamily: MONO }}>Trimis către {sentTarget}</p>}
       {sendState === "error" && <p className="basis-full text-[10px] text-[#FF3366]" style={{ fontFamily: MONO }}>{sendError}</p>}
     </div>
   )

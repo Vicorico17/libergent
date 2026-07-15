@@ -452,7 +452,7 @@ async function handleApi(request, env) {
       if (!response.ok) {
         return json({ ok: false, error: payload.error || `WhatsApp bridge failed (${response.status}).` }, 502);
       }
-      return json({ ok: true, target, messageId: payload.messageId || null }, 200);
+      return json({ ok: true, target, messageId: payload.messageId || payload.result?.messageId || null }, 200);
     } catch (error) {
       return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 502);
     }
