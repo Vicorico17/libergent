@@ -31,6 +31,11 @@ test("normalizes numeric and string price fields from structured marketplace dat
   assert.equal(normalizeListing({ numericPrice: "99,99", currency: "RON" }).priceRon, 99.99);
 });
 
+test("rejects zero and negative prices as unavailable", () => {
+  assert.equal(normalizeListing({ price: "0 lei" }).priceRon, null);
+  assert.equal(normalizeListing({ priceRon: -10, currency: "RON" }).priceRon, null);
+});
+
 test("keeps thousands separators as whole RON values", () => {
   assert.equal(normalizeListing({ price: "1.234 lei" }).priceRon, 1234);
   assert.equal(normalizeListing({ price: "1,234 lei" }).priceRon, 1234);

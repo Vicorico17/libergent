@@ -34,6 +34,9 @@ function parseNumberFromPrice(priceValue = "") {
   }
 
   const priceText = String(priceValue || "");
+  if (/^\s*-/.test(priceText)) {
+    return null;
+  }
   const matches = priceText.match(/\d[\d.,\s]*/g);
   if (!matches) {
     return null;
@@ -60,7 +63,7 @@ function parseNumberFromPrice(priceValue = "") {
     : compact.replace(/[^\d]/g, "");
 
   const value = Number.parseFloat(normalized);
-  return Number.isFinite(value) ? value : null;
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 function getSingleDecimalSeparator(compact) {
@@ -129,7 +132,7 @@ function getNumericPrice(item, priceText) {
 
 function getPriceRon(item, currency, numericPrice) {
   const explicitPriceRon = parseNumberFromPrice(item.priceRon);
-  if (Number.isFinite(explicitPriceRon)) {
+  if (Number.isFinite(explicitPriceRon) && explicitPriceRon > 0) {
     return explicitPriceRon;
   }
 

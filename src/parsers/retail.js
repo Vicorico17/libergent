@@ -76,7 +76,7 @@ function normalizeJsonLdProduct(entry, origin) {
   const priceValue = offer.lowPrice || offer.price || product.lowPrice || product.price || "";
   const currency = cleanText(offer.priceCurrency || product.priceCurrency || "");
 
-  if (!title || !url) {
+  if (!title || !url || !Number.isFinite(Number(priceValue)) || Number(priceValue) <= 0) {
     return null;
   }
 
@@ -106,7 +106,11 @@ function findPrice(block) {
   const pattern = /(?:de la|pret de la|preț de la)?\s*(\d{1,3}(?:(?:[.\s]\d{3})+|(?:,\d{3})+)(?:[,.]\d{2})?|\d+(?:[,.]\d{2})?)\s*(lei|ron|€|eur)(?:\b|$)/gi;
   const matches = [...text.matchAll(pattern)];
   const match = matches[0];
-  return match ? match[1].trim() + " " + match[2] : "";
+  if (!match) return "";
+  const numericValue = Number(match[1].replace(/\./g, "").replace(/,/g, "."));
+  return Number.isFinite(numericValue) && numericValue > 0
+    ? match[1].trim() + " " + match[2]
+    : "";
 }
 
 function normalizeTitle(rawTitle = "") {
@@ -248,7 +252,7 @@ function parseEmagProductBlock(block, origin) {
   );
   const numericPrice = Number(product?.price);
   const currency = cleanText(product?.currency || "RON");
-  const price = Number.isFinite(numericPrice) ? String(numericPrice) + " " + currency : findPrice(block);
+  const price = Number.isFinite(numericPrice) && numericPrice > 0 ? String(numericPrice) + " " + currency : findPrice(block);
 
   if (!title || !url || !price) {
     return null;

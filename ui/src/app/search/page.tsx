@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useState, useEffect, useMemo, useRef, type FormEvent, type ReactNode } from "react"
+import { Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Bookmark, CalendarDays, Copy, ExternalLink, EyeOff, MapPin, MessageSquare, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
@@ -1093,78 +1093,6 @@ function OfferFeedbackActions({ item, query }: { item: SearchResultItem; query: 
   )
 }
 
-function SaveSearchPanel({ query }: { query: string }) {
-  const [email, setEmail] = useState("")
-  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle")
-  const [message, setMessage] = useState("")
-
-  async function saveSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const normalizedEmail = email.trim().toLowerCase()
-    if (!normalizedEmail || !query) return
-
-    setStatus("submitting")
-    setMessage("")
-
-    try {
-      const response = await fetch("/api/saved-searches", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: normalizedEmail,
-          query,
-          source: "search_results_sidebar",
-          pagePath: window.location.pathname + window.location.search,
-          notificationsEnabled: true,
-        }),
-      })
-      const payload = (await response.json()) as { ok?: boolean; error?: string }
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error || "Căutarea nu a putut fi salvată.")
-      }
-      setStatus("success")
-      setMessage("Căutare salvată. O vom folosi pentru update-uri când activăm notificările.")
-      trackSearchEvent("save_search", { search_term: query })
-    } catch (error) {
-      setStatus("error")
-      setMessage(error instanceof Error ? error.message : "Căutarea nu a putut fi salvată.")
-    }
-  }
-
-  return (
-    <div style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
-      <PanelHeader title="Salvează Căutarea" />
-      <form onSubmit={saveSearch} className="flex flex-col gap-3 p-4" style={{ background: CREAM }}>
-        <p className="text-[11px] font-bold uppercase leading-relaxed" style={{ color: `${INK}99` }}>
-          Păstrăm căutarea pe email. Notificările de oferte vor porni după ce activăm jobul de verificare.
-        </p>
-        <input
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="email@exemplu.ro"
-          className="min-h-10 bg-white px-3 text-[11px] font-bold outline-none"
-          style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO }}
-          required
-        />
-        <button
-          type="submit"
-          disabled={!query || status === "submitting" || status === "success"}
-          className="min-h-10 px-3 py-2 text-[10px] font-bold uppercase disabled:opacity-60"
-          style={{ border: `1px solid ${INK}`, background: INK, color: "white", fontFamily: MONO }}
-        >
-          {status === "submitting" ? "Salvez..." : status === "success" ? "Salvată" : "Salvează"}
-        </button>
-        {message && (
-          <p className="text-[10px] font-bold uppercase leading-relaxed" style={{ color: status === "error" ? PINK : GREEN }}>
-            {message}
-          </p>
-        )}
-      </form>
-    </div>
-  )
-}
-
 function ResultCard({
   item,
   query,
@@ -2106,8 +2034,6 @@ function SearchResultsContent() {
             </div>
 
             <aside className="w-full xl:w-72 flex-none flex flex-col gap-6">
-              {query && <SaveSearchPanel query={query} />}
-
               <div style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
                 <PanelHeader title="Agent Notes" />
                 <ul className="p-4 flex flex-col gap-4" style={{ background: CREAM }}>

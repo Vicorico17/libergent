@@ -48,6 +48,15 @@ test("parses retail anchor cards with nearby prices", () => {
   assert.equal(parsed.items[0].url, "https://shop.example/telefon-samsung-galaxy-s24");
 });
 
+test("ignores zero-price retail cards", () => {
+  const parsed = parseRetailHtml(`
+    <a href="/product-zero"><span>Product with unavailable price</span></a>
+    <span>0 lei</span>
+  `, 10, { origin: "https://example.ro" });
+
+  assert.equal(parsed.items.length, 0);
+});
+
 
 test("parses eMAG product metadata prices instead of promo installment text", () => {
   const html = `

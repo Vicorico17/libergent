@@ -843,7 +843,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       secondaryMatches
     } = splitClassifiedItems(classifiedItems);
     const items = productMatches;
-    const pricedItems = items.filter((item) => Number.isFinite(item.priceRon));
+    const pricedItems = items.filter((item) => Number.isFinite(item.priceRon) && item.priceRon > 0);
     const medianPriceRon = median(pricedItems.map((item) => item.priceRon));
     const lowest = pricedItems.length
       ? pricedItems.reduce((best, item) => (item.priceRon < best.priceRon ? item : best))
@@ -886,7 +886,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const allPricedItems = dedupedResults
     .filter((result) => result.ok)
     .flatMap((result) => result.items)
-    .filter((item) => Number.isFinite(item.priceRon));
+    .filter((item) => Number.isFinite(item.priceRon) && item.priceRon > 0);
   const allScoredItems = dedupedResults
     .filter((result) => result.ok)
     .flatMap((result) => result.items.map((item) => ({
