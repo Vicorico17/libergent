@@ -152,6 +152,7 @@ export function normalizeListing(item) {
       .map((value) => String(value || "").trim())
       .filter(Boolean)
   )];
+  const phones = extractPhonesFromListing(item);
 
   return {
     ...item,
@@ -160,7 +161,9 @@ export function normalizeListing(item) {
     numericPrice,
     priceRon,
     imageUrl: item.imageUrl || imageUrls[0] || "",
-    imageUrls
+    imageUrls,
+    phone: item.phone || phones[0] || "",
+    phones
   };
 }
 
@@ -171,3 +174,4 @@ export function formatRon(value) {
     maximumFractionDigits: 0
   }).format(value);
 }
+import { extractPhonesFromListing } from "./phone-numbers.js";

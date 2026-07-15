@@ -14,6 +14,16 @@ test("normalizes comma decimal RON prices", () => {
   assert.equal(listing.priceRon, 99.99);
 });
 
+test("extracts a seller phone from listing content", () => {
+  const listing = normalizeListing({
+    title: "Bicicletă",
+    description: "Contact: 0722 123 456"
+  });
+
+  assert.equal(listing.phone, "+40722123456");
+  assert.deepEqual(listing.phones, ["+40722123456"]);
+});
+
 test("uses the first price when marketplace text includes buyer protection totals", () => {
   const listing = normalizeListing({
     title: "Husa iPhone",

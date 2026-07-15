@@ -966,7 +966,21 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
   }
 
   async function sendWhatsApp() {
-    const phone = window.prompt("Numărul WhatsApp al sellerului (ex. 07xx xxx xxx):", item.sellerPhone || "")?.trim()
+    let phone = item.sellerPhone || ""
+    if (!phone && item.url) {
+      setSendState("sending")
+      try {
+        const response = await fetch(`/api/marketplace/contact?url=${encodeURIComponent(item.url)}`)
+        const payload = await response.json().catch(() => ({}))
+        phone = Array.isArray(payload.phones) ? String(payload.phones[0] || "") : ""
+      } catch {
+        phone = ""
+      }
+      setSendState("idle")
+    }
+    if (!phone) {
+      phone = window.prompt("Numărul WhatsApp al sellerului (ex. 07xx xxx xxx):", "")?.trim() || ""
+    }
     if (!phone) return
     if (!window.confirm("Trimiți acest mesaj pe WhatsApp?\n\n" + message)) return
 

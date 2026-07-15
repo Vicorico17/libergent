@@ -5,10 +5,10 @@ import { extractImageSearchIntent, validateImageSearchRequest } from "./image-se
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertWhatsAppInboundToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
-import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
-import { normalizeRomanianPhone } from "./phone-numbers.js";
+import { extractPhonesFromListing, normalizeRomanianPhone } from "./phone-numbers.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -455,6 +455,47 @@ async function handleApi(request, env) {
       return json({ ok: true, target, messageId: payload.messageId || null }, 200);
     } catch (error) {
       return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 502);
+    }
+  }
+
+  if (apiPath === "/api/marketplace/contact") {
+    if (request.method !== "GET") {
+      return json({ error: "Method not allowed" }, 405);
+    }
+
+    const listingUrl = String(url.searchParams.get("url") || "").trim();
+    let targetUrl;
+    try {
+      targetUrl = new URL(listingUrl);
+    } catch {
+      return json({ ok: false, error: "Invalid listing URL." }, 400);
+    }
+
+    const allowedHosts = new Set(Object.keys(SITES));
+    const allowed = [...allowedHosts].some((host) =>
+      targetUrl.hostname === host || targetUrl.hostname.endsWith(`.${host}`)
+    );
+    if (targetUrl.protocol !== "https:" || !allowed) {
+      return json({ ok: false, error: "Listing host is not supported." }, 400);
+    }
+
+    try {
+      const response = await fetch(targetUrl.toString(), {
+        headers: {
+          "user-agent": "Mozilla/5.0 (compatible; LiberGent/1.0; +https://libergent.com)",
+          accept: "text/html,application/xhtml+xml"
+        },
+        redirect: "follow",
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!response.ok) {
+        return json({ ok: false, phones: [], error: `Listing fetch failed (${response.status}).` }, 502);
+      }
+      const html = await response.text();
+      const phones = extractPhonesFromListing({ html });
+      return json({ ok: true, phones }, 200);
+    } catch (error) {
+      return json({ ok: false, phones: [], error: error instanceof Error ? error.message : String(error) }, 502);
     }
   }
 
