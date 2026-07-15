@@ -12,6 +12,7 @@ const DEFAULT_KEYWORD_STATS_TABLE = "keyword_stats";
 const DEFAULT_FEEDBACK_TABLE = "offer_feedback";
 const DEFAULT_EMAIL_LEADS_TABLE = "email_leads";
 const DEFAULT_SAVED_SEARCHES_TABLE = "saved_searches";
+const DEFAULT_WHATSAPP_MESSAGES_TABLE = "whatsapp_messages";
 
 function trimTrailingSlash(value = "") {
   return value.replace(/\/+$/, "");
@@ -31,12 +32,13 @@ function getSupabaseConfig(env = process.env) {
   const feedbackTable = normalizePublicRestTableName(env.SUPABASE_FEEDBACK_TABLE, DEFAULT_FEEDBACK_TABLE);
   const emailLeadsTable = normalizePublicRestTableName(env.SUPABASE_EMAIL_LEADS_TABLE, DEFAULT_EMAIL_LEADS_TABLE);
   const savedSearchesTable = normalizePublicRestTableName(env.SUPABASE_SAVED_SEARCHES_TABLE, DEFAULT_SAVED_SEARCHES_TABLE);
+  const whatsappMessagesTable = normalizePublicRestTableName(env.SUPABASE_WHATSAPP_MESSAGES_TABLE, DEFAULT_WHATSAPP_MESSAGES_TABLE);
 
   if (!url || !apiKey) {
     return null;
   }
 
-  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable };
+  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable };
 }
 
 function getRequestHeaders(apiKey) {
@@ -272,6 +274,39 @@ export async function insertSavedSearchToSupabase(entry, env = process.env) {
   };
 
   await requestSupabase(`${config.savedSearchesTable}?on_conflict=email,query`, {
+    method: "POST",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=minimal"
+    },
+    body: JSON.stringify(row)
+  }, env);
+
+  return true;
+}
+
+export async function insertWhatsAppInboundToSupabase(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) {
+    return false;
+  }
+
+  const timestamp = entry.timestamp || new Date().toISOString();
+  const from = String(entry.from || "").trim();
+  const text = String(entry.text || "").trim();
+  const messageId = String(entry.messageId || entry.message_id || `${from}:${timestamp}:${text}`).trim();
+  const row = {
+    message_id: messageId,
+    direction: "inbound",
+    channel: entry.channel || "whatsapp",
+    from_number: from,
+    to_number: String(entry.to || entry.to_number || "").trim(),
+    text,
+    received_at: timestamp,
+    raw: entry.raw || null,
+    created_at: entry.createdAt || new Date().toISOString()
+  };
+
+  await requestSupabase(`${config.whatsappMessagesTable}?on_conflict=message_id`, {
     method: "POST",
     headers: {
       Prefer: "resolution=merge-duplicates,return=minimal"

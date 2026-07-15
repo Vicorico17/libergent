@@ -1,5 +1,6 @@
 import http from "node:http";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 
 const HOST = process.env.OPENCLAW_BRIDGE_HOST || "127.0.0.1";
 const PORT = Number.parseInt(process.env.OPENCLAW_BRIDGE_PORT || "8788", 10);
@@ -39,10 +40,17 @@ function readJson(req) {
 
 function runOpenClawMessage({ target, message, media, replyTo }) {
   const args = CONTAINER
-    ? ["exec", CONTAINER, "openclaw", "message", "send"]
-    : ["message", "send"];
-  args.push("--channel", "whatsapp", "--target", target, "--message", message, "--json");
-  if (media) args.push("--media", media);
+    ? ["exec", CONTAINER, "openclaw", "gateway", "call", "send"]
+    : ["gateway", "call", "send"];
+  const params = {
+    idempotencyKey: "bridge-" + Date.now() + "-" + randomUUID(),
+    channel: "whatsapp",
+    to: target,
+    message
+  };
+  if (media) params.mediaUrl = media;
+  if (replyTo) params.replyTo = replyTo;
+  args.push("--json", "--timeout", "30000", "--params", JSON.stringify(params));
   return new Promise((resolve, reject) => {
     const child = spawn(CONTAINER ? "docker" : (process.env.OPENCLAW_BIN || "openclaw"), args, {
       stdio: ["ignore", "pipe", "pipe"]

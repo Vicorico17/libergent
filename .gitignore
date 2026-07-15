@@ -6,3 +6,6 @@ results/
 data/
 .wrangler/
 .DS_Store
+.openclaw-bridge.env
+.openclaw-inbound-forwarder.env
+.openclaw-inbound-forwarder-state.json

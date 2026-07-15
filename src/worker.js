@@ -4,7 +4,7 @@ import { runMarketplaceHealthChecks } from "./health.js";
 import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
-import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
+import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertWhatsAppInboundToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
 import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
@@ -50,13 +50,16 @@ function json(payload, status = 200) {
   });
 }
 
-function getAdminTokenFromRequest(request, url) {
+function getBearerTokenFromRequest(request) {
   const authorization = request.headers.get("authorization") || "";
   if (authorization.toLowerCase().startsWith("bearer ")) {
     return authorization.slice("bearer ".length).trim();
   }
+  return "";
+}
 
-  return String(request.headers.get("x-libergent-admin-token") || url.searchParams.get("token") || "").trim();
+function getAdminTokenFromRequest(request, url) {
+  return getBearerTokenFromRequest(request) || String(request.headers.get("x-libergent-admin-token") || url.searchParams.get("token") || "").trim();
 }
 
 function isAuthorizedAdminRequest(request, url, env = {}) {
@@ -182,11 +185,68 @@ async function parseJsonRequest(request) {
   }
 }
 
+function normalizeInboundWhatsAppPayload(body = {}) {
+  const from = String(body.from || body.senderE164 || body.senderId || "").trim();
+  const text = String(body.text || body.message || body.content || "").trim();
+  const timestamp = String(body.timestamp || body.receivedAt || new Date().toISOString()).trim();
+  const to = String(body.to || body.to_number || "").trim();
+  const messageId = String(body.messageId || body.message_id || "").trim();
+  if (!/^\+\d{8,15}$/.test(from)) {
+    throw new Error("Expected from to be an E.164 phone number.");
+  }
+  if (!text || text.length > 8000) {
+    throw new Error("Expected a non-empty text value under 8000 characters.");
+  }
+  return {
+    from,
+    to,
+    text,
+    timestamp,
+    messageId,
+    channel: "whatsapp",
+    raw: body.raw || body
+  };
+}
+
 async function handleApi(request, env) {
   applyEnv(env);
 
   const url = new URL(request.url);
   const apiPath = normalizeApiPathname(url.pathname);
+
+  if (apiPath === "/api/openclaw/inbound") {
+    if (request.method !== "POST") {
+      return json({ error: "Method not allowed" }, 405);
+    }
+
+    const expectedToken = String(env.OPENCLAW_INBOUND_TOKEN || "");
+    if (!expectedToken || getBearerTokenFromRequest(request) !== expectedToken) {
+      return json({ error: "Unauthorized" }, 401);
+    }
+
+    const parsedBody = await parseJsonRequest(request);
+    if (parsedBody.error) {
+      return json({ error: parsedBody.error }, parsedBody.error.includes("large") ? 413 : 400);
+    }
+
+    let inbound;
+    try {
+      inbound = normalizeInboundWhatsAppPayload(parsedBody.data || {});
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+
+    if (!isSupabaseConfigured(env)) {
+      return json({ ok: false, error: "Supabase is not configured." }, 200);
+    }
+
+    try {
+      await insertWhatsAppInboundToSupabase(inbound, env);
+      return json({ ok: true }, 200);
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
 
   if (apiPath === "/api/image") {
     return proxyImage(url.searchParams.get("url") || "");
