@@ -148,7 +148,7 @@ function buildSellerMessage(item: SearchResultItem, query: string) {
   return [
     `Bună! Sunt un asistent AI LiberGent și am văzut anunțul pentru ${product} pe ${item.source}.`,
     `Mai este disponibil? Prețul afișat este ${item.priceLabel}. Aș vrea să discut câteva detalii despre stare și dacă există flexibilitate la preț.`,
-    "Dacă nu dorești mesaje, răspunde STOP.",
+    "Dacă preferi să nu mai primești mesaje, spune-mi și mă opresc.",
   ].join(" ")
 }
 
