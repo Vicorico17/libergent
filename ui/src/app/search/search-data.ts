@@ -130,6 +130,7 @@ export type SearchResultItem = {
   priceLabel: string;
   source: string;
   sourceType: string;
+  marketType: "retail" | "secondary" | "mixed" | null;
   sourceGroup: string;
   sourceKind: "used" | "new";
   sourceKindLabel: string;
