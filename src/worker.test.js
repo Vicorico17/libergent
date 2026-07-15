@@ -56,3 +56,32 @@ test("requires the OpenClaw bridge token before sending WhatsApp messages", asyn
   assert.equal(payload.ok, false);
   assert.match(payload.error, /not configured/i);
 });
+
+
+test("resolves OLX listing phones through the OLX offer phone endpoint", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const requestedUrls = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async (url) => {
+    requestedUrls.push(String(url));
+    if (String(url).includes("/api/v1/offers/299484800/phones/")) {
+      return new Response(JSON.stringify({ data: { phones: ["076 720 9070"] } }), { status: 200 });
+    }
+    return new Response(String.raw`window.__PRERENDERED_STATE__= "{\\"ad\\":{\\"ad\\":{\\"id\\":299484800,\\"title\\":\\"Kirby Air Riders Nintendo Switch 2 nou sigilat\\"}}}"; support +40201100020`, { status: 200 });
+  };
+
+  const listingUrl = "https://www.olx.ro/d/oferta/kirby-air-riders-nintendo-switch-2-nou-sigilat-IDkgBG0.html";
+  const response = await worker.fetch(
+    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`),
+    {}
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(payload.phones, ["+40767209070"]);
+  assert.equal(requestedUrls[1], "https://www.olx.ro/api/v1/offers/299484800/phones/");
+});

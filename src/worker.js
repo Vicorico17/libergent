@@ -8,7 +8,7 @@ import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSe
 import { SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
-import { extractPhonesFromListing, normalizeRomanianMobilePhone } from "./phone-numbers.js";
+import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -206,6 +206,44 @@ function normalizeInboundWhatsAppPayload(body = {}) {
     channel: "whatsapp",
     raw: body.raw || body
   };
+}
+
+function getOlxOfferIdFromHtml(html = "") {
+  return String(html.match(/\\+\"id\\+\":(\d+),\\+\"title\\+\"/)?.[1] || "").trim();
+}
+
+async function fetchOlxOfferPhones(targetUrl, html) {
+  const offerId = getOlxOfferIdFromHtml(html);
+  if (!offerId) {
+    return [];
+  }
+
+  const response = await fetch(new URL(`/api/v1/offers/${offerId}/phones/`, targetUrl.origin).toString(), {
+    headers: {
+      "user-agent": "Mozilla/5.0 (compatible; LiberGent/1.0; +https://libergent.com)",
+      accept: "application/json, text/plain, */*",
+      referer: targetUrl.toString()
+    },
+    redirect: "follow",
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!response.ok) {
+    return [];
+  }
+
+  const payload = await response.json().catch(() => null);
+  const phones = Array.isArray(payload?.data?.phones) ? payload.data.phones : [];
+  return [...new Set(phones.flatMap(extractRomanianMobilePhones))];
+}
+
+async function resolveListingPhones(targetUrl, html) {
+  if (targetUrl.hostname === "www.olx.ro" || targetUrl.hostname.endsWith(".olx.ro")) {
+    const olxPhones = await fetchOlxOfferPhones(targetUrl, html);
+    if (olxPhones.length) {
+      return olxPhones;
+    }
+  }
+  return extractPhonesFromListing({ html });
 }
 
 async function handleApi(request, env) {
@@ -492,7 +530,7 @@ async function handleApi(request, env) {
         return json({ ok: false, phones: [], error: `Listing fetch failed (${response.status}).` }, 502);
       }
       const html = await response.text();
-      const phones = extractPhonesFromListing({ html });
+      const phones = await resolveListingPhones(targetUrl, html);
       return json({ ok: true, phones }, 200);
     } catch (error) {
       return json({ ok: false, phones: [], error: error instanceof Error ? error.message : String(error) }, 502);
