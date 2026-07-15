@@ -9,3 +9,6 @@ command = "npm run build:ui"
 [assets]
 directory = "./ui/out"
 binding = "ASSETS"
+
+[vars]
+OPENCLAW_BRIDGE_URL = "https://bridge.srv1648069.hstgr.cloud"
