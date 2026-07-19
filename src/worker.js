@@ -232,21 +232,24 @@ async function fetchOlxOfferPhones(targetUrl, html) {
     return [];
   }
 
-  const response = await fetch(new URL(`/api/v1/offers/${offerId}/phones/`, targetUrl.origin).toString(), {
-    headers: {
-      "user-agent": "Mozilla/5.0 (compatible; LiberGent/1.0; +https://libergent.com)",
-      accept: "application/json, text/plain, */*",
-      referer: targetUrl.toString()
-    },
-    redirect: "follow",
-    signal: AbortSignal.timeout(10000)
-  });
-  if (!response.ok) {
-    return [];
+  for (const endpoint of ["phones", "limited-phones"]) {
+    const response = await fetch(new URL(`/api/v1/offers/${offerId}/${endpoint}/`, targetUrl.origin).toString(), {
+      headers: {
+        "user-agent": "Mozilla/5.0 (compatible; LiberGent/1.0; +https://libergent.com)",
+        accept: "application/json, text/plain, */*",
+        referer: targetUrl.toString()
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!response.ok) continue;
+
+    const payload = await response.json().catch(() => null);
+    const phones = extractOlxPhonesFromPayload(payload);
+    if (phones.length) return phones;
   }
 
-  const payload = await response.json().catch(() => null);
-  return extractOlxPhonesFromPayload(payload);
+  return [];
 }
 
 function extractOlxPhonesFromPayload(payload) {

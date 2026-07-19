@@ -140,3 +140,35 @@ test("resolves OLX phones when the phone endpoint returns phone objects", async 
   assert.equal(response.status, 200);
   assert.deepEqual(payload.phones, ["+40755111222"]);
 });
+
+test("falls back to OLX limited-phones when the regular endpoint is empty", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const requestedUrls = [];
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    requestedUrls.push(requestUrl);
+    if (requestUrl.includes("/limited-phones/")) {
+      return new Response(JSON.stringify({ data: { phones: ["0733 444 555"] } }), { status: 200 });
+    }
+    if (requestUrl.includes("/phones/")) {
+      return new Response(JSON.stringify({ data: { phones: [] } }), { status: 200 });
+    }
+    return new Response('<script>window.state = {"ad":{"id":421339,"title":"Aparat"}}</script>', { status: 200 });
+  };
+
+  const listingUrl = "https://www.olx.ro/d/oferta/espressor-IDkMeZT.html";
+  const response = await worker.fetch(
+    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`),
+    {}
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(payload.phones, ["+40733444555"]);
+  assert.equal(requestedUrls[1], "https://www.olx.ro/api/v1/offers/421339/phones/");
+  assert.equal(requestedUrls[2], "https://www.olx.ro/api/v1/offers/421339/limited-phones/");
+});
