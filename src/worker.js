@@ -9,6 +9,7 @@ import { SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./s
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
+import { revealOlxPhonesWithBrowser } from "./providers/cloudflare-browser.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -299,14 +300,33 @@ function extractOlxPhonesFromPayload(payload) {
   return [...new Set(values.flatMap(extractRomanianMobilePhones))];
 }
 
-async function resolveListingPhones(targetUrl, html, cookieHeader = "") {
+async function resolveListingPhones(targetUrl, html, cookieHeader = "", env = {}) {
   if (targetUrl.hostname === "www.olx.ro" || targetUrl.hostname.endsWith(".olx.ro")) {
     const olxPhones = await fetchOlxOfferPhones(targetUrl, html, cookieHeader);
     if (olxPhones.phones.length) {
       return olxPhones;
     }
     const htmlPhones = extractPhonesFromListing({ html });
-    return { phones: htmlPhones, debug: { ...olxPhones.debug, htmlPhones: htmlPhones.length } };
+    if (htmlPhones.length) {
+      return { phones: htmlPhones, debug: { ...olxPhones.debug, htmlPhones: htmlPhones.length } };
+    }
+
+    try {
+      const browserResult = await revealOlxPhonesWithBrowser(env.BROWSER, targetUrl.toString());
+      return {
+        phones: browserResult.phones,
+        debug: { ...olxPhones.debug, htmlPhones: 0, browser: browserResult.debug }
+      };
+    } catch (error) {
+      return {
+        phones: [],
+        debug: {
+          ...olxPhones.debug,
+          htmlPhones: 0,
+          browser: { configured: Boolean(env.BROWSER), error: error instanceof Error ? error.message : String(error) }
+        }
+      };
+    }
   }
   return { phones: extractPhonesFromListing({ html }), debug: { provider: "html" } };
 }
@@ -596,7 +616,7 @@ async function handleApi(request, env) {
       }
       const cookieHeader = getResponseCookieHeader(response);
       const html = await response.text();
-      const result = await resolveListingPhones(targetUrl, html, cookieHeader);
+      const result = await resolveListingPhones(targetUrl, html, cookieHeader, env);
       return json({ ok: true, phones: result.phones, debug: result.debug }, 200);
     } catch (error) {
       return json({ ok: false, phones: [], error: error instanceof Error ? error.message : String(error) }, 502);
