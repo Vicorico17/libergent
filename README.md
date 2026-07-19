@@ -220,13 +220,12 @@ curl "https://YOUR_DOMAIN/api/search/free?q=iphone&site=all&limit=30"
 `/api/search` remains a backward-compatible alias for the Free contract. Premium search combines the Free results with browser-rendered searches across the configured Premium marketplaces:
 
 ```bash
-curl -H "Authorization: Bearer $LIBERGENT_PREMIUM_TOKEN" \
-  "https://YOUR_DOMAIN/api/search/premium?q=iphone&site=all&limit=30"
+curl "https://YOUR_DOMAIN/api/search/premium?q=iphone&site=all&limit=30"
 ```
 
-Premium search requires both the `BROWSER` binding and a `LIBERGENT_PREMIUM_TOKEN` Wrangler secret. The admin token is also accepted for internal testing. Browser marketplaces run with bounded concurrency and a maximum of 30 parsed items per source.
+During the internal testing phase, Premium search requires only the `BROWSER` binding. No account, payment, or test token is required. Browser marketplaces run with bounded concurrency and a maximum of 30 parsed items per source.
 
-During the internal test phase, select **Premium test** on the search page and enter either `LIBERGENT_PREMIUM_TOKEN` or `LIBERGENT_ADMIN_TOKEN`. The token is kept in `sessionStorage` for the current browser tab only. The coverage panel then reports each marketplace's provider, result count, and failure reason.
+Select **Free** or **Premium test** directly on the search page. The coverage panel reports each marketplace's provider, result count, and failure reason. Authentication and paid access can be added after Premium marketplace coverage has been validated.
 
 ### Private seller conversations
 

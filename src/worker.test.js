@@ -23,23 +23,10 @@ test("exposes the direct search contract at /api/search/free", async (t) => {
   assert.ok(payload.summary.marketplaces > 0);
 });
 
-test("protects premium search before starting Browser Run", async () => {
+test("allows Premium testing without a token and requires Browser Run", async () => {
   const response = await worker.fetch(
     new Request("https://libergent.test/api/search/premium?q=iphone&site=all"),
-    { BROWSER: {} }
-  );
-  const payload = await response.json();
-
-  assert.equal(response.status, 401);
-  assert.match(payload.error, /premium authorization/i);
-});
-
-test("requires Browser Run for an authorized premium search", async () => {
-  const response = await worker.fetch(
-    new Request("https://libergent.test/api/search/premium?q=iphone&site=all", {
-      headers: { authorization: "Bearer premium-secret" }
-    }),
-    { LIBERGENT_PREMIUM_TOKEN: "premium-secret" }
+    {}
   );
   const payload = await response.json();
 

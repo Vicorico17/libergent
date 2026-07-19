@@ -70,12 +70,6 @@ function isAuthorizedAdminRequest(request, url, env = {}) {
   return Boolean(expectedToken) && getAdminTokenFromRequest(request, url) === expectedToken;
 }
 
-function isAuthorizedPremiumRequest(request, url, env = {}) {
-  const premiumToken = String(env.LIBERGENT_PREMIUM_TOKEN || "");
-  const bearerToken = getBearerTokenFromRequest(request);
-  return (Boolean(premiumToken) && bearerToken === premiumToken) || isAuthorizedAdminRequest(request, url, env);
-}
-
 async function authenticateSupabaseUser(request, env = {}) {
   const accessToken = getBearerTokenFromRequest(request);
   if (!accessToken) return { error: "Authentication required.", status: 401 };
@@ -531,9 +525,6 @@ async function handleApi(request, env) {
   }
 
   if (apiPath === "/api/search/premium") {
-    if (!isAuthorizedPremiumRequest(request, url, env)) {
-      return json({ error: "Premium authorization required." }, 401);
-    }
     if (!env.BROWSER) {
       return json({ error: "Cloudflare Browser Run is not configured." }, 503);
     }

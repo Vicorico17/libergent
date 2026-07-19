@@ -61,8 +61,6 @@ const VISIBLE_RESULT_STEP = 48
 const SAVED_LISTINGS_STORAGE_KEY = "libergent-saved-listings-v1"
 const HIDDEN_LISTINGS_STORAGE_KEY = "libergent-hidden-listings-v1"
 const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v3"
-const PREMIUM_TEST_TOKEN_STORAGE_KEY = "libergent-premium-test-token"
-
 type SearchTier = "free" | "premium"
 type MarketplaceCoverage = {
   site: string
@@ -1921,9 +1919,6 @@ function SearchResultsContent() {
   const [excludedListings, setExcludedListings] = useState(0)
   const [marketplaceStatus, setMarketplaceStatus] = useState<MarketplaceStatus>({ successful: 0, total: 0, failed: [], blocked: [] })
   const [marketplaceCoverage, setMarketplaceCoverage] = useState<MarketplaceCoverage[]>([])
-  const [premiumToken, setPremiumToken] = useState(() =>
-    typeof window === "undefined" ? "" : window.sessionStorage.getItem(PREMIUM_TEST_TOKEN_STORAGE_KEY) || ""
-  )
   const [isLoading, setIsLoading]   = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchReportOpen, setSearchReportOpen] = useState(true)
@@ -1939,24 +1934,10 @@ function SearchResultsContent() {
   const [loaderDone, setLoaderDone]       = useState(false)
   const loaderTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  function configurePremiumAccess() {
-    const token = window.prompt("Token intern pentru testarea Premium:", "")?.trim() || ""
-    if (!token) return false
-    window.sessionStorage.setItem(PREMIUM_TEST_TOKEN_STORAGE_KEY, token)
-    setPremiumToken(token)
-    return true
-  }
-
   function selectSearchTier(nextTier: SearchTier) {
-    if (nextTier === "premium" && !premiumToken && !configurePremiumAccess()) return
     const params = new URLSearchParams(searchParams.toString())
     params.set("tier", nextTier)
     router.push(`/search?${params.toString()}`)
-  }
-
-  function resetPremiumAccess() {
-    window.sessionStorage.removeItem(PREMIUM_TEST_TOKEN_STORAGE_KEY)
-    setPremiumToken("")
   }
 
   useEffect(() => {
@@ -2005,14 +1986,6 @@ function SearchResultsContent() {
         return
       }
 
-      if (searchTier === "premium" && !premiumToken) {
-        setError("Adaugă tokenul intern pentru a porni testul Premium.")
-        setMarketplaceCoverage([])
-        setIsLoading(false)
-        setShowLoader(false)
-        return
-      }
-
       setIsLoading(true)
       setShowLoader(true)
       setSearchReportOpen(true)
@@ -2039,10 +2012,7 @@ function SearchResultsContent() {
       })
 
       const searchEndpoint = searchTier === "premium" ? "/api/search/premium" : "/api/search/free"
-      fetch(`${searchEndpoint}?${params.toString()}`, {
-        signal: controller.signal,
-        headers: searchTier === "premium" ? { authorization: `Bearer ${premiumToken}` } : undefined,
-      })
+      fetch(`${searchEndpoint}?${params.toString()}`, { signal: controller.signal })
         .then(async (response) => {
           const payload = await readJsonResponse(response)
           if (!response.ok || payload.error) {
@@ -2113,7 +2083,7 @@ function SearchResultsContent() {
       controller.abort()
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
     }
-  }, [premiumToken, query, searchTier])
+  }, [query, searchTier])
 
   useEffect(() => {
     const id = setInterval(() => setTime(formatSearchTime()), 30_000)
@@ -2299,11 +2269,6 @@ function SearchResultsContent() {
               </button>
             ))}
           </div>
-          {searchTier === "premium" && premiumToken && (
-            <button type="button" onClick={resetPremiumAccess} className="px-2 py-2 text-[9px] font-bold uppercase underline">
-              Resetează token
-            </button>
-          )}
           <div className="flex items-center gap-3 text-[11px] uppercase font-bold px-3 py-1.5" style={{ background: "white", border: `1px solid ${INK}` }}>
             <div className="w-2 h-2 animate-pulse" style={{ background: "#22C55E" }} />
             <span>Live <span className="mx-2">|</span> {updatedLabel === "în timp real" ? time : updatedLabel}</span>
@@ -2384,14 +2349,7 @@ function SearchResultsContent() {
 
           {error && (
             <section className="p-4 text-[12px] uppercase font-bold" style={{ border: `1px solid ${INK}`, background: "white", color: PINK }}>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span>&gt; {error}</span>
-                {searchTier === "premium" && (
-                  <button type="button" onClick={configurePremiumAccess} className="px-3 py-2 text-[10px] uppercase" style={{ border: `1px solid ${PINK}` }}>
-                    Configurează accesul
-                  </button>
-                )}
-              </div>
+              <span>&gt; {error}</span>
             </section>
           )}
 
