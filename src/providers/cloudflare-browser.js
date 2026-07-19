@@ -34,10 +34,16 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
         .toLowerCase()
         .replace(/\s+/g, " ")
         .trim();
-      const candidates = [...document.querySelectorAll("button, a")];
+      const candidates = [...document.querySelectorAll('[data-testid="show-phone"], button, a')];
       const contactButton = candidates.find((element) => {
         const text = normalize(element.textContent);
-        return text.includes("suna vanzatorul") || text.includes("arata telefon") || text.includes("show phone");
+        const style = window.getComputedStyle(element);
+        const visible = element.getClientRects().length > 0 && style.visibility !== "hidden" && style.display !== "none";
+        const enabled = !element.disabled && element.getAttribute("aria-disabled") !== "true" && element.getAttribute("data-button-disabled") !== "true";
+        const isPhoneControl = element.getAttribute("data-testid") === "show-phone" ||
+          text.includes("suna vanzatorul") || text.includes("arata telefon") ||
+          text === "arata" || text.includes("afiseaza telefon") || text.includes("show phone");
+        return visible && enabled && isPhoneControl;
       });
       if (!contactButton) return null;
       contactButton.scrollIntoView({ block: "center", inline: "center" });
