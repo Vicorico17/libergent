@@ -17,6 +17,7 @@ test("returns an unconfigured result without launching a browser", async () => {
 test("clicks the OLX seller button and extracts the phone response", async () => {
   let closed = false;
   let clickedPoint = null;
+  let evaluateCall = 0;
   let navigatedTo = "";
   const response = {
     url: () => "https://www.olx.ro/api/v1/offers/307024117/phones/",
@@ -29,7 +30,10 @@ test("clicks the OLX seller button and extracts the phone response", async () =>
       navigatedTo = url;
     },
     waitForResponse: async (predicate) => predicate(response) ? response : null,
-    evaluate: async () => ({ text: "Sună vânzătorul", x: 420, y: 180 }),
+    evaluate: async () => {
+      evaluateCall += 1;
+      return evaluateCall === 1 ? null : { text: "Sună vânzătorul", x: 420, y: 180 };
+    },
     mouse: {
       click: async (x, y) => {
         clickedPoint = { x, y };
@@ -52,6 +56,7 @@ test("clicks the OLX seller button and extracts the phone response", async () =>
   assert.deepEqual(result.phones, ["+40722123456"]);
   assert.deepEqual(result.debug, {
     configured: true,
+    consentDismissed: false,
     clicked: true,
     responseStatus: 200,
     source: "phone-response"

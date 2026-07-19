@@ -22,6 +22,33 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
     await page.setViewport({ width: 1365, height: 900 });
     await page.goto(listingUrl, { waitUntil: "networkidle2", timeout: 30000 });
 
+    const consentButton = await page.evaluate(() => {
+      const normalize = (value) => String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+      const dialogs = [...document.querySelectorAll('[role="dialog"], [aria-modal="true"]')];
+      const candidates = dialogs.flatMap((dialog) => [...dialog.querySelectorAll("button")]);
+      const acceptButton = candidates.find((element) => {
+        const text = normalize(element.textContent);
+        const style = window.getComputedStyle(element);
+        const visible = element.getClientRects().length > 0 && style.visibility !== "hidden" && style.display !== "none";
+        return visible && ["accepta", "accepta toate", "accept tot", "sunt de acord"].includes(text);
+      });
+      if (!acceptButton) return null;
+      acceptButton.scrollIntoView({ block: "center", inline: "center" });
+      const rect = acceptButton.getBoundingClientRect();
+      return rect.width && rect.height
+        ? { x: rect.left + (rect.width / 2), y: rect.top + (rect.height / 2) }
+        : null;
+    });
+    if (consentButton) {
+      await page.mouse.click(consentButton.x, consentButton.y);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
     const phoneResponsePromise = page.waitForResponse(
       (response) => OLX_PHONE_RESPONSE_PATTERN.test(response.url()),
       { timeout: 15000 }
@@ -57,7 +84,7 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
     });
 
     if (!button) {
-      return { phones: [], debug: { configured: true, clicked: false } };
+      return { phones: [], debug: { configured: true, consentDismissed: Boolean(consentButton), clicked: false } };
     }
 
     await page.mouse.click(button.x, button.y);
@@ -74,7 +101,7 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
     if (responsePhones.length) {
       return {
         phones: [...new Set(responsePhones)],
-        debug: { configured: true, clicked: true, responseStatus, source: "phone-response" }
+        debug: { configured: true, consentDismissed: Boolean(consentButton), clicked: true, responseStatus, source: "phone-response" }
       };
     }
 
@@ -99,6 +126,7 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
       phones: visiblePhones,
       debug: {
         configured: true,
+        consentDismissed: Boolean(consentButton),
         clicked: true,
         buttonText: button.text,
         responseStatus,
