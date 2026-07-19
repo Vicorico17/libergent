@@ -233,6 +233,12 @@ Seller outreach requires a valid Supabase account session. `POST /api/whatsapp/s
 
 The search UI opens a private conversation drawer after a message is sent, shows the agent/seller transcript, and attaches a conversation status to the listing (`contacted`, `replied`, `negotiating`, `unavailable`, or `deal_agreed`). Direct client access to `whatsapp_messages` is disabled by RLS; only the Worker service role can access the table. If inbound ownership is ambiguous because multiple accounts contacted the same seller number, the reply is deliberately left unassigned instead of risking cross-account disclosure.
 
+### Account sign-in methods
+
+The auth page supports Google, Apple, Facebook, and passwordless email links through Supabase Auth. Social providers must be enabled in **Supabase Dashboard → Authentication → Providers** and configured with credentials from the corresponding Google, Apple, or Meta developer console. Add the production `/auth` URL to Supabase's allowed redirect URLs. Email link authentication uses the Supabase email provider.
+
+Signed-out visitors can search and open the original marketplace listing. Favorites, LiberGent listing analysis, seller WhatsApp contact, feedback, listing statuses, and conversation history are shown only after authentication. Favorites are stored in a browser key scoped to the authenticated Supabase user ID during this test phase.
+
 Direct scraping does not require provider secrets. If you later use Cloudflare Browser Rendering as an explicit scraping fallback, configure `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in Wrangler secrets.
 
 ## Usage

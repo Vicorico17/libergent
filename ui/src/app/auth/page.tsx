@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LogoIcon } from "@/components/LogoIcon";
-import { GoogleSignIn } from "@/components/GoogleSignIn";
+import { SignInOptions } from "@/components/GoogleSignIn";
 
 const CREAM = "#F3F0E7";
 const INK = "#111111";
@@ -18,10 +18,10 @@ export default function AuthPage() {
         <div className="flex flex-col gap-3">
           <h1 className="text-[22px] sm:text-[28px] font-bold uppercase leading-tight">Conectează-te la LiberGent</h1>
           <p className="text-[13px] leading-relaxed uppercase" style={{ color: `${INK}B3` }}>
-            Folosește Google pentru a salva căutări, conecta marketplace-uri și gestiona ofertele. Nu colectăm adresa ta.
+            Conectează-te pentru favorite, analiza ofertelor, contactarea sellerilor și istoricul privat al conversațiilor.
           </p>
         </div>
-        <GoogleSignIn />
+        <SignInOptions />
         <p className="text-[10px] font-bold uppercase leading-relaxed" style={{ color: `${INK}88` }}>
           Prin conectare accepți <Link href="/termeni" className="underline" style={{ color: INK }}>termenii</Link> și <Link href="/confidentialitate" className="underline" style={{ color: INK }}>politica de confidențialitate</Link>.
         </p>

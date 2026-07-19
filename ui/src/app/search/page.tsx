@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Bookmark, CalendarDays, Copy, ExternalLink, EyeOff, Lock, MapPin, MessageSquare, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
+import { Bookmark, CalendarDays, Copy, ExternalLink, Lock, MapPin, MessageSquare, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
@@ -59,7 +59,6 @@ const SEARCH_PAGE_LIMIT = 2
 const INITIAL_VISIBLE_RESULTS = 48
 const VISIBLE_RESULT_STEP = 48
 const SAVED_LISTINGS_STORAGE_KEY = "libergent-saved-listings-v1"
-const HIDDEN_LISTINGS_STORAGE_KEY = "libergent-hidden-listings-v1"
 const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v3"
 type SearchTier = "free" | "premium"
 type MarketplaceCoverage = {
@@ -68,6 +67,42 @@ type MarketplaceCoverage = {
   ok: boolean
   itemCount: number
   error: string
+}
+
+type AccountSessionState = {
+  status: "checking" | "signed_out" | "signed_in"
+  userId: string
+}
+
+function useAccountSession(): AccountSessionState {
+  const [account, setAccount] = useState<AccountSessionState>({ status: "checking", userId: "" })
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient()
+    if (!supabase) {
+      queueMicrotask(() => setAccount({ status: "signed_out", userId: "" }))
+      return
+    }
+
+    let mounted = true
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return
+      const userId = data.session?.user?.id || ""
+      setAccount({ status: userId ? "signed_in" : "signed_out", userId })
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return
+      const userId = session?.user?.id || ""
+      setAccount({ status: userId ? "signed_in" : "signed_out", userId })
+    })
+
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  return account
 }
 
 function shouldOpenFiltersByDefault() {
@@ -369,7 +404,24 @@ function ListingMetaChips({ item }: { item: SearchResultItem }) {
       <MetaChip tone="dark" icon={<Tag size={10} strokeWidth={2.2} />}>{item.condition}</MetaChip>
       <MetaChip tone="muted">{item.sourceKindLabel}</MetaChip>
       <MetaChip tone="muted" icon={<CalendarDays size={10} strokeWidth={2.2} />}>{item.postedDateLabel}</MetaChip>
+      {item.sellerType && <MetaChip tone="muted">seller: {formatSignalLabel(item.sellerType)}</MetaChip>}
+      {item.images.length > 1 && <MetaChip tone="muted">{item.images.length} imagini</MetaChip>}
     </div>
+  )
+}
+
+function MarketplaceVisitButton({ item, compact = false }: { item: SearchResultItem; compact?: boolean }) {
+  if (!item.url) {
+    return (
+      <span aria-disabled="true" className="flex min-h-10 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase opacity-50" style={{ border: `1px solid ${INK}`, color: INK }}>
+        Fără link direct
+      </span>
+    )
+  }
+  return (
+    <a href={item.url} target="_blank" rel="noopener noreferrer" className={`flex min-h-10 items-center justify-center gap-2 px-3 py-2 font-bold uppercase ${compact ? "text-[10px]" : "text-[11px]"}`} style={{ border: `1px solid ${INK}`, background: INK, color: "white", fontFamily: MONO }}>
+      Vizitează pagina <ExternalLink size={13} strokeWidth={2.2} />
+    </a>
   )
 }
 
@@ -724,7 +776,7 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
 }
 
 // — SearchNav —
-function SearchNav({ query, tier }: { query: string; tier: SearchTier }) {
+function SearchNav({ query, tier, isLoggedIn }: { query: string; tier: SearchTier; isLoggedIn: boolean }) {
   const router = useRouter()
   const [val, setVal] = useState(query)
 
@@ -774,6 +826,11 @@ function SearchNav({ query, tier }: { query: string; tier: SearchTier }) {
 
       <div className="flex items-center gap-5 text-[12px] uppercase font-bold flex-none ml-auto">
         <Link href="/trenduri" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Trenduri</Link>
+        {isLoggedIn ? (
+          <span className="inline-flex items-center gap-1.5" style={{ color: GREEN }}><span className="h-2 w-2 rounded-full" style={{ background: GREEN }} /> Cont conectat</span>
+        ) : (
+          <Link href={`/auth?next=${encodeURIComponent(`/search?q=${query}&tier=${tier}`)}`} className="px-3 py-2" style={{ border: `1px solid ${INK}`, color: INK }}>Conectează-te</Link>
+        )}
       </div>
     </nav>
   )
@@ -1295,19 +1352,19 @@ function ConversationStatusBadge({ status }: { status?: string }) {
 function ResultCard({
   item,
   query,
+  isLoggedIn,
   conversationStatus,
   onInspect,
   isSaved,
   onToggleSaved,
-  onHide,
 }: {
   item: ResultItem
   query: string
+  isLoggedIn: boolean
   conversationStatus?: string
   onInspect: (item: SearchResultItem) => void
   isSaved: boolean
   onToggleSaved: (item: SearchResultItem) => void
-  onHide: (item: SearchResultItem) => void
 }) {
   const [hov, setHov] = useState(false)
   const { image, handleImageError } = useListingImage(item)
@@ -1369,40 +1426,29 @@ function ResultCard({
           <span style={{ color: keywordScore >= 70 ? GREEN : PINK }}>{keywordScore}%</span>
         </div>
         <KeywordSignalChips item={item} compact />
-        <button
-          type="button"
-          onClick={() => onInspect(item)}
-          className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
-          style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
-        >
-          Detalii Libergent
-        </button>
-        <div className="grid grid-cols-2 gap-2">
+        {isLoggedIn && (
+          <>
           <button
             type="button"
-            onClick={() => onToggleSaved(item)}
-            className="flex min-h-9 items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-bold uppercase"
-            style={{
-              border: `1px solid ${INK}`,
-              background: isSaved ? INK : "white",
-              color: isSaved ? "white" : INK,
-              fontFamily: MONO,
-            }}
-          >
-            <Bookmark size={12} strokeWidth={2.2} />
-            {isSaved ? "Salvat" : "Salvează"}
-          </button>
-          <button
-            type="button"
-            onClick={() => onHide(item)}
-            className="flex min-h-9 items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-bold uppercase"
+            onClick={() => onInspect(item)}
+            className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
             style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
           >
-            <EyeOff size={12} strokeWidth={2.2} />
-            Ascunde
+            Detalii Libergent
           </button>
-        </div>
-        <SellerMessageActions item={item} query={query} compact />
+          <button
+              type="button"
+              onClick={() => onToggleSaved(item)}
+              className="flex min-h-9 items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-bold uppercase"
+              style={{ border: `1px solid ${INK}`, background: isSaved ? INK : "white", color: isSaved ? "white" : INK, fontFamily: MONO }}
+            >
+              <Bookmark size={12} strokeWidth={2.2} />
+              {isSaved ? "Salvat" : "Salvează în favorite"}
+            </button>
+            <SellerMessageActions item={item} query={query} compact />
+          </>
+        )}
+        <MarketplaceVisitButton item={item} compact />
       </div>
     </>
   )
@@ -1427,7 +1473,7 @@ function PanelHeader({ title }: { title: string }) {
   )
 }
 
-function RecommendationCard({ item, query, conversationStatus, onInspect }: { item: SearchResultItem; query: string; conversationStatus?: string; onInspect: (item: SearchResultItem) => void }) {
+function RecommendationCard({ item, query, isLoggedIn, conversationStatus, onInspect }: { item: SearchResultItem; query: string; isLoggedIn: boolean; conversationStatus?: string; onInspect: (item: SearchResultItem) => void }) {
   const { image, handleImageError } = useListingImage(item)
   const keywordScore = getKeywordMatchScore(item, query)
 
@@ -1511,37 +1557,21 @@ function RecommendationCard({ item, query, conversationStatus, onInspect }: { it
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => onInspect(item)}
-                className="flex min-h-11 items-center justify-center px-4 py-3 text-[11px] font-bold uppercase"
-                style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
-              >
-                Vezi analiza Libergent
-              </button>
-              <SellerMessageActions item={item} query={query} />
-              <OfferFeedbackActions item={item} query={query} />
-              <div className="flex justify-end">
-                {item.url ? (
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-6 py-3 text-[12px] font-bold uppercase transition-all duration-150"
-                  style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO, boxShadow: `2px 2px 0px ${INK}` }}
-                >
-                  Vezi Oferta <ExternalLink size={14} strokeWidth={2.2} />
-                </a>
-                ) : (
-                <span
-                  aria-disabled="true"
-                  className="flex items-center gap-2 px-6 py-3 text-[12px] font-bold uppercase opacity-60"
-                  style={{ border: `1px solid ${INK}`, color: INK, fontFamily: MONO }}
-                >
-                  Fără link direct
-                </span>
-                )}
-              </div>
+              {isLoggedIn && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onInspect(item)}
+                    className="flex min-h-11 items-center justify-center px-4 py-3 text-[11px] font-bold uppercase"
+                    style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
+                  >
+                    Vezi analiza Libergent
+                  </button>
+                  <SellerMessageActions item={item} query={query} />
+                  <OfferFeedbackActions item={item} query={query} />
+                </>
+              )}
+              <MarketplaceVisitButton item={item} />
             </div>
           </div>
         </div>
@@ -1550,7 +1580,7 @@ function RecommendationCard({ item, query, conversationStatus, onInspect }: { it
   )
 }
 
-function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: SearchResultItem; usedItem: SearchResultItem | null; priceBenchmark?: PriceBenchmark; onInspect: (item: SearchResultItem) => void }) {
+function BenchmarkCard({ item, usedItem, priceBenchmark, isLoggedIn, onInspect }: { item: SearchResultItem; usedItem: SearchResultItem | null; priceBenchmark?: PriceBenchmark; isLoggedIn: boolean; onInspect: (item: SearchResultItem) => void }) {
   const savings = priceBenchmark?.savingsVsNewPct
   const usedPrice = usedItem?.price ?? null
 
@@ -1578,25 +1608,17 @@ function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: Se
           )}
         </div>
         <div className="flex flex-col gap-2 md:w-48">
-          <button
-            type="button"
-            onClick={() => onInspect(item)}
-            className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
-            style={{ border: "1px solid " + INK, background: "white", color: INK, fontFamily: MONO }}
-          >
-            Vezi analiza
-          </button>
-          {item.url && (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex min-h-10 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase"
-              style={{ border: "1px solid " + INK, background: INK, color: "white", fontFamily: MONO }}
+          {isLoggedIn && (
+            <button
+              type="button"
+              onClick={() => onInspect(item)}
+              className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
+              style={{ border: "1px solid " + INK, background: "white", color: INK, fontFamily: MONO }}
             >
-              Deschide sursa <ExternalLink size={13} strokeWidth={2.2} />
-            </a>
+              Vezi analiza
+            </button>
           )}
+          <MarketplaceVisitButton item={item} compact />
         </div>
       </div>
     </section>
@@ -1719,8 +1741,13 @@ function ListingDetailDrawer({ item, query, conversationStatus, onClose }: { ite
           </section>
 
           <section className="grid grid-cols-2 gap-2">
+            <DetailMetric label="Tip seller" value={item.sellerType ? formatSignalLabel(item.sellerType) : "nespecificat"} />
+            <DetailMetric label="Imagini colectate" value={String(item.images.length)} />
+            <DetailMetric label="Publicat" value={item.postedDateLabel} />
+            <DetailMetric label="Relevanță căutare" value={`${item.relevanceScore}%`} />
             <DetailMetric label="Piață mediană" value={formatRon(item.priceInsight.marketMedianRon)} />
             <DetailMetric label="Interval fair" value={`${formatRon(item.priceInsight.fairLowRon)} - ${formatRon(item.priceInsight.fairHighRon)}`} />
+            <DetailMetric label="Diferență față de piață" value={formatSignedPercent(item.priceInsight.priceDeltaPct) || "n/a"} />
             <DetailMetric label="Scor produs" value={`${item.dealQuality.productMatch}%`} />
             <DetailMetric label="Scor risc" value={`${item.dealQuality.risk}%`} />
           </section>
@@ -1765,7 +1792,7 @@ type SellerConversation = {
   messages: ConversationMessage[]
 }
 
-function ConversationCenter({ onStatusesChange }: { onStatusesChange: (statuses: Record<string, string>) => void }) {
+function ConversationCenter({ enabled, onStatusesChange }: { enabled: boolean; onStatusesChange: (statuses: Record<string, string>) => void }) {
   const [open, setOpen] = useState(false)
   const [conversations, setConversations] = useState<SellerConversation[]>([])
   const [selectedId, setSelectedId] = useState("")
@@ -1773,6 +1800,7 @@ function ConversationCenter({ onStatusesChange }: { onStatusesChange: (statuses:
   const selected = conversations.find((conversation) => conversation.id === selectedId) || null
 
   async function loadConversations(preferredId = "") {
+    if (!enabled) return
     const supabase = getSupabaseBrowserClient()
     const session = supabase ? (await supabase.auth.getSession()).data.session : null
     if (!session?.access_token) {
@@ -1800,6 +1828,7 @@ function ConversationCenter({ onStatusesChange }: { onStatusesChange: (statuses:
   }
 
   useEffect(() => {
+    if (!enabled) return
     const handleOpen = (event: Event) => {
       const detail = (event as CustomEvent).detail || {}
       const temporary: SellerConversation = {
@@ -1826,14 +1855,16 @@ function ConversationCenter({ onStatusesChange }: { onStatusesChange: (statuses:
     queueMicrotask(() => loadConversations())
     return () => window.removeEventListener("libergent:conversation-open", handleOpen)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [enabled])
 
   useEffect(() => {
-    if (!open) return
+    if (!enabled || !open) return
     const id = window.setInterval(() => loadConversations(selectedId), 10_000)
     return () => window.clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, selectedId])
+  }, [enabled, open, selectedId])
+
+  if (!enabled) return null
 
   return (
     <>
@@ -1897,6 +1928,8 @@ function ConversationCenter({ onStatusesChange }: { onStatusesChange: (statuses:
 function SearchResultsContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const account = useAccountSession()
+  const isLoggedIn = account.status === "signed_in"
   const query = String(searchParams.get("q") || "").trim()
   const searchTier: SearchTier = searchParams.get("tier") === "premium" ? "premium" : "free"
 
@@ -1924,9 +1957,9 @@ function SearchResultsContent() {
   const [searchReportOpen, setSearchReportOpen] = useState(true)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS)
   const [selectedListing, setSelectedListing] = useState<SearchResultItem | null>(null)
-  const [conversationStatuses, setConversationStatuses] = useState<Record<string, string>>({})
-  const [savedListings, setSavedListings] = useState<Set<string>>(() => readStringSetStorage(SAVED_LISTINGS_STORAGE_KEY))
-  const [hiddenListings, setHiddenListings] = useState<Set<string>>(() => readStringSetStorage(HIDDEN_LISTINGS_STORAGE_KEY))
+  const [conversationState, setConversationState] = useState<{ ownerId: string; statuses: Record<string, string> }>({ ownerId: "", statuses: {} })
+  const [savedListings, setSavedListings] = useState<Set<string>>(new Set())
+  const [savedListingsOwnerId, setSavedListingsOwnerId] = useState("")
 
   // Loader state
   const [showLoader, setShowLoader]       = useState(false)
@@ -1941,12 +1974,17 @@ function SearchResultsContent() {
   }
 
   useEffect(() => {
-    writeStringSetStorage(SAVED_LISTINGS_STORAGE_KEY, savedListings)
-  }, [savedListings])
+    const userId = account.userId
+    queueMicrotask(() => {
+      setSavedListings(userId ? readStringSetStorage(`${SAVED_LISTINGS_STORAGE_KEY}:${userId}`) : new Set())
+      setSavedListingsOwnerId(userId)
+    })
+  }, [account.userId])
 
   useEffect(() => {
-    writeStringSetStorage(HIDDEN_LISTINGS_STORAGE_KEY, hiddenListings)
-  }, [hiddenListings])
+    if (!account.userId || savedListingsOwnerId !== account.userId) return
+    writeStringSetStorage(`${SAVED_LISTINGS_STORAGE_KEY}:${account.userId}`, savedListings)
+  }, [account.userId, savedListings, savedListingsOwnerId])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -2099,6 +2137,7 @@ function SearchResultsContent() {
   const toggleCondition = (c: string) => { setConditions(prev => { const n = new Set(prev); if (n.has(c)) n.delete(c); else n.add(c); return n }); resetVisibleResults() }
   const resetFilters    = () => { setSort(SORT_OPTIONS[0]); setSources(new Set(SOURCES_LIST)); setSourceTypes(new Set(SOURCE_TYPE_OPTIONS.map((option) => option.value))); setConditions(new Set()); setPriceMin(""); setPriceMax(""); resetVisibleResults() }
   const toggleSavedListing = (item: SearchResultItem) => {
+    if (!isLoggedIn) return
     const id = listingStorageId(item)
     setSavedListings((current) => {
       const next = new Set(current)
@@ -2115,30 +2154,8 @@ function SearchResultsContent() {
       return next
     })
   }
-  const hideListing = (item: SearchResultItem) => {
-    const id = listingStorageId(item)
-    setHiddenListings((current) => new Set(current).add(id))
-    setSavedListings((current) => {
-      if (!current.has(id)) return current
-      const next = new Set(current)
-      next.delete(id)
-      return next
-    })
-    trackSearchEvent("hide_listing", {
-      search_term: query,
-      marketplace: item.source,
-      listing_title: item.title,
-    })
-    resetVisibleResults()
-  }
-  const clearHiddenListings = () => {
-    setHiddenListings(new Set())
-    resetVisibleResults()
-  }
-
   const filteredResults = useMemo(() => {
     const base = results.filter((item) => {
-      if (hiddenListings.has(listingStorageId(item))) return false
       if (sources.size > 0 && !sources.has(item.source)) return false
       if (sourceTypes.size > 0 && !sourceTypes.has(item.sourceGroup)) return false
       if (conditions.size > 0 && !conditions.has(item.condition.toLowerCase())) return false
@@ -2155,19 +2172,17 @@ function SearchResultsContent() {
       if (sort === "potrivire cuvinte cheie") return getKeywordMatchScore(b, query) - getKeywordMatchScore(a, query) || compareByRank(a, b)
       return compareByRank(a, b)
     })
-  }, [conditions, hiddenListings, priceMax, priceMin, query, results, sort, sourceTypes, sources])
+  }, [conditions, priceMax, priceMin, query, results, sort, sourceTypes, sources])
 
   const shownBestOffer = useMemo(() => {
     if (!bestUsedOffer) return null
-    if (hiddenListings.has(listingStorageId(bestUsedOffer))) return null
     return filteredResults.find((item) => item.id === bestUsedOffer.id) || bestUsedOffer
-  }, [bestUsedOffer, filteredResults, hiddenListings])
+  }, [bestUsedOffer, filteredResults])
 
   const shownNewBenchmark = useMemo(() => {
     if (!bestNewBenchmark) return null
-    if (hiddenListings.has(listingStorageId(bestNewBenchmark))) return null
     return filteredResults.find((item) => item.id === bestNewBenchmark.id) || bestNewBenchmark
-  }, [bestNewBenchmark, filteredResults, hiddenListings])
+  }, [bestNewBenchmark, filteredResults])
 
   const regularResults = useMemo(() => {
     return filteredResults.filter((item) =>
@@ -2180,7 +2195,7 @@ function SearchResultsContent() {
   const visibleUsedResults = usedRegularResults.slice(0, visibleCount)
   const visibleNewBenchmarkResults = newBenchmarkResults.slice(0, Math.max(12, Math.floor(visibleCount / 2)))
   const savedVisibleCount = results.filter((item) => savedListings.has(listingStorageId(item))).length
-  const hiddenVisibleCount = results.filter((item) => hiddenListings.has(listingStorageId(item))).length
+  const conversationStatuses = conversationState.ownerId === account.userId ? conversationState.statuses : {}
 
   const sourceBreakdown = useMemo(() => {
     const total = Math.max(results.length, 1)
@@ -2218,7 +2233,6 @@ function SearchResultsContent() {
     { text: duplicateListings ? `${duplicateListings} duplicate eliminate` : "deduplicare cross-source aplicată", pulse: false },
     { text: excludedListings ? `${excludedListings} accesorii/piese excluse` : "clasificare rezultate aplicată", pulse: false },
     { text: savedVisibleCount ? `${savedVisibleCount} rezultate salvate local` : "niciun rezultat salvat local", pulse: false },
-    { text: hiddenVisibleCount ? `${hiddenVisibleCount} rezultate ascunse local` : "niciun rezultat ascuns", pulse: false },
     { text: "focus: second-hand + benchmark de preț nou", pulse: false },
     { text: shownBestOffer ? `Best used deal on ${shownBestOffer.source}` : "Best used deal în așteptare", pulse: false },
     { text: shownNewBenchmark ? `New benchmark on ${shownNewBenchmark.source}` : "New benchmark în așteptare", pulse: false },
@@ -2230,16 +2244,16 @@ function SearchResultsContent() {
 
       {/* Loading overlay — rendered above everything */}
       {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} tier={searchTier} />}
-      <ListingDetailDrawer item={selectedListing} query={query} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} />
-      <ConversationCenter onStatusesChange={(statuses) => setConversationStatuses((current) => ({ ...current, ...statuses }))} />
+      <ListingDetailDrawer item={isLoggedIn ? selectedListing : null} query={query} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} />
+      <ConversationCenter key={account.userId || "signed-out"} enabled={isLoggedIn} onStatusesChange={(statuses) => setConversationState((current) => ({ ownerId: account.userId, statuses: current.ownerId === account.userId ? { ...current.statuses, ...statuses } : statuses }))} />
       <EmailCapturePopup
-        enabled={Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
+        enabled={isLoggedIn && Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
         query={query}
         resultCount={results.length}
         bestOfferSource={shownBestOffer?.source}
       />
 
-      <SearchNav query={query} tier={searchTier} />
+      <SearchNav query={query} tier={searchTier} isLoggedIn={isLoggedIn} />
 
       {/* Session header */}
       <header
@@ -2374,8 +2388,8 @@ function SearchResultsContent() {
             </section>
           )}
 
-          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} />}
-          {shownNewBenchmark && <BenchmarkCard item={shownNewBenchmark} usedItem={shownBestOffer} priceBenchmark={priceBenchmark} onInspect={setSelectedListing} />}
+          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} />}
+          {shownNewBenchmark && <BenchmarkCard item={shownNewBenchmark} usedItem={shownBestOffer} priceBenchmark={priceBenchmark} isLoggedIn={isLoggedIn} onInspect={setSelectedListing} />}
 
           {/* Results + Insights */}
           <div className="flex flex-col xl:flex-row gap-6 items-start">
@@ -2397,11 +2411,11 @@ function SearchResultsContent() {
                         key={item.id}
                         item={item}
                         query={query}
+                        isLoggedIn={isLoggedIn}
                         conversationStatus={item.url ? conversationStatuses[item.url] : undefined}
                         onInspect={setSelectedListing}
                         isSaved={savedListings.has(listingStorageId(item))}
                         onToggleSaved={toggleSavedListing}
-                        onHide={hideListing}
                       />
                     ))}
                   </div>
@@ -2426,11 +2440,11 @@ function SearchResultsContent() {
                         key={item.id}
                         item={item}
                         query={query}
+                        isLoggedIn={isLoggedIn}
                         conversationStatus={item.url ? conversationStatuses[item.url] : undefined}
                         onInspect={setSelectedListing}
                         isSaved={savedListings.has(listingStorageId(item))}
                         onToggleSaved={toggleSavedListing}
-                        onHide={hideListing}
                       />
                     ))}
                   </div>
@@ -2485,28 +2499,15 @@ function SearchResultsContent() {
                 </div>
               </div>
 
-              <div style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
+              {isLoggedIn && <div style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
                 <PanelHeader title="Listă locală" />
                 <div className="flex flex-col gap-3 p-4 text-[11px] font-bold uppercase" style={{ background: CREAM }}>
                   <div className="flex items-center justify-between gap-3">
                     <span>Salvate</span>
                     <span style={{ color: PINK }}>{savedVisibleCount}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span>Ascunse</span>
-                    <span style={{ color: PINK }}>{hiddenVisibleCount}</span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={!hiddenVisibleCount}
-                    onClick={clearHiddenListings}
-                    className="mt-1 min-h-9 px-3 py-2 text-[10px] font-bold uppercase disabled:opacity-50"
-                    style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
-                  >
-                    Arată ascunsele
-                  </button>
                 </div>
-              </div>
+              </div>}
             </aside>
           </div>
 
