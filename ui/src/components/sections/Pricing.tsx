@@ -50,18 +50,20 @@ function CrownIcon() {
 }
 
 const BETA_FEATURES = [
-  "Căutare unificată pe platforme active",
+  "Căutare rapidă prin conexiuni directe",
+  "Marketplace-uri active și validate",
   "Rezultate normalizate și comparabile",
   "Filtre și sortare rapidă",
   "Scor agent și recomandări prioritare",
-  "Acces rapid la insight-uri și trenduri",
-  "Extindere graduală a acoperirii",
+  "Insight-uri și trenduri de bază",
 ];
 
 const PREMIUM_FEATURES = [
-  "Alerts",
-  "WhatsApp",
-  "Post one product announcement on all websites to save time",
+  "Deep Search asistat de browser",
+  "Acoperire extinsă pe marketplace-uri compatibile",
+  "Contact public al vânzătorului, unde este disponibil",
+  "Monitorizare și alerte automate",
+  "Contact și follow-up prin WhatsApp",
 ];
 
 export function Pricing() {
@@ -209,7 +211,7 @@ export function Pricing() {
             </div>
 
             <p className="text-[13px] leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 44 }}>
-              Alerts, WhatsApp și postarea unui singur anunț de produs pe toate website-urile ca să economisești timp.
+              Căutare mai profundă cu browser automatizat, acoperire extinsă și instrumente de contact și monitorizare.
             </p>
 
             <div

@@ -232,12 +232,12 @@ export default function PricingPage() {
 
               <ul className="flex flex-col gap-4 text-sm flex-grow mb-10">
                 {[
-                  "Căutare unificată pe platforme active",
+                  "Căutare rapidă prin conexiuni directe",
+                  "Marketplace-uri active și validate",
                   "Rezultate normalizate și comparabile",
                   "Filtre și sortare rapidă",
                   "Scor agent și recomandări prioritare",
-                  "Acces rapid la insight-uri și trenduri",
-                  "Extindere graduală a acoperirii",
+                  "Insight-uri și trenduri de bază",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3" style={{ color: INK }}>
                     <CheckIcon />
@@ -319,7 +319,7 @@ export default function PricingPage() {
               </div>
 
               <p className="text-sm leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 48 }}>
-                Alerts, WhatsApp și postarea unui singur anunț de produs pe toate website-urile ca să economisești timp.
+                Căutare mai profundă cu browser automatizat, acoperire extinsă și instrumente de contact și monitorizare.
               </p>
 
               {/* Locked notice */}
@@ -342,9 +342,11 @@ export default function PricingPage() {
 
               <ul className="flex flex-col gap-4 text-sm flex-grow mb-10">
                 {[
-                  "Alerts",
-                  "WhatsApp",
-                  "Post one product announcement on all websites to save time",
+                  "Deep Search asistat de browser",
+                  "Acoperire extinsă pe marketplace-uri compatibile",
+                  "Contact public al vânzătorului, unde este disponibil",
+                  "Monitorizare și alerte automate",
+                  "Contact și follow-up prin WhatsApp",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3" style={{ color: "#9CA3AF" }}>
                     <DotIcon />

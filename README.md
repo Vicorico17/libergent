@@ -198,6 +198,17 @@ Deploy:
 npm run deploy
 ```
 
+### Browser marketplace benchmark
+
+Cloudflare Browser Run is reserved for explicit browser-assisted operations. The protected benchmark endpoint renders one marketplace search page at a time and reports parser coverage, duration, challenge detection, and a five-item sample:
+
+```bash
+curl -H "Authorization: Bearer $LIBERGENT_ADMIN_TOKEN" \
+  "https://YOUR_DOMAIN/api/admin/browser-benchmark?site=vinted.ro&q=iphone&limit=20"
+```
+
+Run marketplaces one at a time to keep browser usage and Worker execution time bounded. The endpoint requires `LIBERGENT_ADMIN_TOKEN` and the `BROWSER` binding configured in `wrangler.toml`.
+
 Direct scraping does not require provider secrets. If you later use Cloudflare Browser Rendering as an explicit scraping fallback, configure `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in Wrangler secrets.
 
 ## Usage

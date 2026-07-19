@@ -1,5 +1,6 @@
 import puppeteer from "@cloudflare/puppeteer";
 import { extractRomanianMobilePhones } from "../phone-numbers.js";
+import { parseSiteHtml } from "../site-html-parser.js";
 
 const OLX_PHONE_RESPONSE_PATTERN = /\/api\/v1\/offers\/\d+\/(?:limited-)?phones\/?(?:\?|$)/i;
 
@@ -69,6 +70,49 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
     return {
       phones: visiblePhones,
       debug: { configured: true, clicked: true, responseStatus, source: visiblePhones.length ? "rendered-page" : "none" }
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
+export async function benchmarkMarketplaceWithBrowser(
+  browserBinding,
+  { site, query, limit = 20 },
+  { launch = puppeteer.launch } = {}
+) {
+  if (!browserBinding) throw new Error("Cloudflare Browser Run is not configured.");
+
+  const url = site.searchUrl(query);
+  const startedAt = Date.now();
+  const browser = await launch(browserBinding);
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1440, height: 1000 });
+    const response = await page.goto(url, { waitUntil: "networkidle2", timeout: site.timeoutMs || 30000 });
+    const html = await page.content();
+    const parsed = parseSiteHtml({ site, html, url, limit });
+    const bodyText = await page.evaluate(() => document.body?.innerText || "");
+
+    return {
+      site: site.key,
+      query,
+      url,
+      finalUrl: page.url(),
+      status: response?.status?.() ?? null,
+      durationMs: Date.now() - startedAt,
+      htmlBytes: new TextEncoder().encode(html).byteLength,
+      rawItemCount: parsed.rawItemCount,
+      itemCount: parsed.items.length,
+      totalResults: parsed.totalResults,
+      hasNextPage: parsed.hasNextPage,
+      challengeDetected: /captcha|verific[aă].{0,30}(om|robot)|access denied|just a moment/i.test(bodyText),
+      sample: parsed.items.slice(0, 5).map((item) => ({
+        title: item.title || "",
+        price: item.price || "",
+        url: item.url || "",
+        imageUrl: item.imageUrl || ""
+      }))
     };
   } finally {
     await browser.close();

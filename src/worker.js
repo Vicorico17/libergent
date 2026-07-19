@@ -9,7 +9,7 @@ import { SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./s
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
-import { revealOlxPhonesWithBrowser } from "./providers/cloudflare-browser.js";
+import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser } from "./providers/cloudflare-browser.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -468,6 +468,35 @@ async function handleApi(request, env) {
       return json(await runMarketplaceHealthChecks({ query, provider }), 200);
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
+
+  if (apiPath === "/api/admin/browser-benchmark") {
+    if (!isAuthorizedAdminRequest(request, url, env)) {
+      return json({ error: "Unauthorized" }, 401);
+    }
+    if (request.method !== "GET") {
+      return json({ error: "Method not allowed" }, 405);
+    }
+    if (!env.BROWSER) {
+      return json({ error: "Cloudflare Browser Run is not configured." }, 503);
+    }
+
+    try {
+      const site = getSite(url.searchParams.get("site") || "");
+      const query = String(url.searchParams.get("q") || "iphone").trim().slice(0, 120);
+      const limit = parseBoundedPositiveInteger(url.searchParams.get("limit"), {
+        name: "limit",
+        max: 30
+      }) ?? 20;
+      return json({
+        ok: true,
+        result: await benchmarkMarketplaceWithBrowser(env.BROWSER, { site, query, limit })
+      }, 200);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const status = message.startsWith("Unsupported site") || message.startsWith("Expected ") ? 400 : 500;
+      return json({ ok: false, error: message }, status);
     }
   }
 

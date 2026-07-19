@@ -1,14 +1,9 @@
 import { buildListingSchema } from "./schema.js";
 import { crawlWithCloudflare, scrapeWithCloudflare } from "./providers/cloudflare.js";
 import { scrapeMarkdownWithFirecrawl, scrapeWithFirecrawl } from "./providers/firecrawl.js";
-import { parseOlxHtml, parseOlxMarkdown } from "./parsers/olx.js";
-import { parseLajumateHtml } from "./parsers/lajumate.js";
-import { parseOkaziiHtml } from "./parsers/okazii.js";
-import { parsePubli24Html } from "./parsers/publi24.js";
-import { parseVintedHtml, parseVintedMarkdown } from "./parsers/vinted.js";
-import { parseAutovitHtml } from "./parsers/autovit.js";
-import { parseAnuntulHtml } from "./parsers/anuntul.js";
-import { parseEmagHtml, parseEvomagHtml, parseRetailHtml } from "./parsers/retail.js";
+import { parseOlxMarkdown } from "./parsers/olx.js";
+import { parseVintedMarkdown } from "./parsers/vinted.js";
+import { parseSiteHtml } from "./site-html-parser.js";
 import { getQueryBrandTerms } from "./relevance.js";
 import { buildAbortSignal } from "./abort.js";
 import { normalizeMarketplaceQuery } from "./query-normalization.js";
@@ -280,69 +275,11 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
 
     raw = await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs, signal });
 
-    if (site.key === "lajumate.ro") {
-      const parsed = parseLajumateHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "okazii.ro") {
-      const parsed = parseOkaziiHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "olx.ro") {
-      const parsed = parseOlxHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "vinted.ro") {
-      const parsed = parseVintedHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "publi24.ro") {
-      const parsed = parsePubli24Html(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "autovit.ro") {
-      const parsed = parseAutovitHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "anuntul.ro") {
-      const parsed = parseAnuntulHtml(raw, limit);
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "emag.ro") {
-      const parsed = parseEmagHtml(raw, limit, { origin: new URL(url).origin });
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.key === "evomag.ro") {
-      const parsed = parseEvomagHtml(raw, limit, { origin: new URL(url).origin });
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else if (site.strategy === "direct-html-retail") {
-      const parsed = parseRetailHtml(raw, limit, { origin: new URL(url).origin });
-      items = parsed.items;
-      totalResults = parsed.totalResults;
-      rawItemCount = getRawItemCount(parsed, items);
-      hasNextPage = parsed.hasNextPage ?? null;
-    } else {
-      throw new Error(`No direct HTML parser configured for ${site.key}`);
-    }
+    const parsed = parseSiteHtml({ site, html: raw, url, limit });
+    items = parsed.items;
+    totalResults = parsed.totalResults;
+    rawItemCount = getRawItemCount(parsed, items);
+    hasNextPage = parsed.hasNextPage;
   } else if (resolvedProvider === "cloudflare" && site.strategy === "crawl-seed") {
     raw = await crawlWithCloudflare({
       crawlConfig: site.crawlConfig(query),
