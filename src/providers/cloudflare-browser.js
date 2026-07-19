@@ -2,7 +2,7 @@ import puppeteer from "@cloudflare/puppeteer";
 import { extractRomanianMobilePhones } from "../phone-numbers.js";
 import { parseSiteHtml } from "../site-html-parser.js";
 
-const OLX_PHONE_RESPONSE_PATTERN = /\/api\/v1\/offers\/\d+\/(?:limited-)?phones\/?(?:\?|$)/i;
+const OLX_PHONE_RESPONSE_PATTERN = /\/offers\/\d+\/[^?]*phone/i;
 
 function extractPhonesFromUnknownValue(value) {
   if (typeof value === "string") return extractRomanianMobilePhones(value);
@@ -27,7 +27,7 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
       { timeout: 15000 }
     ).catch(() => null);
 
-    const clicked = await page.evaluate(() => {
+    const button = await page.evaluate(() => {
       const normalize = (value) => String(value || "")
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
@@ -39,14 +39,16 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
         const text = normalize(element.textContent);
         return text.includes("suna vanzatorul") || text.includes("arata telefon") || text.includes("show phone");
       });
-      if (!contactButton) return false;
-      contactButton.click();
-      return true;
+      if (!contactButton) return null;
+      contactButton.setAttribute("data-libergent-phone-button", "true");
+      return { text: String(contactButton.textContent || "").trim().slice(0, 120) };
     });
 
-    if (!clicked) {
+    if (!button) {
       return { phones: [], debug: { configured: true, clicked: false } };
     }
+
+    await page.click('[data-libergent-phone-button="true"]');
 
     const phoneResponse = await phoneResponsePromise;
     let responsePhones = [];
@@ -65,11 +67,35 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    const visibleText = await page.evaluate(() => document.body?.innerText || "");
-    const visiblePhones = extractRomanianMobilePhones(visibleText);
+    const pageState = await page.evaluate(() => ({
+      text: document.body?.innerText || "",
+      title: document.title || "",
+      dialogs: [...document.querySelectorAll('[role="dialog"], [aria-modal="true"]')]
+        .map((element) => String(element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 240))
+        .filter(Boolean)
+        .slice(0, 3)
+    }));
+    const visiblePhones = extractRomanianMobilePhones(pageState.text);
+    const normalizedText = pageState.text.toLowerCase();
+    const pageSignals = [
+      normalizedText.includes("captcha") ? "captcha" : null,
+      normalizedText.includes("verifică") || normalizedText.includes("verifica") ? "verification" : null,
+      normalizedText.includes("conectează-te") || normalizedText.includes("conecteaza-te") ? "login" : null,
+      normalizedText.includes("ceva nu a mers") ? "error" : null
+    ].filter(Boolean);
     return {
       phones: visiblePhones,
-      debug: { configured: true, clicked: true, responseStatus, source: visiblePhones.length ? "rendered-page" : "none" }
+      debug: {
+        configured: true,
+        clicked: true,
+        buttonText: button.text,
+        responseStatus,
+        source: visiblePhones.length ? "rendered-page" : "none",
+        finalUrl: page.url(),
+        pageTitle: pageState.title,
+        pageSignals,
+        dialogs: pageState.dialogs
+      }
     };
   } finally {
     await browser.close();
@@ -80,6 +106,39 @@ export async function benchmarkMarketplaceWithBrowser(
   browserBinding,
   { site, query, limit = 20 },
   { launch = puppeteer.launch } = {}
+) {
+  const result = await searchMarketplaceWithBrowser(
+    browserBinding,
+    { site, query, limit },
+    { launch, includeBodyText: true }
+  );
+
+  return {
+    site: result.site,
+    query: result.query,
+    url: result.url,
+    finalUrl: result.finalUrl,
+    status: result.status,
+    durationMs: result.durationMs,
+    htmlBytes: result.htmlBytes,
+    rawItemCount: result.rawItemCount,
+    itemCount: result.itemCount,
+    totalResults: result.totalResults,
+    hasNextPage: result.hasNextPage,
+    challengeDetected: result.challengeDetected,
+    sample: result.items.slice(0, 5).map((item) => ({
+      title: item.title || "",
+      price: item.price || "",
+      url: item.url || "",
+      imageUrl: item.imageUrl || ""
+    }))
+  };
+}
+
+export async function searchMarketplaceWithBrowser(
+  browserBinding,
+  { site, query, limit = 20 },
+  { launch = puppeteer.launch, includeBodyText = false } = {}
 ) {
   if (!browserBinding) throw new Error("Cloudflare Browser Run is not configured.");
 
@@ -92,9 +151,20 @@ export async function benchmarkMarketplaceWithBrowser(
     const response = await page.goto(url, { waitUntil: "networkidle2", timeout: site.timeoutMs || 30000 });
     const html = await page.content();
     const parsed = parseSiteHtml({ site, html, url, limit });
-    const bodyText = await page.evaluate(() => document.body?.innerText || "");
+    const bodyText = includeBodyText
+      ? await page.evaluate(() => document.body?.innerText || "")
+      : "";
+    const items = parsed.items.map((item) => ({
+      ...item,
+      sourceType: item.sourceType || site.sourceType || "classifieds",
+      condition: item.condition || site.defaultCondition || "",
+      sellerType: item.sellerType || site.defaultSellerType || ""
+    }));
 
     return {
+      ok: true,
+      provider: "cloudflare-browser",
+      strategy: "browser-rendered-html:1-page",
       site: site.key,
       query,
       url,
@@ -103,16 +173,14 @@ export async function benchmarkMarketplaceWithBrowser(
       durationMs: Date.now() - startedAt,
       htmlBytes: new TextEncoder().encode(html).byteLength,
       rawItemCount: parsed.rawItemCount,
-      itemCount: parsed.items.length,
+      itemCount: items.length,
+      items,
       totalResults: parsed.totalResults,
       hasNextPage: parsed.hasNextPage,
+      pagesUsed: 1,
+      creditsUsed: 0,
+      browserSessionsUsed: 1,
       challengeDetected: /captcha|verific[aă].{0,30}(om|robot)|access denied|just a moment/i.test(bodyText),
-      sample: parsed.items.slice(0, 5).map((item) => ({
-        title: item.title || "",
-        price: item.price || "",
-        url: item.url || "",
-        imageUrl: item.imageUrl || ""
-      }))
     };
   } finally {
     await browser.close();

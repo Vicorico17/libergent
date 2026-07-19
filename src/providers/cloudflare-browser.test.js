@@ -16,6 +16,7 @@ test("returns an unconfigured result without launching a browser", async () => {
 
 test("clicks the OLX seller button and extracts the phone response", async () => {
   let closed = false;
+  let clickedSelector = "";
   let navigatedTo = "";
   const response = {
     url: () => "https://www.olx.ro/api/v1/offers/307024117/phones/",
@@ -28,7 +29,10 @@ test("clicks the OLX seller button and extracts the phone response", async () =>
       navigatedTo = url;
     },
     waitForResponse: async (predicate) => predicate(response) ? response : null,
-    evaluate: async () => true
+    evaluate: async () => ({ text: "Sună vânzătorul" }),
+    click: async (selector) => {
+      clickedSelector = selector;
+    }
   };
   const launch = async () => ({
     newPage: async () => page,
@@ -41,6 +45,7 @@ test("clicks the OLX seller button and extracts the phone response", async () =>
   const result = await revealOlxPhonesWithBrowser({}, listingUrl, { launch });
 
   assert.equal(navigatedTo, listingUrl);
+  assert.equal(clickedSelector, '[data-libergent-phone-button="true"]');
   assert.equal(closed, true);
   assert.deepEqual(result.phones, ["+40722123456"]);
   assert.deepEqual(result.debug, {

@@ -2,6 +2,51 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "./worker.js";
 
+test("exposes the direct search contract at /api/search/free", async (t) => {
+  const originalMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
+  t.after(() => {
+    if (originalMockSearch === undefined) {
+      delete process.env.LIBERGENT_MOCK_SEARCH;
+    } else {
+      process.env.LIBERGENT_MOCK_SEARCH = originalMockSearch;
+    }
+  });
+
+  const response = await worker.fetch(
+    new Request("https://libergent.test/api/search/free?q=iphone&site=default&limit=5"),
+    { LIBERGENT_MOCK_SEARCH: "1" }
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.searchTier, "free");
+  assert.ok(payload.summary.marketplaces > 0);
+});
+
+test("protects premium search before starting Browser Run", async () => {
+  const response = await worker.fetch(
+    new Request("https://libergent.test/api/search/premium?q=iphone&site=all"),
+    { BROWSER: {} }
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 401);
+  assert.match(payload.error, /premium authorization/i);
+});
+
+test("requires Browser Run for an authorized premium search", async () => {
+  const response = await worker.fetch(
+    new Request("https://libergent.test/api/search/premium?q=iphone&site=all", {
+      headers: { authorization: "Bearer premium-secret" }
+    }),
+    { LIBERGENT_PREMIUM_TOKEN: "premium-secret" }
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 503);
+  assert.match(payload.error, /browser run/i);
+});
+
 test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
   const originalFetch = globalThis.fetch;
   let bridgeRequest;

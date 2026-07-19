@@ -128,6 +128,16 @@ const CAR_PART_KEYWORDS = [
   "ulei"
 ];
 
+export const PREMIUM_BROWSER_SITE_KEYS = [
+  "compari.ro",
+  "emag.ro",
+  "evomag.ro",
+  "pcgarage.ro",
+  "altex.ro",
+  "flanco.ro",
+  "cel.ro"
+];
+
 const CAR_MODEL_PATH_ALIASES = [
   {
     patterns: [

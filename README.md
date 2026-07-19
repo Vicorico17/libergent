@@ -209,6 +209,23 @@ curl -H "Authorization: Bearer $LIBERGENT_ADMIN_TOKEN" \
 
 Run marketplaces one at a time to keep browser usage and Worker execution time bounded. The endpoint requires `LIBERGENT_ADMIN_TOKEN` and the `BROWSER` binding configured in `wrangler.toml`.
 
+### Free and Premium search APIs
+
+Free search uses direct marketplace connections and never starts Browser Run:
+
+```bash
+curl "https://YOUR_DOMAIN/api/search/free?q=iphone&site=all&limit=30"
+```
+
+`/api/search` remains a backward-compatible alias for the Free contract. Premium search combines the Free results with browser-rendered searches across the configured Premium marketplaces:
+
+```bash
+curl -H "Authorization: Bearer $LIBERGENT_PREMIUM_TOKEN" \
+  "https://YOUR_DOMAIN/api/search/premium?q=iphone&site=all&limit=30"
+```
+
+Premium search requires both the `BROWSER` binding and a `LIBERGENT_PREMIUM_TOKEN` Wrangler secret. The admin token is also accepted for internal testing. Browser marketplaces run with bounded concurrency and a maximum of 30 parsed items per source.
+
 Direct scraping does not require provider secrets. If you later use Cloudflare Browser Rendering as an explicit scraping fallback, configure `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in Wrangler secrets.
 
 ## Usage

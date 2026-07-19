@@ -195,7 +195,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (apiPath === "/api/search") {
+  if (apiPath === "/api/search" || apiPath === "/api/search/free") {
     const query = url.searchParams.get("q")?.trim();
     const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
@@ -234,6 +234,13 @@ const server = http.createServer(async (req, res) => {
         : 500;
       sendJson(res, statusCode, { error: message });
     }
+    return;
+  }
+
+  if (apiPath === "/api/search/premium") {
+    sendJson(res, 501, {
+      error: "Premium search requires the deployed Cloudflare Worker Browser Run binding."
+    });
     return;
   }
 

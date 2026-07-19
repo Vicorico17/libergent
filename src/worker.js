@@ -1,15 +1,16 @@
 import { searchAcrossSites } from "./app.js";
+import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
 import { runMarketplaceHealthChecks } from "./health.js";
 import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertWhatsAppInboundToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
-import { SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { PREMIUM_BROWSER_SITE_KEYS, SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
-import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser } from "./providers/cloudflare-browser.js";
+import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser, searchMarketplaceWithBrowser } from "./providers/cloudflare-browser.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -66,6 +67,76 @@ function getAdminTokenFromRequest(request, url) {
 function isAuthorizedAdminRequest(request, url, env = {}) {
   const expectedToken = env.LIBERGENT_ADMIN_TOKEN || "";
   return Boolean(expectedToken) && getAdminTokenFromRequest(request, url) === expectedToken;
+}
+
+function isAuthorizedPremiumRequest(request, url, env = {}) {
+  const premiumToken = String(env.LIBERGENT_PREMIUM_TOKEN || "");
+  const bearerToken = getBearerTokenFromRequest(request);
+  return (Boolean(premiumToken) && bearerToken === premiumToken) || isAuthorizedAdminRequest(request, url, env);
+}
+
+function getSearchRequestParams(url) {
+  const query = url.searchParams.get("q")?.trim();
+  if (!query) {
+    throw new Error("Missing q parameter");
+  }
+
+  return {
+    query,
+    condition: url.searchParams.get("condition") || "any",
+    provider: url.searchParams.get("provider") || "auto",
+    site: url.searchParams.get("site") || "default",
+    limit: parseBoundedPositiveInteger(url.searchParams.get("limit"), {
+      name: "limit",
+      max: MAX_API_SEARCH_LIMIT
+    }),
+    maxPages: parseBoundedPositiveInteger(url.searchParams.get("pages"), {
+      name: "pages",
+      max: MAX_API_SEARCH_PAGES
+    })
+  };
+}
+
+function getFreeSearchSiteKeys(site, query) {
+  return site === "all"
+    ? getSiteKeysForAllSearch(query)
+    : site === "default"
+      ? getDefaultSiteKeys()
+      : [getSite(site).key];
+}
+
+async function searchPremiumBrowserSites(env, { query, limit }) {
+  const results = [];
+  const browserLimit = Math.min(limit ?? 20, 30);
+  let nextIndex = 0;
+
+  async function browserWorker() {
+    while (nextIndex < PREMIUM_BROWSER_SITE_KEYS.length) {
+      const siteKey = PREMIUM_BROWSER_SITE_KEYS[nextIndex];
+      nextIndex += 1;
+      try {
+        const result = await searchMarketplaceWithBrowser(
+          env.BROWSER,
+          { site: getSite(siteKey), query, limit: browserLimit },
+          { includeBodyText: true }
+        );
+        results.push(result.challengeDetected
+          ? { ok: false, site: siteKey, query, provider: "cloudflare-browser", error: "Browser challenge detected." }
+          : result);
+      } catch (error) {
+        results.push({
+          ok: false,
+          site: siteKey,
+          query,
+          provider: "cloudflare-browser",
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: 2 }, () => browserWorker()));
+  return PREMIUM_BROWSER_SITE_KEYS.map((siteKey) => results.find((result) => result.site === siteKey));
 }
 
 async function proxyImage(url) {
@@ -375,32 +446,10 @@ async function handleApi(request, env) {
     return proxyImage(url.searchParams.get("url") || "");
   }
 
-  if (apiPath === "/api/search") {
-    const query = url.searchParams.get("q")?.trim();
-    const condition = url.searchParams.get("condition") || "any";
-    const provider = url.searchParams.get("provider") || "auto";
-    const site = url.searchParams.get("site") || "default";
-    const limitParam = url.searchParams.get("limit");
-    const pagesParam = url.searchParams.get("pages");
-
-    if (!query) {
-      return json({ error: "Missing q parameter" }, 400);
-    }
-
+  if (apiPath === "/api/search" || apiPath === "/api/search/free") {
     try {
-      const limit = parseBoundedPositiveInteger(limitParam, {
-        name: "limit",
-        max: MAX_API_SEARCH_LIMIT
-      });
-      const maxPages = parseBoundedPositiveInteger(pagesParam, {
-        name: "pages",
-        max: MAX_API_SEARCH_PAGES
-      });
-      const siteKeys = site === "all"
-        ? getSiteKeysForAllSearch(query)
-        : site === "default"
-          ? getDefaultSiteKeys()
-          : [getSite(site).key];
+      const { query, condition, provider, site, limit, maxPages } = getSearchRequestParams(url);
+      const siteKeys = getFreeSearchSiteKeys(site, query);
 
       const payload = await searchAcrossSites({
         query,
@@ -412,10 +461,56 @@ async function handleApi(request, env) {
       });
 
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider, siteKeys, payload }), env);
+      return json({ ...payload, searchTier: "free" }, 200);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const statusCode = message === "Missing q parameter" || message.startsWith("Expected ") ||
+        message.startsWith("Unsupported site") ||
+        message.startsWith("Unsupported provider")
+        ? 400
+        : 500;
+      return json({ error: message }, statusCode);
+    }
+  }
+
+  if (apiPath === "/api/search/premium") {
+    if (!isAuthorizedPremiumRequest(request, url, env)) {
+      return json({ error: "Premium authorization required." }, 401);
+    }
+    if (!env.BROWSER) {
+      return json({ error: "Cloudflare Browser Run is not configured." }, 503);
+    }
+
+    try {
+      const { query, condition, provider, site, limit, maxPages } = getSearchRequestParams(url);
+      if (site !== "all" && site !== "default") {
+        return json({ error: "Premium search currently supports site=all or site=default." }, 400);
+      }
+
+      const freeSiteKeys = getFreeSearchSiteKeys(site, query);
+      const [freePayload, premiumResults] = await Promise.all([
+        searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys: freeSiteKeys }),
+        searchPremiumBrowserSites(env, { query, limit })
+      ]);
+      const payload = aggregateMarketplaceResults(
+        [...freePayload.results, ...premiumResults],
+        {
+          condition,
+          creditBudget: freePayload.summary?.creditBudget || 0,
+          creditsUsed: freePayload.summary?.creditsUsed || 0
+        }
+      );
+      payload.searchTier = "premium";
+      payload.summary.browserMarketplaces = PREMIUM_BROWSER_SITE_KEYS.length;
+      payload.summary.successfulBrowserMarketplaces = premiumResults.filter((result) => result?.ok).length;
+      payload.summary.browserSessionsUsed = premiumResults.reduce((sum, result) => sum + (result?.browserSessionsUsed || 0), 0);
+
+      const siteKeys = [...freeSiteKeys, ...PREMIUM_BROWSER_SITE_KEYS];
+      await persistSearchEvent(buildHistoryEntry({ query, condition, provider: "premium-browser", siteKeys, payload }), env);
       return json(payload, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const statusCode = message.startsWith("Expected ") ||
+      const statusCode = message === "Missing q parameter" || message.startsWith("Expected ") ||
         message.startsWith("Unsupported site") ||
         message.startsWith("Unsupported provider")
         ? 400

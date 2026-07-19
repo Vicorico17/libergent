@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Bookmark, CalendarDays, Copy, ExternalLink, EyeOff, MapPin, MessageSquare, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
+import { Bookmark, CalendarDays, Copy, ExternalLink, EyeOff, Lock, MapPin, MessageSquare, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import { mapOffer, mapSearchResults, type SearchPayload, type SearchResultItem } from "./search-data"
@@ -35,17 +35,18 @@ type MarketplaceStatus = {
 type PriceBenchmark = NonNullable<NonNullable<SearchPayload["summary"]>["priceIntelligence"]>
 
 // — Loader config —
-const SOURCE_TIMING = [
+const FREE_SOURCE_TIMING = [
   { name: "OLX",      start: 0,  end: 22 },
   { name: "VINTED",   start: 4,  end: 36 },
   { name: "OKAZII",   start: 12, end: 50 },
   { name: "PUBLI24",  start: 24, end: 63 },
   { name: "ANUNTUL",  start: 36, end: 76 },
   { name: "LAJUMATE", start: 48, end: 88 },
-  { name: "AUTOVIT",  start: 56, end: 82 },
   { name: "PRICE.RO", start: 64, end: 90 },
   { name: "SHOPMANIA", start: 72, end: 96 },
 ]
+const AUTOVIT_SOURCE_TIMING = { name: "AUTOVIT", start: 56, end: 82 }
+const PREMIUM_SOURCES = ["COMPARI", "EMAG", "EVOMAG", "PC GARAGE", "ALTEX", "FLANCO", "CEL.RO"]
 const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const MAIN_BLOCKS   = 15
 const SOURCE_BLOCKS = 10
@@ -59,6 +60,19 @@ const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v2"
 
 function shouldOpenFiltersByDefault() {
   return typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
+}
+
+function isLikelyVehicleSearch(query: string) {
+  const normalized = normalizeKeywordText(query)
+  const tokens = new Set(normalized.split(/[^a-z0-9]+/).filter(Boolean))
+  const vehicleTerms = [
+    "auto", "autoturism", "autoturisme", "masina", "masini", "suv", "sedan", "coupe",
+    "cabrio", "diesel", "benzina", "hibrid", "hybrid", "bmw", "audi", "dacia", "ford",
+    "mercedes", "opel", "renault", "skoda", "tesla", "toyota", "volkswagen", "volvo",
+  ]
+  const excludedTerms = ["anvelope", "cauciucuri", "jante", "piese", "parbriz", "ulei"]
+
+  return !excludedTerms.some((term) => tokens.has(term)) && vehicleTerms.some((term) => tokens.has(term))
 }
 
 function formatSearchTime() {
@@ -482,7 +496,7 @@ function DealQualitySummary({ item, compact = false }: { item: SearchResultItem;
 }
 
 // — Loading Overlay —
-function LoadingOverlay({ progress, done }: { progress: number; done: boolean }) {
+function LoadingOverlay({ progress, done, query }: { progress: number; done: boolean; query: string }) {
   const [tick, setTick] = useState(0)
 
   useEffect(() => {
@@ -494,6 +508,9 @@ function LoadingOverlay({ progress, done }: { progress: number; done: boolean })
   const step1 = progress > 30
   const step2 = progress > 60
   const step3 = progress > 90
+  const activeSources = isLikelyVehicleSearch(query)
+    ? [...FREE_SOURCE_TIMING, AUTOVIT_SOURCE_TIMING]
+    : FREE_SOURCE_TIMING
 
   return (
     <div
@@ -512,7 +529,9 @@ function LoadingOverlay({ progress, done }: { progress: number; done: boolean })
           boxShadow: `4px 4px 0 0 ${INK}`,
           fontFamily: MONO,
           width: "100%",
-          maxWidth: 520,
+          maxWidth: 560,
+          maxHeight: "calc(100vh - 32px)",
+          overflowY: "auto",
         }}
       >
         {/* Header */}
@@ -532,9 +551,13 @@ function LoadingOverlay({ progress, done }: { progress: number; done: boolean })
             {done ? "Căutare finalizată." : "Căutăm în marketplace-uri active..."}
           </p>
 
-          {/* Source rows */}
+          {/* Free source rows */}
           <div className="flex flex-col gap-2.5">
-            {SOURCE_TIMING.map(({ name, start, end }) => {
+            <div className="flex items-center justify-between gap-3 pb-1 text-[10px] font-bold uppercase">
+              <span>Căutare Free</span>
+              <span style={{ color: GREEN }}>{activeSources.length} surse active</span>
+            </div>
+            {activeSources.map(({ name, start, end }) => {
               const lp = progress >= end ? 1 : progress <= start ? 0 : (progress - start) / (end - start)
               const filled = Math.floor(lp * SOURCE_BLOCKS)
               const isComplete = lp === 1
@@ -585,6 +608,34 @@ function LoadingOverlay({ progress, done }: { progress: number; done: boolean })
                 </div>
               )
             })}
+          </div>
+
+          {/* Premium source rows */}
+          <div
+            className="p-3"
+            style={{ border: `1px dashed ${INK}55`, background: `${INK}05` }}
+          >
+            <div className="flex items-center justify-between gap-3 mb-3 text-[10px] font-bold uppercase">
+              <span className="flex items-center gap-2">
+                <Lock size={12} strokeWidth={2.4} /> Deep Search
+              </span>
+              <span style={{ color: PINK }}>Premium blocat</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {PREMIUM_SOURCES.map((name) => (
+                <div
+                  key={name}
+                  className="flex items-center justify-between gap-2 px-2 py-1.5 text-[9px] font-bold uppercase"
+                  style={{ border: `1px solid ${INK}22`, color: `${INK}66`, background: MODAL_BG }}
+                >
+                  <span>{name}</span>
+                  <Lock size={10} strokeWidth={2.2} />
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}88` }}>
+              Browser-assisted search pe surse suplimentare nu este inclus în planul Free.
+            </p>
           </div>
 
           {/* Checklist */}
@@ -1707,7 +1758,7 @@ function SearchResultsContent() {
         pages: String(SEARCH_PAGE_LIMIT),
       })
 
-      fetch(`/api/search?${params.toString()}`, { signal: controller.signal })
+      fetch(`/api/search/free?${params.toString()}`, { signal: controller.signal })
         .then(async (response) => {
           const payload = await readJsonResponse(response)
           if (!response.ok || payload.error) {
@@ -1916,7 +1967,7 @@ function SearchResultsContent() {
     <div className="flex flex-col flex-1 pb-14" style={{ background: CREAM, fontFamily: MONO, color: INK }}>
 
       {/* Loading overlay — rendered above everything */}
-      {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} />}
+      {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} />}
       <ListingDetailDrawer item={selectedListing} query={query} onClose={() => setSelectedListing(null)} />
       <EmailCapturePopup
         enabled={Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
