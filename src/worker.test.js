@@ -83,6 +83,7 @@ test("resolves OLX listing phones through the OLX offer phone endpoint", async (
 
   assert.equal(response.status, 200);
   assert.deepEqual(payload.phones, ["+40767209070"]);
+  assert.equal(payload.debug.offerId, "299484800");
   assert.equal(requestedUrls[1], "https://www.olx.ro/api/v1/offers/299484800/phones/");
 });
 
@@ -169,6 +170,10 @@ test("falls back to OLX limited-phones when the regular endpoint is empty", asyn
 
   assert.equal(response.status, 200);
   assert.deepEqual(payload.phones, ["+40733444555"]);
+  assert.deepEqual(payload.debug.attempts, [
+    { endpoint: "phones", status: 200, phones: 0 },
+    { endpoint: "limited-phones", status: 200, phones: 1 }
+  ]);
   assert.equal(requestedUrls[1], "https://www.olx.ro/api/v1/offers/421339/phones/");
   assert.equal(requestedUrls[2], "https://www.olx.ro/api/v1/offers/421339/limited-phones/");
 });

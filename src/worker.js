@@ -229,9 +229,10 @@ function getOlxOfferIdFromHtml(html = "") {
 async function fetchOlxOfferPhones(targetUrl, html) {
   const offerId = getOlxOfferIdFromHtml(html);
   if (!offerId) {
-    return [];
+    return { phones: [], debug: { offerId: "", attempts: [] } };
   }
 
+  const attempts = [];
   for (const endpoint of ["phones", "limited-phones"]) {
     const response = await fetch(new URL(`/api/v1/offers/${offerId}/${endpoint}/`, targetUrl.origin).toString(), {
       headers: {
@@ -242,14 +243,18 @@ async function fetchOlxOfferPhones(targetUrl, html) {
       redirect: "follow",
       signal: AbortSignal.timeout(10000)
     });
-    if (!response.ok) continue;
+    if (!response.ok) {
+      attempts.push({ endpoint, status: response.status, phones: 0 });
+      continue;
+    }
 
     const payload = await response.json().catch(() => null);
     const phones = extractOlxPhonesFromPayload(payload);
-    if (phones.length) return phones;
+    attempts.push({ endpoint, status: response.status, phones: phones.length });
+    if (phones.length) return { phones, debug: { offerId, attempts } };
   }
 
-  return [];
+  return { phones: [], debug: { offerId, attempts } };
 }
 
 function extractOlxPhonesFromPayload(payload) {
@@ -276,11 +281,13 @@ function extractOlxPhonesFromPayload(payload) {
 async function resolveListingPhones(targetUrl, html) {
   if (targetUrl.hostname === "www.olx.ro" || targetUrl.hostname.endsWith(".olx.ro")) {
     const olxPhones = await fetchOlxOfferPhones(targetUrl, html);
-    if (olxPhones.length) {
+    if (olxPhones.phones.length) {
       return olxPhones;
     }
+    const htmlPhones = extractPhonesFromListing({ html });
+    return { phones: htmlPhones, debug: { ...olxPhones.debug, htmlPhones: htmlPhones.length } };
   }
-  return extractPhonesFromListing({ html });
+  return { phones: extractPhonesFromListing({ html }), debug: { provider: "html" } };
 }
 
 async function handleApi(request, env) {
@@ -567,8 +574,8 @@ async function handleApi(request, env) {
         return json({ ok: false, phones: [], error: `Listing fetch failed (${response.status}).` }, 502);
       }
       const html = await response.text();
-      const phones = await resolveListingPhones(targetUrl, html);
-      return json({ ok: true, phones }, 200);
+      const result = await resolveListingPhones(targetUrl, html);
+      return json({ ok: true, phones: result.phones, debug: result.debug }, 200);
     } catch (error) {
       return json({ ok: false, phones: [], error: error instanceof Error ? error.message : String(error) }, 502);
     }

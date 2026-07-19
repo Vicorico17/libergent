@@ -980,7 +980,8 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
           setContactLookupDebug(`Lookup: ${response.status} · phone found ${phone}`)
         } else {
           const detail = typeof payload.error === "string" ? ` · ${payload.error}` : " · no phone returned"
-          setContactLookupDebug(`Lookup: ${response.status}${detail}`)
+          const debug = payload.debug ? ` · ${JSON.stringify(payload.debug)}` : ""
+          setContactLookupDebug(`Lookup: ${response.status}${detail}${debug}`)
         }
       } catch {
         phone = ""
