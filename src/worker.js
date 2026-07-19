@@ -244,7 +244,15 @@ async function fetchOlxOfferPhones(targetUrl, html) {
       signal: AbortSignal.timeout(10000)
     });
     if (!response.ok) {
-      attempts.push({ endpoint, status: response.status, phones: 0 });
+      const errorBody = await response.text().catch(() => "");
+      let detail = "";
+      try {
+        const parsed = JSON.parse(errorBody);
+        detail = String(parsed.error?.detail || parsed.error?.message || parsed.error || parsed.message || "").slice(0, 240);
+      } catch {
+        detail = errorBody.replace(/\s+/g, " ").trim().slice(0, 240);
+      }
+      attempts.push({ endpoint, status: response.status, phones: 0, detail });
       continue;
     }
 
