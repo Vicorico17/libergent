@@ -40,15 +40,21 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
         return text.includes("suna vanzatorul") || text.includes("arata telefon") || text.includes("show phone");
       });
       if (!contactButton) return null;
-      contactButton.setAttribute("data-libergent-phone-button", "true");
-      return { text: String(contactButton.textContent || "").trim().slice(0, 120) };
+      contactButton.scrollIntoView({ block: "center", inline: "center" });
+      const rect = contactButton.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      return {
+        text: String(contactButton.textContent || "").trim().slice(0, 120),
+        x: rect.left + (rect.width / 2),
+        y: rect.top + (rect.height / 2)
+      };
     });
 
     if (!button) {
       return { phones: [], debug: { configured: true, clicked: false } };
     }
 
-    await page.click('[data-libergent-phone-button="true"]');
+    await page.mouse.click(button.x, button.y);
 
     const phoneResponse = await phoneResponsePromise;
     let responsePhones = [];
