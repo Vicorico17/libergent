@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Bookmark, CalendarDays, Copy, ExternalLink, EyeOff, Lock, MapPin, MessageSquare, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { mapOffer, mapSearchResults, type SearchPayload, type SearchResultItem } from "./search-data"
 
 // — Constants —
@@ -1041,6 +1042,14 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
   }
 
   async function sendWhatsApp() {
+    const supabase = getSupabaseBrowserClient()
+    const session = supabase ? (await supabase.auth.getSession()).data.session : null
+    if (!session?.access_token) {
+      setSendState("error")
+      setSendError("Conectează-te pentru a trimite mesaje și a păstra conversația privată în contul tău.")
+      return
+    }
+
     let phone = ""
     setContactLookupDebug("")
     if (item.url) {
@@ -1078,8 +1087,22 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
     try {
       const response = await fetch("/api/whatsapp/send", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ target: phone, message }),
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          target: phone,
+          message,
+          listing: {
+            url: item.url,
+            title: item.title,
+            marketplace: item.source,
+            imageUrl: item.image,
+            price: item.priceLabel,
+            query,
+          },
+        }),
       })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok || payload.ok === false) {
@@ -1088,6 +1111,20 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
       setSentTarget(String(payload.target || phone))
       setSentMessageId(String(payload.messageId || ""))
       setSendState("sent")
+      window.dispatchEvent(new CustomEvent("libergent:conversation-open", {
+        detail: {
+          conversationId: String(payload.conversationId || ""),
+          sellerPhone: String(payload.target || phone),
+          listingTitle: item.title,
+          listingUrl: item.url,
+          marketplace: item.source,
+          listingPrice: item.priceLabel,
+          message,
+          messageId: String(payload.messageId || ""),
+          timestamp: new Date().toISOString(),
+          historySaved: Boolean(payload.historySaved),
+        },
+      }))
       trackSearchEvent("whatsapp_message_sent", {
         search_term: query,
         marketplace: item.source,
@@ -1165,6 +1202,11 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
       )}
       {contactLookupDebug && <p className="basis-full text-[10px] text-[#B45309]" style={{ fontFamily: MONO }}>{contactLookupDebug}</p>}
       {sendState === "error" && <p className="basis-full text-[10px] text-[#FF3366]" style={{ fontFamily: MONO }}>{sendError}</p>}
+      {sendState === "error" && sendError.includes("Conectează-te") && (
+        <Link href={`/auth?next=${encodeURIComponent(`/search?q=${query}`)}`} className="basis-full text-[10px] font-bold uppercase underline" style={{ color: PINK }}>
+          Conectează-te cu Google
+        </Link>
+      )}
     </div>
   )
 }
@@ -1235,9 +1277,27 @@ function OfferFeedbackActions({ item, query }: { item: SearchResultItem; query: 
   )
 }
 
+const CONVERSATION_STATUS_LABELS: Record<string, string> = {
+  contacted: "Contactat",
+  replied: "A răspuns",
+  negotiating: "În negociere",
+  unavailable: "Indisponibil",
+  deal_agreed: "Acord stabilit",
+}
+
+function ConversationStatusBadge({ status }: { status?: string }) {
+  if (!status) return null
+  return (
+    <span className="inline-flex w-fit px-2 py-1 text-[9px] font-bold uppercase" style={{ border: `1px solid ${PINK}`, color: PINK, background: "white" }}>
+      Status: {CONVERSATION_STATUS_LABELS[status] || status}
+    </span>
+  )
+}
+
 function ResultCard({
   item,
   query,
+  conversationStatus,
   onInspect,
   isSaved,
   onToggleSaved,
@@ -1245,6 +1305,7 @@ function ResultCard({
 }: {
   item: ResultItem
   query: string
+  conversationStatus?: string
   onInspect: (item: SearchResultItem) => void
   isSaved: boolean
   onToggleSaved: (item: SearchResultItem) => void
@@ -1297,6 +1358,7 @@ function ResultCard({
           <div className="mb-3">
             <ListingMetaChips item={item} />
           </div>
+          <ConversationStatusBadge status={conversationStatus} />
           <p className="text-[14px] font-bold" style={{ color: PINK }}>{item.priceLabel}</p>
         </div>
         <div className="flex items-center gap-2 text-[10px] uppercase font-bold pt-3" style={{ borderTop: `1px solid ${INK}22` }}>
@@ -1367,7 +1429,7 @@ function PanelHeader({ title }: { title: string }) {
   )
 }
 
-function RecommendationCard({ item, query, onInspect }: { item: SearchResultItem; query: string; onInspect: (item: SearchResultItem) => void }) {
+function RecommendationCard({ item, query, conversationStatus, onInspect }: { item: SearchResultItem; query: string; conversationStatus?: string; onInspect: (item: SearchResultItem) => void }) {
   const { image, handleImageError } = useListingImage(item)
   const keywordScore = getKeywordMatchScore(item, query)
 
@@ -1424,6 +1486,7 @@ function RecommendationCard({ item, query, onInspect }: { item: SearchResultItem
                 <MetaChip>{item.source}</MetaChip>
                 <MetaChip icon={<MapPin size={10} strokeWidth={2.2} />}>{item.city}</MetaChip>
               </div>
+              <ConversationStatusBadge status={conversationStatus} />
               <div className="text-[22px] font-bold mb-8" style={{ color: PINK }}>{item.priceLabel}</div>
             </div>
             <div className="flex flex-col gap-4">
@@ -1551,7 +1614,7 @@ function DetailMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ListingDetailDrawer({ item, query, onClose }: { item: SearchResultItem | null; query: string; onClose: () => void }) {
+function ListingDetailDrawer({ item, query, conversationStatus, onClose }: { item: SearchResultItem | null; query: string; conversationStatus?: string; onClose: () => void }) {
   const { image, handleImageError } = useListingImage(item || {
     id: "empty",
     images: [],
@@ -1614,6 +1677,7 @@ function ListingDetailDrawer({ item, query, onClose }: { item: SearchResultItem 
             <div className="flex flex-col gap-3">
               <div className="text-[24px] font-bold" style={{ color: PINK }}>{item.priceLabel}</div>
               <ListingMetaChips item={item} />
+              <ConversationStatusBadge status={conversationStatus} />
               <DealQualitySummary item={item} />
               <SellerMessageActions item={item} query={query} />
               <OfferFeedbackActions item={item} query={query} />
@@ -1680,6 +1744,157 @@ function ListingDetailDrawer({ item, query, onClose }: { item: SearchResultItem 
   )
 }
 
+type ConversationMessage = {
+  id: string
+  direction: "inbound" | "outbound"
+  role: "seller" | "agent"
+  text: string
+  timestamp: string
+}
+
+type SellerConversation = {
+  id: string
+  sellerPhone: string
+  marketplace: string
+  listingUrl: string
+  listingTitle: string
+  listingImageUrl: string
+  listingPrice: string
+  status: string
+  lastMessageAt: string
+  lastMessage: string
+  messageCount: number
+  messages: ConversationMessage[]
+}
+
+function ConversationCenter({ onStatusesChange }: { onStatusesChange: (statuses: Record<string, string>) => void }) {
+  const [open, setOpen] = useState(false)
+  const [conversations, setConversations] = useState<SellerConversation[]>([])
+  const [selectedId, setSelectedId] = useState("")
+  const [error, setError] = useState("")
+  const selected = conversations.find((conversation) => conversation.id === selectedId) || null
+
+  async function loadConversations(preferredId = "") {
+    const supabase = getSupabaseBrowserClient()
+    const session = supabase ? (await supabase.auth.getSession()).data.session : null
+    if (!session?.access_token) {
+      setError("Conectează-te pentru a vedea conversațiile private.")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/conversations", {
+        headers: { authorization: `Bearer ${session.access_token}` },
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.error || "Conversațiile nu au putut fi încărcate.")
+      const next = Array.isArray(payload.conversations) ? payload.conversations : []
+      setConversations(next)
+      setError("")
+      const statusMap = Object.fromEntries(next.filter((conversation: SellerConversation) => conversation.listingUrl).map((conversation: SellerConversation) => [conversation.listingUrl, conversation.status]))
+      onStatusesChange(statusMap)
+      const targetId = preferredId || selectedId
+      if (targetId && next.some((conversation: SellerConversation) => conversation.id === targetId)) setSelectedId(targetId)
+      else if (!selectedId && next[0]?.id) setSelectedId(next[0].id)
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Conversațiile nu au putut fi încărcate.")
+    }
+  }
+
+  useEffect(() => {
+    const handleOpen = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      const temporary: SellerConversation = {
+        id: detail.conversationId || `pending_${Date.now()}`,
+        sellerPhone: detail.sellerPhone || "",
+        marketplace: detail.marketplace || "",
+        listingUrl: detail.listingUrl || "",
+        listingTitle: detail.listingTitle || "Conversație WhatsApp",
+        listingImageUrl: "",
+        listingPrice: detail.listingPrice || "",
+        status: "contacted",
+        lastMessageAt: detail.timestamp || new Date().toISOString(),
+        lastMessage: detail.message || "",
+        messageCount: 1,
+        messages: [{ id: detail.messageId || "pending", direction: "outbound", role: "agent", text: detail.message || "", timestamp: detail.timestamp || new Date().toISOString() }],
+      }
+      setConversations((current) => [temporary, ...current.filter((conversation) => conversation.id !== temporary.id)])
+      setSelectedId(temporary.id)
+      setOpen(true)
+      if (temporary.listingUrl) onStatusesChange({ [temporary.listingUrl]: "contacted" })
+      window.setTimeout(() => loadConversations(temporary.id), 400)
+    }
+    window.addEventListener("libergent:conversation-open", handleOpen)
+    queueMicrotask(() => loadConversations())
+    return () => window.removeEventListener("libergent:conversation-open", handleOpen)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    const id = window.setInterval(() => loadConversations(selectedId), 10_000)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, selectedId])
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => { setOpen(true); loadConversations() }}
+        className="fixed bottom-14 right-4 z-[90] flex items-center gap-2 px-4 py-3 text-[10px] font-bold uppercase"
+        style={{ border: `1px solid ${INK}`, background: INK, color: "white", boxShadow: `3px 3px 0 ${PINK}`, fontFamily: MONO }}
+      >
+        <MessageSquare size={14} /> Conversații {conversations.length ? `(${conversations.length})` : ""}
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-[140] flex justify-end" role="dialog" aria-modal="true">
+          <button type="button" aria-label="Închide conversațiile" className="absolute inset-0" style={{ background: "rgba(0,0,0,.38)" }} onClick={() => setOpen(false)} />
+          <aside className="relative grid h-full w-full max-w-5xl grid-cols-1 overflow-hidden md:grid-cols-[340px_1fr]" style={{ background: CREAM, borderLeft: `1px solid ${INK}`, fontFamily: MONO }}>
+            <section className="flex min-h-0 flex-col" style={{ borderRight: `1px solid ${INK}` }}>
+              <div className="flex items-center justify-between p-4" style={{ background: "white", borderBottom: `1px solid ${INK}` }}>
+                <div><div className="text-[10px] font-bold uppercase" style={{ color: PINK }}>Private</div><h2 className="text-[15px] font-bold uppercase">Conversații selleri</h2></div>
+                <button type="button" onClick={() => setOpen(false)} className="h-9 w-9" style={{ border: `1px solid ${INK}` }}>×</button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {conversations.map((conversation) => (
+                  <button key={conversation.id} type="button" onClick={() => setSelectedId(conversation.id)} className="w-full p-4 text-left" style={{ borderBottom: `1px solid ${INK}33`, background: selectedId === conversation.id ? "white" : CREAM }}>
+                    <div className="mb-1 flex items-center justify-between gap-2"><span className="truncate text-[11px] font-bold uppercase">{conversation.listingTitle}</span><span className="flex-none text-[8px] font-bold uppercase" style={{ color: PINK }}>{CONVERSATION_STATUS_LABELS[conversation.status] || conversation.status}</span></div>
+                    <div className="truncate text-[9px] font-bold uppercase" style={{ color: `${INK}66` }}>{conversation.marketplace} · {conversation.sellerPhone}</div>
+                    <div className="mt-2 truncate text-[10px]">{conversation.lastMessage}</div>
+                  </button>
+                ))}
+                {!conversations.length && <div className="p-5 text-[10px] font-bold uppercase" style={{ color: `${INK}66` }}>{error || "Nicio conversație încă."}</div>}
+              </div>
+            </section>
+            <section className="flex min-h-0 flex-col">
+              {selected ? (
+                <>
+                  <div className="p-4" style={{ background: "white", borderBottom: `1px solid ${INK}` }}>
+                    <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-[14px] font-bold uppercase">{selected.listingTitle}</h3><p className="text-[9px] font-bold uppercase" style={{ color: `${INK}66` }}>{selected.marketplace} · {selected.listingPrice} · {selected.sellerPhone}</p></div><span className="px-2 py-1 text-[9px] font-bold uppercase" style={{ border: `1px solid ${PINK}`, color: PINK }}>{CONVERSATION_STATUS_LABELS[selected.status] || selected.status}</span></div>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-5">
+                    {selected.messages.map((message) => (
+                      <div key={message.id} className={`flex ${message.direction === "outbound" ? "justify-end" : "justify-start"}`}>
+                        <div className="max-w-[80%] p-3 text-[11px] leading-relaxed" style={{ background: message.direction === "outbound" ? INK : "white", color: message.direction === "outbound" ? "white" : INK, border: `1px solid ${INK}` }}>
+                          <div className="mb-1 text-[8px] font-bold uppercase" style={{ color: message.direction === "outbound" ? PINK : GREEN }}>{message.direction === "outbound" ? "Agent LiberGent" : "Seller"}</div>
+                          <div>{message.text}</div>
+                          <div className="mt-2 text-[8px] opacity-60">{formatDateTime(message.timestamp)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {selected.listingUrl && <a href={selected.listingUrl} target="_blank" rel="noopener noreferrer" className="m-4 flex items-center justify-center gap-2 p-3 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: "white" }}>Deschide listingul <ExternalLink size={12} /></a>}
+                </>
+              ) : <div className="flex h-full items-center justify-center p-8 text-[11px] font-bold uppercase" style={{ color: `${INK}66` }}>{error || "Selectează o conversație."}</div>}
+            </section>
+          </aside>
+        </div>
+      )}
+    </>
+  )
+}
+
 // — Main search results —
 function SearchResultsContent() {
   const searchParams = useSearchParams()
@@ -1714,6 +1929,7 @@ function SearchResultsContent() {
   const [searchReportOpen, setSearchReportOpen] = useState(true)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS)
   const [selectedListing, setSelectedListing] = useState<SearchResultItem | null>(null)
+  const [conversationStatuses, setConversationStatuses] = useState<Record<string, string>>({})
   const [savedListings, setSavedListings] = useState<Set<string>>(() => readStringSetStorage(SAVED_LISTINGS_STORAGE_KEY))
   const [hiddenListings, setHiddenListings] = useState<Set<string>>(() => readStringSetStorage(HIDDEN_LISTINGS_STORAGE_KEY))
 
@@ -2044,7 +2260,8 @@ function SearchResultsContent() {
 
       {/* Loading overlay — rendered above everything */}
       {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} tier={searchTier} />}
-      <ListingDetailDrawer item={selectedListing} query={query} onClose={() => setSelectedListing(null)} />
+      <ListingDetailDrawer item={selectedListing} query={query} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} />
+      <ConversationCenter onStatusesChange={(statuses) => setConversationStatuses((current) => ({ ...current, ...statuses }))} />
       <EmailCapturePopup
         enabled={Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
         query={query}
@@ -2199,7 +2416,7 @@ function SearchResultsContent() {
             </section>
           )}
 
-          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} onInspect={setSelectedListing} />}
+          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} />}
           {shownNewBenchmark && <BenchmarkCard item={shownNewBenchmark} usedItem={shownBestOffer} priceBenchmark={priceBenchmark} onInspect={setSelectedListing} />}
 
           {/* Results + Insights */}
@@ -2222,6 +2439,7 @@ function SearchResultsContent() {
                         key={item.id}
                         item={item}
                         query={query}
+                        conversationStatus={item.url ? conversationStatuses[item.url] : undefined}
                         onInspect={setSelectedListing}
                         isSaved={savedListings.has(listingStorageId(item))}
                         onToggleSaved={toggleSavedListing}
@@ -2250,6 +2468,7 @@ function SearchResultsContent() {
                         key={item.id}
                         item={item}
                         query={query}
+                        conversationStatus={item.url ? conversationStatuses[item.url] : undefined}
                         onInspect={setSelectedListing}
                         isSaved={savedListings.has(listingStorageId(item))}
                         onToggleSaved={toggleSavedListing}

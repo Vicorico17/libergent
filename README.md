@@ -228,6 +228,12 @@ Premium search requires both the `BROWSER` binding and a `LIBERGENT_PREMIUM_TOKE
 
 During the internal test phase, select **Premium test** on the search page and enter either `LIBERGENT_PREMIUM_TOKEN` or `LIBERGENT_ADMIN_TOKEN`. The token is kept in `sessionStorage` for the current browser tab only. The coverage panel then reports each marketplace's provider, result count, and failure reason.
 
+### Private seller conversations
+
+Seller outreach requires a valid Supabase account session. `POST /api/whatsapp/send`, `GET /api/conversations`, and `GET /api/conversations/:id` validate the Supabase access token. Outbound and inbound WhatsApp messages are tagged with the account ID and conversation APIs filter history server-side, so one account cannot read another account's messages.
+
+The search UI opens a private conversation drawer after a message is sent, shows the agent/seller transcript, and attaches a conversation status to the listing (`contacted`, `replied`, `negotiating`, `unavailable`, or `deal_agreed`). Direct client access to `whatsapp_messages` is disabled by RLS; only the Worker service role can access the table. If inbound ownership is ambiguous because multiple accounts contacted the same seller number, the reply is deliberately left unassigned instead of risking cross-account disclosure.
+
 Direct scraping does not require provider secrets. If you later use Cloudflare Browser Rendering as an explicit scraping fallback, configure `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in Wrangler secrets.
 
 ## Usage

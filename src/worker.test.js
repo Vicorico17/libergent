@@ -50,25 +50,36 @@ test("requires Browser Run for an authorized premium search", async () => {
 test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
   const originalFetch = globalThis.fetch;
   let bridgeRequest;
+  let storedMessage;
 
   t.after(() => {
     globalThis.fetch = originalFetch;
   });
 
   globalThis.fetch = async (url, init) => {
-    bridgeRequest = { url, init };
+    const requestUrl = String(url);
+    if (requestUrl === "https://supabase.example/auth/v1/user") {
+      return new Response(JSON.stringify({ id: "user-1", email: "buyer@example.test" }), { status: 200 });
+    }
+    if (requestUrl.startsWith("https://supabase.example/rest/v1/whatsapp_messages")) {
+      storedMessage = JSON.parse(init.body);
+      return new Response(null, { status: 201 });
+    }
+    bridgeRequest = { url: requestUrl, init };
     return new Response(JSON.stringify({ ok: true, messageId: "msg_123" }), { status: 200 });
   };
 
   const response = await worker.fetch(
     new Request("https://libergent.test/api/whatsapp/send", {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ target: "0722 123 456", message: "Salut" })
+      headers: { "content-type": "application/json", authorization: "Bearer user-token" },
+      body: JSON.stringify({ target: "0722 123 456", message: "Salut", listing: { url: "https://www.olx.ro/d/oferta/test.html", title: "Test OLX" } })
     }),
     {
       OPENCLAW_BRIDGE_URL: "https://bridge.example/",
-      OPENCLAW_BRIDGE_TOKEN: "secret"
+      OPENCLAW_BRIDGE_TOKEN: "secret",
+      SUPABASE_URL: "https://supabase.example",
+      SUPABASE_SECRET_KEY: "service-secret"
     }
   );
 
@@ -78,20 +89,32 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
   assert.equal(payload.ok, true);
   assert.equal(payload.target, "+40722123456");
   assert.equal(payload.messageId, "msg_123");
+  assert.match(payload.conversationId, /^wa_/);
+  assert.equal(payload.historySaved, true);
   assert.equal(bridgeRequest.url, "https://bridge.example/whatsapp/send");
   assert.equal(bridgeRequest.init.headers.authorization, "Bearer secret");
   assert.equal(bridgeRequest.init.body, JSON.stringify({ target: "+40722123456", message: "Salut" }));
+  assert.equal(storedMessage.raw.userId, "user-1");
+  assert.equal(storedMessage.raw.listing.title, "Test OLX");
 });
 
-test("requires the OpenClaw bridge token before sending WhatsApp messages", async () => {
+test("requires the OpenClaw bridge token before sending WhatsApp messages", async (t) => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ id: "user-1" }), { status: 200 });
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
   const response = await worker.fetch(
     new Request("https://libergent.test/api/whatsapp/send", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", authorization: "Bearer user-token" },
       body: JSON.stringify({ target: "+40722123456", message: "Salut" })
     }),
     {
-      OPENCLAW_BRIDGE_URL: "https://bridge.example"
+      OPENCLAW_BRIDGE_URL: "https://bridge.example",
+      SUPABASE_URL: "https://supabase.example",
+      SUPABASE_SECRET_KEY: "service-secret"
     }
   );
 
@@ -100,6 +123,39 @@ test("requires the OpenClaw bridge token before sending WhatsApp messages", asyn
   assert.equal(response.status, 503);
   assert.equal(payload.ok, false);
   assert.match(payload.error, /not configured/i);
+});
+
+test("returns only the authenticated account's seller conversations", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let historyRequestUrl = "";
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    if (requestUrl === "https://supabase.example/auth/v1/user") {
+      return new Response(JSON.stringify({ id: "user-1" }), { status: 200 });
+    }
+    historyRequestUrl = requestUrl;
+    return new Response(JSON.stringify([
+      { message_id: "mine", direction: "outbound", from_number: "agent", to_number: "+40722111111", text: "Salut", received_at: "2026-07-19T10:00:00Z", raw: { userId: "user-1", listing: { url: "https://example.test/mine", title: "Al meu" } } },
+      { message_id: "theirs", direction: "outbound", from_number: "agent", to_number: "+40722222222", text: "Secret", received_at: "2026-07-19T10:01:00Z", raw: { userId: "user-2", listing: { url: "https://example.test/theirs", title: "Al altuia" } } }
+    ]), { status: 200 });
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const response = await worker.fetch(new Request("https://libergent.test/api/conversations", {
+    headers: { authorization: "Bearer user-token" }
+  }), {
+    SUPABASE_URL: "https://supabase.example",
+    SUPABASE_SECRET_KEY: "service-secret"
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.conversations.length, 1);
+  assert.equal(payload.conversations[0].listingTitle, "Al meu");
+  assert.doesNotMatch(JSON.stringify(payload), /Secret|Al altuia/);
+  assert.equal(new URL(historyRequestUrl).searchParams.get("raw->>userId"), "eq.user-1");
 });
 
 

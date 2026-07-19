@@ -1,11 +1,12 @@
 import { searchAcrossSites } from "./app.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
+import { buildConversationHistory, getConversationById } from "./conversations.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
 import { runMarketplaceHealthChecks } from "./health.js";
 import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
-import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertWhatsAppInboundToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
+import { findWhatsAppConversationOwner, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload, readWhatsAppMessagesFromSupabase } from "./supabase.js";
 import { PREMIUM_BROWSER_SITE_KEYS, SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
@@ -73,6 +74,37 @@ function isAuthorizedPremiumRequest(request, url, env = {}) {
   const premiumToken = String(env.LIBERGENT_PREMIUM_TOKEN || "");
   const bearerToken = getBearerTokenFromRequest(request);
   return (Boolean(premiumToken) && bearerToken === premiumToken) || isAuthorizedAdminRequest(request, url, env);
+}
+
+async function authenticateSupabaseUser(request, env = {}) {
+  const accessToken = getBearerTokenFromRequest(request);
+  if (!accessToken) return { error: "Authentication required.", status: 401 };
+
+  const supabaseUrl = String(env.SUPABASE_URL || "").replace(/\/+$/, "");
+  const apiKey = String(env.SUPABASE_ANON_KEY || env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || "");
+  if (!supabaseUrl || !apiKey) return { error: "Supabase authentication is not configured.", status: 503 };
+
+  try {
+    const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { apikey: apiKey, authorization: `Bearer ${accessToken}` }
+    });
+    const user = await response.json().catch(() => null);
+    if (!response.ok || !user?.id) return { error: "Invalid or expired session.", status: 401 };
+    return { user };
+  } catch {
+    return { error: "Authentication service unavailable.", status: 503 };
+  }
+}
+
+function normalizeConversationListing(value = {}) {
+  return {
+    url: String(value.url || "").slice(0, 2000),
+    title: String(value.title || "").slice(0, 300),
+    marketplace: String(value.marketplace || value.source || "").slice(0, 80),
+    imageUrl: String(value.imageUrl || value.image || "").slice(0, 2000),
+    price: String(value.price || value.priceLabel || "").slice(0, 100),
+    query: String(value.query || "").slice(0, 200)
+  };
 }
 
 function getSearchRequestParams(url) {
@@ -452,6 +484,14 @@ async function handleApi(request, env) {
     }
 
     try {
+      const owner = await findWhatsAppConversationOwner(inbound.from, env).catch(() => null);
+      if (owner?.userId) {
+        inbound.raw = {
+          ...(inbound.raw || {}),
+          userId: owner.userId,
+          listing: owner.listing || null
+        };
+      }
       await insertWhatsAppInboundToSupabase(inbound, env);
       return json({ ok: true }, 200);
     } catch (error) {
@@ -678,10 +718,33 @@ async function handleApi(request, env) {
     }
   }
 
+  if (apiPath === "/api/conversations" || apiPath.startsWith("/api/conversations/")) {
+    if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+    const auth = await authenticateSupabaseUser(request, env);
+    if (!auth.user) return json({ error: auth.error }, auth.status);
+    if (!isSupabaseConfigured(env)) return json({ error: "Supabase is not configured." }, 503);
+
+    try {
+      const rows = await readWhatsAppMessagesFromSupabase({ limit: 1000, userId: auth.user.id }, env);
+      const conversationId = decodeURIComponent(apiPath.slice("/api/conversations/".length));
+      if (apiPath !== "/api/conversations") {
+        const conversation = getConversationById(rows, conversationId, { userId: auth.user.id });
+        return conversation ? json({ ok: true, conversation }, 200) : json({ error: "Conversation not found." }, 404);
+      }
+      const conversations = buildConversationHistory(rows, { userId: auth.user.id });
+      return json({ ok: true, conversations }, 200);
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
+
   if (apiPath === "/api/whatsapp/send") {
     if (request.method !== "POST") {
       return json({ error: "Method not allowed" }, 405);
     }
+
+    const auth = await authenticateSupabaseUser(request, env);
+    if (!auth.user) return json({ ok: false, error: auth.error }, auth.status);
 
     if (!env.OPENCLAW_BRIDGE_URL || !env.OPENCLAW_BRIDGE_TOKEN) {
       return json({ ok: false, error: "WhatsApp bridge is not configured." }, 503);
@@ -695,6 +758,7 @@ async function handleApi(request, env) {
     const body = parsedBody.data || {};
     const target = normalizeRomanianMobilePhone(body.target);
     const message = String(body.message || "").trim().slice(0, 2000);
+    const listing = normalizeConversationListing(body.listing || {});
     if (!target) {
       return json({ ok: false, error: "Enter a valid Romanian mobile seller phone number." }, 400);
     }
@@ -716,7 +780,38 @@ async function handleApi(request, env) {
       if (!response.ok) {
         return json({ ok: false, error: payload.error || `WhatsApp bridge failed (${response.status}).` }, 502);
       }
-      return json({ ok: true, target, messageId: payload.messageId || payload.result?.messageId || null }, 200);
+      const messageId = String(payload.messageId || payload.result?.messageId || `outbound:${target}:${Date.now()}`);
+      const timestamp = new Date().toISOString();
+      let historySaved = false;
+      let historyError = "";
+      try {
+        historySaved = await insertWhatsAppOutboundToSupabase({
+          messageId,
+          to: target,
+          text: message,
+          timestamp,
+          raw: { userId: auth.user.id, listing, bridge: payload }
+        }, env);
+      } catch (error) {
+        historyError = error instanceof Error ? error.message : String(error);
+      }
+      const [conversation] = buildConversationHistory([{
+        message_id: messageId,
+        direction: "outbound",
+        from_number: "libergent-agent",
+        to_number: target,
+        text: message,
+        received_at: timestamp,
+        raw: { userId: auth.user.id, listing }
+      }], { userId: auth.user.id });
+      return json({
+        ok: true,
+        target,
+        messageId,
+        conversationId: conversation?.id || null,
+        historySaved,
+        historyError: historyError || null
+      }, 200);
     } catch (error) {
       return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 502);
     }

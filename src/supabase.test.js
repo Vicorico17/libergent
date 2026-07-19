@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { insertEmailLeadToSupabase, insertWhatsAppInboundToSupabase } from "./supabase.js";
+import { findWhatsAppConversationOwner, insertEmailLeadToSupabase, insertWhatsAppInboundToSupabase } from "./supabase.js";
 
 test("insertEmailLeadToSupabase accepts a public-qualified email leads table setting", async (t) => {
   const previousFetch = globalThis.fetch;
@@ -70,4 +70,22 @@ test("insertWhatsAppInboundToSupabase upserts inbound WhatsApp messages", async 
   assert.equal(capturedBody.direction, "inbound");
   assert.equal(capturedBody.from_number, "+40735577052");
   assert.equal(capturedBody.text, "Da, este disponibil");
+});
+
+test("findWhatsAppConversationOwner fails closed when a seller number belongs to multiple accounts", async (t) => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify([
+    { direction: "outbound", to_number: "+40735577052", raw: { userId: "user-1", listing: { title: "One" } } },
+    { direction: "outbound", to_number: "+40735577052", raw: { userId: "user-2", listing: { title: "Two" } } }
+  ]), { status: 200 });
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const owner = await findWhatsAppConversationOwner("+40735577052", {
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SECRET_KEY: "service-role"
+  });
+
+  assert.equal(owner, null);
 });

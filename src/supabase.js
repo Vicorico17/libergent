@@ -317,6 +317,61 @@ export async function insertWhatsAppInboundToSupabase(entry, env = process.env) 
   return true;
 }
 
+export async function insertWhatsAppOutboundToSupabase(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return false;
+
+  const timestamp = entry.timestamp || new Date().toISOString();
+  const to = String(entry.to || entry.to_number || "").trim();
+  const text = String(entry.text || "").trim();
+  const messageId = String(entry.messageId || entry.message_id || `outbound:${to}:${timestamp}`).trim();
+  const row = {
+    message_id: messageId,
+    direction: "outbound",
+    channel: entry.channel || "whatsapp",
+    from_number: String(entry.from || entry.from_number || "libergent-agent").trim(),
+    to_number: to,
+    text,
+    received_at: timestamp,
+    raw: entry.raw || null,
+    created_at: entry.createdAt || new Date().toISOString()
+  };
+
+  await requestSupabase(`${config.whatsappMessagesTable}?on_conflict=message_id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(row)
+  }, env);
+  return true;
+}
+
+export async function readWhatsAppMessagesFromSupabase({ limit = 500, userId = "", sellerPhone = "", direction = "" } = {}, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return [];
+  const query = new URLSearchParams({
+    select: "message_id,direction,channel,from_number,to_number,text,received_at,raw,created_at",
+    order: "received_at.asc",
+    limit: String(Math.max(1, Math.min(limit, 1000)))
+  });
+  if (userId) query.set("raw->>userId", `eq.${userId}`);
+  if (sellerPhone) query.set("to_number", `eq.${sellerPhone}`);
+  if (direction) query.set("direction", `eq.${direction}`);
+  const rows = await requestSupabase(`${config.whatsappMessagesTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function findWhatsAppConversationOwner(sellerPhone, env = process.env) {
+  const rows = await readWhatsAppMessagesFromSupabase({ limit: 1000, sellerPhone, direction: "outbound" }, env);
+  const matchingOutbound = rows.filter((row) =>
+    row.direction === "outbound" &&
+    String(row.to_number || "").trim() === String(sellerPhone || "").trim() &&
+    row.raw?.userId
+  );
+  const ownerIds = new Set(matchingOutbound.map((row) => String(row.raw.userId)));
+  if (ownerIds.size !== 1) return null;
+  return matchingOutbound[matchingOutbound.length - 1]?.raw || null;
+}
+
 export async function readSearchEventsFromSupabase({ limit = MAX_HISTORY_ENTRIES } = {}, env = process.env) {
   const config = getSupabaseConfig(env);
   if (!config) {

@@ -1,9 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type AuthState = "checking" | "signed_out" | "signed_in" | "error";
+
+function getSafeNextPath() {
+  if (typeof window === "undefined") return "/";
+  const next = new URLSearchParams(window.location.search).get("next") || "/";
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
+}
 
 export function GoogleSignIn() {
   const [state, setState] = useState<AuthState>("checking");
@@ -12,8 +19,10 @@ export function GoogleSignIn() {
   useEffect(() => {
     const client = getSupabaseBrowserClient();
     if (!client) {
-      setState("error");
-      setMessage("Autentificarea Google nu este configurată încă.");
+      queueMicrotask(() => {
+        setState("error");
+        setMessage("Autentificarea Google nu este configurată încă.");
+      });
       return;
     }
 
@@ -50,7 +59,7 @@ export function GoogleSignIn() {
     setMessage("");
     const { error } = await client.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth` }
+      options: { redirectTo: `${window.location.origin}/auth?next=${encodeURIComponent(getSafeNextPath())}` }
     });
     if (error) {
       setState("error");
@@ -62,9 +71,9 @@ export function GoogleSignIn() {
     return (
       <div className="flex flex-col gap-3">
         <p className="text-[12px] font-bold uppercase">Ești conectat cu Google.</p>
-        <a href="/" className="inline-flex justify-center items-center px-5 py-3 text-[12px] font-bold uppercase" style={{ background: "#111111", color: "#F3F0E7", border: "2px solid #111111" }}>
+        <Link href={getSafeNextPath()} className="inline-flex justify-center items-center px-5 py-3 text-[12px] font-bold uppercase" style={{ background: "#111111", color: "#F3F0E7", border: "2px solid #111111" }}>
           Mergi la căutare
-        </a>
+        </Link>
       </div>
     );
   }
