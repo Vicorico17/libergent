@@ -116,3 +116,27 @@ test("resolves OLX listing phones when the ad JSON uses normal quotes and spacin
   assert.deepEqual(payload.phones, ["+40744555666"]);
   assert.equal(requestedUrls[1], "https://www.olx.ro/api/v1/offers/421337/phones/");
 });
+
+test("resolves OLX phones when the phone endpoint returns phone objects", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("/api/v1/offers/421338/phones/")) {
+      return new Response(JSON.stringify({ data: { phones: [{ phoneNumber: "0755 111 222" }] } }), { status: 200 });
+    }
+    return new Response('<script>window.state = {"ad":{"id":421338,"title":"Aparat"}}</script>', { status: 200 });
+  };
+
+  const listingUrl = "https://www.olx.ro/d/oferta/aparat-IDtest.html";
+  const response = await worker.fetch(
+    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`),
+    {}
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(payload.phones, ["+40755111222"]);
+});

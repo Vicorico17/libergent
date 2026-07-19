@@ -246,8 +246,28 @@ async function fetchOlxOfferPhones(targetUrl, html) {
   }
 
   const payload = await response.json().catch(() => null);
-  const phones = Array.isArray(payload?.data?.phones) ? payload.data.phones : [];
-  return [...new Set(phones.flatMap(extractRomanianMobilePhones))];
+  return extractOlxPhonesFromPayload(payload);
+}
+
+function extractOlxPhonesFromPayload(payload) {
+  const values = [];
+
+  function visit(value, key = "") {
+    if (typeof value === "string") {
+      if (/phone|number|tel/i.test(key)) values.push(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((entry) => visit(entry, key));
+      return;
+    }
+    if (value && typeof value === "object") {
+      Object.entries(value).forEach(([childKey, childValue]) => visit(childValue, childKey));
+    }
+  }
+
+  visit(payload);
+  return [...new Set(values.flatMap(extractRomanianMobilePhones))];
 }
 
 async function resolveListingPhones(targetUrl, html) {
