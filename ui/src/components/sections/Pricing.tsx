@@ -63,7 +63,8 @@ const PREMIUM_FEATURES = [
   "Acoperire extinsă pe marketplace-uri compatibile",
   "Contact public al vânzătorului, unde este disponibil",
   "Monitorizare și alerte automate",
-  "Contact și follow-up prin WhatsApp",
+  "Contact și follow-up cu vânzătorii prin WhatsApp",
+  "Conversații cu agentul LiberGent pe WhatsApp",
 ];
 
 export function Pricing() {

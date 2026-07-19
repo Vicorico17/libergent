@@ -346,7 +346,8 @@ export default function PricingPage() {
                   "Acoperire extinsă pe marketplace-uri compatibile",
                   "Contact public al vânzătorului, unde este disponibil",
                   "Monitorizare și alerte automate",
-                  "Contact și follow-up prin WhatsApp",
+                  "Contact și follow-up cu vânzătorii prin WhatsApp",
+                  "Conversații cu agentul LiberGent pe WhatsApp",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3" style={{ color: "#9CA3AF" }}>
                     <DotIcon />

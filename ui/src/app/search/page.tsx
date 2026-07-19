@@ -16,7 +16,10 @@ const GREEN  = "#22C55E"
 const MONO   = "var(--font-mono-var), monospace"
 const MODAL_BG = "#FDFAF3"
 
-const SOURCES_LIST = ["OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT", "PRICE.RO", "SHOPMANIA"]
+const SOURCES_LIST = [
+  "OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT", "PRICE.RO", "SHOPMANIA",
+  "COMPARI.RO", "EMAG", "EVOMAG", "PC GARAGE", "ALTEX", "FLANCO", "CEL.RO",
+]
 const SORT_OPTIONS = ["relevanță", "potrivire cuvinte cheie", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
 const SOURCE_TYPE_OPTIONS = [
   { value: "classifieds", label: "second-hand" },
@@ -56,7 +59,17 @@ const INITIAL_VISIBLE_RESULTS = 48
 const VISIBLE_RESULT_STEP = 48
 const SAVED_LISTINGS_STORAGE_KEY = "libergent-saved-listings-v1"
 const HIDDEN_LISTINGS_STORAGE_KEY = "libergent-hidden-listings-v1"
-const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v2"
+const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v3"
+const PREMIUM_TEST_TOKEN_STORAGE_KEY = "libergent-premium-test-token"
+
+type SearchTier = "free" | "premium"
+type MarketplaceCoverage = {
+  site: string
+  provider: string
+  ok: boolean
+  itemCount: number
+  error: string
+}
 
 function shouldOpenFiltersByDefault() {
   return typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
@@ -496,7 +509,7 @@ function DealQualitySummary({ item, compact = false }: { item: SearchResultItem;
 }
 
 // — Loading Overlay —
-function LoadingOverlay({ progress, done, query }: { progress: number; done: boolean; query: string }) {
+function LoadingOverlay({ progress, done, query, tier }: { progress: number; done: boolean; query: string; tier: SearchTier }) {
   const [tick, setTick] = useState(0)
 
   useEffect(() => {
@@ -554,8 +567,8 @@ function LoadingOverlay({ progress, done, query }: { progress: number; done: boo
           {/* Free source rows */}
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-3 pb-1 text-[10px] font-bold uppercase">
-              <span>Căutare Free</span>
-              <span style={{ color: GREEN }}>{activeSources.length} surse active</span>
+              <span>Căutare {tier === "premium" ? "Premium" : "Free"}</span>
+              <span style={{ color: GREEN }}>{activeSources.length + (tier === "premium" ? PREMIUM_SOURCES.length : 0)} surse active</span>
             </div>
             {activeSources.map(({ name, start, end }) => {
               const lp = progress >= end ? 1 : progress <= start ? 0 : (progress - start) / (end - start)
@@ -619,22 +632,30 @@ function LoadingOverlay({ progress, done, query }: { progress: number; done: boo
               <span className="flex items-center gap-2">
                 <Lock size={12} strokeWidth={2.4} /> Deep Search
               </span>
-              <span style={{ color: PINK }}>Premium blocat</span>
+              <span style={{ color: tier === "premium" ? GREEN : PINK }}>{tier === "premium" ? "Premium activ" : "Premium blocat"}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {PREMIUM_SOURCES.map((name) => (
                 <div
                   key={name}
                   className="flex items-center justify-between gap-2 px-2 py-1.5 text-[9px] font-bold uppercase"
-                  style={{ border: `1px solid ${INK}22`, color: `${INK}66`, background: MODAL_BG }}
+                  style={{
+                    border: `1px solid ${tier === "premium" ? GREEN : `${INK}22`}`,
+                    color: tier === "premium" ? INK : `${INK}66`,
+                    background: MODAL_BG,
+                  }}
                 >
                   <span>{name}</span>
-                  <Lock size={10} strokeWidth={2.2} />
+                  {tier === "premium"
+                    ? <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: GREEN }} />
+                    : <Lock size={10} strokeWidth={2.2} />}
                 </div>
               ))}
             </div>
             <p className="mt-3 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}88` }}>
-              Browser-assisted search pe surse suplimentare nu este inclus în planul Free.
+              {tier === "premium"
+                ? "Browser-assisted Deep Search rulează acum pe sursele suplimentare."
+                : "Browser-assisted search pe surse suplimentare nu este inclus în planul Free."}
             </p>
           </div>
 
@@ -704,7 +725,7 @@ function LoadingOverlay({ progress, done, query }: { progress: number; done: boo
 }
 
 // — SearchNav —
-function SearchNav({ query }: { query: string }) {
+function SearchNav({ query, tier }: { query: string; tier: SearchTier }) {
   const router = useRouter()
   const [val, setVal] = useState(query)
 
@@ -716,7 +737,7 @@ function SearchNav({ query }: { query: string }) {
   function submit(e: React.FormEvent) {
     e.preventDefault()
     const q = val.trim()
-    if (q) router.push(`/search?q=${encodeURIComponent(q)}`)
+    if (q) router.push(`/search?q=${encodeURIComponent(q)}&tier=${tier}`)
   }
 
   return (
@@ -993,6 +1014,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
   const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle")
   const [sendError, setSendError] = useState("")
   const [sentTarget, setSentTarget] = useState("")
+  const [sentMessageId, setSentMessageId] = useState("")
   const [contactLookupDebug, setContactLookupDebug] = useState("")
 
   async function copyMessage() {
@@ -1027,12 +1049,13 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
         const response = await fetch(`/api/marketplace/contact?url=${encodeURIComponent(item.url)}`)
         const payload = await response.json().catch(() => ({}))
         phone = Array.isArray(payload.phones) ? String(payload.phones[0] || "") : ""
+        const lookupStatus = String(payload.contactStatus || (phone ? "phone_found" : "phone_not_available"))
         if (phone) {
-          setContactLookupDebug(`Lookup: ${response.status} · phone found ${phone}`)
+          setContactLookupDebug(`Contact pipeline: ${lookupStatus} · ${phone}`)
         } else {
           const detail = typeof payload.error === "string" ? ` · ${payload.error}` : " · no phone returned"
           const debug = payload.debug ? ` · ${JSON.stringify(payload.debug)}` : ""
-          setContactLookupDebug(`Lookup: ${response.status}${detail}${debug}`)
+          setContactLookupDebug(`Contact pipeline: ${lookupStatus} · HTTP ${response.status}${detail}${debug}`)
         }
       } catch {
         phone = ""
@@ -1051,6 +1074,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
 
     setSendState("sending")
     setSendError("")
+    setSentMessageId("")
     try {
       const response = await fetch("/api/whatsapp/send", {
         method: "POST",
@@ -1062,6 +1086,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
         throw new Error(payload.error || "Mesajul nu a putut fi trimis.")
       }
       setSentTarget(String(payload.target || phone))
+      setSentMessageId(String(payload.messageId || ""))
       setSendState("sent")
       trackSearchEvent("whatsapp_message_sent", {
         search_term: query,
@@ -1133,7 +1158,11 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
           Fără contact
         </span>
       )}
-      {sendState === "sent" && sentTarget && <p className="basis-full text-[10px] text-[#22C55E]" style={{ fontFamily: MONO }}>Trimis către {sentTarget}</p>}
+      {sendState === "sent" && sentTarget && (
+        <p className="basis-full text-[10px] text-[#22C55E]" style={{ fontFamily: MONO }}>
+          WhatsApp confirmat către {sentTarget}{sentMessageId ? ` · messageId ${sentMessageId}` : ""}
+        </p>
+      )}
       {contactLookupDebug && <p className="basis-full text-[10px] text-[#B45309]" style={{ fontFamily: MONO }}>{contactLookupDebug}</p>}
       {sendState === "error" && <p className="basis-full text-[10px] text-[#FF3366]" style={{ fontFamily: MONO }}>{sendError}</p>}
     </div>
@@ -1654,7 +1683,9 @@ function ListingDetailDrawer({ item, query, onClose }: { item: SearchResultItem 
 // — Main search results —
 function SearchResultsContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const query = String(searchParams.get("q") || "").trim()
+  const searchTier: SearchTier = searchParams.get("tier") === "premium" ? "premium" : "free"
 
   const [sort, setSort]             = useState(() => readSearchFiltersStorage().sort)
   const [sources, setSources]       = useState<Set<string>>(() => readSearchFiltersStorage().sources)
@@ -1674,6 +1705,10 @@ function SearchResultsContent() {
   const [parsedListings, setParsedListings] = useState(0)
   const [excludedListings, setExcludedListings] = useState(0)
   const [marketplaceStatus, setMarketplaceStatus] = useState<MarketplaceStatus>({ successful: 0, total: 0, failed: [], blocked: [] })
+  const [marketplaceCoverage, setMarketplaceCoverage] = useState<MarketplaceCoverage[]>([])
+  const [premiumToken, setPremiumToken] = useState(() =>
+    typeof window === "undefined" ? "" : window.sessionStorage.getItem(PREMIUM_TEST_TOKEN_STORAGE_KEY) || ""
+  )
   const [isLoading, setIsLoading]   = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchReportOpen, setSearchReportOpen] = useState(true)
@@ -1687,6 +1722,26 @@ function SearchResultsContent() {
   const [loaderProgress, setLoaderProgress] = useState(0)
   const [loaderDone, setLoaderDone]       = useState(false)
   const loaderTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  function configurePremiumAccess() {
+    const token = window.prompt("Token intern pentru testarea Premium:", "")?.trim() || ""
+    if (!token) return false
+    window.sessionStorage.setItem(PREMIUM_TEST_TOKEN_STORAGE_KEY, token)
+    setPremiumToken(token)
+    return true
+  }
+
+  function selectSearchTier(nextTier: SearchTier) {
+    if (nextTier === "premium" && !premiumToken && !configurePremiumAccess()) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tier", nextTier)
+    router.push(`/search?${params.toString()}`)
+  }
+
+  function resetPremiumAccess() {
+    window.sessionStorage.removeItem(PREMIUM_TEST_TOKEN_STORAGE_KEY)
+    setPremiumToken("")
+  }
 
   useEffect(() => {
     writeStringSetStorage(SAVED_LISTINGS_STORAGE_KEY, savedListings)
@@ -1725,11 +1780,20 @@ function SearchResultsContent() {
         setParsedListings(0)
         setExcludedListings(0)
         setMarketplaceStatus({ successful: 0, total: 0, failed: [], blocked: [] })
+        setMarketplaceCoverage([])
         setSelectedListing(null)
         setIsLoading(false)
         setShowLoader(false)
         setLoaderProgress(0)
         setLoaderDone(false)
+        return
+      }
+
+      if (searchTier === "premium" && !premiumToken) {
+        setError("Adaugă tokenul intern pentru a porni testul Premium.")
+        setMarketplaceCoverage([])
+        setIsLoading(false)
+        setShowLoader(false)
         return
       }
 
@@ -1758,7 +1822,11 @@ function SearchResultsContent() {
         pages: String(SEARCH_PAGE_LIMIT),
       })
 
-      fetch(`/api/search/free?${params.toString()}`, { signal: controller.signal })
+      const searchEndpoint = searchTier === "premium" ? "/api/search/premium" : "/api/search/free"
+      fetch(`${searchEndpoint}?${params.toString()}`, {
+        signal: controller.signal,
+        headers: searchTier === "premium" ? { authorization: `Bearer ${premiumToken}` } : undefined,
+      })
         .then(async (response) => {
           const payload = await readJsonResponse(response)
           if (!response.ok || payload.error) {
@@ -1783,6 +1851,13 @@ function SearchResultsContent() {
               .map((result) => (result.site || "marketplace").toUpperCase()),
             blocked: (payload.summary?.blockedMarketplaces || []).map((site) => site.toUpperCase()),
           })
+          setMarketplaceCoverage((payload.results || []).map((result) => ({
+            site: String(result.site || "marketplace").toUpperCase(),
+            provider: String(result.provider || "unknown"),
+            ok: Boolean(result.ok),
+            itemCount: Number(result.itemCount ?? result.items?.length ?? 0),
+            error: String(result.error || ""),
+          })))
         })
         .catch((searchError) => {
           if (controller.signal.aborted) return
@@ -1797,6 +1872,7 @@ function SearchResultsContent() {
           setExcludedListings(0)
           setError(searchError instanceof Error ? searchError.message : String(searchError))
           setMarketplaceStatus({ successful: 0, total: 0, failed: [], blocked: [] })
+          setMarketplaceCoverage([])
         })
         .finally(() => {
           if (controller.signal.aborted) return
@@ -1821,7 +1897,7 @@ function SearchResultsContent() {
       controller.abort()
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
     }
-  }, [query])
+  }, [premiumToken, query, searchTier])
 
   useEffect(() => {
     const id = setInterval(() => setTime(formatSearchTime()), 30_000)
@@ -1967,7 +2043,7 @@ function SearchResultsContent() {
     <div className="flex flex-col flex-1 pb-14" style={{ background: CREAM, fontFamily: MONO, color: INK }}>
 
       {/* Loading overlay — rendered above everything */}
-      {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} />}
+      {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} tier={searchTier} />}
       <ListingDetailDrawer item={selectedListing} query={query} onClose={() => setSelectedListing(null)} />
       <EmailCapturePopup
         enabled={Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
@@ -1976,7 +2052,7 @@ function SearchResultsContent() {
         bestOfferSource={shownBestOffer?.source}
       />
 
-      <SearchNav query={query} />
+      <SearchNav query={query} tier={searchTier} />
 
       {/* Session header */}
       <header
@@ -1988,9 +2064,33 @@ function SearchResultsContent() {
           <span>Query: <span style={{ color: PINK }}>{query ? `“${query}”` : "—"}</span></span>
           <span style={{ color: PINK }}>{filteredResults.length} Matches Found</span>
         </div>
-        <div className="flex items-center gap-3 text-[11px] uppercase font-bold px-3 py-1.5" style={{ background: "white", border: `1px solid ${INK}` }}>
-          <div className="w-2 h-2 animate-pulse" style={{ background: "#22C55E" }} />
-          <span>Live <span className="mx-2">|</span> {updatedLabel === "în timp real" ? time : updatedLabel}</span>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex" style={{ border: `1px solid ${INK}` }}>
+            {(["free", "premium"] as SearchTier[]).map((tier) => (
+              <button
+                key={tier}
+                type="button"
+                onClick={() => selectSearchTier(tier)}
+                className="px-3 py-2 text-[10px] font-bold uppercase"
+                style={{
+                  background: searchTier === tier ? (tier === "premium" ? PINK : INK) : "white",
+                  color: searchTier === tier ? "white" : INK,
+                  borderLeft: tier === "premium" ? `1px solid ${INK}` : "none",
+                }}
+              >
+                {tier === "premium" ? "Premium test" : "Free"}
+              </button>
+            ))}
+          </div>
+          {searchTier === "premium" && premiumToken && (
+            <button type="button" onClick={resetPremiumAccess} className="px-2 py-2 text-[9px] font-bold uppercase underline">
+              Resetează token
+            </button>
+          )}
+          <div className="flex items-center gap-3 text-[11px] uppercase font-bold px-3 py-1.5" style={{ background: "white", border: `1px solid ${INK}` }}>
+            <div className="w-2 h-2 animate-pulse" style={{ background: "#22C55E" }} />
+            <span>Live <span className="mx-2">|</span> {updatedLabel === "în timp real" ? time : updatedLabel}</span>
+          </div>
         </div>
       </header>
 
@@ -2067,7 +2167,35 @@ function SearchResultsContent() {
 
           {error && (
             <section className="p-4 text-[12px] uppercase font-bold" style={{ border: `1px solid ${INK}`, background: "white", color: PINK }}>
-              &gt; {error}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>&gt; {error}</span>
+                {searchTier === "premium" && (
+                  <button type="button" onClick={configurePremiumAccess} className="px-3 py-2 text-[10px] uppercase" style={{ border: `1px solid ${PINK}` }}>
+                    Configurează accesul
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
+
+          {marketplaceCoverage.length > 0 && (
+            <section style={{ border: `1px solid ${INK}`, background: "white" }}>
+              <PanelHeader title={`Marketplace Coverage · ${searchTier}`} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+                {marketplaceCoverage.map((source) => (
+                  <div key={source.site} className="flex min-w-0 items-center justify-between gap-3 p-3 text-[10px] font-bold uppercase" style={{ borderRight: `1px solid ${INK}22`, borderBottom: `1px solid ${INK}22` }}>
+                    <div className="min-w-0">
+                      <div className="truncate">{source.site}</div>
+                      <div className="truncate text-[8px]" style={{ color: `${INK}66` }}>{source.provider}</div>
+                      {!source.ok && source.error && <div className="mt-1 truncate text-[8px]" title={source.error} style={{ color: PINK }}>{source.error}</div>}
+                    </div>
+                    <div className="flex flex-none items-center gap-2">
+                      <span style={{ color: source.ok ? GREEN : PINK }}>{source.ok ? source.itemCount : "ERR"}</span>
+                      <span className="h-2 w-2 rounded-full" style={{ background: source.ok ? GREEN : PINK }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </section>
           )}
 

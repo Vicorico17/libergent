@@ -80,6 +80,8 @@ export type ApiListing = {
 export type ApiResult = {
   ok: boolean;
   site?: string;
+  provider?: string;
+  itemCount?: number;
   items?: ApiListing[];
   rawItemCount?: number;
   parsedItemCount?: number;
@@ -90,6 +92,7 @@ export type ApiResult = {
 };
 
 export type SearchPayload = {
+  searchTier?: "free" | "premium";
   results?: ApiResult[];
   summary?: {
     totalListings?: number;

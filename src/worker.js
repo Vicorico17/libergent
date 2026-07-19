@@ -402,6 +402,23 @@ async function resolveListingPhones(targetUrl, html, cookieHeader = "", env = {}
   return { phones: extractPhonesFromListing({ html }), debug: { provider: "html" } };
 }
 
+function classifyContactLookup(result = {}) {
+  if (Array.isArray(result.phones) && result.phones.length) {
+    return "phone_found";
+  }
+  const browserSignals = result.debug?.browser?.pageSignals || [];
+  if (browserSignals.includes("verification")) {
+    return "verification_required";
+  }
+  if (browserSignals.includes("login")) {
+    return "login_required";
+  }
+  if (result.debug?.browser?.error) {
+    return "browser_error";
+  }
+  return "phone_not_available";
+}
+
 async function handleApi(request, env) {
   applyEnv(env);
 
@@ -741,7 +758,13 @@ async function handleApi(request, env) {
       const cookieHeader = getResponseCookieHeader(response);
       const html = await response.text();
       const result = await resolveListingPhones(targetUrl, html, cookieHeader, env);
-      return json({ ok: true, phones: result.phones, debug: result.debug }, 200);
+      return json({
+        ok: true,
+        marketplace: targetUrl.hostname.replace(/^www\./, ""),
+        contactStatus: classifyContactLookup(result),
+        phones: result.phones,
+        debug: result.debug
+      }, 200);
     } catch (error) {
       return json({ ok: false, phones: [], error: error instanceof Error ? error.message : String(error) }, 502);
     }

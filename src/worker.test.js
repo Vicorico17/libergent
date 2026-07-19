@@ -128,6 +128,8 @@ test("resolves OLX listing phones through the OLX offer phone endpoint", async (
 
   assert.equal(response.status, 200);
   assert.deepEqual(payload.phones, ["+40767209070"]);
+  assert.equal(payload.contactStatus, "phone_found");
+  assert.equal(payload.marketplace, "olx.ro");
   assert.equal(payload.debug.offerId, "299484800");
   assert.equal(requestedUrls[1], "https://www.olx.ro/api/v1/offers/299484800/phones/");
 });

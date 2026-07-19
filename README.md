@@ -226,6 +226,8 @@ curl -H "Authorization: Bearer $LIBERGENT_PREMIUM_TOKEN" \
 
 Premium search requires both the `BROWSER` binding and a `LIBERGENT_PREMIUM_TOKEN` Wrangler secret. The admin token is also accepted for internal testing. Browser marketplaces run with bounded concurrency and a maximum of 30 parsed items per source.
 
+During the internal test phase, select **Premium test** on the search page and enter either `LIBERGENT_PREMIUM_TOKEN` or `LIBERGENT_ADMIN_TOKEN`. The token is kept in `sessionStorage` for the current browser tab only. The coverage panel then reports each marketplace's provider, result count, and failure reason.
+
 Direct scraping does not require provider secrets. If you later use Cloudflare Browser Rendering as an explicit scraping fallback, configure `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in Wrangler secrets.
 
 ## Usage
