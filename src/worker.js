@@ -226,7 +226,17 @@ function getOlxOfferIdFromHtml(html = "") {
   return "";
 }
 
-async function fetchOlxOfferPhones(targetUrl, html) {
+function getResponseCookieHeader(response) {
+  const setCookies = typeof response.headers.getSetCookie === "function"
+    ? response.headers.getSetCookie()
+    : [response.headers.get("set-cookie")].filter(Boolean);
+  return setCookies
+    .map((value) => String(value).split(";", 1)[0].trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
+async function fetchOlxOfferPhones(targetUrl, html, cookieHeader = "") {
   const offerId = getOlxOfferIdFromHtml(html);
   if (!offerId) {
     return { phones: [], debug: { offerId: "", attempts: [] } };
@@ -238,7 +248,10 @@ async function fetchOlxOfferPhones(targetUrl, html) {
       headers: {
         "user-agent": "Mozilla/5.0 (compatible; LiberGent/1.0; +https://libergent.com)",
         accept: "application/json, text/plain, */*",
-        referer: targetUrl.toString()
+        "accept-language": "ro-RO,ro;q=0.9,en;q=0.8",
+        "x-requested-with": "XMLHttpRequest",
+        referer: targetUrl.toString(),
+        ...(cookieHeader ? { cookie: cookieHeader } : {})
       },
       redirect: "follow",
       signal: AbortSignal.timeout(10000)
@@ -259,10 +272,10 @@ async function fetchOlxOfferPhones(targetUrl, html) {
     const payload = await response.json().catch(() => null);
     const phones = extractOlxPhonesFromPayload(payload);
     attempts.push({ endpoint, status: response.status, phones: phones.length });
-    if (phones.length) return { phones, debug: { offerId, attempts } };
+    if (phones.length) return { phones, debug: { offerId, cookieReceived: Boolean(cookieHeader), attempts } };
   }
 
-  return { phones: [], debug: { offerId, attempts } };
+  return { phones: [], debug: { offerId, cookieReceived: Boolean(cookieHeader), attempts } };
 }
 
 function extractOlxPhonesFromPayload(payload) {
@@ -286,9 +299,9 @@ function extractOlxPhonesFromPayload(payload) {
   return [...new Set(values.flatMap(extractRomanianMobilePhones))];
 }
 
-async function resolveListingPhones(targetUrl, html) {
+async function resolveListingPhones(targetUrl, html, cookieHeader = "") {
   if (targetUrl.hostname === "www.olx.ro" || targetUrl.hostname.endsWith(".olx.ro")) {
-    const olxPhones = await fetchOlxOfferPhones(targetUrl, html);
+    const olxPhones = await fetchOlxOfferPhones(targetUrl, html, cookieHeader);
     if (olxPhones.phones.length) {
       return olxPhones;
     }
@@ -581,8 +594,9 @@ async function handleApi(request, env) {
       if (!response.ok) {
         return json({ ok: false, phones: [], error: `Listing fetch failed (${response.status}).` }, 502);
       }
+      const cookieHeader = getResponseCookieHeader(response);
       const html = await response.text();
-      const result = await resolveListingPhones(targetUrl, html);
+      const result = await resolveListingPhones(targetUrl, html, cookieHeader);
       return json({ ok: true, phones: result.phones, debug: result.debug }, 200);
     } catch (error) {
       return json({ ok: false, phones: [], error: error instanceof Error ? error.message : String(error) }, 502);

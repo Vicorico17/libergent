@@ -177,3 +177,34 @@ test("falls back to OLX limited-phones when the regular endpoint is empty", asyn
   assert.equal(requestedUrls[1], "https://www.olx.ro/api/v1/offers/421339/phones/");
   assert.equal(requestedUrls[2], "https://www.olx.ro/api/v1/offers/421339/limited-phones/");
 });
+
+test("keeps OLX listing cookies when requesting the seller phone", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let phoneRequest;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).includes("/api/v1/offers/421340/phones/")) {
+      phoneRequest = init;
+      return new Response(JSON.stringify({ data: { phones: ["0722 333 444"] } }), { status: 200 });
+    }
+    return new Response('<script>window.state = {"ad":{"id":421340,"title":"Aparat"}}</script>', {
+      status: 200,
+      headers: { "set-cookie": "device_id=public-session; Path=/; Secure; HttpOnly" }
+    });
+  };
+
+  const listingUrl = "https://www.olx.ro/d/oferta/espressor-IDcookie.html";
+  const response = await worker.fetch(
+    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`),
+    {}
+  );
+  const payload = await response.json();
+
+  assert.deepEqual(payload.phones, ["+40722333444"]);
+  assert.equal(payload.debug.cookieReceived, true);
+  assert.equal(phoneRequest.headers.cookie, "device_id=public-session");
+  assert.equal(phoneRequest.headers["x-requested-with"], "XMLHttpRequest");
+});
