@@ -209,7 +209,21 @@ function normalizeInboundWhatsAppPayload(body = {}) {
 }
 
 function getOlxOfferIdFromHtml(html = "") {
-  return String(html.match(/\\+\"id\\+\":(\d+),\\+\"title\\+\"/)?.[1] || "").trim();
+  const normalizedHtml = String(html)
+    .replace(/\\+\"/g, '"')
+    .replace(/\\u0022/gi, '"');
+
+  const patterns = [
+    /["'](?:ad|offer)["'][\s\S]{0,300}?["'](?:id|offerId|offer_id)["']\s*:\s*["']?(\d+)/i,
+    /(?:data-ad-id|data-offer-id)\s*=\s*["'](\d+)["']/i,
+    /["'](?:id|offerId|offer_id)["']\s*:\s*["']?(\d+)["']?\s*,\s*["']title["']/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = normalizedHtml.match(pattern);
+    if (match?.[1]) return match[1].trim();
+  }
+  return "";
 }
 
 async function fetchOlxOfferPhones(targetUrl, html) {
