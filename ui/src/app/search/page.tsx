@@ -942,6 +942,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
   const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle")
   const [sendError, setSendError] = useState("")
   const [sentTarget, setSentTarget] = useState("")
+  const [contactLookupDebug, setContactLookupDebug] = useState("")
 
   async function copyMessage() {
     try {
@@ -968,14 +969,22 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
 
   async function sendWhatsApp() {
     let phone = ""
+    setContactLookupDebug("")
     if (item.url) {
       setSendState("sending")
       try {
         const response = await fetch(`/api/marketplace/contact?url=${encodeURIComponent(item.url)}`)
         const payload = await response.json().catch(() => ({}))
         phone = Array.isArray(payload.phones) ? String(payload.phones[0] || "") : ""
+        if (phone) {
+          setContactLookupDebug(`Lookup: ${response.status} · phone found ${phone}`)
+        } else {
+          const detail = typeof payload.error === "string" ? ` · ${payload.error}` : " · no phone returned"
+          setContactLookupDebug(`Lookup: ${response.status}${detail}`)
+        }
       } catch {
         phone = ""
+        setContactLookupDebug("Lookup: request failed before receiving a response")
       }
       setSendState("idle")
     }
@@ -1073,6 +1082,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
         </span>
       )}
       {sendState === "sent" && sentTarget && <p className="basis-full text-[10px] text-[#22C55E]" style={{ fontFamily: MONO }}>Trimis către {sentTarget}</p>}
+      {contactLookupDebug && <p className="basis-full text-[10px] text-[#B45309]" style={{ fontFamily: MONO }}>{contactLookupDebug}</p>}
       {sendState === "error" && <p className="basis-full text-[10px] text-[#FF3366]" style={{ fontFamily: MONO }}>{sendError}</p>}
     </div>
   )
