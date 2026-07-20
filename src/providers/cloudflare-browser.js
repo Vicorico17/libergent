@@ -190,7 +190,14 @@ export async function searchMarketplaceWithBrowser(
   try {
     page = await browser.newPage();
     await page.setViewport({ width: 1440, height: 1000 });
-    const response = await page.goto(url, { waitUntil: "networkidle2", timeout: site.timeoutMs || 30000 });
+    const response = await page.goto(url, {
+      waitUntil: site.browserWaitUntil || "networkidle2",
+      timeout: site.timeoutMs || 30000
+    });
+    const browserWaitForMs = Math.max(0, Math.min(Number(site.browserWaitForMs) || 0, 5000));
+    if (browserWaitForMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, browserWaitForMs));
+    }
     const html = await page.content();
     const parsed = parseSiteHtml({ site, html, url, limit });
     const bodyText = includeBodyText

@@ -89,7 +89,7 @@ function preferBrowserFallback(directResult, browserResult) {
 }
 
 function buildPremiumCacheRequest(request, params) {
-  const cacheUrl = new URL("/api/search/premium-cache/v3", request.url);
+  const cacheUrl = new URL("/api/search/premium-cache/v4", request.url);
   cacheUrl.searchParams.set("q", params.query.trim().toLocaleLowerCase("ro-RO"));
   cacheUrl.searchParams.set("condition", params.condition);
   cacheUrl.searchParams.set("provider", params.provider);

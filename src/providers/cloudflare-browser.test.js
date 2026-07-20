@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser, searchMarketplacesWithBrowser } from "./cloudflare-browser.js";
+import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser, searchMarketplaceWithBrowser, searchMarketplacesWithBrowser } from "./cloudflare-browser.js";
 
 test("returns an unconfigured result without launching a browser", async () => {
   let launched = false;
@@ -129,4 +129,33 @@ test("searches multiple marketplaces with one shared browser session", async () 
   assert.equal(pageCloses, 2);
   assert.equal(browserCloses, 1);
   assert.equal(results.reduce((sum, result) => sum + result.browserSessionsUsed, 0), 1);
+});
+
+test("uses site-specific browser navigation readiness for long-lived retail pages", async () => {
+  let gotoOptions;
+  const launch = async () => ({
+    newPage: async () => ({
+      setViewport: async () => {},
+      goto: async (_url, options) => {
+        gotoOptions = options;
+        return { status: () => 200 };
+      },
+      content: async () => "<html><body>No products</body></html>",
+      evaluate: async () => "No products",
+      url: () => "https://retailer.example/search",
+      close: async () => {}
+    }),
+    close: async () => {}
+  });
+  const site = {
+    key: "retailer.ro",
+    strategy: "direct-html-retail",
+    timeoutMs: 16000,
+    browserWaitUntil: "domcontentloaded",
+    searchUrl: () => "https://retailer.example/search"
+  };
+
+  await searchMarketplaceWithBrowser({}, { site, query: "ps5", limit: 5 }, { launch });
+
+  assert.deepEqual(gotoOptions, { waitUntil: "domcontentloaded", timeout: 16000 });
 });
