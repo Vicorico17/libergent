@@ -223,7 +223,7 @@ curl "https://YOUR_DOMAIN/api/search/free?q=iphone&site=all&limit=30"
 curl "https://YOUR_DOMAIN/api/search/premium?q=iphone&site=all&limit=30"
 ```
 
-During the internal testing phase, Premium search requires only the `BROWSER` binding. No account, payment, or test token is required. Browser marketplaces run with bounded concurrency and a maximum of 30 parsed items per source.
+During the internal testing phase, Premium search requires only the `BROWSER` binding. No account, payment, or test token is required. Premium searches try the free direct parser first and render only missing sources, with one shared browser session and at most two browser fallbacks by default. Set `PREMIUM_BROWSER_FALLBACK_LIMIT` to adjust that cap. Identical Premium searches are cached for five minutes, and listing contact lookups are cached for fifteen minutes, so refreshes and repeated clicks do not open another browser session.
 
 Select **Free** or **Premium test** directly on the search page. The coverage panel reports each marketplace's provider, result count, and failure reason. Authentication and paid access can be added after Premium marketplace coverage has been validated.
 

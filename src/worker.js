@@ -22,6 +22,18 @@ import {
 } from "./api-params.js";
 
 const LEAD_API_PATHS = new Set(["/api/leads", "/api/lead", "/api/email-leads", "/api/email_leads", "/api/waitlist"]);
+const PREMIUM_SEARCH_CACHE_SECONDS = 300;
+const MARKETPLACE_CONTACT_CACHE_SECONDS = 900;
+const DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT = 2;
+const PREMIUM_BROWSER_FALLBACK_PRIORITY = [
+  "emag.ro",
+  "compari.ro",
+  "pcgarage.ro",
+  "evomag.ro",
+  "altex.ro",
+  "flanco.ro",
+  "cel.ro"
+];
 
 function normalizeApiPathname(pathname = "") {
   return pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
@@ -51,6 +63,85 @@ function json(payload, status = 200) {
       "cache-control": "no-store"
     }
   });
+}
+
+function getPremiumBrowserFallbackLimit(env = {}) {
+  const configured = Number.parseInt(String(env.PREMIUM_BROWSER_FALLBACK_LIMIT || ""), 10);
+  if (!Number.isFinite(configured)) return DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT;
+  return Math.max(0, Math.min(configured, PREMIUM_BROWSER_SITE_KEYS.length));
+}
+
+function needsBrowserFallback(result) {
+  if (!result?.ok) return true;
+  const parsedCount = result.parsedItemCount ?? result.rawItemCount ?? result.itemCount ?? result.items?.length ?? 0;
+  return parsedCount === 0;
+}
+
+function buildPremiumCacheRequest(request, params) {
+  const cacheUrl = new URL("/api/search/premium-cache/v2", request.url);
+  cacheUrl.searchParams.set("q", params.query.trim().toLocaleLowerCase("ro-RO"));
+  cacheUrl.searchParams.set("condition", params.condition);
+  cacheUrl.searchParams.set("provider", params.provider);
+  cacheUrl.searchParams.set("site", params.site);
+  cacheUrl.searchParams.set("limit", String(params.limit ?? ""));
+  cacheUrl.searchParams.set("pages", String(params.maxPages ?? ""));
+  return new Request(cacheUrl, { method: "GET" });
+}
+
+async function readPremiumSearchCache(cacheRequest) {
+  const cache = globalThis.caches?.default;
+  if (!cache) return null;
+  const response = await cache.match(cacheRequest);
+  if (!response) return null;
+  const payload = await response.json().catch(() => null);
+  if (!payload) return null;
+  payload.summary = { ...payload.summary, cacheHit: true, browserSessionsUsed: 0 };
+  return json(payload, 200);
+}
+
+function writePremiumSearchCache(cacheRequest, payload, context) {
+  const cache = globalThis.caches?.default;
+  if (!cache) return;
+  const response = new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": `public, max-age=${PREMIUM_SEARCH_CACHE_SECONDS}`
+    }
+  });
+  const operation = cache.put(cacheRequest, response).catch(() => {});
+  if (context?.waitUntil) context.waitUntil(operation);
+}
+
+function buildMarketplaceContactCacheRequest(request, targetUrl) {
+  const cacheUrl = new URL("/api/marketplace/contact-cache/v1", request.url);
+  cacheUrl.searchParams.set("url", `${targetUrl.origin}${targetUrl.pathname}`);
+  return new Request(cacheUrl, { method: "GET" });
+}
+
+async function readMarketplaceContactCache(cacheRequest) {
+  const cache = globalThis.caches?.default;
+  if (!cache) return null;
+  const response = await cache.match(cacheRequest);
+  if (!response) return null;
+  const payload = await response.json().catch(() => null);
+  if (!payload) return null;
+  payload.debug = { ...payload.debug, cacheHit: true };
+  return json(payload, 200);
+}
+
+function writeMarketplaceContactCache(cacheRequest, payload, context) {
+  const cache = globalThis.caches?.default;
+  if (!cache) return;
+  const response = new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": `public, max-age=${MARKETPLACE_CONTACT_CACHE_SECONDS}`
+    }
+  });
+  const operation = cache.put(cacheRequest, response).catch(() => {});
+  if (context?.waitUntil) context.waitUntil(operation);
 }
 
 function getBearerTokenFromRequest(request) {
@@ -131,12 +222,13 @@ function getFreeSearchSiteKeys(site, query) {
       : [getSite(site).key];
 }
 
-async function searchPremiumBrowserSites(env, { query, limit }) {
+async function searchPremiumBrowserSites(env, { query, limit, siteKeys }) {
+  if (!siteKeys.length) return [];
   const browserLimit = Math.min(limit ?? 20, 30);
   try {
     const results = await searchMarketplacesWithBrowser(
       env.BROWSER,
-      PREMIUM_BROWSER_SITE_KEYS.map((siteKey) => ({ site: getSite(siteKey), query, limit: browserLimit })),
+      siteKeys.map((siteKey) => ({ site: getSite(siteKey), query, limit: browserLimit })),
       { includeBodyText: true, concurrency: 2 }
     );
     return results.map((result) => {
@@ -144,7 +236,7 @@ async function searchPremiumBrowserSites(env, { query, limit }) {
       return { ok: false, site: result.site, query, provider: "cloudflare-browser", error: "Browser challenge detected." };
     });
   } catch (error) {
-    return PREMIUM_BROWSER_SITE_KEYS.map((siteKey) => ({
+    return siteKeys.map((siteKey) => ({
       ok: false,
       site: siteKey,
       query,
@@ -434,7 +526,7 @@ function classifyContactLookup(result = {}) {
   return "phone_not_available";
 }
 
-async function handleApi(request, env) {
+async function handleApi(request, env, context) {
   applyEnv(env);
 
   const url = new URL(request.url);
@@ -519,16 +611,29 @@ async function handleApi(request, env) {
     }
 
     try {
-      const { query, condition, provider, site, limit, maxPages } = getSearchRequestParams(url);
+      const params = getSearchRequestParams(url);
+      const { query, condition, provider, site, limit, maxPages } = params;
       if (site !== "all" && site !== "default") {
         return json({ error: "Premium search currently supports site=all or site=default." }, 400);
       }
 
+      const cacheRequest = buildPremiumCacheRequest(request, params);
+      const cachedResponse = await readPremiumSearchCache(cacheRequest);
+      if (cachedResponse) return cachedResponse;
+
       const freeSiteKeys = getFreeSearchSiteKeys(site, query).filter((siteKey) => !PREMIUM_BROWSER_SITE_KEYS.includes(siteKey));
-      const [freePayload, premiumResults] = await Promise.all([
+      const [freePayload, directPremiumPayload] = await Promise.all([
         searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys: freeSiteKeys }),
-        searchPremiumBrowserSites(env, { query, limit })
+        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages: 1, siteKeys: PREMIUM_BROWSER_SITE_KEYS })
       ]);
+      const directPremiumBySite = new Map(directPremiumPayload.results.map((result) => [result.site, result]));
+      const browserFallbackLimit = getPremiumBrowserFallbackLimit(env);
+      const browserSiteKeys = PREMIUM_BROWSER_FALLBACK_PRIORITY
+        .filter((siteKey) => needsBrowserFallback(directPremiumBySite.get(siteKey)))
+        .slice(0, browserFallbackLimit);
+      const browserResults = await searchPremiumBrowserSites(env, { query, limit, siteKeys: browserSiteKeys });
+      const browserBySite = new Map(browserResults.map((result) => [result.site, result]));
+      const premiumResults = PREMIUM_BROWSER_SITE_KEYS.map((siteKey) => browserBySite.get(siteKey) || directPremiumBySite.get(siteKey));
       const payload = aggregateMarketplaceResults(
         [...freePayload.results, ...premiumResults],
         {
@@ -538,12 +643,16 @@ async function handleApi(request, env) {
         }
       );
       payload.searchTier = "premium";
-      payload.summary.browserMarketplaces = PREMIUM_BROWSER_SITE_KEYS.length;
-      payload.summary.successfulBrowserMarketplaces = premiumResults.filter((result) => result?.ok).length;
-      payload.summary.browserSessionsUsed = premiumResults.reduce((sum, result) => sum + (result?.browserSessionsUsed || 0), 0);
+      payload.summary.browserEligibleMarketplaces = PREMIUM_BROWSER_SITE_KEYS.length;
+      payload.summary.browserFallbackLimit = browserFallbackLimit;
+      payload.summary.browserMarketplaces = browserResults.length;
+      payload.summary.successfulBrowserMarketplaces = browserResults.filter((result) => result?.ok).length;
+      payload.summary.browserSessionsUsed = browserResults.reduce((sum, result) => sum + (result?.browserSessionsUsed || 0), 0);
+      payload.summary.cacheHit = false;
 
       const siteKeys = [...freeSiteKeys, ...PREMIUM_BROWSER_SITE_KEYS];
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider: "premium-browser", siteKeys, payload }), env);
+      writePremiumSearchCache(cacheRequest, payload, context);
       return json(payload, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -818,6 +927,10 @@ async function handleApi(request, env) {
       return json({ ok: false, error: "Listing host is not supported." }, 400);
     }
 
+    const contactCacheRequest = buildMarketplaceContactCacheRequest(request, targetUrl);
+    const cachedContactResponse = await readMarketplaceContactCache(contactCacheRequest);
+    if (cachedContactResponse) return cachedContactResponse;
+
     try {
       const response = await fetch(targetUrl.toString(), {
         headers: {
@@ -833,13 +946,15 @@ async function handleApi(request, env) {
       const cookieHeader = getResponseCookieHeader(response);
       const html = await response.text();
       const result = await resolveListingPhones(targetUrl, html, cookieHeader, env);
-      return json({
+      const payload = {
         ok: true,
         marketplace: targetUrl.hostname.replace(/^www\./, ""),
         contactStatus: classifyContactLookup(result),
         phones: result.phones,
-        debug: result.debug
-      }, 200);
+        debug: { ...result.debug, cacheHit: false }
+      };
+      writeMarketplaceContactCache(contactCacheRequest, payload, context);
+      return json(payload, 200);
     } catch (error) {
       return json({ ok: false, phones: [], error: error instanceof Error ? error.message : String(error) }, 502);
     }
@@ -881,11 +996,11 @@ async function handleApi(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, context) {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith("/api/")) {
-      return handleApi(request, env);
+      return handleApi(request, env, context);
     }
 
     return env.ASSETS.fetch(request);

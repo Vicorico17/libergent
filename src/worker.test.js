@@ -34,6 +34,28 @@ test("allows Premium testing without a token and requires Browser Run", async ()
   assert.match(payload.error, /browser run/i);
 });
 
+test("Premium search skips Browser Run when direct marketplace results are usable", async (t) => {
+  const originalMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
+  t.after(() => {
+    if (originalMockSearch === undefined) {
+      delete process.env.LIBERGENT_MOCK_SEARCH;
+    } else {
+      process.env.LIBERGENT_MOCK_SEARCH = originalMockSearch;
+    }
+  });
+
+  const response = await worker.fetch(
+    new Request("https://libergent.test/api/search/premium?q=iphone&site=all&limit=5"),
+    { BROWSER: {}, LIBERGENT_MOCK_SEARCH: "1" }
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.summary.browserMarketplaces, 0);
+  assert.equal(payload.summary.browserSessionsUsed, 0);
+  assert.equal(payload.summary.browserFallbackLimit, 2);
+});
+
 test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
   const originalFetch = globalThis.fetch;
   let bridgeRequest;
