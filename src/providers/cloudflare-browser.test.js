@@ -128,4 +128,5 @@ test("searches multiple marketplaces with one shared browser session", async () 
   assert.equal(launches, 1);
   assert.equal(pageCloses, 2);
   assert.equal(browserCloses, 1);
+  assert.equal(results.reduce((sum, result) => sum + result.browserSessionsUsed, 0), 1);
 });

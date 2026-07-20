@@ -265,7 +265,10 @@ export async function searchMarketplacesWithBrowser(
   try {
     const workerCount = Math.max(1, Math.min(Number(concurrency) || 1, searches.length));
     await Promise.all(Array.from({ length: workerCount }, () => pageWorker()));
-    return results;
+    return results.map((result, index) => ({
+      ...result,
+      browserSessionsUsed: index === 0 ? 1 : 0
+    }));
   } finally {
     await browser.close();
   }
