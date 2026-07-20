@@ -211,7 +211,7 @@ Run marketplaces one at a time to keep browser usage and Worker execution time b
 
 ### Free and Premium search APIs
 
-Free search uses direct marketplace connections and never starts Browser Run:
+Free search uses direct marketplace connections and never starts Browser Run. In the HTTP API, `provider=auto` is resolved to `direct` for this tier; remote providers remain available only when requested explicitly:
 
 ```bash
 curl "https://YOUR_DOMAIN/api/search/free?q=iphone&site=all&limit=30"

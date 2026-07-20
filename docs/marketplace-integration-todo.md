@@ -58,6 +58,7 @@ This file tracks marketplaces we still need to add or harden before advertising 
 - Premium direct-first: eMAG, evoMAG, CEL.ro, Compari, PC Garage, Flanco, and Altex.
 - Browser-eligible only after a failed or empty direct result: Okazii, Compari, PC Garage, Flanco, and Altex.
 - Direct-only even in Premium: eMAG, evoMAG, CEL.ro, BestAuto, Flip, and Klap.
+- Free API searches resolve `provider=auto` to `direct`; remote browser providers run only when explicitly requested, while automatic browser fallback is owned by the Premium allowlist.
 
 ## Coverage and Provider Audit (2026-07-20)
 

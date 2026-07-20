@@ -587,17 +587,18 @@ async function handleApi(request, env, context) {
     try {
       const { query, condition, provider, site, limit, maxPages } = getSearchRequestParams(url);
       const siteKeys = getFreeSearchSiteKeys(site, query);
+      const freeProvider = provider === "auto" ? "direct" : provider;
 
       const payload = await searchAcrossSites({
         query,
         condition,
-        provider,
+        provider: freeProvider,
         limit,
         maxPages,
         siteKeys
       });
 
-      await persistSearchEvent(buildHistoryEntry({ query, condition, provider, siteKeys, payload }), env);
+      await persistSearchEvent(buildHistoryEntry({ query, condition, provider: freeProvider, siteKeys, payload }), env);
       return json({ ...payload, searchTier: "free" }, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -628,7 +629,7 @@ async function handleApi(request, env, context) {
 
       const freeSiteKeys = getFreeSearchSiteKeys(site, query).filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey));
       const [freePayload, directPremiumPayload] = await Promise.all([
-        searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys: freeSiteKeys }),
+        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages, siteKeys: freeSiteKeys }),
         searchAcrossSites({ query, condition, provider: "direct", limit, maxPages: 1, siteKeys: PREMIUM_SITE_KEYS })
       ]);
       const directResults = [...freePayload.results, ...directPremiumPayload.results];
