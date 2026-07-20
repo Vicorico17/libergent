@@ -50,7 +50,16 @@ const FREE_SOURCE_TIMING = [
   { name: "SHOPMANIA", start: 72, end: 96 },
 ]
 const AUTOVIT_SOURCE_TIMING = { name: "AUTOVIT", start: 56, end: 82 }
-const PREMIUM_SOURCES = ["COMPARI", "EMAG", "EVOMAG", "PC GARAGE", "ALTEX", "FLANCO", "CEL.RO"]
+const PREMIUM_SOURCE_TIMING = [
+  { name: "COMPARI",   start: 38, end: 70 },
+  { name: "EMAG",      start: 44, end: 76 },
+  { name: "EVOMAG",    start: 50, end: 82 },
+  { name: "PC GARAGE", start: 56, end: 88 },
+  { name: "ALTEX",     start: 62, end: 93 },
+  { name: "FLANCO",    start: 68, end: 96 },
+  { name: "CEL.RO",    start: 74, end: 99 },
+]
+const PREMIUM_SOURCES = PREMIUM_SOURCE_TIMING.map(({ name }) => name)
 const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const MAIN_BLOCKS   = 15
 const SOURCE_BLOCKS = 10
@@ -592,6 +601,7 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
   const step1 = progress > 30
   const step2 = progress > 60
   const step3 = progress > 90
+  const elapsedSeconds = Math.floor((tick * 400) / 1000)
   const activeSources = isLikelyVehicleSearch(query)
     ? [...FREE_SOURCE_TIMING, AUTOVIT_SOURCE_TIMING]
     : FREE_SOURCE_TIMING
@@ -639,14 +649,19 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between gap-3 pb-1 text-[10px] font-bold uppercase">
               <span>Căutare {tier === "premium" ? "Premium" : "Free"}</span>
-              <span style={{ color: GREEN }}>{activeSources.length + (tier === "premium" ? PREMIUM_SOURCES.length : 0)} surse active</span>
+              <span style={{ color: GREEN }}>
+                {done ? "finalizată" : `${activeSources.length + (tier === "premium" ? PREMIUM_SOURCES.length : 0)} surse · ${elapsedSeconds}s`}
+              </span>
             </div>
             {activeSources.map(({ name, start, end }) => {
               const lp = progress >= end ? 1 : progress <= start ? 0 : (progress - start) / (end - start)
               const filled = Math.floor(lp * SOURCE_BLOCKS)
-              const isComplete = lp === 1
+              const scanComplete = lp === 1
+              const isComplete = done
               const statusText = isComplete
                 ? "gata"
+                : scanComplete
+                ? "aștept răspuns"
                 : lp > 0
                 ? LOADER_STATUS[tick % LOADER_STATUS.length]
                 : "standby"
@@ -695,34 +710,81 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
           </div>
 
           {/* Premium source rows */}
-          <div
-            className="p-3"
-            style={{ border: `1px dashed ${INK}55`, background: `${INK}05` }}
-          >
+          <div className="p-3" style={{ border: `1px dashed ${INK}55`, background: `${INK}05` }}>
             <div className="flex items-center justify-between gap-3 mb-3 text-[10px] font-bold uppercase">
               <span className="flex items-center gap-2">
                 <Lock size={12} strokeWidth={2.4} /> Deep Search
               </span>
               <span style={{ color: tier === "premium" ? GREEN : PINK }}>{tier === "premium" ? "Premium activ" : "Premium blocat"}</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {PREMIUM_SOURCES.map((name) => (
-                <div
-                  key={name}
-                  className="flex items-center justify-between gap-2 px-2 py-1.5 text-[9px] font-bold uppercase"
-                  style={{
-                    border: `1px solid ${tier === "premium" ? GREEN : `${INK}22`}`,
-                    color: tier === "premium" ? INK : `${INK}66`,
-                    background: MODAL_BG,
-                  }}
-                >
-                  <span>{name}</span>
-                  {tier === "premium"
-                    ? <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: GREEN }} />
-                    : <Lock size={10} strokeWidth={2.2} />}
-                </div>
-              ))}
-            </div>
+            {tier === "premium" ? (
+              <div className="flex flex-col gap-2.5">
+                {PREMIUM_SOURCE_TIMING.map(({ name, start, end }) => {
+                  const lp = progress >= end ? 1 : progress <= start ? 0 : (progress - start) / (end - start)
+                  const filled = Math.floor(lp * SOURCE_BLOCKS)
+                  const scanComplete = lp === 1
+                  const isComplete = done
+                  const statusText = isComplete
+                    ? "gata"
+                    : scanComplete
+                    ? "aștept răspuns"
+                    : lp > 0
+                    ? LOADER_STATUS[tick % LOADER_STATUS.length]
+                    : "standby"
+
+                  return (
+                    <div key={name} className="flex items-center text-[11px] w-full uppercase">
+                      <div
+                        className={`w-2 h-2 rounded-full mr-3 flex-none ${isComplete ? "" : "animate-pulse"}`}
+                        style={{
+                          background: lp > 0 || isComplete ? GREEN : "#D2CFC6",
+                          boxShadow: lp > 0 && !isComplete ? `0 0 5px ${GREEN}` : "none",
+                        }}
+                      />
+                      <div className="font-bold" style={{ width: 76, flexShrink: 0 }}>{name}</div>
+                      <div className="flex-1 flex gap-[2px]">
+                        {Array.from({ length: SOURCE_BLOCKS }).map((_, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              width: 10,
+                              height: 10,
+                              background: i < filled ? PINK : "transparent",
+                              border: `1px solid ${i < filled ? PINK : "#D2CFC6"}`,
+                              transition: "background 0.1s, border-color 0.1s",
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div
+                        style={{
+                          width: 92,
+                          textAlign: "right",
+                          flexShrink: 0,
+                          color: isComplete ? INK : "#A8A69E",
+                          fontWeight: isComplete ? "bold" : "normal",
+                        }}
+                      >
+                        {statusText}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {PREMIUM_SOURCES.map((name) => (
+                  <div
+                    key={name}
+                    className="flex items-center justify-between gap-2 px-2 py-1.5 text-[9px] font-bold uppercase"
+                    style={{ border: `1px solid ${INK}22`, color: `${INK}66`, background: MODAL_BG }}
+                  >
+                    <span>{name}</span>
+                    <Lock size={10} strokeWidth={2.2} />
+                  </div>
+                ))}
+              </div>
+            )}
             <p className="mt-3 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}88` }}>
               {tier === "premium"
                 ? "Browser-assisted Deep Search rulează acum pe sursele suplimentare."
@@ -2067,7 +2129,7 @@ function SearchResultsContent() {
 
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
       loaderTimerRef.current = setInterval(() => {
-        prog = Math.min(94, prog + Math.max(1, Math.round((96 - prog) * 0.08)))
+        prog = Math.min(98, prog + Math.max(1, Math.round((99 - prog) * 0.08)))
         setLoaderProgress(prog)
       }, TICK)
 
@@ -2365,7 +2427,7 @@ function SearchResultsContent() {
                 style={{ border: `1px solid ${INK}`, color: INK }}
                 aria-expanded={searchReportOpen}
               >
-                Detalii căutare <span className={searchReportOpen ? "rotate-180" : ""}><ChevronDown size={14} /></span>
+                Raport Căutare <span className={searchReportOpen ? "rotate-180" : ""}><ChevronDown size={14} /></span>
               </button>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-6" style={{ background: "white" }}>
@@ -2389,34 +2451,73 @@ function SearchResultsContent() {
                 <span className="text-[11px] uppercase font-bold">{time || "00:20"}</span>
               </div>
             </div>
-            {searchReportOpen && marketplaceCoverage.length > 0 && (
+            {searchReportOpen && (
               <div style={{ borderTop: `1px solid ${INK}`, background: "white" }}>
-                <div className="flex items-center justify-between gap-3 p-3" style={{ borderBottom: `1px solid ${INK}33` }}>
-                  <span className="text-[11px] font-bold uppercase">Marketplace coverage · {searchTier}</span>
-                  <span className="text-[9px] font-bold uppercase" style={{ color: `${INK}66` }}>{marketplaceStatus.successful}/{marketplaceStatus.total} surse active</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-                  {marketplaceCoverage.map((source) => (
-                    <div key={source.site} className="flex min-w-0 flex-col gap-2 p-3 text-[10px] font-bold uppercase" style={{ borderRight: `1px solid ${INK}22`, borderBottom: `1px solid ${INK}22` }}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate">{source.site}</div>
-                          <div className="truncate text-[8px]" style={{ color: `${INK}66` }}>{source.provider}</div>
+                <div className="grid grid-cols-1 lg:grid-cols-2">
+                  <div style={{ borderBottom: `1px solid ${INK}`, fontFamily: MONO }}>
+                    <PanelHeader title="Agent Notes" />
+                    <ul className="p-4 flex flex-col gap-4" style={{ background: CREAM }}>
+                      {agentNotes.map(({ text, pulse }) => (
+                        <li key={text} className={`flex items-start gap-2 text-[11px] uppercase font-bold${pulse ? " animate-pulse" : ""}`}>
+                          <span style={{ color: PINK }} className="flex-none mt-0.5">&gt;</span>
+                          <span>{text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="lg:border-l" style={{ borderBottom: `1px solid ${INK}`, borderColor: INK, fontFamily: MONO }}>
+                    <PanelHeader title="Sources Breakdown" />
+                    <div className="p-4 flex flex-col gap-3" style={{ background: CREAM }}>
+                      {sourceBreakdown.length ? sourceBreakdown.map(({ name, count, pct }) => (
+                        <div key={name} className="flex items-center gap-2 text-[11px] uppercase font-bold">
+                          <span style={{ width: 64, flexShrink: 0 }}>{name}</span>
+                          <div className="flex-1 h-2 mx-1" style={{ background: "#E5E0D5" }}>
+                            <div className="h-full" style={{ width: `${pct}%`, background: PINK }} />
+                          </div>
+                          <span className="text-right" style={{ width: 76, flexShrink: 0, color: `${INK}77` }}>{count} ({pct}%)</span>
                         </div>
-                        <div className="flex flex-none items-center gap-2">
-                          <span style={{ color: source.ok ? GREEN : PINK }}>{source.ok ? source.itemCount : marketplaceFailureLabel(source.error)}</span>
-                          <span className="h-2 w-2 rounded-full" style={{ background: source.ok ? GREEN : PINK }} />
-                        </div>
-                      </div>
-                      {!source.ok && source.error && (
-                        <details className="text-[8px] normal-case" style={{ color: `${INK}77` }}>
-                          <summary className="cursor-pointer font-bold uppercase" style={{ color: PINK }}>Detalii tehnice</summary>
-                          <div className="mt-2 break-words font-normal leading-relaxed">{source.error}</div>
-                        </details>
+                      )) : (
+                        <div className="text-[11px] uppercase font-bold" style={{ color: `${INK}66` }}>Nicio sursă încă.</div>
                       )}
                     </div>
-                  ))}
+                    <div className="p-3 flex justify-between items-center" style={{ borderTop: `1px solid ${INK}`, background: "white" }}>
+                      <span className="text-[11px] uppercase font-bold">Total</span>
+                      <span className="text-[14px] font-bold" style={{ color: PINK }}>{results.length}</span>
+                    </div>
+                  </div>
                 </div>
+
+                {marketplaceCoverage.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between gap-3 p-3" style={{ borderBottom: `1px solid ${INK}33` }}>
+                      <span className="text-[11px] font-bold uppercase">Marketplace coverage · {searchTier}</span>
+                      <span className="text-[9px] font-bold uppercase" style={{ color: `${INK}66` }}>{marketplaceStatus.successful}/{marketplaceStatus.total} surse active</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+                      {marketplaceCoverage.map((source) => (
+                        <div key={source.site} className="flex min-w-0 flex-col gap-2 p-3 text-[10px] font-bold uppercase" style={{ borderRight: `1px solid ${INK}22`, borderBottom: `1px solid ${INK}22` }}>
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="truncate">{source.site}</div>
+                              <div className="truncate text-[8px]" style={{ color: `${INK}66` }}>{source.provider}</div>
+                            </div>
+                            <div className="flex flex-none items-center gap-2">
+                              <span style={{ color: source.ok ? GREEN : PINK }}>{source.ok ? source.itemCount : marketplaceFailureLabel(source.error)}</span>
+                              <span className="h-2 w-2 rounded-full" style={{ background: source.ok ? GREEN : PINK }} />
+                            </div>
+                          </div>
+                          {!source.ok && source.error && (
+                            <details className="text-[8px] normal-case" style={{ color: `${INK}77` }}>
+                              <summary className="cursor-pointer font-bold uppercase" style={{ color: PINK }}>Detalii tehnice</summary>
+                              <div className="mt-2 break-words font-normal leading-relaxed">{source.error}</div>
+                            </details>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </section>
@@ -2506,41 +2607,8 @@ function SearchResultsContent() {
               )}
             </div>
 
-            <aside className="w-full xl:w-72 flex-none flex flex-col gap-6">
+            {isLoggedIn && <aside className="w-full xl:w-72 flex-none flex flex-col gap-6">
               <div style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
-                <PanelHeader title="Agent Notes" />
-                <ul className="p-4 flex flex-col gap-4" style={{ background: CREAM }}>
-                  {agentNotes.map(({ text, pulse }) => (
-                    <li key={text} className={`flex items-start gap-2 text-[11px] uppercase font-bold${pulse ? " animate-pulse" : ""}`}>
-                      <span style={{ color: PINK }} className="flex-none mt-0.5">&gt;</span>
-                      <span>{text}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
-                <PanelHeader title="Sources Breakdown" />
-                <div className="p-4 flex flex-col gap-3" style={{ background: CREAM }}>
-                  {sourceBreakdown.length ? sourceBreakdown.map(({ name, count, pct }) => (
-                    <div key={name} className="flex items-center gap-2 text-[11px] uppercase font-bold">
-                      <span style={{ width: 64, flexShrink: 0 }}>{name}</span>
-                      <div className="flex-1 h-2 mx-1" style={{ background: "#E5E0D5" }}>
-                        <div className="h-full" style={{ width: `${pct}%`, background: PINK }} />
-                      </div>
-                      <span className="text-right" style={{ width: 76, flexShrink: 0, color: `${INK}77` }}>{count} ({pct}%)</span>
-                    </div>
-                  )) : (
-                    <div className="text-[11px] uppercase font-bold" style={{ color: `${INK}66` }}>Nicio sursă încă.</div>
-                  )}
-                </div>
-                <div className="p-3 flex justify-between items-center" style={{ borderTop: `1px solid ${INK}`, background: "white" }}>
-                  <span className="text-[11px] uppercase font-bold">Total</span>
-                  <span className="text-[14px] font-bold" style={{ color: PINK }}>{results.length}</span>
-                </div>
-              </div>
-
-              {isLoggedIn && <div style={{ border: `1px solid ${INK}`, fontFamily: MONO }}>
                 <PanelHeader title="Listă locală" />
                 <div className="flex flex-col gap-3 p-4 text-[11px] font-bold uppercase" style={{ background: CREAM }}>
                   <div className="flex items-center justify-between gap-3">
@@ -2548,8 +2616,8 @@ function SearchResultsContent() {
                     <span style={{ color: PINK }}>{savedVisibleCount}</span>
                   </div>
                 </div>
-              </div>}
-            </aside>
+              </div>
+            </aside>}
           </div>
 
         </div>
