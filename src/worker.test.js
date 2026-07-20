@@ -53,7 +53,8 @@ test("Premium search skips Browser Run when direct marketplace results are usabl
   assert.equal(response.status, 200);
   assert.equal(payload.summary.browserMarketplaces, 0);
   assert.equal(payload.summary.browserSessionsUsed, 0);
-  assert.equal(payload.summary.browserFallbackLimit, 2);
+  assert.equal(payload.summary.browserFallbackLimit, 8);
+  assert.deepEqual(payload.summary.browserFallbackMarketplaces, []);
 });
 
 test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {

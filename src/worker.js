@@ -24,8 +24,10 @@ import {
 const LEAD_API_PATHS = new Set(["/api/leads", "/api/lead", "/api/email-leads", "/api/email_leads", "/api/waitlist"]);
 const PREMIUM_SEARCH_CACHE_SECONDS = 300;
 const MARKETPLACE_CONTACT_CACHE_SECONDS = 900;
-const DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT = 2;
+const PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS = ["vinted.ro"];
+const DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT = PREMIUM_BROWSER_SITE_KEYS.length + PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS.length;
 const PREMIUM_BROWSER_FALLBACK_PRIORITY = [
+  ...PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS,
   "emag.ro",
   "compari.ro",
   "pcgarage.ro",
@@ -68,7 +70,7 @@ function json(payload, status = 200) {
 function getPremiumBrowserFallbackLimit(env = {}) {
   const configured = Number.parseInt(String(env.PREMIUM_BROWSER_FALLBACK_LIMIT || ""), 10);
   if (!Number.isFinite(configured)) return DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT;
-  return Math.max(0, Math.min(configured, PREMIUM_BROWSER_SITE_KEYS.length));
+  return Math.max(0, Math.min(configured, PREMIUM_BROWSER_FALLBACK_PRIORITY.length));
 }
 
 function needsBrowserFallback(result) {
@@ -77,8 +79,17 @@ function needsBrowserFallback(result) {
   return parsedCount === 0;
 }
 
+function preferBrowserFallback(directResult, browserResult) {
+  if (!browserResult) return directResult;
+
+  const browserItemCount = browserResult.parsedItemCount ?? browserResult.rawItemCount ?? browserResult.itemCount ?? browserResult.items?.length ?? 0;
+  if (browserResult.ok && browserItemCount > 0) return browserResult;
+  if (directResult?.ok) return directResult;
+  return browserResult;
+}
+
 function buildPremiumCacheRequest(request, params) {
-  const cacheUrl = new URL("/api/search/premium-cache/v2", request.url);
+  const cacheUrl = new URL("/api/search/premium-cache/v3", request.url);
   cacheUrl.searchParams.set("q", params.query.trim().toLocaleLowerCase("ro-RO"));
   cacheUrl.searchParams.set("condition", params.condition);
   cacheUrl.searchParams.set("provider", params.provider);
@@ -626,16 +637,18 @@ async function handleApi(request, env, context) {
         searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys: freeSiteKeys }),
         searchAcrossSites({ query, condition, provider: "direct", limit, maxPages: 1, siteKeys: PREMIUM_BROWSER_SITE_KEYS })
       ]);
-      const directPremiumBySite = new Map(directPremiumPayload.results.map((result) => [result.site, result]));
+      const directResults = [...freePayload.results, ...directPremiumPayload.results];
+      const directBySite = new Map(directResults.map((result) => [result.site, result]));
       const browserFallbackLimit = getPremiumBrowserFallbackLimit(env);
       const browserSiteKeys = PREMIUM_BROWSER_FALLBACK_PRIORITY
-        .filter((siteKey) => needsBrowserFallback(directPremiumBySite.get(siteKey)))
+        .filter((siteKey) => needsBrowserFallback(directBySite.get(siteKey)))
         .slice(0, browserFallbackLimit);
       const browserResults = await searchPremiumBrowserSites(env, { query, limit, siteKeys: browserSiteKeys });
       const browserBySite = new Map(browserResults.map((result) => [result.site, result]));
-      const premiumResults = PREMIUM_BROWSER_SITE_KEYS.map((siteKey) => browserBySite.get(siteKey) || directPremiumBySite.get(siteKey));
+      const freeResults = freePayload.results.map((result) => preferBrowserFallback(result, browserBySite.get(result.site)));
+      const premiumResults = PREMIUM_BROWSER_SITE_KEYS.map((siteKey) => preferBrowserFallback(directBySite.get(siteKey), browserBySite.get(siteKey)));
       const payload = aggregateMarketplaceResults(
-        [...freePayload.results, ...premiumResults],
+        [...freeResults, ...premiumResults],
         {
           condition,
           creditBudget: freePayload.summary?.creditBudget || 0,
@@ -645,6 +658,7 @@ async function handleApi(request, env, context) {
       payload.searchTier = "premium";
       payload.summary.browserEligibleMarketplaces = PREMIUM_BROWSER_SITE_KEYS.length;
       payload.summary.browserFallbackLimit = browserFallbackLimit;
+      payload.summary.browserFallbackMarketplaces = browserSiteKeys;
       payload.summary.browserMarketplaces = browserResults.length;
       payload.summary.successfulBrowserMarketplaces = browserResults.filter((result) => result?.ok).length;
       payload.summary.browserSessionsUsed = browserResults.reduce((sum, result) => sum + (result?.browserSessionsUsed || 0), 0);
