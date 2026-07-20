@@ -7,7 +7,7 @@ import { extractImageSearchIntent, validateImageSearchRequest } from "./image-se
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { findWhatsAppConversationOwner, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload, readWhatsAppMessagesFromSupabase } from "./supabase.js";
-import { PREMIUM_BROWSER_SITE_KEYS, SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
@@ -24,17 +24,11 @@ import {
 const LEAD_API_PATHS = new Set(["/api/leads", "/api/lead", "/api/email-leads", "/api/email_leads", "/api/waitlist"]);
 const PREMIUM_SEARCH_CACHE_SECONDS = 300;
 const MARKETPLACE_CONTACT_CACHE_SECONDS = 900;
-const PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS = ["vinted.ro"];
+const PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS = ["okazii.ro"];
 const DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT = PREMIUM_BROWSER_SITE_KEYS.length + PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS.length;
 const PREMIUM_BROWSER_FALLBACK_PRIORITY = [
   ...PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS,
-  "emag.ro",
-  "compari.ro",
-  "pcgarage.ro",
-  "evomag.ro",
-  "altex.ro",
-  "flanco.ro",
-  "cel.ro"
+  ...PREMIUM_BROWSER_SITE_KEYS
 ];
 
 function normalizeApiPathname(pathname = "") {
@@ -89,7 +83,7 @@ function preferBrowserFallback(directResult, browserResult) {
 }
 
 function buildPremiumCacheRequest(request, params) {
-  const cacheUrl = new URL("/api/search/premium-cache/v4", request.url);
+  const cacheUrl = new URL("/api/search/premium-cache/v5", request.url);
   cacheUrl.searchParams.set("q", params.query.trim().toLocaleLowerCase("ro-RO"));
   cacheUrl.searchParams.set("condition", params.condition);
   cacheUrl.searchParams.set("provider", params.provider);
@@ -632,10 +626,10 @@ async function handleApi(request, env, context) {
       const cachedResponse = await readPremiumSearchCache(cacheRequest);
       if (cachedResponse) return cachedResponse;
 
-      const freeSiteKeys = getFreeSearchSiteKeys(site, query).filter((siteKey) => !PREMIUM_BROWSER_SITE_KEYS.includes(siteKey));
+      const freeSiteKeys = getFreeSearchSiteKeys(site, query).filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey));
       const [freePayload, directPremiumPayload] = await Promise.all([
         searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys: freeSiteKeys }),
-        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages: 1, siteKeys: PREMIUM_BROWSER_SITE_KEYS })
+        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages: 1, siteKeys: PREMIUM_SITE_KEYS })
       ]);
       const directResults = [...freePayload.results, ...directPremiumPayload.results];
       const directBySite = new Map(directResults.map((result) => [result.site, result]));
@@ -646,7 +640,7 @@ async function handleApi(request, env, context) {
       const browserResults = await searchPremiumBrowserSites(env, { query, limit, siteKeys: browserSiteKeys });
       const browserBySite = new Map(browserResults.map((result) => [result.site, result]));
       const freeResults = freePayload.results.map((result) => preferBrowserFallback(result, browserBySite.get(result.site)));
-      const premiumResults = PREMIUM_BROWSER_SITE_KEYS.map((siteKey) => preferBrowserFallback(directBySite.get(siteKey), browserBySite.get(siteKey)));
+      const premiumResults = PREMIUM_SITE_KEYS.map((siteKey) => preferBrowserFallback(directBySite.get(siteKey), browserBySite.get(siteKey)));
       const payload = aggregateMarketplaceResults(
         [...freeResults, ...premiumResults],
         {
@@ -656,7 +650,8 @@ async function handleApi(request, env, context) {
         }
       );
       payload.searchTier = "premium";
-      payload.summary.browserEligibleMarketplaces = PREMIUM_BROWSER_SITE_KEYS.length;
+      payload.summary.premiumMarketplaces = PREMIUM_SITE_KEYS.length;
+      payload.summary.browserEligibleMarketplaces = PREMIUM_BROWSER_FALLBACK_PRIORITY.length;
       payload.summary.browserFallbackLimit = browserFallbackLimit;
       payload.summary.browserFallbackMarketplaces = browserSiteKeys;
       payload.summary.browserMarketplaces = browserResults.length;
@@ -664,7 +659,7 @@ async function handleApi(request, env, context) {
       payload.summary.browserSessionsUsed = browserResults.reduce((sum, result) => sum + (result?.browserSessionsUsed || 0), 0);
       payload.summary.cacheHit = false;
 
-      const siteKeys = [...freeSiteKeys, ...PREMIUM_BROWSER_SITE_KEYS];
+      const siteKeys = [...freeSiteKeys, ...PREMIUM_SITE_KEYS];
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider: "premium-browser", siteKeys, payload }), env);
       writePremiumSearchCache(cacheRequest, payload, context);
       return json(payload, 200);

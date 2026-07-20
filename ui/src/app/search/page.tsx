@@ -17,10 +17,12 @@ const GREEN  = "#22C55E"
 const MONO   = "var(--font-mono-var), monospace"
 const MODAL_BG = "#FDFAF3"
 
-const SOURCES_LIST = [
-  "OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT", "PRICE.RO", "SHOPMANIA",
-  "COMPARI.RO", "EMAG", "EVOMAG", "PC GARAGE", "ALTEX", "FLANCO", "CEL.RO",
+const FREE_SOURCES_LIST = [
+  "OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT", "BESTAUTO", "FLIP", "KLAP",
+  "PRICE.RO", "SHOPMANIA",
 ]
+const PREMIUM_FILTER_SOURCES = ["EMAG", "EVOMAG", "CEL.RO", "COMPARI.RO", "PC GARAGE", "FLANCO", "ALTEX"]
+const SOURCES_LIST = [...FREE_SOURCES_LIST, ...PREMIUM_FILTER_SOURCES]
 const SORT_OPTIONS = ["relevanță", "potrivire cuvinte cheie", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
 const SOURCE_TYPE_OPTIONS = [
   { value: "classifieds", label: "second-hand" },
@@ -49,15 +51,22 @@ const FREE_SOURCE_TIMING = [
   { name: "PRICE.RO", start: 64, end: 90 },
   { name: "SHOPMANIA", start: 72, end: 96 },
 ]
-const AUTOVIT_SOURCE_TIMING = { name: "AUTOVIT", start: 56, end: 82 }
+const VEHICLE_SOURCE_TIMING = [
+  { name: "AUTOVIT", start: 50, end: 80 },
+  { name: "BESTAUTO", start: 56, end: 86 },
+]
+const REFURBISHED_SOURCE_TIMING = [
+  { name: "FLIP", start: 42, end: 78 },
+  { name: "KLAP", start: 50, end: 84 },
+]
 const PREMIUM_SOURCE_TIMING = [
-  { name: "COMPARI",   start: 38, end: 70 },
-  { name: "EMAG",      start: 44, end: 76 },
-  { name: "EVOMAG",    start: 50, end: 82 },
-  { name: "PC GARAGE", start: 56, end: 88 },
-  { name: "ALTEX",     start: 62, end: 93 },
+  { name: "EMAG",      start: 38, end: 70 },
+  { name: "EVOMAG",    start: 44, end: 76 },
+  { name: "CEL.RO",    start: 50, end: 82 },
+  { name: "COMPARI",   start: 56, end: 88 },
+  { name: "PC GARAGE", start: 62, end: 93 },
   { name: "FLANCO",    start: 68, end: 96 },
-  { name: "CEL.RO",    start: 74, end: 99 },
+  { name: "ALTEX",     start: 74, end: 99 },
 ]
 const PREMIUM_SOURCES = PREMIUM_SOURCE_TIMING.map(({ name }) => name)
 const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
@@ -137,6 +146,15 @@ function isLikelyVehicleSearch(query: string) {
   const excludedTerms = ["anvelope", "cauciucuri", "jante", "piese", "parbriz", "ulei"]
 
   return !excludedTerms.some((term) => tokens.has(term)) && vehicleTerms.some((term) => tokens.has(term))
+}
+
+function isLikelyRefurbishedTechSearch(query: string) {
+  const tokens = new Set(normalizeKeywordText(query).split(/[^a-z0-9]+/).filter(Boolean))
+  const terms = [
+    "telefon", "smartphone", "iphone", "samsung", "galaxy", "pixel", "xiaomi", "huawei",
+    "tablet", "ipad", "laptop", "macbook", "smartwatch", "ceas",
+  ]
+  return terms.some((term) => tokens.has(term))
 }
 
 function formatSearchTime() {
@@ -602,9 +620,11 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
   const step2 = progress > 60
   const step3 = progress > 90
   const elapsedSeconds = Math.floor((tick * 400) / 1000)
-  const activeSources = isLikelyVehicleSearch(query)
-    ? [...FREE_SOURCE_TIMING, AUTOVIT_SOURCE_TIMING]
-    : FREE_SOURCE_TIMING
+  const activeSources = [
+    ...FREE_SOURCE_TIMING,
+    ...(isLikelyVehicleSearch(query) ? VEHICLE_SOURCE_TIMING : []),
+    ...(isLikelyRefurbishedTechSearch(query) ? REFURBISHED_SOURCE_TIMING : []),
+  ]
 
   return (
     <div
@@ -787,7 +807,7 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
             )}
             <p className="mt-3 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}88` }}>
               {tier === "premium"
-                ? "Browser-assisted Deep Search rulează acum pe sursele suplimentare."
+                ? "Sursele Premium rulează direct mai întâi. Browser-ul pornește doar pentru fallback-urile eligibile care nu au returnat date utile."
                 : "Browser-assisted search pe surse suplimentare nu este inclus în planul Free."}
             </p>
           </div>
@@ -1024,20 +1044,30 @@ function FilterPanel({ sort, setSort, sources, toggleSource, sourceTypes, toggle
 
         <div className="flex flex-col gap-3">
           <FilterLabel>Surse</FilterLabel>
-          <div className="flex flex-col gap-2.5">
-            {SOURCES_LIST.map((src) => (
-              <label key={src} className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={sources.has(src)}
-                  onChange={() => toggleSource(src)}
-                  className="sr-only"
-                />
-                <div className="w-3.5 h-3.5 border flex-none flex items-center justify-center" style={{ borderColor: INK, background: "white" }}>
-                  {sources.has(src) && <div style={{ width: 7, height: 7, background: INK }} />}
-                </div>
-                <span className="text-[11px] uppercase font-bold">{src}</span>
-              </label>
+          <div className="flex flex-col gap-4">
+            {[
+              { label: "Free", items: FREE_SOURCES_LIST },
+              { label: "Premium", items: PREMIUM_FILTER_SOURCES },
+            ].map((group) => (
+              <div key={group.label} className="flex flex-col gap-2.5">
+                <span className="text-[9px] font-bold uppercase" style={{ color: group.label === "Premium" ? PINK : `${INK}66` }}>
+                  {group.label}
+                </span>
+                {group.items.map((src) => (
+                  <label key={src} className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sources.has(src)}
+                      onChange={() => toggleSource(src)}
+                      className="sr-only"
+                    />
+                    <div className="w-3.5 h-3.5 border flex-none flex items-center justify-center" style={{ borderColor: INK, background: "white" }}>
+                      {sources.has(src) && <div style={{ width: 7, height: 7, background: INK }} />}
+                    </div>
+                    <span className="text-[11px] uppercase font-bold">{src}</span>
+                  </label>
+                ))}
+              </div>
             ))}
           </div>
         </div>

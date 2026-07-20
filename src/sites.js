@@ -128,14 +128,40 @@ const CAR_PART_KEYWORDS = [
   "ulei"
 ];
 
-export const PREMIUM_BROWSER_SITE_KEYS = [
-  "compari.ro",
+export const FREE_DEFAULT_SITE_KEYS = [
+  "olx.ro",
+  "lajumate.ro",
+  "vinted.ro",
+  "okazii.ro",
+  "publi24.ro",
+  "anuntul.ro",
+  "price.ro",
+  "shopmania.ro"
+];
+
+export const FREE_CAR_SITE_KEYS = ["autovit.ro", "bestauto.ro"];
+export const FREE_TECH_SITE_KEYS = ["flip.ro", "klap.ro"];
+
+export const PREMIUM_SITE_KEYS = [
   "emag.ro",
   "evomag.ro",
+  "cel.ro",
+  "compari.ro",
   "pcgarage.ro",
-  "altex.ro",
   "flanco.ro",
-  "cel.ro"
+  "altex.ro"
+];
+
+export const PREMIUM_BROWSER_SITE_KEYS = [
+  "compari.ro",
+  "pcgarage.ro",
+  "flanco.ro",
+  "altex.ro"
+];
+
+const REFURBISHED_TECH_KEYWORDS = [
+  "telefon", "smartphone", "iphone", "samsung", "galaxy", "pixel", "xiaomi", "huawei",
+  "tablet", "ipad", "laptop", "macbook", "smartwatch", "ceas"
 ];
 
 const CAR_MODEL_PATH_ALIASES = [
@@ -231,6 +257,15 @@ export function isCarQuery(query = "") {
   return false;
 }
 
+export function isRefurbishedTechQuery(query = "") {
+  const normalized = normalizeMarketplaceQuery(query)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const tokens = new Set(normalized.split(/[^a-z0-9]+/).filter(Boolean));
+  return REFURBISHED_TECH_KEYWORDS.some((keyword) => tokens.has(keyword));
+}
+
 export const SITES = {
   "autovit.ro": {
     key: "autovit.ro",
@@ -267,6 +302,32 @@ export const SITES = {
         limit,
         "This page contains car listings. Keep only full vehicles, not parts, tires, accessories, services, or wanted ads."
       );
+    }
+  },
+  "bestauto.ro": {
+    key: "bestauto.ro",
+    label: "BestAuto",
+    priority: 1,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-local",
+    sourceType: "automotive",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 16000,
+    pageSize: 40,
+    maxPages: 4,
+    defaultLimit: 40,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.bestauto.ro/anunturi/?q=${encodeSearchText(query).replace(/%20/g, "+")}`;
+    },
+    pagedSearchUrl(query, page) {
+      const base = this.searchUrl(query);
+      return page <= 1 ? base : `${base}&pag=${page}`;
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("BestAuto", query, limit, "Keep complete vehicle listings and exclude parts, tires, accessories, and services.");
     }
   },
   "olx.ro": {
@@ -327,6 +388,56 @@ export const SITES = {
         limit,
         "Focus on product tiles in the catalog feed and ignore sign-in or personalized recommendations."
       );
+    }
+  },
+  "flip.ro": {
+    key: "flip.ro",
+    label: "Flip",
+    priority: 4,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-local",
+    sourceType: "classifieds",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 22000,
+    pageSize: 500,
+    maxPages: 1,
+    defaultLimit: 500,
+    defaultMaxPages: 1,
+    searchUrl() {
+      return "https://flip.ro/magazin/";
+    },
+    pagedSearchUrl() {
+      return this.searchUrl();
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("Flip", query, limit, "Use the final payable refurbished-product price, never monthly installments or crossed-out retail prices.");
+    }
+  },
+  "klap.ro": {
+    key: "klap.ro",
+    label: "Klap",
+    priority: 5,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-local",
+    sourceType: "classifieds",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 22000,
+    pageSize: 48,
+    maxPages: 1,
+    defaultLimit: 48,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://klap.ro/?s=${encodeSearchText(query)}&post_type=product`;
+    },
+    pagedSearchUrl(query) {
+      return this.searchUrl(query);
+    },
+    prompt(query, limit) {
+      return buildBasePrompt("Klap", query, limit, "Use the current refurbished-product sale price and ignore crossed-out prices and financing copy.");
     }
   },
   "lajumate.ro": {
@@ -682,8 +793,6 @@ export const SITES = {
     defaultSellerType: "Retailer",
     estimatedCreditsPerPage: 0,
     waitForMs: 0,
-    browserWaitUntil: "domcontentloaded",
-    browserWaitForMs: 2500,
     timeoutMs: 24000,
     pageSize: 24,
     maxPages: 1,
@@ -711,21 +820,13 @@ export function getSite(siteKey) {
 }
 
 export function getDefaultSiteKeys() {
-  return Object.values(SITES)
-    .filter((site) => site.defaultEnabled)
-    .sort((a, b) => a.priority - b.priority)
-    .map((site) => site.key);
+  return [...FREE_DEFAULT_SITE_KEYS];
 }
 
 export function getSiteKeysForAllSearch(query) {
-  const defaultSiteKeys = Object.values(SITES)
-    .filter((site) => site.defaultEnabled)
-    .sort((a, b) => a.priority - b.priority)
-    .map((site) => site.key);
-
-  if (isCarQuery(query)) {
-    return ["autovit.ro", ...defaultSiteKeys];
-  }
-
-  return defaultSiteKeys;
+  const conditionalSiteKeys = [
+    ...(isCarQuery(query) ? FREE_CAR_SITE_KEYS : []),
+    ...(isRefurbishedTechQuery(query) ? FREE_TECH_SITE_KEYS : [])
+  ];
+  return [...conditionalSiteKeys, ...FREE_DEFAULT_SITE_KEYS];
 }

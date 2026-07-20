@@ -20,7 +20,7 @@ function stripTags(value = "") {
   return cleanText(value.replace(/<[^>]+>/g, " "));
 }
 
-function toAbsoluteUrl(url = "") {
+function toAbsoluteUrl(url = "", origin = "https://www.publi24.ro") {
   const value = cleanText(url);
   if (!value) {
     return "";
@@ -32,9 +32,9 @@ function toAbsoluteUrl(url = "") {
     return `https:${value}`;
   }
   if (value.startsWith("/")) {
-    return `https://www.publi24.ro${value}`;
+    return `${origin}${value}`;
   }
-  return `https://www.publi24.ro/${value.replace(/^\/+/, "")}`;
+  return `${origin}/${value.replace(/^\/+/, "")}`;
 }
 
 function splitArticleBlocks(html) {
@@ -54,7 +54,7 @@ function parsePrice(block) {
   return match ? `${match[1].trim()} ${match[2]}` : rawPrice;
 }
 
-function parseArticleBlock(block) {
+function parseArticleBlock(block, origin) {
   const titleMatch = block.match(/<h2[^>]+class="[^"]*\barticle-title\b[^"]*"[^>]*>[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
   const imageUrl = extractImageCandidate(block);
   const locationMatch = block.match(/<p[^>]+class="[^"]*\barticle-location\b[^"]*"[^>]*>[\s\S]*?<span>([\s\S]*?)<\/span>/i);
@@ -62,7 +62,7 @@ function parseArticleBlock(block) {
   const sellerTypeMatch = block.match(/<span[^>]+class="[^"]*\barticle-lbl-txt\b[^"]*"[^>]*>(Telefon validat)<\/span>/i);
 
   const title = stripTags(titleMatch?.[2] || "");
-  const url = toAbsoluteUrl(titleMatch?.[1] || "");
+  const url = toAbsoluteUrl(titleMatch?.[1] || "", origin);
   if (!title || !url) {
     return null;
   }
@@ -77,7 +77,7 @@ function parseArticleBlock(block) {
     condition: "",
     sellerType: stripTags(sellerTypeMatch?.[1] || ""),
     url,
-    imageUrl: toAbsoluteUrl(imageUrl)
+    imageUrl: toAbsoluteUrl(imageUrl, origin)
   };
 }
 
@@ -98,10 +98,10 @@ function hasNextPage(html) {
   return /[?&amp;]pag=\d+/i.test(html) || /[?&]pag=\d+/i.test(html);
 }
 
-export function parsePubli24Html(html, limit) {
+export function parsePubli24Html(html, limit, { origin = "https://www.publi24.ro" } = {}) {
   const blocks = splitArticleBlocks(html);
   const items = blocks
-    .map(parseArticleBlock)
+    .map((block) => parseArticleBlock(block, origin))
     .filter(Boolean)
     .slice(0, limit);
 

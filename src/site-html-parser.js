@@ -6,8 +6,9 @@ import { parseVintedHtml } from "./parsers/vinted.js";
 import { parseAutovitHtml } from "./parsers/autovit.js";
 import { parseAnuntulHtml } from "./parsers/anuntul.js";
 import { parseEmagHtml, parseEvomagHtml, parseRetailHtml } from "./parsers/retail.js";
+import { parseFlipHtml, parseKlapHtml } from "./parsers/refurbished.js";
 
-export function parseSiteHtml({ site, html, url, limit }) {
+export function parseSiteHtml({ site, html, url, limit, query = "" }) {
   let parsed;
   if (site.key === "lajumate.ro") {
     parsed = parseLajumateHtml(html, limit);
@@ -17,8 +18,8 @@ export function parseSiteHtml({ site, html, url, limit }) {
     parsed = parseOlxHtml(html, limit);
   } else if (site.key === "vinted.ro") {
     parsed = parseVintedHtml(html, limit);
-  } else if (site.key === "publi24.ro") {
-    parsed = parsePubli24Html(html, limit);
+  } else if (site.key === "publi24.ro" || site.key === "bestauto.ro") {
+    parsed = parsePubli24Html(html, limit, { origin: new URL(url).origin });
   } else if (site.key === "autovit.ro") {
     parsed = parseAutovitHtml(html, limit);
   } else if (site.key === "anuntul.ro") {
@@ -27,6 +28,10 @@ export function parseSiteHtml({ site, html, url, limit }) {
     parsed = parseEmagHtml(html, limit, { origin: new URL(url).origin });
   } else if (site.key === "evomag.ro") {
     parsed = parseEvomagHtml(html, limit, { origin: new URL(url).origin });
+  } else if (site.key === "flip.ro") {
+    parsed = parseFlipHtml(html, limit, { query, origin: new URL(url).origin });
+  } else if (site.key === "klap.ro") {
+    parsed = parseKlapHtml(html, limit, { origin: new URL(url).origin });
   } else if (site.strategy === "direct-html-retail") {
     parsed = parseRetailHtml(html, limit, { origin: new URL(url).origin });
   } else {

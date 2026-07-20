@@ -217,13 +217,13 @@ Free search uses direct marketplace connections and never starts Browser Run:
 curl "https://YOUR_DOMAIN/api/search/free?q=iphone&site=all&limit=30"
 ```
 
-`/api/search` remains a backward-compatible alias for the Free contract. Premium search combines the Free results with browser-rendered searches across the configured Premium marketplaces:
+`/api/search` remains a backward-compatible alias for the Free contract. Premium search combines the Free results with seven additional marketplace and retailer benchmarks:
 
 ```bash
 curl "https://YOUR_DOMAIN/api/search/premium?q=iphone&site=all&limit=30"
 ```
 
-During the internal testing phase, Premium search requires only the `BROWSER` binding. No account, payment, or test token is required. Premium searches try the free direct parser first and render only missing sources, with one shared browser session and at most two browser fallbacks by default. Set `PREMIUM_BROWSER_FALLBACK_LIMIT` to adjust that cap. Identical Premium searches are cached for five minutes, and listing contact lookups are cached for fifteen minutes, so refreshes and repeated clicks do not open another browser session.
+During the internal testing phase, Premium search requires only the `BROWSER` binding. No account, payment, or test token is required. Every source is fetched directly first. Browser Run is limited to Okazii plus the explicitly eligible Premium sources (Compari, PC Garage, Flanco, and Altex), starts only after a failed or empty direct result, and shares one browser session with bounded concurrency. eMAG, evoMAG, and CEL.ro remain direct-only. Set `PREMIUM_BROWSER_FALLBACK_LIMIT` to lower the five-source fallback cap. Identical Premium searches are cached for five minutes, and listing contact lookups are cached for fifteen minutes, so refreshes and repeated clicks do not open another browser session.
 
 Select **Free** or **Premium test** directly on the search page. The coverage panel reports each marketplace's provider, result count, and failure reason. Authentication and paid access can be added after Premium marketplace coverage has been validated.
 

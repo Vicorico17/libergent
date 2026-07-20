@@ -199,7 +199,7 @@ export async function searchMarketplaceWithBrowser(
       await new Promise((resolve) => setTimeout(resolve, browserWaitForMs));
     }
     const html = await page.content();
-    const parsed = parseSiteHtml({ site, html, url, limit });
+    const parsed = parseSiteHtml({ site, html, url, limit, query });
     const bodyText = includeBodyText
       ? await page.evaluate(() => document.body?.innerText || "")
       : "";

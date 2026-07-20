@@ -275,7 +275,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
 
     raw = await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs, signal });
 
-    const parsed = parseSiteHtml({ site, html: raw, url, limit });
+    const parsed = parseSiteHtml({ site, html: raw, url, limit, query });
     items = parsed.items;
     totalResults = parsed.totalResults;
     rawItemCount = getRawItemCount(parsed, items);
