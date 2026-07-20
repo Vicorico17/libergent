@@ -433,6 +433,18 @@ function MarketplaceVisitButton({ item, compact = false }: { item: SearchResultI
   )
 }
 
+function AccountFeatureNotice({ query, tier = "free", compact = false }: { query: string; tier?: SearchTier; compact?: boolean }) {
+  return (
+    <Link
+      href={`/auth?next=${encodeURIComponent(`/search?q=${query}&tier=${tier}`)}`}
+      className={`flex items-center justify-center gap-2 px-3 py-2 font-bold uppercase ${compact ? "text-[9px]" : "text-[10px]"}`}
+      style={{ border: `1px dashed ${INK}`, background: CREAM, color: `${INK}AA`, fontFamily: MONO }}
+    >
+      <Lock size={12} strokeWidth={2.2} /> Conectează-te pentru favorite și contact seller
+    </Link>
+  )
+}
+
 function KeywordSignalChips({ item, compact = false }: { item: SearchResultItem; compact?: boolean }) {
   const matched = item.keywordSignals.matchedKeywords.slice(0, compact ? 4 : 6)
   const missing = item.keywordSignals.missingKeywords.slice(0, compact ? 3 : 5)
@@ -1360,6 +1372,7 @@ function ConversationStatusBadge({ status }: { status?: string }) {
 function ResultCard({
   item,
   query,
+  searchTier,
   isLoggedIn,
   conversationStatus,
   onInspect,
@@ -1368,6 +1381,7 @@ function ResultCard({
 }: {
   item: ResultItem
   query: string
+  searchTier: SearchTier
   isLoggedIn: boolean
   conversationStatus?: string
   onInspect: (item: SearchResultItem) => void
@@ -1434,16 +1448,16 @@ function ResultCard({
           <span style={{ color: keywordScore >= 70 ? GREEN : PINK }}>{keywordScore}%</span>
         </div>
         <KeywordSignalChips item={item} compact />
-        {isLoggedIn && (
+        <button
+          type="button"
+          onClick={() => onInspect(item)}
+          className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
+          style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
+        >
+          Analiză Libergent
+        </button>
+        {isLoggedIn ? (
           <>
-          <button
-            type="button"
-            onClick={() => onInspect(item)}
-            className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
-            style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
-          >
-            Detalii Libergent
-          </button>
           <button
               type="button"
               onClick={() => onToggleSaved(item)}
@@ -1455,6 +1469,8 @@ function ResultCard({
             </button>
             <SellerMessageActions item={item} query={query} compact />
           </>
+        ) : (
+          <AccountFeatureNotice query={query} tier={searchTier} compact />
         )}
         <MarketplaceVisitButton item={item} compact />
       </div>
@@ -1481,7 +1497,7 @@ function PanelHeader({ title }: { title: string }) {
   )
 }
 
-function RecommendationCard({ item, query, isLoggedIn, conversationStatus, onInspect }: { item: SearchResultItem; query: string; isLoggedIn: boolean; conversationStatus?: string; onInspect: (item: SearchResultItem) => void }) {
+function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationStatus, onInspect }: { item: SearchResultItem; query: string; searchTier: SearchTier; isLoggedIn: boolean; conversationStatus?: string; onInspect: (item: SearchResultItem) => void }) {
   const { image, handleImageError } = useListingImage(item)
   const keywordScore = getKeywordMatchScore(item, query)
 
@@ -1565,19 +1581,21 @@ function RecommendationCard({ item, query, isLoggedIn, conversationStatus, onIns
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3">
-              {isLoggedIn && (
+              <button
+                type="button"
+                onClick={() => onInspect(item)}
+                className="flex min-h-11 items-center justify-center px-4 py-3 text-[11px] font-bold uppercase"
+                style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
+              >
+                Analiză Libergent
+              </button>
+              {isLoggedIn ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => onInspect(item)}
-                    className="flex min-h-11 items-center justify-center px-4 py-3 text-[11px] font-bold uppercase"
-                    style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
-                  >
-                    Vezi analiza Libergent
-                  </button>
                   <SellerMessageActions item={item} query={query} />
                   <OfferFeedbackActions item={item} query={query} />
                 </>
+              ) : (
+                <AccountFeatureNotice query={query} tier={searchTier} />
               )}
               <MarketplaceVisitButton item={item} />
             </div>
@@ -1588,7 +1606,7 @@ function RecommendationCard({ item, query, isLoggedIn, conversationStatus, onIns
   )
 }
 
-function BenchmarkCard({ item, usedItem, priceBenchmark, isLoggedIn, onInspect }: { item: SearchResultItem; usedItem: SearchResultItem | null; priceBenchmark?: PriceBenchmark; isLoggedIn: boolean; onInspect: (item: SearchResultItem) => void }) {
+function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: SearchResultItem; usedItem: SearchResultItem | null; priceBenchmark?: PriceBenchmark; onInspect: (item: SearchResultItem) => void }) {
   const savings = priceBenchmark?.savingsVsNewPct
   const usedPrice = usedItem?.price ?? null
 
@@ -1616,16 +1634,14 @@ function BenchmarkCard({ item, usedItem, priceBenchmark, isLoggedIn, onInspect }
           )}
         </div>
         <div className="flex flex-col gap-2 md:w-48">
-          {isLoggedIn && (
-            <button
-              type="button"
-              onClick={() => onInspect(item)}
-              className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
-              style={{ border: "1px solid " + INK, background: "white", color: INK, fontFamily: MONO }}
-            >
-              Vezi analiza
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => onInspect(item)}
+            className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
+            style={{ border: "1px solid " + INK, background: "white", color: INK, fontFamily: MONO }}
+          >
+            Analiză Libergent
+          </button>
           <MarketplaceVisitButton item={item} compact />
         </div>
       </div>
@@ -1642,7 +1658,7 @@ function DetailMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ListingDetailDrawer({ item, query, conversationStatus, onClose }: { item: SearchResultItem | null; query: string; conversationStatus?: string; onClose: () => void }) {
+function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversationStatus, onClose }: { item: SearchResultItem | null; query: string; searchTier: SearchTier; isLoggedIn: boolean; conversationStatus?: string; onClose: () => void }) {
   const { image, handleImageError } = useListingImage(item || {
     id: "empty",
     images: [],
@@ -1707,8 +1723,14 @@ function ListingDetailDrawer({ item, query, conversationStatus, onClose }: { ite
               <ListingMetaChips item={item} />
               <ConversationStatusBadge status={conversationStatus} />
               <DealQualitySummary item={item} />
-              <SellerMessageActions item={item} query={query} />
-              <OfferFeedbackActions item={item} query={query} />
+              {isLoggedIn ? (
+                <>
+                  <SellerMessageActions item={item} query={query} />
+                  <OfferFeedbackActions item={item} query={query} />
+                </>
+              ) : (
+                <AccountFeatureNotice query={query} tier={searchTier} />
+              )}
             </div>
           </div>
 
@@ -2252,7 +2274,7 @@ function SearchResultsContent() {
 
       {/* Loading overlay — rendered above everything */}
       {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} tier={searchTier} />}
-      <ListingDetailDrawer item={isLoggedIn ? selectedListing : null} query={query} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} />
+      <ListingDetailDrawer item={selectedListing} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} />
       <ConversationCenter key={account.userId || "signed-out"} enabled={isLoggedIn} onStatusesChange={(statuses) => setConversationState((current) => ({ ownerId: account.userId, statuses: current.ownerId === account.userId ? { ...current.statuses, ...statuses } : statuses }))} />
       <EmailCapturePopup
         enabled={isLoggedIn && Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
@@ -2405,8 +2427,8 @@ function SearchResultsContent() {
             </section>
           )}
 
-          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} />}
-          {shownNewBenchmark && <BenchmarkCard item={shownNewBenchmark} usedItem={shownBestOffer} priceBenchmark={priceBenchmark} isLoggedIn={isLoggedIn} onInspect={setSelectedListing} />}
+          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} />}
+          {shownNewBenchmark && <BenchmarkCard item={shownNewBenchmark} usedItem={shownBestOffer} priceBenchmark={priceBenchmark} onInspect={setSelectedListing} />}
 
           {/* Results + Insights */}
           <div className="flex flex-col xl:flex-row gap-6 items-start">
@@ -2428,6 +2450,7 @@ function SearchResultsContent() {
                         key={item.id}
                         item={item}
                         query={query}
+                        searchTier={searchTier}
                         isLoggedIn={isLoggedIn}
                         conversationStatus={item.url ? conversationStatuses[item.url] : undefined}
                         onInspect={setSelectedListing}
@@ -2457,6 +2480,7 @@ function SearchResultsContent() {
                         key={item.id}
                         item={item}
                         query={query}
+                        searchTier={searchTier}
                         isLoggedIn={isLoggedIn}
                         conversationStatus={item.url ? conversationStatuses[item.url] : undefined}
                         onInspect={setSelectedListing}
