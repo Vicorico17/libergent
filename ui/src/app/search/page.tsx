@@ -835,7 +835,7 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
                 className="text-[20px] font-bold"
                 style={{ color: PINK, width: 52, textAlign: "right", flexShrink: 0 }}
               >
-                {Math.floor(progress)}%
+                {done ? "100%" : progress >= 98 ? "ACTIV" : `${Math.floor(progress)}%`}
               </div>
             </div>
           </div>
