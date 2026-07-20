@@ -69,6 +69,14 @@ type MarketplaceCoverage = {
   error: string
 }
 
+function marketplaceFailureLabel(error = "") {
+  if (/401|authentication error|unauthorized/i.test(error)) return "Provider neautorizat"
+  if (/429|rate limit/i.test(error)) return "Limită browser atinsă"
+  if (/challenge|captcha|verification/i.test(error)) return "Verificare marketplace"
+  if (/timeout|timpul maxim/i.test(error)) return "Timp de răspuns depășit"
+  return "Sursă indisponibilă"
+}
+
 type AccountSessionState = {
   status: "checking" | "signed_out" | "signed_in"
   userId: string
@@ -1954,7 +1962,7 @@ function SearchResultsContent() {
   const [marketplaceCoverage, setMarketplaceCoverage] = useState<MarketplaceCoverage[]>([])
   const [isLoading, setIsLoading]   = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [searchReportOpen, setSearchReportOpen] = useState(true)
+  const [searchReportOpen, setSearchReportOpen] = useState(false)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS)
   const [selectedListing, setSelectedListing] = useState<SearchResultItem | null>(null)
   const [conversationState, setConversationState] = useState<{ ownerId: string; statuses: Record<string, string> }>({ ownerId: "", statuses: {} })
@@ -2026,7 +2034,7 @@ function SearchResultsContent() {
 
       setIsLoading(true)
       setShowLoader(true)
-      setSearchReportOpen(true)
+      setSearchReportOpen(false)
       setVisibleCount(INITIAL_VISIBLE_RESULTS)
       setLoaderProgress(8)
       setLoaderDone(false)
@@ -2331,14 +2339,14 @@ function SearchResultsContent() {
               <button
                 type="button"
                 onClick={() => setSearchReportOpen((open) => !open)}
-                className="md:hidden h-7 w-7 flex items-center justify-center"
+                className="flex min-h-8 items-center justify-center gap-2 px-3 text-[9px] font-bold uppercase"
                 style={{ border: `1px solid ${INK}`, color: INK }}
-                aria-label={searchReportOpen ? "Close search report" : "Open search report"}
+                aria-expanded={searchReportOpen}
               >
-                <ChevronDown size={14} />
+                Detalii căutare <span className={searchReportOpen ? "rotate-180" : ""}><ChevronDown size={14} /></span>
               </button>
             </div>
-            <div className={`${searchReportOpen ? "grid" : "hidden md:grid"} grid-cols-2 md:grid-cols-6`} style={{ background: "white" }}>
+            <div className="grid grid-cols-2 md:grid-cols-6" style={{ background: "white" }}>
               {[
                 { value: String(filteredResults.length), label: "Results" },
                 { value: String(parsedListings || totalListings), label: "Parsed" },
@@ -2359,32 +2367,41 @@ function SearchResultsContent() {
                 <span className="text-[11px] uppercase font-bold">{time || "00:20"}</span>
               </div>
             </div>
+            {searchReportOpen && marketplaceCoverage.length > 0 && (
+              <div style={{ borderTop: `1px solid ${INK}`, background: "white" }}>
+                <div className="flex items-center justify-between gap-3 p-3" style={{ borderBottom: `1px solid ${INK}33` }}>
+                  <span className="text-[11px] font-bold uppercase">Marketplace coverage · {searchTier}</span>
+                  <span className="text-[9px] font-bold uppercase" style={{ color: `${INK}66` }}>{marketplaceStatus.successful}/{marketplaceStatus.total} surse active</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+                  {marketplaceCoverage.map((source) => (
+                    <div key={source.site} className="flex min-w-0 flex-col gap-2 p-3 text-[10px] font-bold uppercase" style={{ borderRight: `1px solid ${INK}22`, borderBottom: `1px solid ${INK}22` }}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate">{source.site}</div>
+                          <div className="truncate text-[8px]" style={{ color: `${INK}66` }}>{source.provider}</div>
+                        </div>
+                        <div className="flex flex-none items-center gap-2">
+                          <span style={{ color: source.ok ? GREEN : PINK }}>{source.ok ? source.itemCount : marketplaceFailureLabel(source.error)}</span>
+                          <span className="h-2 w-2 rounded-full" style={{ background: source.ok ? GREEN : PINK }} />
+                        </div>
+                      </div>
+                      {!source.ok && source.error && (
+                        <details className="text-[8px] normal-case" style={{ color: `${INK}77` }}>
+                          <summary className="cursor-pointer font-bold uppercase" style={{ color: PINK }}>Detalii tehnice</summary>
+                          <div className="mt-2 break-words font-normal leading-relaxed">{source.error}</div>
+                        </details>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
 
           {error && (
             <section className="p-4 text-[12px] uppercase font-bold" style={{ border: `1px solid ${INK}`, background: "white", color: PINK }}>
               <span>&gt; {error}</span>
-            </section>
-          )}
-
-          {marketplaceCoverage.length > 0 && (
-            <section style={{ border: `1px solid ${INK}`, background: "white" }}>
-              <PanelHeader title={`Marketplace Coverage · ${searchTier}`} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-                {marketplaceCoverage.map((source) => (
-                  <div key={source.site} className="flex min-w-0 items-center justify-between gap-3 p-3 text-[10px] font-bold uppercase" style={{ borderRight: `1px solid ${INK}22`, borderBottom: `1px solid ${INK}22` }}>
-                    <div className="min-w-0">
-                      <div className="truncate">{source.site}</div>
-                      <div className="truncate text-[8px]" style={{ color: `${INK}66` }}>{source.provider}</div>
-                      {!source.ok && source.error && <div className="mt-1 truncate text-[8px]" title={source.error} style={{ color: PINK }}>{source.error}</div>}
-                    </div>
-                    <div className="flex flex-none items-center gap-2">
-                      <span style={{ color: source.ok ? GREEN : PINK }}>{source.ok ? source.itemCount : "ERR"}</span>
-                      <span className="h-2 w-2 rounded-full" style={{ background: source.ok ? GREEN : PINK }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
             </section>
           )}
 

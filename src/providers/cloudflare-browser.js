@@ -178,15 +178,17 @@ export async function benchmarkMarketplaceWithBrowser(
 export async function searchMarketplaceWithBrowser(
   browserBinding,
   { site, query, limit = 20 },
-  { launch = puppeteer.launch, includeBodyText = false } = {}
+  { launch = puppeteer.launch, includeBodyText = false, browser: sharedBrowser = null } = {}
 ) {
   if (!browserBinding) throw new Error("Cloudflare Browser Run is not configured.");
 
   const url = site.searchUrl(query);
   const startedAt = Date.now();
-  const browser = await launch(browserBinding);
+  const browser = sharedBrowser || await launch(browserBinding);
+  const ownsBrowser = !sharedBrowser;
+  let page;
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setViewport({ width: 1440, height: 1000 });
     const response = await page.goto(url, { waitUntil: "networkidle2", timeout: site.timeoutMs || 30000 });
     const html = await page.content();
@@ -222,6 +224,48 @@ export async function searchMarketplaceWithBrowser(
       browserSessionsUsed: 1,
       challengeDetected: /captcha|verific[aă].{0,30}(om|robot)|access denied|just a moment/i.test(bodyText),
     };
+  } finally {
+    if (page?.close) await page.close().catch(() => {});
+    if (ownsBrowser) await browser.close();
+  }
+}
+
+export async function searchMarketplacesWithBrowser(
+  browserBinding,
+  searches,
+  { launch = puppeteer.launch, includeBodyText = false, concurrency = 2 } = {}
+) {
+  if (!browserBinding) throw new Error("Cloudflare Browser Run is not configured.");
+  const browser = await launch(browserBinding);
+  const results = new Array(searches.length);
+  let nextIndex = 0;
+
+  async function pageWorker() {
+    while (nextIndex < searches.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const search = searches[index];
+      try {
+        results[index] = await searchMarketplaceWithBrowser(browserBinding, search, {
+          includeBodyText,
+          browser
+        });
+      } catch (error) {
+        results[index] = {
+          ok: false,
+          site: search.site.key,
+          query: search.query,
+          provider: "cloudflare-browser",
+          error: error instanceof Error ? error.message : String(error)
+        };
+      }
+    }
+  }
+
+  try {
+    const workerCount = Math.max(1, Math.min(Number(concurrency) || 1, searches.length));
+    await Promise.all(Array.from({ length: workerCount }, () => pageWorker()));
+    return results;
   } finally {
     await browser.close();
   }

@@ -11,7 +11,7 @@ import { PREMIUM_BROWSER_SITE_KEYS, SITES, getDefaultSiteKeys, getSite, getSiteK
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
-import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser, searchMarketplaceWithBrowser } from "./providers/cloudflare-browser.js";
+import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser, searchMarketplacesWithBrowser } from "./providers/cloudflare-browser.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -132,37 +132,26 @@ function getFreeSearchSiteKeys(site, query) {
 }
 
 async function searchPremiumBrowserSites(env, { query, limit }) {
-  const results = [];
   const browserLimit = Math.min(limit ?? 20, 30);
-  let nextIndex = 0;
-
-  async function browserWorker() {
-    while (nextIndex < PREMIUM_BROWSER_SITE_KEYS.length) {
-      const siteKey = PREMIUM_BROWSER_SITE_KEYS[nextIndex];
-      nextIndex += 1;
-      try {
-        const result = await searchMarketplaceWithBrowser(
-          env.BROWSER,
-          { site: getSite(siteKey), query, limit: browserLimit },
-          { includeBodyText: true }
-        );
-        results.push(result.challengeDetected
-          ? { ok: false, site: siteKey, query, provider: "cloudflare-browser", error: "Browser challenge detected." }
-          : result);
-      } catch (error) {
-        results.push({
-          ok: false,
-          site: siteKey,
-          query,
-          provider: "cloudflare-browser",
-          error: error instanceof Error ? error.message : String(error)
-        });
-      }
-    }
+  try {
+    const results = await searchMarketplacesWithBrowser(
+      env.BROWSER,
+      PREMIUM_BROWSER_SITE_KEYS.map((siteKey) => ({ site: getSite(siteKey), query, limit: browserLimit })),
+      { includeBodyText: true, concurrency: 2 }
+    );
+    return results.map((result) => {
+      if (!result?.challengeDetected) return result;
+      return { ok: false, site: result.site, query, provider: "cloudflare-browser", error: "Browser challenge detected." };
+    });
+  } catch (error) {
+    return PREMIUM_BROWSER_SITE_KEYS.map((siteKey) => ({
+      ok: false,
+      site: siteKey,
+      query,
+      provider: "cloudflare-browser",
+      error: error instanceof Error ? error.message : String(error)
+    }));
   }
-
-  await Promise.all(Array.from({ length: 2 }, () => browserWorker()));
-  return PREMIUM_BROWSER_SITE_KEYS.map((siteKey) => results.find((result) => result.site === siteKey));
 }
 
 async function proxyImage(url) {
@@ -535,7 +524,7 @@ async function handleApi(request, env) {
         return json({ error: "Premium search currently supports site=all or site=default." }, 400);
       }
 
-      const freeSiteKeys = getFreeSearchSiteKeys(site, query);
+      const freeSiteKeys = getFreeSearchSiteKeys(site, query).filter((siteKey) => !PREMIUM_BROWSER_SITE_KEYS.includes(siteKey));
       const [freePayload, premiumResults] = await Promise.all([
         searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys: freeSiteKeys }),
         searchPremiumBrowserSites(env, { query, limit })

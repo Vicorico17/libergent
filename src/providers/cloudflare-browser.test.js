@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser } from "./cloudflare-browser.js";
+import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser, searchMarketplacesWithBrowser } from "./cloudflare-browser.js";
 
 test("returns an unconfigured result without launching a browser", async () => {
   let launched = false;
@@ -95,4 +95,37 @@ test("benchmarks rendered marketplace HTML with the existing site parser", async
   assert.equal(result.status, 200);
   assert.equal(result.itemCount, 1);
   assert.equal(result.sample[0].title, "iPhone test");
+});
+
+test("searches multiple marketplaces with one shared browser session", async () => {
+  let launches = 0;
+  let browserCloses = 0;
+  let pageCloses = 0;
+  const launch = async () => {
+    launches += 1;
+    return {
+      newPage: async () => ({
+        setViewport: async () => {},
+        goto: async () => ({ status: () => 200 }),
+        content: async () => "<html><body>No products</body></html>",
+        evaluate: async () => "No products",
+        url: () => "https://example.test/search",
+        close: async () => { pageCloses += 1; }
+      }),
+      close: async () => { browserCloses += 1; }
+    };
+  };
+  const sites = ["one", "two"].map((key) => ({
+    key: `${key}.ro`,
+    strategy: "direct-html-retail",
+    timeoutMs: 1000,
+    searchUrl: () => `https://${key}.example/search`
+  }));
+
+  const results = await searchMarketplacesWithBrowser({}, sites.map((site) => ({ site, query: "iphone", limit: 5 })), { launch, concurrency: 2 });
+
+  assert.equal(results.length, 2);
+  assert.equal(launches, 1);
+  assert.equal(pageCloses, 2);
+  assert.equal(browserCloses, 1);
 });
