@@ -71,9 +71,6 @@ export function HowItWorks() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-8 mb-12">
           <div className="max-w-xl">
-            <div className="text-[11px] font-semibold tracking-[0.15em] uppercase mb-5" style={{ color: PINK }}>
-              03 / REȚEAUA AGENTULUI
-            </div>
             <h2 className="font-semibold tracking-tighter leading-[1.15]"
               style={{ fontSize: "clamp(28px, 3.5vw, 42px)", color: INK }}>
               Conectat la marketplace-urile<br />

@@ -78,10 +78,6 @@ export function Pricing() {
 
         {/* Header */}
         <div className="text-center mb-16 flex flex-col items-center">
-          <div className="text-[11px] tracking-widest uppercase mb-6" style={{ color: PINK }}>
-            07 / PREȚURI
-          </div>
-
           <div className="flex items-end justify-center gap-2 mb-6">
             <h2
               className="font-bold tracking-tight leading-[0.95]"

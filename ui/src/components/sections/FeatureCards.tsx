@@ -240,13 +240,6 @@ export function FeatureCards() {
 
         {/* Section headline */}
         <div className="mb-12">
-          <div
-            className="font-bold text-[11px] tracking-widest uppercase mb-5 flex items-center gap-2"
-            style={{ color: PINK, fontFamily: MONO }}
-          >
-            02 / CUM FUNCȚIONEAZĂ
-          </div>
-
           <h2
             className="font-bold leading-[0.95] mb-5"
             style={{ fontFamily: MONO, fontSize: "clamp(40px, 5.5vw, 80px)", color: BLACK }}

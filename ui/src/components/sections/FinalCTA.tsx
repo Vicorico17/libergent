@@ -129,13 +129,6 @@ export function FinalCTA() {
 
       <div className="relative z-10 max-w-[1280px] mx-auto flex flex-col items-center text-center gap-8 lg:gap-10">
 
-        {/* Section label */}
-        <div className="flex items-center gap-2 text-[11px] tracking-widest uppercase" style={{ color: PINK }}>
-          <div style={{ width: 5, height: 5, background: PINK }} />
-          06 / CTA FINAL
-          <div style={{ width: 5, height: 5, background: PINK }} />
-        </div>
-
         {/* Logo mascot */}
         <LogoIcon size={64} />
 

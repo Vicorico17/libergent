@@ -44,13 +44,6 @@ export function FeaturesGrid() {
 
         {/* Section header */}
         <div className="text-center mb-16 flex flex-col items-center">
-          <div
-            className="text-[11px] tracking-widest uppercase mb-6 font-normal"
-            style={{ color: PINK }}
-          >
-            05 / TESTIMONIALE
-          </div>
-
           <div className="flex items-end justify-center gap-2 mb-6">
             <h2
               className="font-bold tracking-tight leading-[0.95]"
