@@ -6,6 +6,14 @@ import Link from "next/link"
 import { Bookmark, CalendarDays, Copy, ExternalLink, Lock, MapPin, MessageSquare, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
+import {
+  readSavedListingIds,
+  readSavedListings,
+  recordAccountActivity,
+  removeSavedListing,
+  upsertSavedListing,
+  writeSavedListingIds,
+} from "@/lib/account-data"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { useAccountSession } from "@/lib/use-account-session"
 import { mapOffer, mapSearchResults, type ListingDetails, type SearchPayload, type SearchResultItem } from "./search-data"
@@ -77,7 +85,6 @@ const SEARCH_RESULT_LIMIT = 180
 const SEARCH_PAGE_LIMIT = 2
 const INITIAL_VISIBLE_RESULTS = 48
 const VISIBLE_RESULT_STEP = 48
-const SAVED_LISTINGS_STORAGE_KEY = "libergent-saved-listings-v1"
 const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v3"
 type SearchTier = "free" | "premium"
 type MarketplaceCoverage = {
@@ -224,23 +231,6 @@ function trackSearchEvent(eventName: string, params: Record<string, string | num
 
 function listingStorageId(item: Pick<SearchResultItem, "id" | "url" | "title" | "source">) {
   return item.url || `${item.source}:${item.title}:${item.id}`
-}
-
-function readStringSetStorage(key: string) {
-  if (typeof window === "undefined") return new Set<string>()
-
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(key) || "[]")
-    return new Set(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [])
-  } catch {
-    window.localStorage.removeItem(key)
-    return new Set<string>()
-  }
-}
-
-function writeStringSetStorage(key: string, values: Set<string>) {
-  if (typeof window === "undefined") return
-  window.localStorage.setItem(key, JSON.stringify([...values]))
 }
 
 function readSearchFiltersStorage(): {
@@ -2177,15 +2167,51 @@ function SearchResultsContent() {
   useEffect(() => {
     const userId = account.userId
     queueMicrotask(() => {
-      setSavedListings(userId ? readStringSetStorage(`${SAVED_LISTINGS_STORAGE_KEY}:${userId}`) : new Set())
+      setSavedListings(userId ? readSavedListingIds(userId) : new Set())
       setSavedListingsOwnerId(userId)
     })
   }, [account.userId])
 
   useEffect(() => {
     if (!account.userId || savedListingsOwnerId !== account.userId) return
-    writeStringSetStorage(`${SAVED_LISTINGS_STORAGE_KEY}:${account.userId}`, savedListings)
+    writeSavedListingIds(account.userId, savedListings)
   }, [account.userId, savedListings, savedListingsOwnerId])
+
+  useEffect(() => {
+    if (!account.userId || savedListingsOwnerId !== account.userId || !results.length) return
+    const detailedIds = new Set(readSavedListings(account.userId).map((record) => record.id))
+    for (const item of results) {
+      const id = listingStorageId(item)
+      if (!savedListings.has(id) || detailedIds.has(id)) continue
+      upsertSavedListing(account.userId, {
+        id,
+        title: item.title,
+        url: item.url || "",
+        source: item.source,
+        priceLabel: item.priceLabel,
+        image: item.image || "",
+        city: item.city,
+        condition: item.condition,
+        query,
+        savedAt: new Date().toISOString(),
+      })
+    }
+  }, [account.userId, query, results, savedListings, savedListingsOwnerId])
+
+  useEffect(() => {
+    if (!account.userId || !query || isLoading || !searchedAt || !results.length) return
+    const offer = bestUsedOffer || results[0]
+    recordAccountActivity(account.userId, {
+      id: `${searchTier}:${query.toLowerCase()}:${searchedAt}`,
+      query,
+      tier: searchTier,
+      searchedAt,
+      resultCount: results.length,
+      bestOfferTitle: offer?.title || "",
+      bestOfferPrice: offer?.priceLabel || "",
+      bestOfferUrl: offer?.url || "",
+    })
+  }, [account.userId, bestUsedOffer, isLoading, query, results, searchTier, searchedAt])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -2344,6 +2370,7 @@ function SearchResultsContent() {
   const toggleSavedListing = (item: SearchResultItem) => {
     if (!isLoggedIn) return
     const id = listingStorageId(item)
+    const shouldSave = !savedListings.has(id)
     setSavedListings((current) => {
       const next = new Set(current)
       if (next.has(id)) {
@@ -2358,6 +2385,22 @@ function SearchResultsContent() {
       }
       return next
     })
+    if (shouldSave) {
+      upsertSavedListing(account.userId, {
+        id,
+        title: item.title,
+        url: item.url || "",
+        source: item.source,
+        priceLabel: item.priceLabel,
+        image: item.image || "",
+        city: item.city,
+        condition: item.condition,
+        query,
+        savedAt: new Date().toISOString(),
+      })
+    } else {
+      removeSavedListing(account.userId, id)
+    }
   }
   const filteredResults = useMemo(() => {
     const base = results.filter((item) => {
