@@ -7,6 +7,7 @@ import { Bookmark, CalendarDays, Copy, ExternalLink, Lock, MapPin, MessageSquare
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { useAccountSession } from "@/lib/use-account-session"
 import { mapOffer, mapSearchResults, type ListingDetails, type SearchPayload, type SearchResultItem } from "./search-data"
 
 // — Constants —
@@ -93,42 +94,6 @@ function marketplaceFailureLabel(error = "") {
   if (/challenge|captcha|verification/i.test(error)) return "Verificare marketplace"
   if (/timeout|timpul maxim/i.test(error)) return "Timp de răspuns depășit"
   return "Sursă indisponibilă"
-}
-
-type AccountSessionState = {
-  status: "checking" | "signed_out" | "signed_in"
-  userId: string
-}
-
-function useAccountSession(): AccountSessionState {
-  const [account, setAccount] = useState<AccountSessionState>({ status: "checking", userId: "" })
-
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient()
-    if (!supabase) {
-      queueMicrotask(() => setAccount({ status: "signed_out", userId: "" }))
-      return
-    }
-
-    let mounted = true
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return
-      const userId = data.session?.user?.id || ""
-      setAccount({ status: userId ? "signed_in" : "signed_out", userId })
-    })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return
-      const userId = session?.user?.id || ""
-      setAccount({ status: userId ? "signed_in" : "signed_out", userId })
-    })
-
-    return () => {
-      mounted = false
-      listener.subscription.unsubscribe()
-    }
-  }, [])
-
-  return account
 }
 
 function shouldOpenFiltersByDefault() {
@@ -929,7 +894,7 @@ function SearchNav({ query, tier, isLoggedIn }: { query: string; tier: SearchTie
       <div className="flex items-center gap-5 text-[12px] uppercase font-bold flex-none ml-auto">
         <Link href="/trenduri" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Trenduri</Link>
         {isLoggedIn ? (
-          <span className="inline-flex items-center gap-1.5" style={{ color: GREEN }}><span className="h-2 w-2 rounded-full" style={{ background: GREEN }} /> Cont conectat</span>
+          <Link href={`/account?next=${encodeURIComponent(`/search?q=${query}&tier=${tier}`)}`} className="inline-flex items-center gap-1.5 px-3 py-2" style={{ color: GREEN, border: `1px solid ${GREEN}` }}><span className="h-2 w-2 rounded-full" style={{ background: GREEN }} /> Contul meu</Link>
         ) : (
           <Link href={`/auth?next=${encodeURIComponent(`/search?q=${query}&tier=${tier}`)}`} className="px-3 py-2" style={{ border: `1px solid ${INK}`, color: INK }}>Conectează-te</Link>
         )}

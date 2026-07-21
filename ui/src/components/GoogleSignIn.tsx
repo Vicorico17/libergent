@@ -2,18 +2,22 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { getSafeNextPath } from "@/lib/auth-path";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
-type AuthState = "checking" | "signed_out" | "signed_in";
+type AuthState = "checking" | "signed_out" | "sending" | "email_sent";
 type SocialProvider = "google" | "apple" | "facebook";
 
-function getSafeNextPath() {
-  if (typeof window === "undefined") return "/";
-  const next = new URLSearchParams(window.location.search).get("next") || "/";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
+function friendlyAuthError(message = "") {
+  if (/provider.*not enabled|unsupported provider/i.test(message)) return "Această metodă de conectare nu este activată încă.";
+  if (/rate limit|too many requests/i.test(message)) return "Prea multe încercări. Așteaptă puțin și încearcă din nou.";
+  if (/invalid email/i.test(message)) return "Introdu o adresă de email validă.";
+  return message || "Autentificarea nu a putut fi finalizată.";
 }
 
-export function SignInOptions() {
+export function SignInOptions({ submitLabel = "Trimite link de conectare" }: { submitLabel?: string }) {
+  const router = useRouter();
   const [state, setState] = useState<AuthState>("checking");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
@@ -29,28 +33,36 @@ export function SignInOptions() {
     }
 
     let mounted = true;
+    const finishSignIn = () => {
+      if (!mounted) return;
+      router.replace(getSafeNextPath(window.location.search));
+    };
+
     client.auth.getSession().then(({ data, error }) => {
       if (!mounted) return;
       if (error) {
         setState("signed_out");
-        setMessage(error.message);
-        return;
+        setMessage(friendlyAuthError(error.message));
+      } else if (data.session) {
+        finishSignIn();
+      } else {
+        setState("signed_out");
       }
-      setState(data.session ? "signed_in" : "signed_out");
     });
 
-    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
-      if (mounted) setState(session ? "signed_in" : "signed_out");
+    const { data: listener } = client.auth.onAuthStateChange((event, session) => {
+      if (session && event !== "INITIAL_SESSION") finishSignIn();
     });
 
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [router]);
 
   function authRedirectUrl() {
-    return `${window.location.origin}/auth?next=${encodeURIComponent(getSafeNextPath())}`;
+    const next = getSafeNextPath(window.location.search);
+    return `${window.location.origin}/confirm?next=${encodeURIComponent(next)}`;
   }
 
   async function signInWithSocial(provider: SocialProvider) {
@@ -61,7 +73,7 @@ export function SignInOptions() {
       return;
     }
 
-    setState("checking");
+    setState("sending");
     setMessage("");
     const { error } = await client.auth.signInWithOAuth({
       provider,
@@ -69,7 +81,7 @@ export function SignInOptions() {
     });
     if (error) {
       setState("signed_out");
-      setMessage(error.message);
+      setMessage(friendlyAuthError(error.message));
     }
   }
 
@@ -79,26 +91,25 @@ export function SignInOptions() {
     const normalizedEmail = email.trim().toLowerCase();
     if (!client || !normalizedEmail) return;
 
-    setState("checking");
+    setState("sending");
     setMessage("");
     const { error } = await client.auth.signInWithOtp({
       email: normalizedEmail,
-      options: { emailRedirectTo: authRedirectUrl() }
+      options: {
+        emailRedirectTo: authRedirectUrl(),
+        shouldCreateUser: true,
+      }
     });
-    setState("signed_out");
-    setMessage(error ? error.message : "Ți-am trimis un link de conectare pe email.");
+    if (error) {
+      setState("signed_out");
+      setMessage(friendlyAuthError(error.message));
+      return;
+    }
+    setState("email_sent");
+    setMessage(`Am trimis linkul către ${normalizedEmail}. Verifică și folderul Spam.`);
   }
 
-  if (state === "signed_in") {
-    return (
-      <div className="flex flex-col gap-3">
-        <p className="text-[12px] font-bold uppercase">Ești conectat la contul tău LiberGent.</p>
-        <Link href={getSafeNextPath()} className="inline-flex justify-center items-center px-5 py-3 text-[12px] font-bold uppercase" style={{ background: "#111111", color: "#F3F0E7", border: "2px solid #111111" }}>
-          Mergi la căutare
-        </Link>
-      </div>
-    );
-  }
+  const busy = state === "checking" || state === "sending";
 
   return (
     <div className="flex flex-col gap-3">
@@ -111,22 +122,25 @@ export function SignInOptions() {
           key={option.provider}
           type="button"
           onClick={() => signInWithSocial(option.provider)}
-          disabled={state === "checking"}
+          disabled={busy}
           className="inline-flex min-h-12 justify-center items-center gap-3 px-5 py-3 text-[12px] font-bold uppercase disabled:opacity-60"
           style={{ background: option.provider === "apple" ? "white" : "#111111", color: option.provider === "apple" ? "#111111" : "#F3F0E7", border: "2px solid #111111" }}
         >
           <span aria-hidden="true" className="text-[18px] leading-none">{option.symbol}</span>
-          {state === "checking" ? "Se verifică..." : option.label}
+          {state === "sending" ? "Se deschide..." : option.label}
         </button>
       ))}
       <div className="flex items-center gap-3 py-1 text-[10px] font-bold uppercase" style={{ color: "#11111188" }}><span className="h-px flex-1 bg-black/20" />sau<span className="h-px flex-1 bg-black/20" /></div>
       <form onSubmit={sendMagicLink} className="flex flex-col gap-2">
-        <input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="EMAIL" className="min-h-12 px-4 text-[12px] font-bold uppercase outline-none" style={{ border: "2px solid #111111" }} />
-        <button type="submit" disabled={state === "checking" || !email.trim()} className="min-h-12 px-5 py-3 text-[12px] font-bold uppercase disabled:opacity-50" style={{ background: "#FF4F8B", color: "#111111", border: "2px solid #111111" }}>
-          Trimite link de conectare
+        <label htmlFor="auth-email" className="text-[10px] font-bold uppercase">Email</label>
+        <input id="auth-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="nume@exemplu.ro" className="min-h-12 px-4 text-[12px] font-bold outline-none" style={{ border: "2px solid #111111" }} />
+        <button type="submit" disabled={busy || !email.trim()} className="min-h-12 px-5 py-3 text-[12px] font-bold uppercase disabled:opacity-50" style={{ background: "#FF4F8B", color: "#111111", border: "2px solid #111111" }}>
+          {state === "sending" ? "Se trimite..." : state === "email_sent" ? "Retrimite linkul" : submitLabel}
         </button>
       </form>
-      {message ? <p className="text-[10px] font-bold uppercase leading-relaxed" style={{ color: "#FF4F8B" }}>{message}</p> : null}
+      {message ? <p role="status" className="text-[10px] font-bold uppercase leading-relaxed" style={{ color: state === "email_sent" ? "#198754" : "#FF4F8B" }}>{message}</p> : null}
+      <p className="text-[9px] font-bold uppercase leading-relaxed" style={{ color: "#11111177" }}>Nu ai nevoie de parolă. Linkul de email este valabil o perioadă limitată.</p>
+      <p className="text-[9px] font-bold uppercase leading-relaxed" style={{ color: "#11111177" }}>Prin continuare accepți <Link href="/termeni" className="underline">termenii</Link> și <Link href="/confidentialitate" className="underline">politica de confidențialitate</Link>.</p>
     </div>
   );
 }

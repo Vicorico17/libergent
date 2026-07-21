@@ -278,7 +278,9 @@ The protected `/api/admin/browser-benchmark` endpoint renders one supported mark
 
 ## Accounts, analytics, and Supabase
 
-Supabase Auth supports configured social providers and passwordless email. Signed-out visitors can search, inspect **Analiză LiberGent**, and open original marketplace listings. Favorites, feedback, WhatsApp outreach, listing statuses, and private conversation history require authentication.
+Supabase Auth supports Google, Apple, Facebook, and passwordless email when their providers are configured. `/confirm` completes OAuth/magic-link callbacks, `/account` shows the active identity and provides logout, and `/signup` plus `/reset` use the same passwordless account flow. Signed-out visitors can search, inspect **Analiză LiberGent**, and open original marketplace listings. Favorites, feedback, WhatsApp outreach, listing statuses, and private conversation history require authentication.
+
+Apple web OAuth requires an Apple Services ID (the Client ID), Team ID, Key ID, a private `.p8` signing key, and a generated client secret configured in Supabase—not frontend environment variables. Follow [docs/apple-auth-setup.md](docs/apple-auth-setup.md) for the exact Apple/Supabase callback and rotation checklist.
 
 Search analytics and email capture require:
 
@@ -313,6 +315,7 @@ Production deployment is also automated by [.github/workflows/deploy-cloudflare.
 - [Search E2E QA](docs/lib-23-qa-website-search-e2e.md)
 - [GitHub workflow](docs/github-workflow.md)
 - [OpenClaw bridge](docs/openclaw-bridge.md)
+- [Sign in with Apple setup](docs/apple-auth-setup.md)
 
 ## Current limitations
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { LogoIcon } from "./LogoIcon";
+import { AccountNavLink } from "./AccountNavLink";
 
 const TICKER_TEXT =
   "AGENT ACTIV: ROMÂNIA +++ SCANARE MULTI-PLATFORMĂ +++ COMPARARE OFERTE +++ INTELIGENȚĂ ARTIFICIALĂ PENTRU SECOND-HAND";
@@ -97,6 +98,7 @@ export function Navbar() {
               {link.label}
             </Link>
           ))}
+          <AccountNavLink />
         </div>
 
         <button
@@ -144,6 +146,7 @@ export function Navbar() {
               {link.label}
             </Link>
           ))}
+          <AccountNavLink compact />
         </div>
       </div>
 
