@@ -156,8 +156,7 @@ export const PREMIUM_BROWSER_SITE_KEYS = [
   "compari.ro",
   "pcgarage.ro",
   "flanco.ro",
-  "altex.ro",
-  "cel.ro"
+  "altex.ro"
 ];
 
 const REFURBISHED_TECH_KEYWORDS = [
@@ -794,8 +793,6 @@ export const SITES = {
     defaultSellerType: "Retailer",
     estimatedCreditsPerPage: 0,
     waitForMs: 0,
-    browserWaitUntil: "domcontentloaded",
-    browserWaitForMs: 1500,
     timeoutMs: 24000,
     pageSize: 24,
     maxPages: 1,

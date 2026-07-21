@@ -67,7 +67,7 @@ test("categorizes every registered marketplace into one access tier", () => {
   assert.equal(PREMIUM_BROWSER_SITE_KEYS.every((siteKey) => PREMIUM_SITE_KEYS.includes(siteKey)), true);
   assert.equal(PREMIUM_BROWSER_SITE_KEYS.includes("emag.ro"), false);
   assert.equal(PREMIUM_BROWSER_SITE_KEYS.includes("evomag.ro"), false);
-  assert.equal(PREMIUM_BROWSER_SITE_KEYS.includes("cel.ro"), true);
+  assert.equal(PREMIUM_BROWSER_SITE_KEYS.includes("cel.ro"), false);
 });
 
 test("does not classify non-car terms as car searches", () => {
