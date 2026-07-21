@@ -11,6 +11,7 @@ import { normalizeSearchProvider } from "./provider-options.js";
 
 const DESKTOP_BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 const MOBILE_BROWSER_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+const VINTED_DIRECT_HTML_CACHE_SECONDS = 300;
 
 function tokenize(value = "") {
   return value
@@ -167,7 +168,38 @@ function buildDirectFetchError(response, url) {
   return new Error(`Direct fetch failed (${response.status}) for ${url}`);
 }
 
+function buildDirectHtmlCacheRequest(url) {
+  const targetUrl = new URL(url);
+  if (targetUrl.hostname !== "vinted.ro" && targetUrl.hostname !== "www.vinted.ro") return null;
+  const cacheUrl = new URL("/api/internal-cache/direct-html/v1", "https://libergent.com");
+  cacheUrl.searchParams.set("url", targetUrl.toString());
+  return new Request(cacheUrl, { method: "GET" });
+}
+
+async function readDirectHtmlCache(cacheRequest) {
+  const cache = globalThis.caches?.default;
+  if (!cache || !cacheRequest) return null;
+  const response = await cache.match(cacheRequest);
+  return response ? response.text() : null;
+}
+
+async function writeDirectHtmlCache(cacheRequest, html) {
+  const cache = globalThis.caches?.default;
+  if (!cache || !cacheRequest || !html) return;
+  await cache.put(cacheRequest, new Response(html, {
+    status: 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": `public, max-age=${VINTED_DIRECT_HTML_CACHE_SECONDS}`
+    }
+  })).catch(() => {});
+}
+
 async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
+  const cacheRequest = buildDirectHtmlCacheRequest(url);
+  const cachedHtml = await readDirectHtmlCache(cacheRequest);
+  if (cachedHtml) return cachedHtml;
+
   const headerProfiles = getDirectFetchHeaderProfiles(url);
   let lastError = null;
 
@@ -188,7 +220,9 @@ async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
     }
 
     if (response.ok) {
-      return response.text();
+      const html = await response.text();
+      await writeDirectHtmlCache(cacheRequest, html);
+      return html;
     }
 
     lastError = buildDirectFetchError(response, url);

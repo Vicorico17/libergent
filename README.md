@@ -217,6 +217,8 @@ Free search uses direct marketplace connections and never starts Browser Run. In
 curl "https://YOUR_DOMAIN/api/search/free?q=iphone&site=all&limit=30"
 ```
 
+Successful Vinted catalog HTML is cached at the Worker edge for five minutes per exact search URL. This reduces repeated origin requests and smooths Vinted's intermittent Cloudflare challenges without retry storms, browser automation, or caching failed challenge responses.
+
 `/api/search` remains a backward-compatible alias for the Free contract. Premium search combines the Free results with seven additional marketplace and retailer benchmarks:
 
 ```bash

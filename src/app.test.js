@@ -290,6 +290,57 @@ test("Cloudflare challenge direct failures are reported without retrying the sam
   }
 });
 
+test("reuses successful Vinted HTML briefly instead of repeating the origin request", async () => {
+  const envKeys = ["LIBERGENT_MOCK_SEARCH", "LIBERGENT_MOCK_PROVIDER"];
+  const previousEnv = new Map(envKeys.map((key) => [key, process.env[key]]));
+  const previousFetch = globalThis.fetch;
+  const previousCaches = globalThis.caches;
+  const cachedResponses = new Map();
+  let fetchCalls = 0;
+
+  try {
+    process.env.LIBERGENT_MOCK_SEARCH = "0";
+    process.env.LIBERGENT_MOCK_PROVIDER = "0";
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          return cachedResponses.get(request.url)?.clone();
+        },
+        async put(request, response) {
+          cachedResponses.set(request.url, response.clone());
+        }
+      }
+    };
+    globalThis.fetch = async () => {
+      fetchCalls += 1;
+      return new Response(`
+        <div data-testid="grid-item">
+          <a href="/items/123-iphone-15" title="iPhone 15, brand: Apple, stare: Foarte bună, 2.000 Lei"></a>
+          <img alt="iPhone 15" src="https://images1.vinted.net/test.webp" />
+        </div>
+      `, { status: 200, headers: { "content-type": "text/html" } });
+    };
+
+    const request = { query: "iphone 15", provider: "direct", siteKeys: ["vinted.ro"], limit: 5, maxPages: 1 };
+    const first = await searchAcrossSites(request);
+    const second = await searchAcrossSites(request);
+
+    assert.equal(first.results[0].ok, true);
+    assert.equal(second.results[0].ok, true);
+    assert.equal(fetchCalls, 1);
+    assert.equal(cachedResponses.size, 1);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousCaches === undefined) delete globalThis.caches;
+    else globalThis.caches = previousCaches;
+    for (const key of envKeys) {
+      const previous = previousEnv.get(key);
+      if (previous === undefined) delete process.env[key];
+      else process.env[key] = previous;
+    }
+  }
+});
+
 test("Cloudflare Worker runtime caps marketplace searches to one page", async () => {
   const previousRuntime = process.env.LIBERGENT_RUNTIME;
   const previousMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
