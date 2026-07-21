@@ -341,6 +341,56 @@ test("reuses successful Vinted HTML briefly instead of repeating the origin requ
   }
 });
 
+test("retries one intermittent Vinted challenge before returning a failure", async () => {
+  const envKeys = ["LIBERGENT_MOCK_SEARCH", "LIBERGENT_MOCK_PROVIDER"];
+  const previousEnv = new Map(envKeys.map((key) => [key, process.env[key]]));
+  const previousFetch = globalThis.fetch;
+  const previousCaches = globalThis.caches;
+  let fetchCalls = 0;
+
+  try {
+    process.env.LIBERGENT_MOCK_SEARCH = "0";
+    process.env.LIBERGENT_MOCK_PROVIDER = "0";
+    delete globalThis.caches;
+    globalThis.fetch = async () => {
+      fetchCalls += 1;
+      if (fetchCalls === 1) {
+        return new Response("<html>challenge</html>", {
+          status: 403,
+          headers: { "content-type": "text/html", "cf-mitigated": "challenge" }
+        });
+      }
+      return new Response(`
+        <div data-testid="grid-item">
+          <a href="/items/456-iphone-15" title="iPhone 15, brand: Apple, stare: Bună, 2.100 Lei"></a>
+          <img alt="iPhone 15" src="https://images1.vinted.net/retry.webp" />
+        </div>
+      `, { status: 200, headers: { "content-type": "text/html" } });
+    };
+
+    const payload = await searchAcrossSites({
+      query: "iphone 15",
+      provider: "direct",
+      siteKeys: ["vinted.ro"],
+      limit: 5,
+      maxPages: 1
+    });
+
+    assert.equal(payload.results[0].ok, true);
+    assert.equal(payload.results[0].attempts, 2);
+    assert.equal(fetchCalls, 2);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousCaches === undefined) delete globalThis.caches;
+    else globalThis.caches = previousCaches;
+    for (const key of envKeys) {
+      const previous = previousEnv.get(key);
+      if (previous === undefined) delete process.env[key];
+      else process.env[key] = previous;
+    }
+  }
+});
+
 test("Cloudflare Worker runtime caps marketplace searches to one page", async () => {
   const previousRuntime = process.env.LIBERGENT_RUNTIME;
   const previousMockSearch = process.env.LIBERGENT_MOCK_SEARCH;

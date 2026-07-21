@@ -199,7 +199,7 @@ async function searchSiteOnce({ siteKey, query, condition, provider, limit, maxP
 function isRetryableResult(result) {
   if (!result.ok) {
     if (/Cloudflare challenge/i.test(result.error || "")) {
-      return false;
+      return result.site === "vinted.ro";
     }
 
     return !/Missing environment variables|Unsupported site/i.test(result.error || "");
@@ -255,7 +255,10 @@ async function searchSiteWithProvider({ siteKey, query, condition, provider, lim
       errors.push("empty response");
     }
 
-    await delay(SITE_RETRY_DELAY_MS * attempt);
+    const retryDelayMs = result.site === "vinted.ro" && /Cloudflare challenge/i.test(result.error || "")
+      ? 1200
+      : SITE_RETRY_DELAY_MS * attempt;
+    await delay(retryDelayMs);
   }
 
   return buildSiteFailureResult({
