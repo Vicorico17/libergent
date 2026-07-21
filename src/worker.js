@@ -12,6 +12,7 @@ import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
 import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser, searchMarketplacesWithBrowser } from "./providers/cloudflare-browser.js";
+import { parseListingDetailsHtml } from "./listing-details.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -24,6 +25,8 @@ import {
 const LEAD_API_PATHS = new Set(["/api/leads", "/api/lead", "/api/email-leads", "/api/email_leads", "/api/waitlist"]);
 const PREMIUM_SEARCH_CACHE_SECONDS = 300;
 const MARKETPLACE_CONTACT_CACHE_SECONDS = 900;
+const MARKETPLACE_DETAILS_CACHE_SECONDS = 1800;
+const MAX_MARKETPLACE_DETAILS_HTML_BYTES = 6 * 1024 * 1024;
 const PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS = ["okazii.ro"];
 const DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT = PREMIUM_BROWSER_SITE_KEYS.length + PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS.length;
 const PREMIUM_BROWSER_FALLBACK_PRIORITY = [
@@ -147,6 +150,76 @@ function writeMarketplaceContactCache(cacheRequest, payload, context) {
   });
   const operation = cache.put(cacheRequest, response).catch(() => {});
   if (context?.waitUntil) context.waitUntil(operation);
+}
+
+function buildMarketplaceDetailsCacheRequest(request, targetUrl) {
+  const cacheUrl = new URL("/api/marketplace/details-cache/v1", request.url);
+  cacheUrl.searchParams.set("url", `${targetUrl.origin}${targetUrl.pathname}${targetUrl.search}`);
+  return new Request(cacheUrl, { method: "GET" });
+}
+
+async function readMarketplaceDetailsCache(cacheRequest) {
+  const cache = globalThis.caches?.default;
+  if (!cache) return null;
+  const response = await cache.match(cacheRequest);
+  if (!response) return null;
+  const payload = await response.json().catch(() => null);
+  if (!payload) return null;
+  payload.cacheHit = true;
+  return json(payload, 200);
+}
+
+function writeMarketplaceDetailsCache(cacheRequest, payload, context) {
+  const cache = globalThis.caches?.default;
+  if (!cache) return;
+  const response = new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": `public, max-age=${MARKETPLACE_DETAILS_CACHE_SECONDS}`
+    }
+  });
+  const operation = cache.put(cacheRequest, response).catch(() => {});
+  if (context?.waitUntil) context.waitUntil(operation);
+}
+
+function parseSupportedMarketplaceUrl(listingUrl) {
+  let targetUrl;
+  try {
+    targetUrl = new URL(String(listingUrl || "").trim());
+  } catch {
+    throw new Error("Invalid listing URL.");
+  }
+
+  const allowed = Object.keys(SITES).some((host) =>
+    targetUrl.hostname === host || targetUrl.hostname.endsWith(`.${host}`)
+  );
+  if (targetUrl.protocol !== "https:" || !allowed) {
+    throw new Error("Listing host is not supported.");
+  }
+  return targetUrl;
+}
+
+async function fetchSupportedMarketplacePage(targetUrl, { headers, timeoutMs }) {
+  const signal = AbortSignal.timeout(timeoutMs);
+  let currentUrl = targetUrl;
+
+  for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
+    const response = await fetch(currentUrl.toString(), {
+      headers,
+      redirect: "manual",
+      signal
+    });
+    if (response.status < 300 || response.status >= 400) {
+      return { response, finalUrl: currentUrl };
+    }
+
+    const location = response.headers.get("location");
+    if (!location) return { response, finalUrl: currentUrl };
+    currentUrl = parseSupportedMarketplaceUrl(new URL(location, currentUrl).toString());
+  }
+
+  throw new Error("Listing redirected too many times.");
 }
 
 function getBearerTokenFromRequest(request) {
@@ -916,25 +989,66 @@ async function handleApi(request, env, context) {
     }
   }
 
+  if (apiPath === "/api/marketplace/details") {
+    if (request.method !== "GET") {
+      return json({ error: "Method not allowed" }, 405);
+    }
+
+    let targetUrl;
+    try {
+      targetUrl = parseSupportedMarketplaceUrl(url.searchParams.get("url"));
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400);
+    }
+
+    const detailsCacheRequest = buildMarketplaceDetailsCacheRequest(request, targetUrl);
+    const cachedDetailsResponse = await readMarketplaceDetailsCache(detailsCacheRequest);
+    if (cachedDetailsResponse) return cachedDetailsResponse;
+
+    try {
+      const { response, finalUrl } = await fetchSupportedMarketplacePage(targetUrl, {
+        headers: {
+          "user-agent": "Mozilla/5.0 (compatible; LiberGent/1.0; +https://libergent.com)",
+          accept: "text/html,application/xhtml+xml",
+          "accept-language": "ro-RO,ro;q=0.9,en;q=0.7"
+        },
+        timeoutMs: 12000
+      });
+      if (!response.ok) {
+        return json({ ok: false, error: `Listing fetch failed (${response.status}).` }, 502);
+      }
+      const contentLength = Number.parseInt(response.headers.get("content-length") || "0", 10);
+      if (contentLength > MAX_MARKETPLACE_DETAILS_HTML_BYTES) {
+        return json({ ok: false, error: "Listing response is too large." }, 502);
+      }
+      const html = await response.text();
+      if (html.length > MAX_MARKETPLACE_DETAILS_HTML_BYTES) {
+        return json({ ok: false, error: "Listing response is too large." }, 502);
+      }
+      const payload = {
+        ok: true,
+        marketplace: finalUrl.hostname.replace(/^www\./, ""),
+        url: finalUrl.toString(),
+        details: parseListingDetailsHtml(html, { url: finalUrl.toString() }),
+        cacheHit: false
+      };
+      writeMarketplaceDetailsCache(detailsCacheRequest, payload, context);
+      return json(payload, 200);
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 502);
+    }
+  }
+
   if (apiPath === "/api/marketplace/contact") {
     if (request.method !== "GET") {
       return json({ error: "Method not allowed" }, 405);
     }
 
-    const listingUrl = String(url.searchParams.get("url") || "").trim();
     let targetUrl;
     try {
-      targetUrl = new URL(listingUrl);
-    } catch {
-      return json({ ok: false, error: "Invalid listing URL." }, 400);
-    }
-
-    const allowedHosts = new Set(Object.keys(SITES));
-    const allowed = [...allowedHosts].some((host) =>
-      targetUrl.hostname === host || targetUrl.hostname.endsWith(`.${host}`)
-    );
-    if (targetUrl.protocol !== "https:" || !allowed) {
-      return json({ ok: false, error: "Listing host is not supported." }, 400);
+      targetUrl = parseSupportedMarketplaceUrl(url.searchParams.get("url"));
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400);
     }
 
     const contactCacheRequest = buildMarketplaceContactCacheRequest(request, targetUrl);
@@ -942,13 +1056,12 @@ async function handleApi(request, env, context) {
     if (cachedContactResponse) return cachedContactResponse;
 
     try {
-      const response = await fetch(targetUrl.toString(), {
+      const { response } = await fetchSupportedMarketplacePage(targetUrl, {
         headers: {
           "user-agent": "Mozilla/5.0 (compatible; LiberGent/1.0; +https://libergent.com)",
           accept: "text/html,application/xhtml+xml"
         },
-        redirect: "follow",
-        signal: AbortSignal.timeout(10000)
+        timeoutMs: 10000
       });
       if (!response.ok) {
         return json({ ok: false, phones: [], error: `Listing fetch failed (${response.status}).` }, 502);

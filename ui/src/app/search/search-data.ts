@@ -205,6 +205,48 @@ export type SearchResultItem = {
   };
 };
 
+export type ListingDetails = {
+  title?: string;
+  description?: string;
+  location?: string;
+  condition?: string;
+  availability?: string;
+  images?: string[];
+  attributes?: Array<{ label: string; value: string }>;
+  seller?: {
+    name?: string;
+    rating?: number | null;
+    reviewCount?: number | null;
+    ratingScale?: number | null;
+  };
+  productRating?: {
+    rating?: number | null;
+    reviewCount?: number | null;
+    ratingScale?: number | null;
+  };
+  pricing?: {
+    itemPrice?: number | null;
+    currency?: string;
+    buyerProtectionFee?: number | null;
+    buyerProtectionTotal?: number | null;
+    deliveryPrice?: number | null;
+    totalPrice?: number | null;
+    deliveryStatus?: "free" | "known" | "unknown";
+  };
+  delivery?: {
+    status?: "free" | "known" | "unknown";
+    price?: number | null;
+    currency?: string;
+    minDays?: number | null;
+    maxDays?: number | null;
+  };
+  extraction?: {
+    provider?: string;
+    structuredData?: boolean;
+    browserUsed?: boolean;
+  };
+};
+
 const platformLabels: Record<string, string> = {
   "anuntul.ro": "ANUNTUL",
   "autovit.ro": "AUTOVIT",

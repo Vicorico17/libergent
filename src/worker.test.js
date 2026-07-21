@@ -23,6 +23,45 @@ test("exposes the direct search contract at /api/search/free", async (t) => {
   assert.ok(payload.summary.marketplaces > 0);
 });
 
+test("enriches a supported listing directly when its analysis is opened", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async () => new Response(`
+    <script type="application/ld+json">
+      {"@type":"Product","name":"Produs test","description":"Descriere completă","offers":{"@type":"Offer","price":100,"priceCurrency":"RON","areaServed":{"name":"Brașov"}}}
+    </script>
+  `, { status: 200, headers: { "content-type": "text/html" } });
+
+  const listingUrl = "https://www.olx.ro/d/oferta/produs-test-ID123.html";
+  const response = await worker.fetch(
+    new Request(`https://libergent.test/api/marketplace/details?url=${encodeURIComponent(listingUrl)}`),
+    {}
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.details.description, "Descriere completă");
+  assert.equal(payload.details.location, "Brașov");
+  assert.equal(payload.details.extraction.provider, "direct");
+  assert.equal(payload.details.extraction.browserUsed, false);
+});
+
+test("rejects unsupported hosts for listing enrichment", async () => {
+  const response = await worker.fetch(
+    new Request("https://libergent.test/api/marketplace/details?url=https%3A%2F%2Fexample.com%2Fproduct"),
+    {}
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.ok, false);
+  assert.match(payload.error, /not supported/i);
+});
+
 test("allows Premium testing without a token and requires Browser Run", async () => {
   const response = await worker.fetch(
     new Request("https://libergent.test/api/search/premium?q=iphone&site=all"),

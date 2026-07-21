@@ -227,6 +227,8 @@ During the internal testing phase, Premium search requires only the `BROWSER` bi
 
 Select **Free** or **Premium test** directly on the search page. The coverage panel reports each marketplace's provider, result count, and failure reason. Authentication and paid access can be added after Premium marketplace coverage has been validated.
 
+Opening **Analiză LiberGent** lazily calls `GET /api/marketplace/details?url=...`. The Worker fetches only that supported marketplace URL, follows only allowlisted marketplace redirects, and parses public structured data for the full description, precise location, seller identity/rating when exposed, product rating, specifications, buyer-protection fee, delivery cost/timing, and known payable total. It is direct-only, never launches Browser Run, rejects unsupported hosts, limits response size, and caches successful enrichment for thirty minutes.
+
 ### Private seller conversations
 
 Seller outreach requires a valid Supabase account session. `POST /api/whatsapp/send`, `GET /api/conversations`, and `GET /api/conversations/:id` validate the Supabase access token. Outbound and inbound WhatsApp messages are tagged with the account ID and conversation APIs filter history server-side, so one account cannot read another account's messages.

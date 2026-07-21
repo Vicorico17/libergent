@@ -7,7 +7,7 @@ import { Bookmark, CalendarDays, Copy, ExternalLink, Lock, MapPin, MessageSquare
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
-import { mapOffer, mapSearchResults, type SearchPayload, type SearchResultItem } from "./search-data"
+import { mapOffer, mapSearchResults, type ListingDetails, type SearchPayload, type SearchResultItem } from "./search-data"
 
 // — Constants —
 const CREAM  = "#F5F3EE"
@@ -1750,12 +1750,74 @@ function DetailMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
+function formatDetailMoney(value?: number | null, currency = "RON") {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "n/a"
+  return new Intl.NumberFormat("ro-RO", {
+    style: "currency",
+    currency: currency || "RON",
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function formatRating(rating?: number | null, scale?: number | null, reviewCount?: number | null) {
+  if (typeof rating !== "number" || !Number.isFinite(rating)) return "n/a"
+  const reviews = typeof reviewCount === "number" && Number.isFinite(reviewCount) ? ` · ${reviewCount} evaluări` : ""
+  return `${rating.toFixed(1)}/${scale || 5}${reviews}`
+}
+
+function deliveryLabel(details: ListingDetails) {
+  const delivery = details.delivery
+  if (delivery?.status === "free") return "gratuită"
+  if (delivery?.status === "known") return formatDetailMoney(delivery.price, delivery.currency || details.pricing?.currency)
+  return "calculată la checkout"
+}
+
+function deliveryTimeLabel(details: ListingDetails) {
+  const min = details.delivery?.minDays
+  const max = details.delivery?.maxDays
+  if (typeof min === "number" && typeof max === "number") return `${min}-${max} zile`
+  if (typeof max === "number") return `până la ${max} zile`
+  if (typeof min === "number") return `de la ${min} zile`
+  return "nespecificat"
+}
+
 function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversationStatus, onClose }: { item: SearchResultItem | null; query: string; searchTier: SearchTier; isLoggedIn: boolean; conversationStatus?: string; onClose: () => void }) {
+  const [details, setDetails] = useState<ListingDetails | null>(null)
+  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [detailsError, setDetailsError] = useState("")
   const { image, handleImageError } = useListingImage(item || {
     id: "empty",
     images: [],
     image: undefined,
   })
+
+  useEffect(() => {
+    const listingUrl = item?.url
+    setDetails(null)
+    setDetailsError("")
+    if (!listingUrl) {
+      setDetailsLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    setDetailsLoading(true)
+    fetch(`/api/marketplace/details?url=${encodeURIComponent(listingUrl)}`, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null)
+        if (!response.ok || !payload?.ok) throw new Error(payload?.error || "Detaliile anunțului nu sunt disponibile.")
+        setDetails(payload.details || null)
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        setDetailsError(error instanceof Error ? error.message : "Detaliile anunțului nu sunt disponibile.")
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDetailsLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [item?.url])
 
   if (!item) return null
 
@@ -1825,6 +1887,62 @@ function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversation
               )}
             </div>
           </div>
+
+          <section className="flex flex-col gap-3">
+            <PanelHeader title="Informații din anunț" />
+            {detailsLoading && (
+              <div className="flex items-center gap-2 p-4 text-[11px] font-bold uppercase" style={{ border: `1px solid ${INK}22`, background: CREAM }}>
+                <span className="inline-block h-2 w-2 animate-pulse" style={{ background: PINK }} />
+                Extrag descrierea, sellerul, locația și livrarea...
+              </div>
+            )}
+            {!detailsLoading && detailsError && (
+              <div className="p-4 text-[11px] font-bold" style={{ border: `1px solid ${PINK}55`, background: `${PINK}0D`, color: INK }}>
+                {detailsError} Poți deschide anunțul original pentru informațiile complete.
+              </div>
+            )}
+            {!detailsLoading && details && (
+              <>
+                {details.description ? (
+                  <p className="whitespace-pre-wrap p-4 text-[12px] leading-relaxed" style={{ border: `1px solid ${INK}22`, background: CREAM }}>
+                    {details.description}
+                  </p>
+                ) : (
+                  <p className="p-4 text-[11px] font-bold uppercase" style={{ border: `1px solid ${INK}22`, color: `${INK}66` }}>
+                    Marketplace-ul nu publică o descriere suplimentară în pagina accesibilă.
+                  </p>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                  <DetailMetric label="Locație" value={details.location || item.city || "nespecificată"} />
+                  <DetailMetric label="Seller" value={details.seller?.name || item.sellerType || "nespecificat"} />
+                  <DetailMetric label="Rating seller" value={formatRating(details.seller?.rating, details.seller?.ratingScale, details.seller?.reviewCount)} />
+                  <DetailMetric label="Rating produs" value={formatRating(details.productRating?.rating, details.productRating?.ratingScale, details.productRating?.reviewCount)} />
+                  <DetailMetric label="Livrare" value={deliveryLabel(details)} />
+                  <DetailMetric label="Timp livrare" value={deliveryTimeLabel(details)} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                  <DetailMetric label="Preț produs" value={formatDetailMoney(details.pricing?.itemPrice, details.pricing?.currency)} />
+                  <DetailMetric label="Protecție cumpărător" value={formatDetailMoney(details.pricing?.buyerProtectionFee, details.pricing?.currency)} />
+                  <DetailMetric label="Cost livrare" value={deliveryLabel(details)} />
+                  <DetailMetric label="Total cunoscut" value={formatDetailMoney(details.pricing?.totalPrice, details.pricing?.currency)} />
+                </div>
+
+                {details.attributes && details.attributes.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                    {details.attributes.map((attribute) => (
+                      <DetailMetric key={`${attribute.label}-${attribute.value}`} label={attribute.label} value={attribute.value} />
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-[9px] font-bold uppercase" style={{ color: `${INK}66` }}>
+                  Date extrase direct din pagina anunțului · fără browser automation
+                </p>
+              </>
+            )}
+          </section>
 
           <section className="flex flex-col gap-3">
             <PanelHeader title="Why This Deal" />
