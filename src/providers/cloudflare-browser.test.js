@@ -159,3 +159,39 @@ test("uses site-specific browser navigation readiness for long-lived retail page
 
   assert.deepEqual(gotoOptions, { waitUntil: "domcontentloaded", timeout: 16000 });
 });
+
+test("parses a page whose navigation times out after reaching the marketplace", async () => {
+  let closed = false;
+  const launch = async () => ({
+    newPage: async () => ({
+      setViewport: async () => {},
+      goto: async () => {
+        throw new Error("Navigation timeout of 16000 ms exceeded");
+      },
+      content: async () => `
+        <article class="product">
+          <a href="/telefon-iphone-15" title="Apple iPhone 15 128GB">Apple iPhone 15 128GB</a>
+          <span class="price">3.499 lei</span>
+        </article>
+      `,
+      evaluate: async () => "Apple iPhone 15 128GB 3.499 lei",
+      url: () => "https://altex.ro/cauta/?q=iphone%2015",
+      close: async () => { closed = true; }
+    }),
+    close: async () => {}
+  });
+  const site = {
+    key: "altex.ro",
+    strategy: "direct-html-retail",
+    timeoutMs: 16000,
+    browserWaitUntil: "domcontentloaded",
+    searchUrl: () => "https://altex.ro/cauta/?q=iphone%2015"
+  };
+
+  const result = await searchMarketplaceWithBrowser({}, { site, query: "iphone 15", limit: 5 }, { launch });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, null);
+  assert.equal(result.itemCount, 1);
+  assert.equal(closed, true);
+});

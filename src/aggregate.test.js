@@ -302,10 +302,12 @@ test("preserves parsed and filtered listing counts after aggregation", () => {
   assert.equal(result.rawItemCount, 8);
   assert.equal(result.parsedItemCount, 8);
   assert.equal(result.matchedItemCount, 2);
+  assert.equal(result.queryMismatchItemCount, 6);
   assert.equal(result.includedItemCount, 1);
   assert.equal(result.excludedItemCount, 1);
   assert.equal(aggregated.summary.parsedListings, 8);
   assert.equal(aggregated.summary.matchedListings, 2);
+  assert.equal(aggregated.summary.queryMismatchListings, 6);
   assert.equal(aggregated.summary.includedListings, 1);
   assert.equal(aggregated.summary.excludedListings, 1);
   assert.equal(aggregated.summary.totalListings, 1);

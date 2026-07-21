@@ -1783,7 +1783,7 @@ function deliveryTimeLabel(details: ListingDetails) {
 
 function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversationStatus, onClose }: { item: SearchResultItem | null; query: string; searchTier: SearchTier; isLoggedIn: boolean; conversationStatus?: string; onClose: () => void }) {
   const [details, setDetails] = useState<ListingDetails | null>(null)
-  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [detailsLoading, setDetailsLoading] = useState(Boolean(item?.url))
   const [detailsError, setDetailsError] = useState("")
   const { image, handleImageError } = useListingImage(item || {
     id: "empty",
@@ -1793,15 +1793,9 @@ function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversation
 
   useEffect(() => {
     const listingUrl = item?.url
-    setDetails(null)
-    setDetailsError("")
-    if (!listingUrl) {
-      setDetailsLoading(false)
-      return
-    }
+    if (!listingUrl) return
 
     const controller = new AbortController()
-    setDetailsLoading(true)
     fetch(`/api/marketplace/details?url=${encodeURIComponent(listingUrl)}`, { signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json().catch(() => null)
@@ -2189,6 +2183,8 @@ function SearchResultsContent() {
   const [searchedAt, setSearchedAt] = useState("")
   const [totalListings, setTotalListings] = useState(0)
   const [parsedListings, setParsedListings] = useState(0)
+  const [matchedListings, setMatchedListings] = useState(0)
+  const [queryMismatchListings, setQueryMismatchListings] = useState(0)
   const [excludedListings, setExcludedListings] = useState(0)
   const [marketplaceStatus, setMarketplaceStatus] = useState<MarketplaceStatus>({ successful: 0, total: 0, failed: [], blocked: [] })
   const [marketplaceCoverage, setMarketplaceCoverage] = useState<MarketplaceCoverage[]>([])
@@ -2253,6 +2249,8 @@ function SearchResultsContent() {
         setSearchedAt("")
         setTotalListings(0)
         setParsedListings(0)
+        setMatchedListings(0)
+        setQueryMismatchListings(0)
         setExcludedListings(0)
         setMarketplaceStatus({ successful: 0, total: 0, failed: [], blocked: [] })
         setMarketplaceCoverage([])
@@ -2306,6 +2304,8 @@ function SearchResultsContent() {
           setSearchedAt(payload.summary?.searchedAt || "")
           setTotalListings(payload.summary?.totalListings ?? mapped.length)
           setParsedListings(payload.summary?.parsedListings ?? payload.summary?.totalListings ?? mapped.length)
+          setMatchedListings(payload.summary?.matchedListings ?? payload.summary?.includedListings ?? mapped.length)
+          setQueryMismatchListings(payload.summary?.queryMismatchListings ?? Math.max(0, (payload.summary?.parsedListings ?? mapped.length) - (payload.summary?.matchedListings ?? mapped.length)))
           setExcludedListings(payload.summary?.excludedListings ?? 0)
           setMarketplaceStatus({
             successful: payload.summary?.successfulMarketplaces ?? (payload.results || []).filter((result) => result.ok).length,
@@ -2447,14 +2447,10 @@ function SearchResultsContent() {
 
   const visibleRegularResults = [...visibleUsedResults, ...visibleNewBenchmarkResults]
 
-  const averageScore = results.length
-    ? Math.round(results.reduce((sum, item) => sum + item.score, 0) / results.length)
-    : 0
   const marketplaceValue = marketplaceStatus.total ? `${marketplaceStatus.successful}/${marketplaceStatus.total}` : "0/0"
   const updatedLabel = searchedAt ? formatDateTime(searchedAt) : "în timp real"
   const statusLabel = !query ? "Introduceți o căutare" : isLoading ? "Search Session Running" : error ? "Search Session Failed" : "Search Session Complete"
   const canCloseFilters = Boolean(query) && !isLoading && !showLoader
-  const filteredOutCount = Math.max(0, (parsedListings || totalListings) - results.length)
   const blockedLabel = marketplaceStatus.blocked.length ? marketplaceStatus.blocked.join(", ") : ""
   const agentNotes = [
     { text: error || `${results.length} rezultate normalizate`, pulse: false },
@@ -2469,9 +2465,9 @@ function SearchResultsContent() {
         : "niciun marketplace pornit încă",
       pulse: false
     },
-    { text: filteredOutCount ? `${filteredOutCount} rezultate filtrate` : "filtre de calitate aplicate", pulse: false },
+    { text: queryMismatchListings ? `${queryMismatchListings} carduri nu corespund termenilor căutării` : "toate cardurile corespund termenilor", pulse: false },
     { text: duplicateListings ? `${duplicateListings} duplicate eliminate` : "deduplicare cross-source aplicată", pulse: false },
-    { text: excludedListings ? `${excludedListings} accesorii/piese excluse` : "clasificare rezultate aplicată", pulse: false },
+    { text: excludedListings ? `${excludedListings} accesorii, piese sau anunțuri nepotrivite excluse` : "niciun produs potrivit exclus de clasificare", pulse: false },
     { text: savedVisibleCount ? `${savedVisibleCount} rezultate salvate local` : "niciun rezultat salvat local", pulse: false },
     { text: "focus: second-hand + benchmark de preț nou", pulse: false },
     { text: shownBestOffer ? `Best used deal on ${shownBestOffer.source}` : "Best used deal în așteptare", pulse: false },
@@ -2484,7 +2480,7 @@ function SearchResultsContent() {
 
       {/* Loading overlay — rendered above everything */}
       {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} tier={searchTier} />}
-      <ListingDetailDrawer item={selectedListing} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} />
+      <ListingDetailDrawer key={selectedListing?.url || "closed"} item={selectedListing} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} />
       <ConversationCenter key={account.userId || "signed-out"} enabled={isLoggedIn} onStatusesChange={(statuses) => setConversationState((current) => ({ ownerId: account.userId, statuses: current.ownerId === account.userId ? { ...current.statuses, ...statuses } : statuses }))} />
       <EmailCapturePopup
         enabled={isLoggedIn && Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
@@ -2580,11 +2576,11 @@ function SearchResultsContent() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-6" style={{ background: "white" }}>
               {[
-                { value: String(filteredResults.length), label: "Results" },
-                { value: String(parsedListings || totalListings), label: "Parsed" },
-                { value: `${averageScore}%`, label: "Avg Score" },
-                { value: marketplaceValue, label: "Marketplaces" },
-                { value: String(filteredOutCount), label: "Filtered" },
+                { value: String(filteredResults.length), label: "Rezultate" },
+                { value: String(parsedListings || totalListings), label: "Carduri citite" },
+                { value: String(matchedListings), label: "Potrivite cu termenii" },
+                { value: String(queryMismatchListings), label: "Nepotrivite cu termenii" },
+                { value: String(excludedListings + duplicateListings), label: "Excluse / duplicate" },
               ].map(({ value, label }) => (
                 <div key={label} className="p-4 flex flex-col items-center justify-center gap-1" style={{ borderRight: `1px solid ${INK}` }}>
                   <span className="text-[20px] font-bold" style={{ color: PINK }}>{value}</span>

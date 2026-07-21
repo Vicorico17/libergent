@@ -190,16 +190,31 @@ export async function searchMarketplaceWithBrowser(
   try {
     page = await browser.newPage();
     await page.setViewport({ width: 1440, height: 1000 });
-    const response = await page.goto(url, {
-      waitUntil: site.browserWaitUntil || "networkidle2",
-      timeout: site.timeoutMs || 30000
-    });
+    let response = null;
+    let navigationTimeoutError = null;
+    try {
+      response = await page.goto(url, {
+        waitUntil: site.browserWaitUntil || "networkidle2",
+        timeout: site.timeoutMs || 30000
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const currentUrl = page.url?.() || "";
+      const usableTimedOutNavigation = /navigation timeout|timeout.+exceeded/i.test(message)
+        && currentUrl
+        && currentUrl !== "about:blank";
+      if (!usableTimedOutNavigation) throw error;
+      navigationTimeoutError = error;
+    }
     const browserWaitForMs = Math.max(0, Math.min(Number(site.browserWaitForMs) || 0, 5000));
     if (browserWaitForMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, browserWaitForMs));
     }
     const html = await page.content();
     const parsed = parseSiteHtml({ site, html, url, limit, query });
+    if (navigationTimeoutError && parsed.rawItemCount === 0) {
+      throw navigationTimeoutError;
+    }
     const bodyText = includeBodyText
       ? await page.evaluate(() => document.body?.innerText || "")
       : "";

@@ -101,6 +101,7 @@ export type SearchPayload = {
     successfulMarketplaces?: number;
     parsedListings?: number;
     matchedListings?: number;
+    queryMismatchListings?: number;
     includedListings?: number;
     excludedListings?: number;
     blockedMarketplaces?: string[];

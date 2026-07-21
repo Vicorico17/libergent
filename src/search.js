@@ -153,7 +153,7 @@ function getDirectFetchHeaderProfiles(url) {
 }
 
 function shouldRetryDirectFetchStatus(status) {
-  return [403, 406, 408, 425, 429, 500, 502, 503, 504].includes(status);
+  return [403, 406, 408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524].includes(status);
 }
 
 function isCloudflareChallengeResponse(response) {
@@ -502,5 +502,6 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
 
 export const __testables = {
   tokenize,
-  filterRelevantItems
+  filterRelevantItems,
+  shouldRetryDirectFetchStatus
 };

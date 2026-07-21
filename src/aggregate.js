@@ -828,6 +828,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       ? result.rawItemCount
       : result.itemCount ?? result.items.length;
     const matchedItemCount = result.itemCount ?? result.items.length;
+    const queryMismatchItemCount = Math.max(0, parsedItemCount - matchedItemCount);
     const classifiedItems = sortItemsByFreshness(
       result.items
         .map(normalizeListing)
@@ -869,6 +870,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       rawItemCount: parsedItemCount,
       parsedItemCount,
       matchedItemCount,
+      queryMismatchItemCount,
       includedItemCount: scoredItems.length,
       itemCount: scoredItems.length,
       items: scoredItems,
@@ -950,6 +952,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const failedResults = rankedResults.filter((result) => !result.ok);
   const parsedListings = successfulResults.reduce((sum, result) => sum + (result.parsedItemCount ?? result.rawItemCount ?? 0), 0);
   const matchedListings = successfulResults.reduce((sum, result) => sum + (result.matchedItemCount ?? result.itemCount ?? 0), 0);
+  const queryMismatchListings = successfulResults.reduce((sum, result) => sum + (result.queryMismatchItemCount || 0), 0);
   const includedListings = successfulResults.reduce((sum, result) => sum + result.items.length, 0);
   const excludedListings = successfulResults.reduce((sum, result) => sum + (result.excludedItemCount || 0), 0);
   const priceIntelligence = buildPriceIntelligence({
@@ -984,6 +987,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
         .map((result) => result.site),
       parsedListings,
       matchedListings,
+      queryMismatchListings,
       includedListings,
       excludedListings,
       duplicateListings,
