@@ -1,362 +1,324 @@
-# libergent
+# LiberGent
 
-Cloudflare Worker app for searching Romanian second-hand marketplaces and comparing them with new-product price benchmarks from Romanian aggregators/retailers.
+LiberGent is a Romanian product-search and deal-ranking application. A user enters one query, LiberGent searches several classified marketplaces and retail sources, normalizes their cards, rejects weak matches, and recommends a second-hand offer alongside a new-price benchmark.
 
-Supported marketplaces:
+Production: [libergent.com](https://libergent.com)
 
-- `olx.ro`
-- `autovit.ro` for car searches
-- `vinted.ro`
-- `lajumate.ro`
-- `okazii.ro`
-- `publi24.ro`
-- `anuntul.ro`
-- `price.ro` for new-product price benchmarks
-- `shopmania.ro` for new-product price benchmarks
+## What the app currently does
 
-Supported providers:
+- searches Romanian marketplaces through **Free** and **Premium test** modes
+- shows progress per marketplace while slower sources continue loading
+- separates second-hand offers from refurbished and new retail benchmarks
+- requires exact model numbers and important variant/specification terms for technical products
+- rejects accessories, parts, wanted ads, repair listings, damaged products, and unrelated variants when appropriate
+- deduplicates equivalent listings within and across sources
+- ranks offers using relevance, condition, price, freshness, seller evidence, and risk signals
+- recommends a **Best Used Deal** and a separate **New Price Benchmark**
+- exposes matched/missing keywords, price intelligence, risk flags, and recommendation reasons
+- loads richer listing information only when **Analiză LiberGent** is opened
+- supports authenticated favorites, offer feedback, seller contact, and private WhatsApp conversation history
+- provides a public trends page based on recorded search activity
 
-- `auto`
-- `direct`
-- `firecrawl`
-- `cloudflare`
+The search page keeps diagnostics collapsed under **Raport Căutare**. That panel contains agent notes, source distribution, marketplace coverage, provider names, result counts, and technical errors.
 
-## Why this design
+## Marketplace coverage
 
-For marketplace search, the useful unit is the search results page, not a whole-site crawl. libergent:
+There are 19 registered adapters. A source being registered does not guarantee that it will return listings for every query; marketplace availability, markup, and anti-bot behavior can change independently.
 
-1. Builds the marketplace-specific search URL from your product query.
-2. Chooses a marketplace-specific provider and strategy.
-3. Uses structured extraction to pull listing cards into JSON.
+### Free
 
-The product direction is intentionally simple in the UI:
+| Source | Role | Routing | Default provider |
+| --- | --- | --- | --- |
+| OLX | Classified / second-hand | Every Free search | Direct |
+| Vinted | Marketplace / second-hand | Every Free search | Direct |
+| Lajumate | Classified / second-hand | Every Free search | Direct |
+| Okazii | Marketplace / mixed inventory | Every Free search | Direct |
+| Publi24 | Classified / second-hand | Every Free search | Direct |
+| Anuntul | Classified / second-hand | Every Free search | Direct |
+| Price.ro | New-price aggregator | Every Free search | Direct |
+| ShopMania | New-price aggregator | Every Free search | Direct |
+| Autovit | Vehicles | Car-like queries only | Direct |
+| BestAuto | Vehicles | Car-like queries only | Direct |
+| Flip | Refurbished technology | Relevant technology queries only | Direct |
+| Klap | Refurbished technology | Relevant technology queries only | Direct |
 
-- the user should only type the product name
-- pagination, result-volume tuning, and provider choice are internal concerns
-- the output should be structured per marketplace with links
-- the app should surface a quality-checked best offer, not just the raw cheapest item
+Free API requests resolve `provider=auto` to direct access and never start automatic Browser Run sessions.
 
-The current product focus is mixed Romanian product search: real second-hand listings, strict keyword matching, deduplication, and a separate new-price benchmark so buyers can see whether a used offer is actually below retail. See [docs/classified-marketplace-feature-plan.md](docs/classified-marketplace-feature-plan.md) for the image-search and seller-messaging roadmap.
+### Premium test
 
-The quality-check layer exists because the lowest price is often misleading. Extremely cheap listings can be:
+Premium includes the query-routed Free sources and adds seven retail/price-benchmark adapters:
 
-- broken
-- for parts
-- incomplete
-- unrelated accessories
-- low-quality query matches
+| Source | Direct first | Automatic browser eligible | Current note |
+| --- | --- | --- | --- |
+| eMAG | Yes | No | Dedicated direct parser |
+| evoMAG | Yes | No | Direct parser; coverage depends on the search route |
+| CEL.ro | Yes | No | Direct connection can intermittently return 522/timeouts from Cloudflare infrastructure |
+| Compari | Yes | Yes | Browser runs only after a failed or empty direct result |
+| PC Garage | Yes | Yes | Browser runs only after a failed or empty direct result |
+| Flanco | Yes | Yes | Browser runs only after a failed or empty direct result |
+| Altex | Yes | Yes | Can parse useful DOM content even when navigation completion times out |
 
-libergent therefore keeps both ideas:
+Okazii is the only Free source eligible for the same conditional browser fallback during a Premium search. All eligible sources share one bounded browser session. Browser automation is never started when the direct result already contains usable cards.
 
-- cheapest visible offer
-- AI-checked best used offer
-- lowest new-price benchmark
+CEL was tested with Browser Run after direct timeouts, but the browser timed out without extracting cards as well. It intentionally remains direct-only so it does not add browser cost and latency without improving coverage.
 
-The best-offer score currently uses lightweight heuristics so the app can stay cheap:
+See [docs/marketplace-integration-todo.md](docs/marketplace-integration-todo.md) for live-source findings, candidate marketplaces, and integration priorities.
 
-- title/query token overlap
-- condition hints such as `Nou`
-- penalties for terms like `pentru piese`, `defect`, `spart`, `nefunctional`
-- penalties for prices far below the marketplace median, which often indicate junk or partial items
+## How search results are processed
 
-## Cost strategy
+The API and **Raport Căutare** distinguish the following stages:
 
-The main engineering constraint is affordability.
+1. **Carduri citite / `parsedListings`** — candidate cards parsed from marketplace pages.
+2. **Potrivite cu termenii / `matchedListings`** — titles that pass the initial query-token filter.
+3. **Nepotrivite cu termenii / `queryMismatchListings`** — parsed cards that do not contain enough required query evidence.
+4. **Excluse / `excludedListings`** — matched cards later classified as accessories, parts/repair, wanted ads, or secondary/wrong variants.
+5. **Duplicate / `duplicateListings`** — equivalent listings removed during cross-source normalization.
+6. **Rezultate / `includedListings`** — normalized listings retained for ranking and display.
 
-The expensive part is not the number of JSON rows returned. The expensive part is how many pages or browser sessions we need to process to get those rows.
+For a query such as `iphone 15`, the numeric token `15` is mandatory. More specific searches also preserve important variant and specification intent: `iphone 15` does not silently become `iphone 15 pro max`, while `iphone 15 pro 256gb` requires the requested model/variant/storage evidence.
 
-That means libergent should optimize for:
+A high “nepotrivite cu termenii” count usually means a marketplace page contained navigation cards, promotions, other catalog products, or loose search results. It does **not** mean that the same number of valid products was removed by the accessory/quality classifier.
 
-1. as few remote renders as possible
-2. as much data as possible per remote render
-3. local parsing and scoring whenever possible
-4. provider-specific fallbacks only when a marketplace blocks the cheaper path
+## Ranking and price intelligence
 
-Current strategy:
+Ranking is deterministic and runs locally after parsing. It considers:
 
-- `olx.ro`: direct HTML fetch + local parser
-- `autovit.ro`: direct HTML fetch + local parser, enabled only for car-like queries
-- `vinted.ro`: direct HTML fetch + local parser
-- `lajumate.ro`: direct HTML fetch + local parser
-- `okazii.ro`: direct HTML fetch + local parser
-- `publi24.ro`: direct HTML fetch + local parser
-- `anuntul.ro`: direct HTML fetch + local parser
-- `price.ro`: direct HTML fetch + local retail parser
-- `shopmania.ro`: direct HTML fetch + local retail parser
+- title and query-token coverage
+- brand, model, variant, storage/size, and condition evidence
+- negative intent such as `pentru piese`, `defect`, `spart`, or `nefuncțional`
+- listing completeness and available seller/location metadata
+- price position relative to comparable results
+- suspiciously low prices that may indicate incomplete or damaged products
+- recency when the marketplace exposes a usable date
 
-Registered but not searched by default until the blocked-source/provider work is handled:
+Used and new inventory are analyzed separately. The response can include used/new medians, fair ranges, the lowest new price, and estimated savings of the recommended used offer versus the new benchmark.
 
-- `cel.ro`
-- `compari.ro`
-- `emag.ro`
-- `altex.ro`
-- `flanco.ro`
+## Listing analysis
 
-Target strategy:
+Opening **Analiză LiberGent** calls:
 
-1. fetch the maximum useful number of listings from one search page
-2. paginate only when necessary
-3. dedupe locally by URL and normalized product identity
-4. compute used median, new benchmark, savings, and best offers locally
+```text
+GET /api/marketplace/details?url=<supported-listing-url>
+```
 
-This is the reason libergent should move toward "close to one scrape for all results" where the marketplace allows it. In practice, that means:
+The request is lazy and direct-only; it does not start Browser Run. When the public listing page exposes the data, the drawer can show:
 
-- determine the maximum number of listings available on the first rendered search page
-- determine whether lazy-loading or infinite scroll reveals more results without a second scrape
-- only then add additional page fetches
+- full description
+- precise location
+- seller identity, type, rating, and review count
+- product rating
+- condition and structured specifications
+- delivery price and timing
+- buyer-protection fees and known payable total
 
-## Provider economics
+Only allowlisted marketplace URLs and redirects are accepted. Responses are size-limited, and successful enrichment is cached for 30 minutes. Missing fields remain explicitly unavailable rather than being invented.
 
-Provider cost matters directly to the scraper design.
+## Reliability and provider policy
 
-Firecrawl documents billing per processed page. Their billing docs currently state:
+The default policy is:
 
-- `Scrape`: `1 credit/page`
-- `JSON format`: `+4 credits/page`
-- `Browser`: `2 credits/browser minute`
+1. fetch the marketplace search page directly with browser-like request headers
+2. parse and score HTML locally
+3. retry a small set of transient transport failures with the alternate direct header profile
+4. use Browser Run only for the explicit Premium allowlist and only after a failed or empty direct result
+5. never use Browser Run as a CAPTCHA or anti-bot bypass
 
-Cloudflare Browser Rendering currently documents REST API pricing by browser duration, with a free allowance and then `$0.09` per browser hour on paid plans.
+Important source-specific behavior:
 
-Implication:
+- successful Vinted catalog HTML is cached for five minutes per exact URL
+- Vinted receives one delayed retry when its first response is an intermittent Cloudflare challenge; failed challenge pages are not cached
+- direct Cloudflare origin errors `520`–`524` are retried with the alternate direct request profile
+- Altex browser navigation timeouts are recoverable only when the already-loaded DOM contains real product cards
+- identical Premium searches are cached for five minutes
+- listing contact lookups are cached for 15 minutes
 
-- `5 listings` from one processed page can be cheap
-- `500 listings` from twenty processed pages is not cheap
-- the biggest savings come from reducing processed pages, not from trimming a few listing objects from the output
+The main cost driver is processed pages/browser duration, not the number of JSON rows. New integrations should therefore prefer direct first-party HTML or public client data plus dedicated local parsers. Review each source's terms, robots policy, and permitted use before production activation.
 
-Because of that, libergent does not default to AI JSON extraction on every page for every marketplace. The cheaper design is:
+## Architecture
 
-1. direct fetch or the cheapest render possible
-2. local HTML parsing when feasible
-3. AI extraction only where markup is too dynamic or brittle
-4. browser/crawl tools only for the marketplaces that truly require them
+- `src/worker.js` — Cloudflare Worker API and static-asset entry point
+- `src/search.js` — provider execution, direct fetching, query filtering, and pagination
+- `src/sites.js` — marketplace registry, Free/Premium tiers, and conditional routing
+- `src/parsers/` — marketplace-specific and retail HTML parsers
+- `src/aggregate.js` — normalization, classification, deduplication, ranking, and price intelligence
+- `src/providers/cloudflare-browser.js` — bounded Cloudflare Browser Run fallback
+- `src/listing-details.js` — on-demand detail extraction
+- `ui/` — Next.js static frontend
+- `supabase/` — search tracking, leads, and private conversation schema
 
-## Collaboration workflow
+## Local setup
 
-Use the GitHub branch and pull request process in [docs/github-workflow.md](docs/github-workflow.md).
-
-## Setup
+Requirements: Node.js 22 or newer.
 
 ```bash
-cd /Users/alex/libergent
+git clone <repository-url>
+cd libergent
 cp .env.example .env
+npm install
+npm --prefix ui install
 ```
 
-Normal search now uses direct scraping and does not require Firecrawl or Cloudflare. Add provider keys if you want `provider=auto` to escalate blocked or blank direct marketplace searches to remote rendering, or if you want to run those providers explicitly:
+Start the API and Next.js UI together:
 
 ```bash
-FIRECRAWL_API_KEY=fc-your-key
-```
-
-or:
-
-```bash
-CLOUDFLARE_ACCOUNT_ID=...
-CLOUDFLARE_API_TOKEN=...
-```
-
-If you already authenticated the Firecrawl CLI, you can usually pull the key locally with:
-
-```bash
-firecrawl env
-```
-
-## Analytics and email leads
-
-Google Analytics is enabled when the UI build has a public measurement ID:
-
-```bash
-NEXT_PUBLIC_GA_MEASUREMENT_ID=G-R8P7G7PWR7
-```
-
-The app loads `gtag` only when that value is present and records client-side route changes in the Next.js app.
-
-Email capture from the search-results popup posts to `/api/leads` and stores rows in Supabase. Run `supabase/search_tracking.sql` before enabling this in production, and configure:
-
-```bash
-SUPABASE_URL=...
-SUPABASE_SECRET_KEY=...
-SUPABASE_EMAIL_LEADS_TABLE=email_leads
-```
-
-Use the unqualified public table name (`email_leads`), not `public.email_leads`, in `SUPABASE_EMAIL_LEADS_TABLE`. If the search tracking tables already exist but `/api/leads` returns `Could not find the table 'public.email_leads' in the schema cache` or an `email_leads_email_check` constraint violation, run `supabase/email_leads.sql` in the Supabase SQL Editor. It creates or repairs the table, enables row level security, and asks PostgREST to reload the schema cache.
-
-The lead endpoint normalizes email addresses to lowercase and upserts by email to avoid duplicate rows.
-
-## Cloudflare deployment
-
-The app is wired for Cloudflare Workers through `wrangler.toml`.
-
-Local Worker dev:
-
-```bash
-npm run dev:worker
-```
-
-Deploy:
-
-```bash
-npm run deploy
-```
-
-### Browser marketplace benchmark
-
-Cloudflare Browser Run is reserved for explicit browser-assisted operations. The protected benchmark endpoint renders one marketplace search page at a time and reports parser coverage, duration, challenge detection, and a five-item sample:
-
-```bash
-curl -H "Authorization: Bearer $LIBERGENT_ADMIN_TOKEN" \
-  "https://YOUR_DOMAIN/api/admin/browser-benchmark?site=vinted.ro&q=iphone&limit=20"
-```
-
-Run marketplaces one at a time to keep browser usage and Worker execution time bounded. The endpoint requires `LIBERGENT_ADMIN_TOKEN` and the `BROWSER` binding configured in `wrangler.toml`.
-
-### Free and Premium search APIs
-
-Free search uses direct marketplace connections and never starts Browser Run. In the HTTP API, `provider=auto` is resolved to `direct` for this tier; remote providers remain available only when requested explicitly:
-
-```bash
-curl "https://YOUR_DOMAIN/api/search/free?q=iphone&site=all&limit=30"
-```
-
-Successful Vinted catalog HTML is cached at the Worker edge for five minutes per exact search URL. This reduces repeated origin requests and smooths Vinted's intermittent Cloudflare challenges without browser automation or caching failed challenge responses. When no successful cache entry exists, Vinted alone receives one delayed retry before the challenge is reported; there is no unbounded retry loop.
-
-`/api/search` remains a backward-compatible alias for the Free contract. Premium search combines the Free results with seven additional marketplace and retailer benchmarks:
-
-```bash
-curl "https://YOUR_DOMAIN/api/search/premium?q=iphone&site=all&limit=30"
-```
-
-During the internal testing phase, Premium search requires only the `BROWSER` binding. No account, payment, or test token is required. Every source is fetched directly first. Browser Run is limited to Okazii plus the explicitly eligible Premium sources (Compari, PC Garage, Flanco, and Altex), starts only after a failed or empty direct result, and shares one browser session with bounded concurrency. eMAG, evoMAG, and CEL.ro remain direct-only. Set `PREMIUM_BROWSER_FALLBACK_LIMIT` to lower the five-source fallback cap. Identical Premium searches are cached for five minutes, and listing contact lookups are cached for fifteen minutes, so refreshes and repeated clicks do not open another browser session.
-
-Select **Free** or **Premium test** directly on the search page. The coverage panel reports each marketplace's provider, result count, and failure reason. Authentication and paid access can be added after Premium marketplace coverage has been validated.
-
-Opening **Analiză LiberGent** lazily calls `GET /api/marketplace/details?url=...`. The Worker fetches only that supported marketplace URL, follows only allowlisted marketplace redirects, and parses public structured data for the full description, precise location, seller identity/rating when exposed, product rating, specifications, buyer-protection fee, delivery cost/timing, and known payable total. It is direct-only, never launches Browser Run, rejects unsupported hosts, limits response size, and caches successful enrichment for thirty minutes.
-
-### Private seller conversations
-
-Seller outreach requires a valid Supabase account session. `POST /api/whatsapp/send`, `GET /api/conversations`, and `GET /api/conversations/:id` validate the Supabase access token. Outbound and inbound WhatsApp messages are tagged with the account ID and conversation APIs filter history server-side, so one account cannot read another account's messages.
-
-The search UI opens a private conversation drawer after a message is sent, shows the agent/seller transcript, and attaches a conversation status to the listing (`contacted`, `replied`, `negotiating`, `unavailable`, or `deal_agreed`). Direct client access to `whatsapp_messages` is disabled by RLS; only the Worker service role can access the table. If inbound ownership is ambiguous because multiple accounts contacted the same seller number, the reply is deliberately left unassigned instead of risking cross-account disclosure.
-
-### Account sign-in methods
-
-The auth page supports Google, Apple, Facebook, and passwordless email links through Supabase Auth. Social providers must be enabled in **Supabase Dashboard → Authentication → Providers** and configured with credentials from the corresponding Google, Apple, or Meta developer console. Add the production `/auth` URL to Supabase's allowed redirect URLs. Email link authentication uses the Supabase email provider.
-
-Signed-out visitors can search and open the original marketplace listing. Favorites, LiberGent listing analysis, seller WhatsApp contact, feedback, listing statuses, and conversation history are shown only after authentication. Favorites are stored in a browser key scoped to the authenticated Supabase user ID during this test phase.
-
-Direct scraping does not require provider secrets. If you later use Cloudflare Browser Rendering as an explicit scraping fallback, configure `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in Wrangler secrets.
-
-## Usage
-
-Local Node web app:
-
-```bash
-cd /Users/alex/libergent
 npm run dev
 ```
 
-Then open `http://localhost:8787`.
+- UI with hot reload: `http://localhost:3000`
+- local API: `http://127.0.0.1:8787`
 
-The UI lets you type only a product name and shows:
-
-- AI-checked best second-hand offer
-- a separate new-price benchmark from aggregators/retailers
-- source-type filters for second-hand, aggregators, and retailers
-- extracted listings per marketplace
-- used and new price intelligence with savings versus the lowest new price
-
-CLI:
-
-Single marketplace:
+The example environment enables mock search/provider modes. Set these to `0` when intentionally running live marketplace requests:
 
 ```bash
-node src/cli.js search --site olx.ro --query "iphone 15 pro" --provider auto --limit 50 --pages 2
+LIBERGENT_MOCK_SEARCH=0
+LIBERGENT_MOCK_PROVIDER=0
 ```
 
-All marketplaces:
+Direct scraping does not require Firecrawl credentials. Optional integrations use the variables documented in [.env.example](.env.example), including Cloudflare, Supabase, analytics, OpenClaw, and OpenAI Realtime configuration.
+
+## Commands
 
 ```bash
-node src/cli.js search --site all --query "iphone 15 pro" --provider auto --limit 120 --pages 3 --out results/iphone-15-pro.json
+# backend tests and CLI contract
+npm run check
+
+# deterministic UI lint
+npm --prefix ui run lint:ci
+
+# production UI build
+npm run build:ui
+
+# one live, readable all-source CLI report
+npm run search:live -- --query "iphone 15"
+
+# local Cloudflare Worker runtime
+npm run dev:worker
+
+# deploy the Worker and static UI
+npm run deploy
 ```
 
-Readable live report across all marketplaces:
+CLI examples:
 
 ```bash
-npm run search:live -- --query "riftbound"
+node src/cli.js search --site olx.ro --query "iphone 15 pro" --provider direct --limit 50 --pages 1
+
+node src/cli.js search --site all --query "iphone 15 pro" --provider auto --limit 120 --pages 1 --pretty
 ```
 
-The `search:live` command:
+## HTTP API
 
-- disables mock mode for that run
-- searches all marketplaces
-- uses one page per marketplace with site-specific default limits
-- tries direct browser-like fetch profiles first, then configured remote providers when `provider=auto` cannot get listings
-- prints a readable report with offers from each marketplace
-- prints one recommended `bestOffer` across all marketplaces
-
-Cloudflare:
+### Free search
 
 ```bash
-node src/cli.js search --site vinted.ro --query "nike dunk" --provider cloudflare
+curl "http://127.0.0.1:8787/api/search/free?q=iphone%2015&site=all&limit=30&pages=1"
 ```
 
-## Output shape
+`/api/search` remains a backward-compatible alias for `/api/search/free`.
+
+### Premium search
+
+```bash
+curl "http://127.0.0.1:8787/api/search/premium?q=iphone%2015&site=all&limit=30&pages=1"
+```
+
+Premium testing currently requires the Cloudflare `BROWSER` binding but does not require a payment token. `PREMIUM_BROWSER_FALLBACK_LIMIT` can lower the maximum number of conditional browser sources; the current full allowlist contains five sources including Okazii.
+
+### Response summary
+
+An aggregated response contains per-source results plus a summary similar to:
 
 ```json
 {
-  "ok": true,
-  "provider": "firecrawl",
-  "site": "olx.ro",
-  "url": "https://www.olx.ro/oferte/q-iphone-15-pro/",
-  "query": "iphone 15 pro",
-  "itemCount": 10,
-  "items": [
+  "searchTier": "premium",
+  "summary": {
+    "marketplaces": 17,
+    "successfulMarketplaces": 15,
+    "parsedListings": 311,
+    "matchedListings": 20,
+    "queryMismatchListings": 291,
+    "includedListings": 20,
+    "excludedListings": 0,
+    "duplicateListings": 0,
+    "bestUsedOffer": {},
+    "bestNewBenchmark": {},
+    "priceIntelligence": {}
+  },
+  "results": [
     {
-      "title": "iPhone 15 Pro 256 GB",
-      "price": "3 100 lei",
-      "currency": "lei",
-      "location": "Bucuresti",
-      "postedAt": "azi",
-      "condition": "Utilizat",
-      "sellerType": "Persoana fizica",
-      "url": "https://www.olx.ro/d/oferta/...",
-      "imageUrl": "https://..."
+      "site": "olx.ro",
+      "provider": "direct",
+      "ok": true,
+      "parsedItemCount": 52,
+      "matchedItemCount": 6,
+      "includedItemCount": 6,
+      "items": []
     }
   ]
 }
 ```
 
-For `--site all`, the response also includes a `summary` section with `averagePriceRon`, `pricedListingsRon`, and `totalListings`.
+Counts vary by query and source availability. Failed marketplaces remain represented with `ok: false`, their provider, and a technical error so partial searches stay auditable.
 
-If you want human-readable terminal output instead of JSON, add `--pretty`:
+### Other endpoints
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/health/sources` | Source health summary |
+| `GET /api/history` | Aggregated search history and trends |
+| `POST /api/leads` | Email lead capture |
+| `POST /api/saved-searches` | Saved-search subscription data |
+| `GET /api/marketplace/details` | Lazy listing enrichment |
+| `GET /api/marketplace/contact` | Supported listing contact lookup |
+| `POST /api/feedback` | Offer feedback |
+| `GET /api/conversations` | Authenticated conversation list |
+| `POST /api/whatsapp/send` | Authenticated seller outreach through the configured bridge |
+
+The protected `/api/admin/browser-benchmark` endpoint renders one supported marketplace at a time and requires `LIBERGENT_ADMIN_TOKEN` plus the `BROWSER` binding.
+
+## Accounts, analytics, and Supabase
+
+Supabase Auth supports configured social providers and passwordless email. Signed-out visitors can search, inspect **Analiză LiberGent**, and open original marketplace listings. Favorites, feedback, WhatsApp outreach, listing statuses, and private conversation history require authentication.
+
+Search analytics and email capture require:
 
 ```bash
-node src/cli.js search --site all --query "riftbound" --provider auto --limit 5 --pages 1 --pretty
+SUPABASE_URL=...
+SUPABASE_SECRET_KEY=...
+SUPABASE_SEARCH_EVENTS_TABLE=search_events
+SUPABASE_EMAIL_LEADS_TABLE=email_leads
 ```
 
-## Notes
+Run the relevant SQL files in `supabase/` before enabling these features. Use the unqualified table name `email_leads`, not `public.email_leads`, in `SUPABASE_EMAIL_LEADS_TABLE`.
 
-- `olx.ro`: direct search-page extraction
-- `vinted.ro`: direct search-page extraction
-- `lajumate.ro`: direct search-page extraction
-- `okazii.ro`: direct search-page extraction
-- `publi24.ro`: direct search-page extraction
+Client-side Google Analytics is enabled only when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is present.
 
-These are direct parsers, not final architecture. The main optimization task is to keep Firecrawl/Browser Rendering as explicit fallbacks while increasing listing coverage through local parsing.
+Seller conversation APIs validate the Supabase access token and filter history by account ID. Direct client access to WhatsApp message rows is disabled through RLS. Ambiguous inbound ownership is intentionally left unassigned rather than risking cross-account disclosure. Bridge setup is documented in [docs/openclaw-bridge.md](docs/openclaw-bridge.md).
 
-## Cloudflare `/crawl`
+## Cloudflare deployment
 
-Cloudflare launched Browser Rendering `/crawl` on March 10, 2026. It is useful for category-wide monitoring and multi-page discovery. For libergent's first version, `/json` is a better fit than `/crawl` because each marketplace already exposes a search results page for a user query.
+`wrangler.toml` configures the Worker, static assets from `ui/out`, Node compatibility, and the `BROWSER` binding.
 
-However, `/crawl` may still be the right choice for specific marketplaces if it gives better listing coverage per unit cost than repeated single-page renders.
+```bash
+npm run build:ui
+npm run deploy
+```
 
-## Constraints
+Production deployment is also automated by [.github/workflows/deploy-cloudflare.yml](.github/workflows/deploy-cloudflare.yml). UI lint/build validation runs through [.github/workflows/ui-lint.yml](.github/workflows/ui-lint.yml).
 
-Check each marketplace's `robots.txt`, terms, and bot protections before production use. Cloudflare documents that Browser Rendering `/crawl` respects `robots.txt`, including `crawl-delay`, and blocked URLs are returned as `disallowed`.
+## Project documents
 
-## Open optimization tasks
+- [Marketplace integration TODO](docs/marketplace-integration-todo.md)
+- [Classified marketplace feature plan](docs/classified-marketplace-feature-plan.md)
+- [Search E2E QA](docs/lib-23-qa-website-search-e2e.md)
+- [GitHub workflow](docs/github-workflow.md)
+- [OpenClaw bridge](docs/openclaw-bridge.md)
 
-- measure maximum usable listings from a single search-page render for each marketplace
-- test whether infinite scroll can reveal more results without additional billed page fetches
-- replace generic AI extraction with marketplace-specific parsing where possible
-- reserve Browser Rendering and crawl workflows for the hardest marketplaces
-- compare cost per 100 listings across Firecrawl and Cloudflare
+## Current limitations
+
+- Marketplace availability and anti-bot responses are inherently intermittent; a partial search can still be useful and is reported transparently.
+- Vinted can challenge both controlled direct attempts when no successful cache entry exists.
+- CEL.ro can time out from Cloudflare infrastructure even when it responds from other networks; browser fallback was tested and intentionally rejected because it added latency without cards.
+- Some retail pages return promotional/navigation candidates that are correctly counted as parsed but rejected as query mismatches.
+- Browser Run cannot solve CAPTCHA or override marketplace access policy.
+- Search-by-image remains an unfinished integration and should not be advertised as active.
