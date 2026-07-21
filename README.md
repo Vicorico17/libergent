@@ -278,7 +278,7 @@ The protected `/api/admin/browser-benchmark` endpoint renders one supported mark
 
 ## Accounts, analytics, and Supabase
 
-Supabase Auth supports Google, Facebook, and passwordless email when their providers are configured. `/confirm` completes OAuth/magic-link callbacks, `/account` shows the active identity and provides logout, and `/signup` plus `/reset` use the same passwordless account flow. Signed-out visitors can search, inspect **Analiză LiberGent**, and open original marketplace listings. Favorites, feedback, WhatsApp outreach, listing statuses, and private conversation history require authentication.
+Supabase Auth supports Google and passwordless email when they are configured. `/confirm` completes OAuth/magic-link callbacks, `/account` shows the active identity and provides logout, and `/signup` plus `/reset` use the same passwordless account flow. Signed-out visitors can search, inspect **Analiză LiberGent**, and open original marketplace listings. Favorites, feedback, WhatsApp outreach, listing statuses, and private conversation history require authentication.
 
 Search analytics and email capture require:
 

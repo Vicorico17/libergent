@@ -7,7 +7,7 @@ import { getSafeNextPath } from "@/lib/auth-path";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type AuthState = "checking" | "signed_out" | "sending" | "email_sent";
-type SocialProvider = "google" | "facebook";
+type SocialProvider = "google";
 
 function friendlyAuthError(message = "") {
   if (/provider.*not enabled|unsupported provider/i.test(message)) return "Această metodă de conectare nu este activată încă.";
@@ -115,7 +115,6 @@ export function SignInOptions({ submitLabel = "Trimite link de conectare" }: { s
     <div className="flex flex-col gap-3">
       {([
         { provider: "google" as const, symbol: "G", label: "Continuă cu Google" },
-        { provider: "facebook" as const, symbol: "f", label: "Continuă cu Facebook" },
       ]).map((option) => (
         <button
           key={option.provider}
