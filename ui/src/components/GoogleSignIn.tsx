@@ -7,7 +7,7 @@ import { getSafeNextPath } from "@/lib/auth-path";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 type AuthState = "checking" | "signed_out" | "sending" | "email_sent";
-type SocialProvider = "google" | "apple" | "facebook";
+type SocialProvider = "google" | "facebook";
 
 function friendlyAuthError(message = "") {
   if (/provider.*not enabled|unsupported provider/i.test(message)) return "Această metodă de conectare nu este activată încă.";
@@ -115,7 +115,6 @@ export function SignInOptions({ submitLabel = "Trimite link de conectare" }: { s
     <div className="flex flex-col gap-3">
       {([
         { provider: "google" as const, symbol: "G", label: "Continuă cu Google" },
-        { provider: "apple" as const, symbol: "A", label: "Continuă cu Apple" },
         { provider: "facebook" as const, symbol: "f", label: "Continuă cu Facebook" },
       ]).map((option) => (
         <button
@@ -124,7 +123,7 @@ export function SignInOptions({ submitLabel = "Trimite link de conectare" }: { s
           onClick={() => signInWithSocial(option.provider)}
           disabled={busy}
           className="inline-flex min-h-12 justify-center items-center gap-3 px-5 py-3 text-[12px] font-bold uppercase disabled:opacity-60"
-          style={{ background: option.provider === "apple" ? "white" : "#111111", color: option.provider === "apple" ? "#111111" : "#F3F0E7", border: "2px solid #111111" }}
+          style={{ background: "#111111", color: "#F3F0E7", border: "2px solid #111111" }}
         >
           <span aria-hidden="true" className="text-[18px] leading-none">{option.symbol}</span>
           {state === "sending" ? "Se deschide..." : option.label}
