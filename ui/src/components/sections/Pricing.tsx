@@ -59,12 +59,12 @@ const BETA_FEATURES = [
 ];
 
 const PREMIUM_FEATURES = [
-  "Deep Search asistat de browser",
-  "Acoperire extinsă pe marketplace-uri compatibile",
-  "Contact public al vânzătorului, unde este disponibil",
+  "Mai multe magazine și marketplace-uri verificate",
+  "Comparație extinsă de preț",
+  "Recomandare mai sigură pentru bugetul tău",
   "Monitorizare și alerte automate",
-  "Contact și follow-up cu vânzătorii prin WhatsApp",
-  "Conversații cu agentul LiberGent pe WhatsApp",
+  "Contact și follow-up cu sellerii",
+  "Istoric privat al conversațiilor",
 ];
 
 export function Pricing() {
@@ -208,7 +208,7 @@ export function Pricing() {
             </div>
 
             <p className="text-[13px] leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 44 }}>
-              Căutare mai profundă cu browser automatizat, acoperire extinsă și instrumente de contact și monitorizare.
+              Mai multe oferte comparate pentru o decizie mai bună și mai multă încredere în prețul ales.
             </p>
 
             <div

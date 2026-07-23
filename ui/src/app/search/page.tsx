@@ -762,8 +762,8 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
             )}
             <p className="mt-3 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}88` }}>
               {tier === "premium"
-                ? "Sursele Premium rulează direct mai întâi. Browser-ul pornește doar pentru fallback-urile eligibile care nu au returnat date utile."
-                : "Premium caută și în 7 surse retail, folosește browser-assisted fallback când o sursă nu răspunde și îți permite să urmărești oportunitățile bune."}
+                ? "Premium verifică mai multe oferte pentru a-ți oferi o comparație mai completă și o recomandare mai sigură."
+                : "Premium verifică mai multe oferte, compară prețurile mai profund și te ajută să nu ratezi alegerea potrivită."}
             </p>
             {tier === "free" && (
               <Link
@@ -772,7 +772,7 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
                 className="mt-3 flex min-h-10 items-center justify-center gap-2 px-4 py-2 text-[10px] font-bold uppercase"
                 style={{ border: `1px solid ${INK}`, background: PINK, color: INK, boxShadow: `2px 2px 0 ${INK}` }}
               >
-                Deblochează Deep Search <Arrow size={12} />
+                Vezi ce găsește Premium <Arrow size={12} />
               </Link>
             )}
           </div>
@@ -2549,11 +2549,11 @@ function SearchResultsContent() {
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 flex-none items-center justify-center" style={{ border: `1px solid ${INK}`, background: PINK }}><Lock size={15} strokeWidth={2.4} /></div>
             <div>
-              <div className="text-[10px] font-bold uppercase" style={{ color: PINK }}>Mai multe șanse să găsești oferta potrivită</div>
-              <p className="mt-1 max-w-3xl text-[10px] uppercase leading-relaxed" style={{ color: `${INK}99` }}>Premium extinde căutarea în 7 surse retail și activează fallback asistat de browser pentru marketplace-urile care nu răspund direct.</p>
+              <div className="text-[10px] font-bold uppercase" style={{ color: PINK }}>Mai multe oferte. Mai multă siguranță.</div>
+              <p className="mt-1 max-w-3xl text-[10px] uppercase leading-relaxed" style={{ color: `${INK}99` }}>Lasă Premium să compare mai profund și să-ți arate dacă există o alegere mai bună pentru banii tăi.</p>
             </div>
           </div>
-          <Link href="/pricing" onClick={() => trackSearchEvent("premium_upsell_click", { placement: "free_search_results", search_term: query })} className="flex min-h-10 flex-none items-center justify-center gap-2 px-4 py-2 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Vezi Premium <Arrow size={11} /></Link>
+          <Link href="/pricing" onClick={() => trackSearchEvent("premium_upsell_click", { placement: "free_search_results", search_term: query })} className="flex min-h-11 flex-none items-center justify-center gap-2 px-4 py-2 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Compară cu Premium <Arrow size={11} /></Link>
         </section>
       )}
 

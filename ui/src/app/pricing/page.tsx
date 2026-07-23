@@ -15,6 +15,24 @@ const NAV_LINKS = [
   { label: "Trenduri",         href: "/trenduri" },
 ];
 
+const BETA_FEATURES = [
+  "Căutare rapidă prin conexiuni directe",
+  "Marketplace-uri active și validate",
+  "Rezultate normalizate și comparabile",
+  "Filtre și sortare rapidă",
+  "Scor agent și recomandări prioritare",
+  "Insight-uri și trenduri de bază",
+];
+
+const PREMIUM_FEATURES = [
+  "Mai multe magazine și marketplace-uri verificate",
+  "Comparație extinsă de preț",
+  "Recomandare mai sigură pentru bugetul tău",
+  "Monitorizare și alerte automate",
+  "Contact și follow-up cu sellerii",
+  "Istoric privat al conversațiilor",
+];
+
 function CheckIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 mt-0.5">
@@ -27,7 +45,7 @@ function CheckIcon() {
 function DotIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 mt-0.5">
-      <circle cx="12" cy="12" r="10" stroke="#9CA3AF" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   );
 }
@@ -77,7 +95,7 @@ function StarIcon() {
 
 function CrownIcon() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M2 20h20M5 20L3 8l4.5 4.5L12 4l4.5 8.5L21 8l-2 12" />
     </svg>
   );
@@ -86,7 +104,7 @@ function CrownIcon() {
 export default function PricingPage() {
   return (
     <div
-      className="min-h-screen flex flex-col p-2 md:p-4"
+      className="min-h-screen flex flex-col p-0 sm:p-2 md:p-4"
       style={{ background: BG, fontFamily: MONO }}
     >
       {/* Outer frame */}
@@ -125,12 +143,12 @@ export default function PricingPage() {
 
         {/* Nav */}
         <header
-          className="flex flex-wrap md:flex-nowrap justify-between items-center px-6 md:px-8 py-5 z-20 relative"
+          className="flex flex-nowrap justify-between items-center px-4 py-4 md:px-8 md:py-5 z-20 relative"
           style={{ borderBottom: `2px solid ${INK}`, background: BG }}
         >
           <Link href="/" className="flex items-center gap-3">
             <LogoIcon size={22} />
-            <span className="text-lg font-bold tracking-tight uppercase" style={{ color: INK }}>
+            <span className="text-[15px] font-bold tracking-tight uppercase sm:text-lg" style={{ color: INK }}>
               LiberGent<span style={{ color: PINK }}>.</span>
             </span>
           </Link>
@@ -146,60 +164,48 @@ export default function PricingPage() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-5">
-            <div
-              className="w-10 h-10 flex items-center justify-center cursor-pointer hover:bg-[#111] hover:text-white transition-colors"
-              style={{ border: `2px solid ${INK}` }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="3" width="7" height="7" stroke="currentColor" strokeWidth="1.8" />
-                <rect x="14" y="3" width="7" height="7" stroke="currentColor" strokeWidth="1.8" />
-                <rect x="3" y="14" width="7" height="7" stroke="currentColor" strokeWidth="1.8" />
-                <rect x="14" y="14" width="7" height="7" stroke="currentColor" strokeWidth="1.8" />
-              </svg>
-            </div>
-          </div>
+          <Link href="/search" className="flex min-h-10 items-center justify-center px-3 text-[9px] font-bold uppercase sm:px-4" style={{ border: `2px solid ${INK}`, color: INK }}>Înapoi la căutare</Link>
         </header>
 
         {/* Main */}
-        <main className="flex-grow flex flex-col items-center pt-20 pb-24 px-4 z-10 relative">
+        <main className="flex-grow flex flex-col items-center px-3 pb-12 pt-9 sm:px-4 md:pb-24 md:pt-20 z-10 relative">
 
           {/* Section label */}
-          <div className="flex items-center gap-2 text-[11px] tracking-widest uppercase mb-10" style={{ color: PINK }}>
+          <div className="mb-5 flex items-center gap-2 text-[10px] tracking-widest uppercase md:mb-10 md:text-[11px]" style={{ color: PINK }}>
             <div style={{ width: 5, height: 5, background: PINK }} />
             Prețuri
             <div style={{ width: 5, height: 5, background: PINK }} />
           </div>
 
           {/* Headline */}
-          <div className="text-center max-w-2xl mb-16">
+          <div className="mb-8 max-w-2xl text-center md:mb-16">
             <h1
-              className="font-bold tracking-tight leading-[1.05] mb-6"
-              style={{ fontSize: "clamp(40px, 6vw, 80px)", color: INK, fontFamily: MONO }}
+              className="mb-4 text-[32px] font-bold tracking-tight leading-[1.05] sm:text-[40px] md:mb-6 md:text-[64px] lg:text-[80px]"
+              style={{ color: INK, fontFamily: MONO }}
             >
-              Lansare beta.<br />
-              Fără cost<span style={{ color: PINK }}>.</span>
+              Mai multe surse.<br />
+              O alegere mai bună<span style={{ color: PINK }}>.</span>
             </h1>
-            <p className="text-sm leading-relaxed" style={{ color: `${INK}99` }}>
-              Beta actuală este gratuită. Accesul Premium este disponibil<br className="hidden md:block" /> și vizibil în roadmap-ul nostru.
+            <p className="mx-auto max-w-xl text-[12px] leading-relaxed md:text-sm" style={{ color: `${INK}99` }}>
+              Începe gratuit sau testează Deep Search pentru acoperire extinsă și mai multe șanse să găsești oferta potrivită.
             </p>
           </div>
 
           {/* Cards */}
-          <div className="grid md:grid-cols-2 gap-8 md:gap-12 w-full max-w-5xl">
+          <div className="grid w-full max-w-5xl gap-5 md:grid-cols-2 md:gap-12">
 
             {/* BETA card */}
             <div
-              className="relative flex flex-col hover:-translate-y-1 hover:-translate-x-1 transition-all duration-300"
+              className="order-2 relative flex flex-col transition-all duration-300 md:order-1 md:hover:-translate-x-1 md:hover:-translate-y-1"
               style={{
                 border: `2px solid ${INK}`,
                 background: BG,
                 boxShadow: `6px 6px 0 0 ${INK}`,
-                padding: "32px",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.boxShadow = `8px 8px 0 0 ${INK}`)}
               onMouseLeave={(e) => (e.currentTarget.style.boxShadow = `6px 6px 0 0 ${INK}`)}
             >
+              <div className="flex h-full flex-col p-5 sm:p-7 md:p-8">
               <div className="flex justify-between items-start mb-6">
                 <div
                   className="w-12 h-12 flex items-center justify-center"
@@ -230,21 +236,19 @@ export default function PricingPage() {
 
               <div style={{ borderTop: `1px dashed ${INK}`, marginBottom: "1.5rem" }} />
 
-              <ul className="flex flex-col gap-4 text-sm flex-grow mb-10">
-                {[
-                  "Căutare rapidă prin conexiuni directe",
-                  "Marketplace-uri active și validate",
-                  "Rezultate normalizate și comparabile",
-                  "Filtre și sortare rapidă",
-                  "Scor agent și recomandări prioritare",
-                  "Insight-uri și trenduri de bază",
-                ].map((item) => (
+              <ul className="mb-7 flex flex-col gap-3 text-[12px] md:mb-10 md:flex-grow md:gap-4 md:text-sm">
+                {BETA_FEATURES.slice(0, 3).map((item) => (
                   <li key={item} className="flex items-start gap-3" style={{ color: INK }}>
                     <CheckIcon />
                     <span>{item}</span>
                   </li>
                 ))}
+                {BETA_FEATURES.slice(3).map((item) => (
+                  <li key={item} className="hidden items-start gap-3 md:flex" style={{ color: INK }}><CheckIcon /><span>{item}</span></li>
+                ))}
               </ul>
+
+              <details className="mb-6 md:hidden"><summary className="cursor-pointer text-[10px] font-bold uppercase underline">Vezi toate funcțiile Free</summary><ul className="mt-4 flex flex-col gap-3 text-[11px]">{BETA_FEATURES.slice(3).map((item) => <li key={item} className="flex items-start gap-2"><CheckIcon /><span>{item}</span></li>)}</ul></details>
 
               <Link
                 href="/#cautare"
@@ -272,100 +276,90 @@ export default function PricingPage() {
                 Caută acum
                 <ArrowRight size={18} />
               </Link>
+              </div>
             </div>
 
             {/* PREMIUM card (locked) */}
             <div
-              className="relative flex flex-col"
+              className="order-1 relative flex flex-col md:order-2"
               style={{
-                border: "2px solid #9CA3AF",
+                border: `2px solid ${INK}`,
                 background: BG,
-                boxShadow: "6px 6px 0 0 #9CA3AF",
-                padding: "32px",
-                opacity: 0.85,
+                boxShadow: `6px 6px 0 0 ${PINK}`,
               }}
             >
+              <div className="flex h-full flex-col p-5 sm:p-7 md:p-8">
               <div className="flex justify-between items-start mb-6">
                 <div
                   className="w-12 h-12 flex items-center justify-center"
-                  style={{ border: "2px solid #9CA3AF" }}
+                  style={{ border: `2px solid ${INK}`, color: PINK }}
                 >
                   <CrownIcon />
                 </div>
                 <div
                   className="px-3 py-1 text-[11px] font-bold uppercase tracking-widest"
-                  style={{ background: "#D1D5DB", border: "2px solid #9CA3AF", color: "#6B7280" }}
+                  style={{ background: PINK, border: `2px solid ${INK}`, color: "white" }}
                 >
-                  Blocat
+                  În curând
                 </div>
               </div>
 
-              <h2 className="font-bold text-3xl tracking-tight mb-2" style={{ color: "#6B7280", fontFamily: MONO }}>
+              <h2 className="mb-2 text-[27px] font-bold tracking-tight md:text-3xl" style={{ color: INK, fontFamily: MONO }}>
                 LiberGent Premium
               </h2>
 
               <div className="mb-4">
                 <div
                   className="mb-2 inline-flex px-2 py-1 text-[10px] font-bold uppercase tracking-widest"
-                  style={{ background: "#FCE7F3", border: "1px solid #9CA3AF", color: PINK }}
+                  style={{ background: "#FCE7F3", border: `1px solid ${PINK}`, color: PINK }}
                 >
-                  Launch offer
+                  Preț de lansare
                 </div>
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <span className="font-bold tracking-tight" style={{ fontSize: 44, color: "#6B7280", fontFamily: MONO }}>39</span>
-                  <span className="text-lg uppercase" style={{ color: "#6B7280" }}>RON / lună</span>
-                  <span className="text-sm uppercase line-through" style={{ color: "#9CA3AF" }}>99 RON / lună</span>
+                  <span className="text-[40px] font-bold tracking-tight md:text-[44px]" style={{ color: INK, fontFamily: MONO }}>39</span>
+                  <span className="text-base uppercase md:text-lg" style={{ color: INK }}>RON / lună</span>
+                  <span className="text-xs uppercase line-through md:text-sm" style={{ color: `${INK}66` }}>99 RON / lună</span>
                 </div>
               </div>
 
-              <p className="text-sm leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 48 }}>
-                Căutare mai profundă cu browser automatizat, acoperire extinsă și instrumente de contact și monitorizare.
+              <p className="mb-4 text-[12px] leading-relaxed md:text-sm" style={{ color: `${INK}B3`, minHeight: 48 }}>
+                Mai multe oferte comparate pentru o decizie mai bună și mai multă încredere în prețul ales.
               </p>
 
               {/* Locked notice */}
               <div
                 className="flex items-start gap-3 p-3 mb-2"
-                style={{ background: "#F3F4F6", border: "1px solid #D1D5DB" }}
+                style={{ background: "#FCE7F3", border: `1px solid ${PINK}` }}
               >
                 <div
                   className="flex items-center justify-center shrink-0 mt-0.5 text-white"
-                  style={{ width: 22, height: 22, background: "#9CA3AF" }}
+                  style={{ width: 22, height: 22, background: PINK }}
                 >
                   <LockIcon size={12} />
                 </div>
-                <p className="text-xs leading-snug" style={{ color: "#6B7280" }}>
-                  Premium nu este disponibil încă.<br />Va fi disponibil în curând.
+                <p className="text-xs leading-snug" style={{ color: INK }}>
+                  Testează căutarea Premium acum. Abonamentul se lansează în curând.
                 </p>
               </div>
 
-              <div style={{ borderTop: "1px dashed #D1D5DB", margin: "1.5rem 0" }} />
+              <div style={{ borderTop: `1px dashed ${INK}`, margin: "1.25rem 0" }} />
 
-              <ul className="flex flex-col gap-4 text-sm flex-grow mb-10">
-                {[
-                  "Deep Search asistat de browser",
-                  "Acoperire extinsă pe marketplace-uri compatibile",
-                  "Contact public al vânzătorului, unde este disponibil",
-                  "Monitorizare și alerte automate",
-                  "Contact și follow-up cu vânzătorii prin WhatsApp",
-                  "Conversații cu agentul LiberGent pe WhatsApp",
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-3" style={{ color: "#9CA3AF" }}>
+              <ul className="mb-7 flex flex-col gap-3 text-[12px] md:mb-10 md:flex-grow md:gap-4 md:text-sm">
+                {PREMIUM_FEATURES.slice(0, 3).map((item) => (
+                  <li key={item} className="flex items-start gap-3" style={{ color: INK }}>
                     <DotIcon />
                     <span>{item}</span>
                   </li>
                 ))}
+                {PREMIUM_FEATURES.slice(3).map((item) => (
+                  <li key={item} className="hidden items-start gap-3 md:flex" style={{ color: INK }}><DotIcon /><span>{item}</span></li>
+                ))}
               </ul>
 
-              <div
-                className="flex justify-center items-center gap-3 py-4 font-bold text-[12px] uppercase tracking-widest cursor-not-allowed"
-                style={{
-                  border: "2px solid #9CA3AF",
-                  background: "#E5E7EB",
-                  color: "#9CA3AF",
-                  fontFamily: MONO,
-                }}
-              >
-                Indisponibil momentan
+              <details className="mb-6 md:hidden"><summary className="cursor-pointer text-[10px] font-bold uppercase underline">Vezi toate beneficiile</summary><ul className="mt-4 flex flex-col gap-3 text-[11px]">{PREMIUM_FEATURES.slice(3).map((item) => <li key={item} className="flex items-start gap-2"><DotIcon /><span>{item}</span></li>)}</ul></details>
+
+              <Link href="/search?tier=premium" className="flex min-h-12 items-center justify-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest" style={{ border: `2px solid ${INK}`, background: PINK, color: INK, boxShadow: `4px 4px 0 ${INK}`, fontFamily: MONO }}>Încearcă Premium <ArrowRight size={16} /></Link>
+              <p className="mt-3 text-center text-[9px] uppercase" style={{ color: `${INK}77` }}>Fără card în perioada de test</p>
               </div>
             </div>
 
@@ -374,8 +368,8 @@ export default function PricingPage() {
 
         {/* Bottom strip */}
         <footer
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 relative z-20"
-          style={{ borderTop: `2px solid ${INK}`, background: BG }}
+          className="relative z-20 grid grid-cols-2 gap-px md:grid-cols-5"
+          style={{ borderTop: `2px solid ${INK}`, background: INK }}
         >
           {[
             {
@@ -389,8 +383,8 @@ export default function PricingPage() {
                   <LockIcon size={12} />
                 </div>
               ),
-              title: "Premium Blocat",
-              sub: "În curând",
+              title: "Premium în curând",
+              sub: "Test disponibil",
             },
             {
               icon: <WalletIcon />,
@@ -410,11 +404,7 @@ export default function PricingPage() {
           ].map((item, i) => (
             <div
               key={item.title}
-              className="px-6 py-5 flex items-center gap-4"
-              style={{
-                borderLeft: i > 0 ? `2px solid ${INK}` : undefined,
-                borderTop: undefined,
-              }}
+              className={`flex items-center gap-3 bg-[#F3F0E7] px-3 py-4 md:px-6 md:py-5 ${i === 4 ? "col-span-2 md:col-span-1" : ""}`}
             >
               {item.icon}
               <div className="flex flex-col">
