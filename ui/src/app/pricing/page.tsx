@@ -342,6 +342,9 @@ export default function PricingPage() {
                 </p>
               </div>
 
+              <Link href="/search?tier=premium" className="mt-3 flex min-h-12 items-center justify-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest" style={{ border: `2px solid ${INK}`, background: PINK, color: INK, boxShadow: `4px 4px 0 ${INK}`, fontFamily: MONO }}>Încearcă Premium <ArrowRight size={16} /></Link>
+              <p className="mt-3 text-center text-[9px] uppercase" style={{ color: `${INK}77` }}>Fără card în perioada de test</p>
+
               <div style={{ borderTop: `1px dashed ${INK}`, margin: "1.25rem 0" }} />
 
               <ul className="mb-7 flex flex-col gap-3 text-[12px] md:mb-10 md:flex-grow md:gap-4 md:text-sm">
@@ -358,8 +361,6 @@ export default function PricingPage() {
 
               <details className="mb-6 md:hidden"><summary className="cursor-pointer text-[10px] font-bold uppercase underline">Vezi toate beneficiile</summary><ul className="mt-4 flex flex-col gap-3 text-[11px]">{PREMIUM_FEATURES.slice(3).map((item) => <li key={item} className="flex items-start gap-2"><DotIcon /><span>{item}</span></li>)}</ul></details>
 
-              <Link href="/search?tier=premium" className="flex min-h-12 items-center justify-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest" style={{ border: `2px solid ${INK}`, background: PINK, color: INK, boxShadow: `4px 4px 0 ${INK}`, fontFamily: MONO }}>Încearcă Premium <ArrowRight size={16} /></Link>
-              <p className="mt-3 text-center text-[9px] uppercase" style={{ color: `${INK}77` }}>Fără card în perioada de test</p>
               </div>
             </div>
 
