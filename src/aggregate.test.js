@@ -109,6 +109,9 @@ test("labels a recommendation as limited when the available evidence is thin", (
 
   assert.equal(aggregated.bestOffer?.recommendation.strong, false);
   assert.equal(aggregated.bestOffer?.recommendation.confidenceLabel, "încredere limitată");
+  assert.ok(aggregated.bestOffer?.recommendationScore <= 79);
+  assert.equal(aggregated.bestOffer?.dealQuality.label, "date insuficiente");
+  assert.equal(aggregated.bestOffer?.priceInsight.label, "eșantion insuficient");
   assert.ok(aggregated.bestOffer?.recommendation.cautions.some((reason) => reason.includes("Date încă lipsă")));
 });
 

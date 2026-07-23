@@ -1087,9 +1087,33 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     const comparisonPool = rankedBaseCandidates.filter(
       (candidate) => isNewProductSource(candidate) === isNewProductSource(item)
     );
+    const pricedComparisonCount = comparisonPool.filter(
+      (candidate) => Number.isFinite(candidate.priceRon) && candidate.priceRon > 0
+    ).length;
     const recommendation = buildRecommendationExplanation(item, comparisonPool);
+    const recommendationScore = comparisonPool.length < 2
+      ? Math.min(item.recommendationScore, 79)
+      : item.recommendationScore;
+    const dealQuality = recommendation.strong
+      ? item.dealQuality
+      : {
+          ...item.dealQuality,
+          score: Math.min(item.dealQuality.score, 79),
+          label: item.evidenceConfidence.score >= 50 ? "promițător, verifică" : "date insuficiente"
+        };
+    const priceInsight = pricedComparisonCount >= 2
+      ? item.priceInsight
+      : {
+          ...item.priceInsight,
+          label: "eșantion insuficient",
+          severity: "warning",
+          priceDeltaPct: null
+        };
     return {
       ...item,
+      recommendationScore,
+      dealQuality,
+      priceInsight,
       recommendation,
       whyThisDeal: [
         ...recommendation.reasons,
