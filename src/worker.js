@@ -29,6 +29,7 @@ const MARKETPLACE_DETAILS_CACHE_SECONDS = 1800;
 const MAX_MARKETPLACE_DETAILS_HTML_BYTES = 6 * 1024 * 1024;
 const PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS = ["okazii.ro"];
 const DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT = PREMIUM_BROWSER_SITE_KEYS.length + PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS.length;
+const DEFAULT_PREMIUM_BROWSER_CONCURRENCY = 3;
 const PREMIUM_BROWSER_FALLBACK_PRIORITY = [
   ...PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS,
   ...PREMIUM_BROWSER_SITE_KEYS
@@ -68,6 +69,12 @@ function getPremiumBrowserFallbackLimit(env = {}) {
   const configured = Number.parseInt(String(env.PREMIUM_BROWSER_FALLBACK_LIMIT || ""), 10);
   if (!Number.isFinite(configured)) return DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT;
   return Math.max(0, Math.min(configured, PREMIUM_BROWSER_FALLBACK_PRIORITY.length));
+}
+
+function getPremiumBrowserConcurrency(env = {}) {
+  const configured = Number.parseInt(String(env.PREMIUM_BROWSER_CONCURRENCY || ""), 10);
+  if (!Number.isFinite(configured)) return DEFAULT_PREMIUM_BROWSER_CONCURRENCY;
+  return Math.max(1, Math.min(configured, 4));
 }
 
 function needsBrowserFallback(result) {
@@ -307,7 +314,7 @@ async function searchPremiumBrowserSites(env, { query, limit, siteKeys }) {
     const results = await searchMarketplacesWithBrowser(
       env.BROWSER,
       siteKeys.map((siteKey) => ({ site: getSite(siteKey), query, limit: browserLimit })),
-      { includeBodyText: true, concurrency: 2 }
+      { includeBodyText: true, concurrency: getPremiumBrowserConcurrency(env) }
     );
     return results.map((result) => {
       if (!result?.challengeDetected) return result;
@@ -727,6 +734,7 @@ async function handleApi(request, env, context) {
       payload.summary.premiumMarketplaces = PREMIUM_SITE_KEYS.length;
       payload.summary.browserEligibleMarketplaces = PREMIUM_BROWSER_FALLBACK_PRIORITY.length;
       payload.summary.browserFallbackLimit = browserFallbackLimit;
+      payload.summary.browserConcurrency = getPremiumBrowserConcurrency(env);
       payload.summary.browserFallbackMarketplaces = browserSiteKeys;
       payload.summary.browserMarketplaces = browserResults.length;
       payload.summary.successfulBrowserMarketplaces = browserResults.filter((result) => result?.ok).length;

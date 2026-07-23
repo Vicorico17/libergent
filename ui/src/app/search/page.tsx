@@ -79,6 +79,12 @@ const PREMIUM_SOURCE_TIMING = [
 ]
 const PREMIUM_SOURCES = PREMIUM_SOURCE_TIMING.map(({ name }) => name)
 const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
+const PREMIUM_WAITING_INSIGHTS = [
+  "Comparăm ofertele second-hand cu prețurile produselor noi.",
+  "Eliminăm duplicatele, accesoriile și rezultatele care nu corespund căutării.",
+  "Luăm în calcul prețul, starea, livrarea, locația și datele despre seller.",
+  "Pregătim o recomandare clară, nu doar o listă lungă de anunțuri.",
+]
 const MAIN_BLOCKS   = 15
 const SOURCE_BLOCKS = 10
 const SEARCH_RESULT_LIMIT = 180
@@ -569,6 +575,22 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
   const step2 = progress > 60
   const step3 = progress > 90
   const elapsedSeconds = Math.floor((tick * 400) / 1000)
+  const phases = tier === "premium"
+    ? [
+        { title: "Pornim căutarea extinsă", detail: `Deschidem sursele potrivite pentru „${query}”.` },
+        { title: "Colectăm ofertele", detail: "Verificăm anunțurile și magazinele care pot avea produsul potrivit." },
+        { title: "Curățăm rezultatele", detail: "Separăm produsele relevante de duplicate, accesorii și rezultate nepotrivite." },
+        { title: "Pregătim alegerea", detail: "Comparăm prețurile și construim recomandarea finală pentru tine." },
+      ]
+    : [
+        { title: "Pornim căutarea", detail: `Deschidem sursele potrivite pentru „${query}”.` },
+        { title: "Colectăm ofertele", detail: "Verificăm anunțurile disponibile." },
+        { title: "Curățăm rezultatele", detail: "Eliminăm duplicatele și rezultatele nepotrivite." },
+        { title: "Pregătim rezultatele", detail: "Ordonăm ofertele pentru comparație." },
+      ]
+  const phaseIndex = done ? phases.length - 1 : progress < 32 ? 0 : progress < 64 ? 1 : progress < 88 ? 2 : 3
+  const activePhase = phases[phaseIndex]
+  const premiumInsightIndex = Math.floor(tick / 6) % PREMIUM_WAITING_INSIGHTS.length
   const activeSources = [
     ...FREE_SOURCE_TIMING,
     ...(isLikelyVehicleSearch(query) ? VEHICLE_SOURCE_TIMING : []),
@@ -607,16 +629,50 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
         </div>
 
         {/* Body */}
-        <div className="p-5 flex flex-col gap-6" style={{ background: MODAL_BG }}>
+        <div className="flex flex-col gap-5 p-4 sm:gap-6 sm:p-5" style={{ background: MODAL_BG }}>
 
           {/* Main status */}
           <p className="text-[13px] font-bold uppercase">
-            {done ? "Căutare finalizată." : "Căutăm în marketplace-uri active..."}
+            {done ? "Căutare finalizată." : tier === "premium" ? "Construim comparația Premium..." : "Căutăm în marketplace-uri active..."}
           </p>
 
+          {/* Current phase */}
+          <div
+            className="p-4"
+            style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}
+            aria-live="polite"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3 text-[9px] font-bold uppercase tracking-widest">
+              <span style={{ color: PINK }}>Etapa {phaseIndex + 1} / {phases.length}</span>
+              <span style={{ color: "#FFFFFF99" }}>{elapsedSeconds}s</span>
+            </div>
+            <div className="text-[14px] font-bold uppercase">{activePhase.title}</div>
+            <p className="mt-2 text-[10px] leading-relaxed" style={{ color: "#FFFFFFB8" }}>{activePhase.detail}</p>
+          </div>
+
+          {/* Main progress bar */}
+          <div>
+            <div className="mb-3 flex items-center justify-between gap-3 text-[10px] font-bold uppercase">
+              <span>Progres căutare</span>
+              <span style={{ color: PINK }}>{done ? "100%" : progress >= 96 ? "Etapa finală" : `${Math.floor(progress)}%`}</span>
+            </div>
+            <div className="flex gap-[3px]">
+              {Array.from({ length: MAIN_BLOCKS }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-3 flex-1 ${progress >= 96 && !done && i >= filledMain - 1 ? "animate-pulse" : ""}`}
+                  style={{
+                    background: i < filledMain ? PINK : "#E4E2DA",
+                    transition: "background 0.2s",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
           {/* Free source rows */}
-          <div className="flex flex-col gap-2.5">
-            <div className="flex items-center justify-between gap-3 pb-1 text-[10px] font-bold uppercase">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:flex sm:flex-col sm:gap-2.5">
+            <div className="col-span-2 flex items-center justify-between gap-3 pb-1 text-[10px] font-bold uppercase">
               <span>Căutare {tier === "premium" ? "Premium" : "Free"}</span>
               <span style={{ color: GREEN }}>
                 {done ? "finalizată" : `${activeSources.length + (tier === "premium" ? PREMIUM_SOURCES.length : 0)} surse · ${elapsedSeconds}s`}
@@ -636,19 +692,19 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
                 : "standby"
 
               return (
-                <div key={name} className="flex items-center text-[11px] w-full uppercase">
+                <div key={name} className="flex min-w-0 items-center text-[10px] uppercase sm:w-full sm:text-[11px]">
                   {/* Green dot */}
                   <div
-                    className={`w-2 h-2 rounded-full mr-3 flex-none ${isComplete ? "" : "animate-pulse"}`}
+                    className={`mr-2 h-2 w-2 flex-none rounded-full sm:mr-3 ${isComplete ? "" : "animate-pulse"}`}
                     style={{
                       background: GREEN,
                       boxShadow: isComplete ? "none" : `0 0 5px ${GREEN}`,
                     }}
                   />
                   {/* Name */}
-                  <div className="font-bold" style={{ width: 76, flexShrink: 0 }}>{name}</div>
+                  <div className="min-w-0 truncate font-bold sm:w-[76px] sm:flex-shrink-0">{name}</div>
                   {/* Progress blocks */}
-                  <div className="flex-1 flex gap-[2px]">
+                  <div className="hidden flex-1 gap-[2px] sm:flex">
                     {Array.from({ length: SOURCE_BLOCKS }).map((_, i) => (
                       <div
                         key={i}
@@ -663,6 +719,7 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
                   </div>
                   {/* Status label */}
                   <div
+                    className="hidden sm:block"
                     style={{
                       width: 72,
                       textAlign: "right",
@@ -687,7 +744,7 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
               <span style={{ color: tier === "premium" ? GREEN : PINK }}>{tier === "premium" ? "Premium activ" : "Premium blocat"}</span>
             </div>
             {tier === "premium" ? (
-              <div className="flex flex-col gap-2.5">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:flex sm:flex-col sm:gap-2.5">
                 {PREMIUM_SOURCE_TIMING.map(({ name, start, end }) => {
                   const lp = progress >= end ? 1 : progress <= start ? 0 : (progress - start) / (end - start)
                   const filled = Math.floor(lp * SOURCE_BLOCKS)
@@ -702,16 +759,16 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
                     : "standby"
 
                   return (
-                    <div key={name} className="flex items-center text-[11px] w-full uppercase">
+                    <div key={name} className="flex min-w-0 items-center text-[10px] uppercase sm:w-full sm:text-[11px]">
                       <div
-                        className={`w-2 h-2 rounded-full mr-3 flex-none ${isComplete ? "" : "animate-pulse"}`}
+                        className={`mr-2 h-2 w-2 flex-none rounded-full sm:mr-3 ${isComplete ? "" : "animate-pulse"}`}
                         style={{
                           background: lp > 0 || isComplete ? GREEN : "#D2CFC6",
                           boxShadow: lp > 0 && !isComplete ? `0 0 5px ${GREEN}` : "none",
                         }}
                       />
-                      <div className="font-bold" style={{ width: 76, flexShrink: 0 }}>{name}</div>
-                      <div className="flex-1 flex gap-[2px]">
+                      <div className="min-w-0 truncate font-bold sm:w-[76px] sm:flex-shrink-0">{name}</div>
+                      <div className="hidden flex-1 gap-[2px] sm:flex">
                         {Array.from({ length: SOURCE_BLOCKS }).map((_, i) => (
                           <div
                             key={i}
@@ -726,6 +783,7 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
                         ))}
                       </div>
                       <div
+                        className="hidden sm:block"
                         style={{
                           width: 92,
                           textAlign: "right",
@@ -769,6 +827,24 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
                 Vezi ce găsește Premium <Arrow size={12} />
               </Link>
             )}
+            {tier === "premium" && (
+              <div className="mt-4 pt-3" style={{ borderTop: `1px dashed ${INK}55` }}>
+                <div className="mb-2 flex items-center justify-between gap-3 text-[9px] font-bold uppercase">
+                  <span>Ce analizăm pentru tine</span>
+                  <span style={{ color: PINK }}>{premiumInsightIndex + 1}/{PREMIUM_WAITING_INSIGHTS.length}</span>
+                </div>
+                <p className="min-h-10 text-[10px] leading-relaxed">{PREMIUM_WAITING_INSIGHTS[premiumInsightIndex]}</p>
+                <div className="mt-2 flex gap-1.5">
+                  {PREMIUM_WAITING_INSIGHTS.map((_, index) => (
+                    <span
+                      key={index}
+                      className="h-1 flex-1"
+                      style={{ background: index === premiumInsightIndex ? PINK : `${INK}18` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Checklist */}
@@ -794,30 +870,6 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
             ))}
           </div>
 
-          {/* Main progress bar */}
-          <div>
-            <div className="text-[11px] font-bold uppercase mb-3">Progres Scanare</div>
-            <div className="flex items-center gap-4">
-              <div className="flex-1 flex gap-[3px]">
-                {Array.from({ length: MAIN_BLOCKS }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 h-4"
-                    style={{
-                      background: i < filledMain ? PINK : "#E4E2DA",
-                      transition: "background 0.1s",
-                    }}
-                  />
-                ))}
-              </div>
-              <div
-                className="text-[20px] font-bold"
-                style={{ color: PINK, width: 52, textAlign: "right", flexShrink: 0 }}
-              >
-                {done ? "100%" : progress >= 98 ? "ACTIV" : `${Math.floor(progress)}%`}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
@@ -2312,10 +2364,12 @@ function SearchResultsContent() {
 
       let prog = 0
       const TICK = 250
+      let elapsedMs = 0
 
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
       loaderTimerRef.current = setInterval(() => {
-        prog = Math.min(98, prog + Math.max(1, Math.round((99 - prog) * 0.08)))
+        elapsedMs += TICK
+        prog = Math.min(97, 8 + (89 * (1 - Math.exp(-elapsedMs / 18_000))))
         setLoaderProgress(prog)
       }, TICK)
 
