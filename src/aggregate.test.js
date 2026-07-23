@@ -53,6 +53,65 @@ test("prefers trusted complete offer over suspiciously cheap defective listing",
   assert.equal(topOlxRecommendation?.url, "https://olx.ro/good");
 });
 
+test("prefers a verifiable balanced offer over a slightly cheaper thin listing", () => {
+  const query = "iPhone 15 Pro";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Apple iPhone 15 Pro 128GB",
+        price: "1900 lei",
+        url: "https://olx.ro/thin"
+      },
+      {
+        title: "Apple iPhone 15 Pro 128GB impecabil",
+        price: "2200 lei",
+        condition: "folosit",
+        postedAt: "Azi",
+        location: "București",
+        sellerType: "Persoană fizică",
+        image: "https://example.test/complete.jpg",
+        url: "https://olx.ro/complete"
+      }
+    ]),
+    makeResult("publi24.ro", query, [
+      {
+        title: "Apple iPhone 15 Pro 128GB",
+        price: "2400 lei",
+        condition: "folosit",
+        postedAt: "Ieri",
+        location: "Cluj-Napoca",
+        image: "https://example.test/market.jpg",
+        url: "https://publi24.ro/market"
+      }
+    ])
+  ]);
+
+  assert.equal(aggregated.bestOffer?.url, "https://olx.ro/complete");
+  assert.ok(aggregated.bestOffer.evidenceConfidence.score > 70);
+  assert.equal(aggregated.bestOffer.recommendation.strong, true);
+  assert.ok(aggregated.bestOffer.recommendation.reasons.some((reason) => reason.includes("3 oferte comparabile")));
+
+  const thin = aggregated.results[0].items.find((item) => item.url === "https://olx.ro/thin");
+  assert.ok(thin.evidenceConfidence.score < aggregated.bestOffer.evidenceConfidence.score);
+});
+
+test("labels a recommendation as limited when the available evidence is thin", () => {
+  const query = "Bialetti Venus";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Bialetti Venus 2 cești",
+        price: "100 lei",
+        url: "https://olx.ro/bialetti"
+      }
+    ])
+  ]);
+
+  assert.equal(aggregated.bestOffer?.recommendation.strong, false);
+  assert.equal(aggregated.bestOffer?.recommendation.confidenceLabel, "încredere limitată");
+  assert.ok(aggregated.bestOffer?.recommendation.cautions.some((reason) => reason.includes("Date încă lipsă")));
+});
+
 test("keeps exact tech product matches ahead of accessories and wrong variants", () => {
   const query = "iphone 15 pro";
   const aggregated = aggregateMarketplaceResults([

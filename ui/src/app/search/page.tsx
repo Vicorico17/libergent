@@ -291,23 +291,16 @@ async function readJsonResponse(response: Response): Promise<SearchPayload> {
 }
 
 function isGreatAgentDeal(item: SearchResultItem) {
-  return item.score > 90
+  return item.recommendation.strong && item.score >= 80
 }
 
 function getAgentScoreExplanation(item: SearchResultItem) {
-  const reasons = [`scor agent ${item.score}%`]
+  const reasons = [
+    `scor recomandare ${item.score}%`,
+    `${item.recommendation.confidenceLabel} ${item.recommendation.confidenceScore}%`,
+  ]
 
-  if (typeof item.rank === "number" && item.rank <= 3) {
-    reasons.push(`top ${item.rank} în rezultate`)
-  }
-  if (item.price !== null) {
-    reasons.push(`preț valid: ${item.priceLabel}`)
-  }
-  if (item.condition && item.condition.toLowerCase() !== "necunoscut") {
-    reasons.push(`condiție ${item.condition.toLowerCase()}`)
-  }
-
-  reasons.push(`sursă verificată: ${item.source}`)
+  if (item.recommendation.summary) reasons.push(item.recommendation.summary)
   return reasons.join(" · ")
 }
 
@@ -363,7 +356,7 @@ function AgentScoreBadge({ item, compact = false }: { item: SearchResultItem; co
         fontFamily: MONO,
       }}
     >
-      Deal foarte bun
+      Recomandare solidă
     </span>
   )
 }
@@ -526,11 +519,12 @@ function DealQualitySummary({ item, compact = false }: { item: SearchResultItem;
           {item.dealQuality.label} · {item.dealQuality.score}%
         </span>
       </div>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-4 gap-1.5">
         {[
           { label: "produs", score: item.dealQuality.productMatch },
           { label: "preț", score: item.dealQuality.price },
           { label: "risc", score: item.dealQuality.risk },
+          { label: "date", score: item.dealQuality.confidence },
         ].map(({ label, score }) => (
           <div key={label} className="min-w-0">
             <div className="mb-1 flex items-center justify-between gap-1">
@@ -1568,7 +1562,7 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
       }}
     >
       <div style={{ background: CREAM }}>
-        <PanelHeader title="Best Used Deal" />
+        <PanelHeader title={item.recommendation.strong ? "Best Used Deal" : "Top Match · Verifică"} />
         <div className="flex flex-col md:flex-row">
           <div className="w-full md:w-2/5 relative overflow-hidden" style={{ minHeight: 256, background: "#DDD9CE", borderRight: `1px solid ${INK}` }}>
             {image ? (
@@ -1635,6 +1629,31 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
               </div>
               <div className="pt-2">
                 <DealQualitySummary item={item} />
+              </div>
+              <div className="mt-2 p-4" style={{ border: `1px solid ${INK}`, background: CREAM }}>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase">De ce este recomandarea #1</span>
+                  <span className="text-[9px] font-bold uppercase" style={{ color: item.recommendation.confidenceScore >= 75 ? GREEN : PINK }}>
+                    {item.recommendation.confidenceLabel} · {item.recommendation.confidenceScore}%
+                  </span>
+                </div>
+                {item.recommendation.summary && (
+                  <p className="mb-3 text-[11px] font-bold leading-relaxed">{item.recommendation.summary}</p>
+                )}
+                <ul className="grid gap-1.5">
+                  {item.recommendation.reasons.slice(0, 3).map((reason) => (
+                    <li key={reason} className="flex gap-2 text-[10px] leading-relaxed">
+                      <span style={{ color: GREEN }}>✓</span>
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                  {item.recommendation.cautions.slice(0, 1).map((caution) => (
+                    <li key={caution} className="flex gap-2 text-[10px] font-bold leading-relaxed">
+                      <span style={{ color: PINK }}>!</span>
+                      <span>{caution}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
             <div className="mt-8 flex flex-col gap-3">
@@ -1905,11 +1924,30 @@ function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversation
 
           <section className="flex flex-col gap-3">
             <PanelHeader title="Why This Deal" />
+            {item.recommendation.summary && (
+              <div className="p-4" style={{ border: `1px solid ${INK}`, background: CREAM }}>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[10px] font-bold uppercase">
+                  <span>{item.recommendation.summary}</span>
+                  <span style={{ color: item.recommendation.confidenceScore >= 75 ? GREEN : PINK }}>
+                    {item.recommendation.confidenceLabel} · {item.recommendation.confidenceScore}%
+                  </span>
+                </div>
+                <span className="text-[9px] font-bold uppercase" style={{ color: `${INK}66` }}>
+                  Comparată cu {item.recommendation.comparedListings} oferte din {item.recommendation.comparedMarketplaces} marketplace-uri
+                </span>
+              </div>
+            )}
             <ul className="grid gap-2">
               {(item.whyThisDeal.length ? item.whyThisDeal : item.dealQuality.reasons).map((reason) => (
                 <li key={reason} className="flex gap-2 text-[11px] font-bold uppercase">
                   <span style={{ color: PINK }}>&gt;</span>
                   <span>{reason}</span>
+                </li>
+              ))}
+              {item.recommendation.cautions.map((caution) => (
+                <li key={caution} className="flex gap-2 text-[11px] font-bold uppercase">
+                  <span style={{ color: PINK }}>!</span>
+                  <span>{caution}</span>
                 </li>
               ))}
             </ul>
@@ -1949,6 +1987,7 @@ function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversation
             <DetailMetric label="Diferență față de piață" value={formatSignedPercent(item.priceInsight.priceDeltaPct) || "n/a"} />
             <DetailMetric label="Scor produs" value={`${item.dealQuality.productMatch}%`} />
             <DetailMetric label="Scor risc" value={`${item.dealQuality.risk}%`} />
+            <DetailMetric label="Încredere date" value={`${item.evidenceConfidence.score}% · ${item.evidenceConfidence.label}`} />
           </section>
 
           {item.url && (

@@ -401,8 +401,63 @@ function scoreRisk(flags) {
   }, 0));
 }
 
+function hasListingImage(item = {}) {
+  return Boolean(
+    item.imageUrl ||
+    item.image ||
+    item.thumbnailUrl ||
+    item.images?.length ||
+    item.imageUrls?.length
+  );
+}
+
+function hasMeaningfulValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return Boolean(normalized) && ![
+    "necunoscut",
+    "necunoscută",
+    "nespecificat",
+    "nespecificată",
+    "românia"
+  ].includes(normalized);
+}
+
+function buildEvidenceConfidence(item = {}) {
+  const phoneSpecs = item.phoneSpecs || extractPhoneSpecs(item);
+  const specificSignals = [
+    phoneSpecs?.storageGb,
+    phoneSpecs?.batteryHealthPct,
+    phoneSpecs?.warranty,
+    phoneSpecs?.invoice,
+    phoneSpecs?.neverlocked,
+    phoneSpecs?.conditionSignals?.length
+  ].some(Boolean);
+  const checks = [
+    { key: "price", label: "preț", weight: 24, available: Number.isFinite(item.priceRon) && item.priceRon > 0 },
+    { key: "image", label: "imagine", weight: 14, available: hasListingImage(item) },
+    { key: "condition", label: "condiție", weight: 14, available: hasMeaningfulValue(item.condition) },
+    { key: "postedAt", label: "data publicării", weight: 14, available: hasMeaningfulValue(item.postedAt) },
+    { key: "location", label: "locație", weight: 12, available: hasMeaningfulValue(item.location) },
+    { key: "sellerType", label: "tip seller", weight: 8, available: hasMeaningfulValue(item.sellerType) },
+    { key: "url", label: "link direct", weight: 8, available: Boolean(item.url) },
+    { key: "specifics", label: "specificații verificabile", weight: 6, available: specificSignals }
+  ];
+  const score = checks.reduce((sum, check) => sum + (check.available ? check.weight : 0), 0);
+
+  return {
+    score,
+    label:
+      score >= 75 ? "încredere ridicată" :
+      score >= 50 ? "încredere medie" :
+      "încredere limitată",
+    available: checks.filter((check) => check.available).map((check) => check.label),
+    missing: checks.filter((check) => !check.available).map((check) => check.label)
+  };
+}
+
 function buildDealQuality(item, medianPriceRon, condition) {
   const riskFlags = item.riskFlags || buildRiskFlags(item, medianPriceRon);
+  const evidenceConfidence = item.evidenceConfidence || buildEvidenceConfidence(item);
   const productMatch = clampScore(Number.isFinite(item.relevanceScore) ? item.relevanceScore : 50);
   const price = clampScore(priceValueScore(item.priceRon, medianPriceRon));
   const conditionScore =
@@ -412,11 +467,12 @@ function buildDealQuality(item, medianPriceRon, condition) {
   const freshness = clampScore(Math.min(100, recencyScore(item.postedAt) * 5));
   const risk = scoreRisk(riskFlags);
   const score = clampScore(
-    (productMatch * 0.34) +
-    (price * 0.26) +
-    (conditionScore * 0.14) +
-    (freshness * 0.10) +
-    (risk * 0.16)
+    (productMatch * 0.32) +
+    (price * 0.22) +
+    (conditionScore * 0.12) +
+    (freshness * 0.08) +
+    (risk * 0.16) +
+    (evidenceConfidence.score * 0.10)
   );
   const label =
     score >= 86 ? "deal foarte bun" :
@@ -432,10 +488,12 @@ function buildDealQuality(item, medianPriceRon, condition) {
     condition: clampScore(conditionScore),
     freshness,
     risk,
+    confidence: evidenceConfidence.score,
     reasons: [
       `potrivire produs ${productMatch}%`,
       `preț ${price}%`,
-      `risc ${risk}%`
+      `risc ${risk}%`,
+      `încredere date ${evidenceConfidence.score}%`
     ]
   };
 }
@@ -605,16 +663,24 @@ function scoreGlobalRecommendation(item, medianPriceRon, condition) {
   const relevance = Number.isFinite(item.relevanceScore) ? item.relevanceScore : 50;
   const value = priceValueScore(item.priceRon, medianPriceRon);
   const freshness = Math.min(100, recencyScore(item.postedAt) * 5);
+  const risk = Number.isFinite(item.dealQuality?.risk)
+    ? item.dealQuality.risk
+    : scoreRisk(item.riskFlags || []);
+  const confidence = Number.isFinite(item.evidenceConfidence?.score)
+    ? item.evidenceConfidence.score
+    : buildEvidenceConfidence(item).score;
   const conditionScore =
     condition === "any" ? 70 :
     matchesCondition(item, condition) ? 100 :
     25;
 
   let score = Math.round(
-    (relevance * 0.46) +
-    (value * 0.34) +
-    (freshness * 0.12) +
-    (conditionScore * 0.08)
+    (relevance * 0.38) +
+    (value * 0.20) +
+    (freshness * 0.08) +
+    (conditionScore * 0.10) +
+    (risk * 0.14) +
+    (confidence * 0.10)
   );
 
   if (Number.isFinite(item.priceRon) && Number.isFinite(medianPriceRon) && medianPriceRon > 0) {
@@ -635,6 +701,15 @@ function scoreGlobalRecommendation(item, medianPriceRon, condition) {
   if (item.listingType === "broken_or_for_parts" || item.listingType === "spare_part") {
     score -= 30;
   }
+  if (!Number.isFinite(item.priceRon)) {
+    score -= 10;
+  }
+  if (item.riskFlags?.some((flag) => flag.code === "very_low_price")) {
+    score -= 18;
+  }
+  if (item.riskFlags?.some((flag) => flag.severity === "bad")) {
+    score -= 22;
+  }
 
   return Math.max(0, Math.min(100, score));
 }
@@ -643,18 +718,101 @@ function enrichItemWithDealIntelligence(item, medianPriceRon, condition) {
   const priceInsight = buildPriceInsight(item, medianPriceRon);
   const phoneSpecs = extractPhoneSpecs(item);
   const riskFlags = buildRiskFlags(item, medianPriceRon);
-  const dealQuality = buildDealQuality({ ...item, riskFlags }, medianPriceRon, condition);
+  const evidenceConfidence = buildEvidenceConfidence({ ...item, phoneSpecs });
+  const dealQuality = buildDealQuality({ ...item, riskFlags, phoneSpecs, evidenceConfidence }, medianPriceRon, condition);
   const enrichedItem = {
     ...item,
     priceInsight,
     riskFlags,
     dealQuality,
-    phoneSpecs
+    phoneSpecs,
+    evidenceConfidence
   };
 
   return {
     ...enrichedItem,
     whyThisDeal: buildWhyThisDeal(enrichedItem)
+  };
+}
+
+function buildRecommendationExplanation(item, comparisonPool) {
+  const pricedPool = comparisonPool.filter((candidate) => Number.isFinite(candidate.priceRon) && candidate.priceRon > 0);
+  const marketplaceCount = new Set(comparisonPool.map((candidate) => candidate.site).filter(Boolean)).size;
+  const segmentRank = comparisonPool.findIndex((candidate) => itemRankKey(candidate) === itemRankKey(item)) + 1;
+  const confidence = item.evidenceConfidence || buildEvidenceConfidence(item);
+  const reasons = [];
+  const cautions = [];
+
+  if (item.dealQuality?.productMatch >= 90 && !item.keywordSignals?.missingKeywords?.length) {
+    reasons.push(`Potrivire exactă cu produsul căutat (${item.dealQuality.productMatch}%), fără termeni esențiali lipsă.`);
+  } else {
+    reasons.push(`Potrivire cu produsul căutat: ${item.dealQuality?.productMatch ?? item.relevanceScore ?? 0}%.`);
+  }
+
+  if (
+    Number.isFinite(item.priceRon) &&
+    Number.isFinite(item.priceInsight?.marketMedianRon) &&
+    pricedPool.length >= 3
+  ) {
+    const delta = item.priceInsight.priceDeltaPct;
+    const comparison =
+      delta < 0 ? `${Math.abs(delta)}% sub` :
+      delta > 0 ? `${delta}% peste` :
+      "la nivelul";
+    reasons.push(
+      `Prețul de ${Math.round(item.priceRon).toLocaleString("ro-RO")} RON este ${comparison} medianei de ${Math.round(item.priceInsight.marketMedianRon).toLocaleString("ro-RO")} RON, calculată din ${pricedPool.length} oferte comparabile.`
+    );
+  } else if (Number.isFinite(item.priceRon)) {
+    reasons.push(`Are preț verificabil (${Math.round(item.priceRon).toLocaleString("ro-RO")} RON), dar eșantionul de comparație este încă mic.`);
+  }
+
+  if (item.riskFlags?.length === 0) {
+    reasons.push("Nu am detectat termeni de defect, variantă greșită sau preț suspect în datele disponibile.");
+  }
+  if (hasMeaningfulValue(item.condition)) {
+    reasons.push(`Condiție declarată: ${item.condition}.`);
+  }
+  if (recencyScore(item.postedAt) >= 14) {
+    reasons.push(`Anunț recent: ${item.postedAt}.`);
+  }
+  if (confidence.available.length) {
+    reasons.push(`Recomandarea se bazează pe: ${confidence.available.slice(0, 5).join(", ")}.`);
+  }
+
+  if (item.riskFlags?.length) {
+    cautions.push(`Verifică înainte de contact: ${item.riskFlags.slice(0, 3).map((flag) => flag.label).join(", ")}.`);
+  }
+  if (confidence.missing.length) {
+    cautions.push(`Date încă lipsă: ${confidence.missing.slice(0, 4).join(", ")}.`);
+  }
+  if (pricedPool.length < 3) {
+    cautions.push("Comparația de preț are mai puțin de 3 oferte și trebuie tratată ca orientativă.");
+  }
+
+  const hasSevereRisk = item.riskFlags?.some((flag) => flag.severity === "bad");
+  const strong = (
+    segmentRank === 1 &&
+    comparisonPool.length >= 2 &&
+    confidence.score >= 55 &&
+    item.dealQuality?.productMatch >= 80 &&
+    !hasSevereRisk
+  );
+  const summary =
+    strong && confidence.score >= 75
+      ? `Cea mai echilibrată ofertă dintre ${comparisonPool.length} rezultate comparabile de pe ${marketplaceCount} marketplace-uri.`
+      : strong
+        ? `Cel mai bun compromis găsit între potrivire, preț și risc, dintre ${comparisonPool.length} rezultate comparabile.`
+        : `Cea mai bună opțiune din datele disponibile, dar recomandarea are nevoie de verificări suplimentare.`;
+
+  return {
+    strong,
+    summary,
+    confidenceScore: confidence.score,
+    confidenceLabel: confidence.label,
+    comparedListings: comparisonPool.length,
+    comparedMarketplaces: marketplaceCount,
+    reasons: reasons.slice(0, 5),
+    cautions: cautions.slice(0, 3)
   };
 }
 
@@ -914,7 +1072,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       recommendationScore: scoreGlobalRecommendation(enrichedItem, referenceMedianRon, condition)
     };
   });
-  const rankedCandidates = allBestCandidates
+  const rankedBaseCandidates = allBestCandidates
     .sort((a, b) => {
       if (b.recommendationScore !== a.recommendationScore) {
         return b.recommendationScore - a.recommendationScore;
@@ -925,6 +1083,20 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       ...item,
       rank: index + 1
     }));
+  const rankedCandidates = rankedBaseCandidates.map((item) => {
+    const comparisonPool = rankedBaseCandidates.filter(
+      (candidate) => isNewProductSource(candidate) === isNewProductSource(item)
+    );
+    const recommendation = buildRecommendationExplanation(item, comparisonPool);
+    return {
+      ...item,
+      recommendation,
+      whyThisDeal: [
+        ...recommendation.reasons,
+        ...item.whyThisDeal
+      ].filter((reason, index, reasons) => reasons.indexOf(reason) === index).slice(0, 10)
+    };
+  });
   const rankByKey = new Map(rankedCandidates.map((item) => [itemRankKey(item), item]));
   const rankedResults = dedupedResults.map((result) => {
     if (!result.ok) {

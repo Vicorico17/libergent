@@ -29,7 +29,24 @@ export type ApiListing = {
     condition?: number;
     freshness?: number;
     risk?: number;
+    confidence?: number;
     reasons?: string[];
+  };
+  evidenceConfidence?: {
+    score?: number;
+    label?: string;
+    available?: string[];
+    missing?: string[];
+  };
+  recommendation?: {
+    strong?: boolean;
+    summary?: string;
+    confidenceScore?: number;
+    confidenceLabel?: string;
+    comparedListings?: number;
+    comparedMarketplaces?: number;
+    reasons?: string[];
+    cautions?: string[];
   };
   riskFlags?: Array<{
     code?: string;
@@ -158,7 +175,24 @@ export type SearchResultItem = {
     condition: number;
     freshness: number;
     risk: number;
+    confidence: number;
     reasons: string[];
+  };
+  evidenceConfidence: {
+    score: number;
+    label: string;
+    available: string[];
+    missing: string[];
+  };
+  recommendation: {
+    strong: boolean;
+    summary: string;
+    confidenceScore: number;
+    confidenceLabel: string;
+    comparedListings: number;
+    comparedMarketplaces: number;
+    reasons: string[];
+    cautions: string[];
   };
   riskFlags: Array<{
     code: string;
@@ -342,6 +376,8 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     rank: typeof item.rank === "number" && Number.isFinite(item.rank) ? item.rank : undefined,
     score,
     dealQuality: normalizeDealQuality(item.dealQuality, score),
+    evidenceConfidence: normalizeEvidenceConfidence(item.evidenceConfidence),
+    recommendation: normalizeRecommendation(item.recommendation),
     riskFlags: normalizeRiskFlags(item.riskFlags),
     priceInsight: normalizePriceInsight(item.priceInsight),
     phoneSpecs: normalizePhoneSpecs(item.phoneSpecs),
@@ -393,7 +429,31 @@ function normalizeDealQuality(value: ApiListing["dealQuality"], fallbackScore: n
     condition: normalizeScore(value?.condition, 70),
     freshness: normalizeScore(value?.freshness, 0),
     risk: normalizeScore(value?.risk, 70),
+    confidence: normalizeScore(value?.confidence, 0),
     reasons: normalizeStringList(value?.reasons),
+  };
+}
+
+function normalizeEvidenceConfidence(value: ApiListing["evidenceConfidence"]): SearchResultItem["evidenceConfidence"] {
+  const score = normalizeScore(value?.score, 0);
+  return {
+    score,
+    label: value?.label || (score >= 75 ? "încredere ridicată" : score >= 50 ? "încredere medie" : "încredere limitată"),
+    available: normalizeStringList(value?.available),
+    missing: normalizeStringList(value?.missing),
+  };
+}
+
+function normalizeRecommendation(value: ApiListing["recommendation"]): SearchResultItem["recommendation"] {
+  return {
+    strong: Boolean(value?.strong),
+    summary: typeof value?.summary === "string" ? value.summary : "",
+    confidenceScore: normalizeScore(value?.confidenceScore, 0),
+    confidenceLabel: typeof value?.confidenceLabel === "string" ? value.confidenceLabel : "încredere limitată",
+    comparedListings: typeof value?.comparedListings === "number" && Number.isFinite(value.comparedListings) ? Math.max(0, Math.round(value.comparedListings)) : 0,
+    comparedMarketplaces: typeof value?.comparedMarketplaces === "number" && Number.isFinite(value.comparedMarketplaces) ? Math.max(0, Math.round(value.comparedMarketplaces)) : 0,
+    reasons: normalizeStringList(value?.reasons),
+    cautions: normalizeStringList(value?.cautions),
   };
 }
 
