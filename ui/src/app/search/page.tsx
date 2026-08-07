@@ -30,7 +30,10 @@ const FREE_SOURCES_LIST = [
   "OLX", "VINTED", "LAJUMATE", "OKAZII", "PUBLI24", "ANUNTUL", "AUTOVIT", "BESTAUTO", "FLIP", "KLAP",
   "PRICE.RO", "SHOPMANIA",
 ]
-const PREMIUM_FILTER_SOURCES = ["EMAG", "EVOMAG", "CEL.RO", "COMPARI.RO", "PC GARAGE", "FLANCO", "ALTEX"]
+const PREMIUM_FILTER_SOURCES = [
+  "EMAG", "EVOMAG", "CEL.RO", "COMPARI.RO", "PC GARAGE", "FLANCO", "ALTEX",
+  "SIZEER", "EPANTOFI", "FASHION DAYS", "ZALANDO", "ABOUT YOU", "ANSWEAR", "MODIVO",
+]
 const SOURCES_LIST = [...FREE_SOURCES_LIST, ...PREMIUM_FILTER_SOURCES]
 const SORT_OPTIONS = ["relevanță", "potrivire cuvinte cheie", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
 const SOURCE_TYPE_OPTIONS = [
@@ -77,11 +80,19 @@ const PREMIUM_SOURCE_TIMING = [
   { name: "PC GARAGE", start: 62, end: 93 },
   { name: "FLANCO",    start: 68, end: 96 },
   { name: "ALTEX",     start: 74, end: 99 },
+  { name: "SIZEER",    start: 28, end: 68 },
+  { name: "EPANTOFI",  start: 34, end: 74 },
+  { name: "FASHION DAYS", start: 40, end: 80 },
+  { name: "ZALANDO",   start: 46, end: 86 },
+  { name: "ABOUT YOU", start: 52, end: 90 },
+  { name: "ANSWEAR",   start: 58, end: 94 },
+  { name: "MODIVO",    start: 64, end: 98 },
 ]
 const PREMIUM_SOURCES = PREMIUM_SOURCE_TIMING.map(({ name }) => name)
 const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const PREMIUM_WAITING_INSIGHTS = [
   "Comparăm ofertele second-hand cu prețurile produselor noi.",
+  "Pentru căutările de fashion, verificăm și retaileri de sneakers, încălțăminte și îmbrăcăminte.",
   "Eliminăm duplicatele, accesoriile și rezultatele care nu corespund căutării.",
   "Luăm în calcul prețul, starea, livrarea, locația și datele despre seller.",
   "Pregătim o recomandare clară, nu doar o listă lungă de anunțuri.",

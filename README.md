@@ -23,7 +23,7 @@ The search page keeps diagnostics collapsed under **Raport Căutare**. That pane
 
 ## Marketplace coverage
 
-There are 19 registered adapters. A source being registered does not guarantee that it will return listings for every query; marketplace availability, markup, and anti-bot behavior can change independently.
+There are 26 registered adapters. A source being registered does not guarantee that it will return listings for every query; marketplace availability, markup, and anti-bot behavior can change independently.
 
 ### Free
 
@@ -46,7 +46,7 @@ Free API requests resolve `provider=auto` to direct access and never start autom
 
 ### Premium test
 
-Premium includes the query-routed Free sources and adds seven retail/price-benchmark adapters:
+Premium includes the query-routed Free sources, seven general retail/price-benchmark adapters, and seven fashion retailers for fashion-related searches:
 
 | Source | Direct first | Automatic browser eligible | Current note |
 | --- | --- | --- | --- |
@@ -57,6 +57,8 @@ Premium includes the query-routed Free sources and adds seven retail/price-bench
 | PC Garage | Yes | Yes | Browser runs only after a failed or empty direct result |
 | Flanco | Yes | Yes | Browser runs only after a failed or empty direct result |
 | Altex | Yes | Yes | Can parse useful DOM content even when navigation completion times out |
+
+Fashion queries (for example sneakers, shoes, clothing, bags, or fashion brands) also search Sizeer, ePantofi, Fashion Days, Zalando, ABOUT YOU, Answear, and MODIVO as direct-first new-price benchmarks. They are intentionally skipped for unrelated searches.
 
 Okazii is the only Free source eligible for the same conditional browser fallback during a Premium search. All eligible sources share one bounded browser session. Browser automation is never started when the direct result already contains usable cards.
 

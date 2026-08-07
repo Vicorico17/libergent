@@ -8,7 +8,7 @@ import { extractImageSearchIntent, validateImageSearchRequest } from "./image-se
 import { searchAcrossSites } from "./app.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildHistoryPayload, logSearchEvent } from "./history.js";
-import { PREMIUM_SITE_KEYS, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { PREMIUM_SITE_KEYS, getDefaultSiteKeys, getPremiumSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, isSupabaseConfigured } from "./supabase.js";
@@ -258,11 +258,12 @@ const server = http.createServer(async (req, res) => {
       }
       const limit = parseBoundedPositiveInteger(limitParam, { name: "limit", max: MAX_API_SEARCH_LIMIT });
       const maxPages = parseBoundedPositiveInteger(pagesParam, { name: "pages", max: MAX_API_SEARCH_PAGES });
+      const premiumSiteKeys = getPremiumSiteKeys(query);
       const freeSiteKeys = (site === "all" ? getSiteKeysForAllSearch(query) : getDefaultSiteKeys())
         .filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey));
       const [freePayload, premiumPayload] = await Promise.all([
         searchAcrossSites({ query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages, siteKeys: freeSiteKeys }),
-        searchAcrossSites({ query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages: 1, siteKeys: PREMIUM_SITE_KEYS })
+        searchAcrossSites({ query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages: 1, siteKeys: premiumSiteKeys })
       ]);
       const payload = aggregateMarketplaceResults([...freePayload.results, ...premiumPayload.results], {
         condition,
@@ -270,10 +271,10 @@ const server = http.createServer(async (req, res) => {
         creditsUsed: freePayload.summary?.creditsUsed || 0
       });
       payload.searchTier = "premium";
-      payload.summary.premiumMarketplaces = PREMIUM_SITE_KEYS.length;
+      payload.summary.premiumMarketplaces = premiumSiteKeys.length;
       payload.summary.browserSessionsUsed = 0;
       payload.summary.browserFallbackMarketplaces = [];
-      await logSearchEvent({ query, condition, provider: "premium-direct", siteKeys: [...freeSiteKeys, ...PREMIUM_SITE_KEYS], payload });
+      await logSearchEvent({ query, condition, provider: "premium-direct", siteKeys: [...freeSiteKeys, ...premiumSiteKeys], payload });
       sendJson(res, 200, payload);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

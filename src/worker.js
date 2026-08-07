@@ -7,7 +7,7 @@ import { extractImageSearchIntent, validateImageSearchRequest } from "./image-se
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { findWhatsAppConversationOwner, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload, readWhatsAppMessagesFromSupabase } from "./supabase.js";
-import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getDefaultSiteKeys, getPremiumSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
@@ -707,10 +707,11 @@ async function handleApi(request, env, context) {
       const cachedResponse = await readPremiumSearchCache(cacheRequest);
       if (cachedResponse) return cachedResponse;
 
+      const premiumSiteKeys = getPremiumSiteKeys(query);
       const freeSiteKeys = getFreeSearchSiteKeys(site, query).filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey));
       const [freePayload, directPremiumPayload] = await Promise.all([
         searchAcrossSites({ query, condition, provider: "direct", limit, maxPages, siteKeys: freeSiteKeys }),
-        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages: 1, siteKeys: PREMIUM_SITE_KEYS })
+        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages: 1, siteKeys: premiumSiteKeys })
       ]);
       const directResults = [...freePayload.results, ...directPremiumPayload.results];
       const directBySite = new Map(directResults.map((result) => [result.site, result]));
@@ -721,7 +722,7 @@ async function handleApi(request, env, context) {
       const browserResults = await searchPremiumBrowserSites(env, { query, limit, siteKeys: browserSiteKeys });
       const browserBySite = new Map(browserResults.map((result) => [result.site, result]));
       const freeResults = freePayload.results.map((result) => preferBrowserFallback(result, browserBySite.get(result.site)));
-      const premiumResults = PREMIUM_SITE_KEYS.map((siteKey) => preferBrowserFallback(directBySite.get(siteKey), browserBySite.get(siteKey)));
+      const premiumResults = premiumSiteKeys.map((siteKey) => preferBrowserFallback(directBySite.get(siteKey), browserBySite.get(siteKey)));
       const payload = aggregateMarketplaceResults(
         [...freeResults, ...premiumResults],
         {
@@ -731,7 +732,7 @@ async function handleApi(request, env, context) {
         }
       );
       payload.searchTier = "premium";
-      payload.summary.premiumMarketplaces = PREMIUM_SITE_KEYS.length;
+      payload.summary.premiumMarketplaces = premiumSiteKeys.length;
       payload.summary.browserEligibleMarketplaces = PREMIUM_BROWSER_FALLBACK_PRIORITY.length;
       payload.summary.browserFallbackLimit = browserFallbackLimit;
       payload.summary.browserConcurrency = getPremiumBrowserConcurrency(env);
@@ -741,7 +742,7 @@ async function handleApi(request, env, context) {
       payload.summary.browserSessionsUsed = browserResults.reduce((sum, result) => sum + (result?.browserSessionsUsed || 0), 0);
       payload.summary.cacheHit = false;
 
-      const siteKeys = [...freeSiteKeys, ...PREMIUM_SITE_KEYS];
+      const siteKeys = [...freeSiteKeys, ...premiumSiteKeys];
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider: "premium-browser", siteKeys, payload }), env);
       writePremiumSearchCache(cacheRequest, payload, context);
       return json(payload, 200);

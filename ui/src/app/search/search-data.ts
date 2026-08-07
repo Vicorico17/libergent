@@ -314,6 +314,13 @@ const platformLabels: Record<string, string> = {
   "pcgarage.ro": "PC GARAGE",
   "altex.ro": "ALTEX",
   "flanco.ro": "FLANCO",
+  "sizeer.ro": "SIZEER",
+  "epantofi.ro": "EPANTOFI",
+  "fashiondays.ro": "FASHION DAYS",
+  "zalando.ro": "ZALANDO",
+  "aboutyou.ro": "ABOUT YOU",
+  "answear.ro": "ANSWEAR",
+  "modivo.ro": "MODIVO",
 };
 
 export function mapSearchResults(payload: SearchPayload): SearchResultItem[] {

@@ -62,12 +62,12 @@ This file tracks marketplaces we still need to add or harden before advertising 
 
 ## Coverage and Provider Audit (2026-07-20)
 
-There are 19 registered adapters in `src/sites.js`. Twelve are Free standard or conditional, and seven are Premium:
+There are 26 registered adapters in `src/sites.js`. Twelve are Free standard or conditional, and fourteen are Premium:
 
 - Classified / used: OLX, Vinted, Lajumate, Okazii, Publi24, Anuntul, Autovit and BestAuto for car-like queries, plus Flip and Klap for refurbished-tech queries.
 - New-price benchmarks: Price.ro and ShopMania.
 
-The seven Premium adapters are Compari, eMAG, evoMAG, PC Garage, Altex, Flanco, and CEL.ro. Premium is an access/coverage tier, not a provider choice: all seven run direct first, and only the explicit browser allowlist can start Browser Run.
+The general Premium adapters are Compari, eMAG, evoMAG, PC Garage, Altex, Flanco, and CEL.ro. Fashion-related Premium searches additionally include Sizeer, ePantofi, Fashion Days, Zalando, ABOUT YOU, Answear, and MODIVO. Premium is an access/coverage tier, not a provider choice: all sources run direct first, and only the explicit browser allowlist can start Browser Run.
 
 A live direct search for `iphone 15 pro` returned usable listings from OLX, Vinted, Lajumate, and Publi24 with zero provider credits. Okazii returned a Cloudflare challenge. Anuntul, Price.ro, and ShopMania completed without a transport error but returned no included listings. This is a one-query smoke test, not a general availability score, but it means the current "active" list should not be treated as nine equally healthy sources.
 
@@ -211,7 +211,27 @@ The same query against the seven configured Premium candidates split them into t
 
 - FashionDays.ro
   - Fit: fashion retail benchmark.
-  - Probe result: candidate search URL returned 404-like HTML; needs correct stable search endpoint.
+  - Current status: added as a Premium, fashion-query-routed direct adapter with its stable `/g/search/` route.
+  - Needed: capture a regression fixture for sale-price and product-card accuracy before treating it as a healthy source.
+
+## Next Niche Research Queue
+
+These are intentionally **not enabled** yet. Each needs a permitted search route, a dedicated fixture, and query-specific quality checks before joining the active registry.
+
+| Priority | Niche | Candidate retailers / marketplaces | Why it fits LiberGent |
+| --- | --- | --- | --- |
+| P1 | Sneakers and sportswear | Footshop, Buzz Sneakers, Sport Vision | Strong overlap with Vinted; product codes, brand, size, and current sale price are especially useful for used-vs-new comparisons. |
+| P1 | Furniture and home | IKEA, JYSK, Mobexpert | Makes the existing used furniture inventory comparable with a reliable new-price benchmark. |
+| P1 | DIY and home improvement | Dedeman, Leroy Merlin, Hornbach | High-price durable goods where local used listings and new alternatives are both meaningful. |
+| P2 | Cycling and outdoor | Decathlon, BikeXCS, PlayBike | Bikes and equipment have strong second-hand demand; keep full bikes separate from parts and accessories. |
+| P2 | Baby and children | Noriel, BabyNeeds, OLX/Vinted children categories | Parents frequently compare new and lightly used items; safety, age range, and completeness need dedicated relevance rules. |
+| P2 | Books, games, and collectibles | Cărturești, Libris, board-game specialists | ISBN, edition, language, and condition make a clean first sub-niche possible. |
+
+### Fashion follow-up
+
+- The new fashion group is query-routed: generic electronics, cars, and home queries do not trigger it.
+- Add fixtures for Sizeer and ePantofi first, then Fashion Days, Zalando, ABOUT YOU, Answear, and MODIVO.
+- Preserve brand, model/SKU when visible, colour, gender, size availability, and the current payable price. Do not rank an unavailable size or crossed-out price as the new benchmark.
 
 ## Reliability Work
 

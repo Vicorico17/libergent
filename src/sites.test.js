@@ -5,9 +5,12 @@ import {
   FREE_DEFAULT_SITE_KEYS,
   FREE_TECH_SITE_KEYS,
   PREMIUM_BROWSER_SITE_KEYS,
+  PREMIUM_FASHION_SITE_KEYS,
   PREMIUM_SITE_KEYS,
+  getPremiumSiteKeys,
   getSiteKeysForAllSearch,
   isCarQuery,
+  isFashionQuery,
   isRefurbishedTechQuery,
   SITES
 } from "./sites.js";
@@ -53,6 +56,16 @@ test("routes refurbished tech sources only for relevant Free searches", () => {
   assert.equal(isRefurbishedTechQuery("canapea extensibila"), false);
   assert.deepEqual(getSiteKeysForAllSearch("iphone 15 pro").slice(0, 2), ["flip.ro", "klap.ro"]);
   assert.equal(getSiteKeysForAllSearch("canapea extensibila").includes("flip.ro"), false);
+});
+
+test("routes fashion retail benchmarks only for fashion searches", () => {
+  assert.equal(isFashionQuery("adidas samba"), true);
+  assert.equal(isFashionQuery("rochie de seara"), true);
+  assert.equal(isFashionQuery("iphone 15 pro"), false);
+  assert.deepEqual(getPremiumSiteKeys("adidas samba").slice(-PREMIUM_FASHION_SITE_KEYS.length), PREMIUM_FASHION_SITE_KEYS);
+  assert.equal(getPremiumSiteKeys("iphone 15 pro").some((siteKey) => PREMIUM_FASHION_SITE_KEYS.includes(siteKey)), false);
+  assert.match(SITES["sizeer.ro"].searchUrl("adidas samba"), /querystring%5D=adidas%20samba/);
+  assert.equal(SITES["epantofi.ro"].searchUrl("adidas samba"), "https://epantofi.ro/s/adidas%20samba?q=adidas%20samba");
 });
 
 test("categorizes every registered marketplace into one access tier", () => {

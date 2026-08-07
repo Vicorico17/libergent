@@ -26,6 +26,7 @@ const BETA_FEATURES = [
 
 const PREMIUM_FEATURES = [
   "Mai multe magazine și marketplace-uri verificate",
+  "Retail fashion: Sizeer, ePantofi, Fashion Days, Zalando, ABOUT YOU, Answear și MODIVO",
   "Comparație extinsă de preț",
   "Recomandare mai sigură pentru bugetul tău",
   "Monitorizare și alerte automate",
@@ -323,7 +324,7 @@ export default function PricingPage() {
               </div>
 
               <p className="mb-4 text-[12px] leading-relaxed md:text-sm" style={{ color: `${INK}B3`, minHeight: 48 }}>
-                Mai multe oferte comparate pentru o decizie mai bună și mai multă încredere în prețul ales.
+                Include retaileri de fashion, sneakers și încălțăminte pentru un benchmark nou mai precis.
               </p>
 
               {/* Locked notice */}

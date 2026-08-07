@@ -86,7 +86,7 @@ export const FREE_DEFAULT_SITE_KEYS = [
 export const FREE_CAR_SITE_KEYS = ["autovit.ro", "bestauto.ro"];
 export const FREE_TECH_SITE_KEYS = ["flip.ro", "klap.ro"];
 
-export const PREMIUM_SITE_KEYS = [
+export const PREMIUM_CORE_SITE_KEYS = [
   "emag.ro",
   "evomag.ro",
   "cel.ro",
@@ -95,6 +95,18 @@ export const PREMIUM_SITE_KEYS = [
   "flanco.ro",
   "altex.ro"
 ];
+
+export const PREMIUM_FASHION_SITE_KEYS = [
+  "sizeer.ro",
+  "epantofi.ro",
+  "fashiondays.ro",
+  "zalando.ro",
+  "aboutyou.ro",
+  "answear.ro",
+  "modivo.ro"
+];
+
+export const PREMIUM_SITE_KEYS = [...PREMIUM_CORE_SITE_KEYS, ...PREMIUM_FASHION_SITE_KEYS];
 
 export const PREMIUM_BROWSER_SITE_KEYS = [
   "compari.ro",
@@ -106,6 +118,17 @@ export const PREMIUM_BROWSER_SITE_KEYS = [
 const REFURBISHED_TECH_KEYWORDS = [
   "telefon", "smartphone", "iphone", "samsung", "galaxy", "pixel", "xiaomi", "huawei",
   "tablet", "ipad", "laptop", "macbook", "smartwatch", "ceas"
+];
+
+const FASHION_KEYWORDS = [
+  "haine", "imbracaminte", "îmbrăcăminte", "rochie", "rochii", "fusta", "fustă", "fuste",
+  "bluza", "bluză", "bluze", "hanorac", "hanorace", "tricou", "tricouri", "camasa", "cămașă",
+  "camasi", "cămăși", "geaca", "geacă", "geci", "pantaloni", "blugi", "jeansi", "colanti",
+  "colanți", "trening", "sacou", "costum", "pantofi", "adidasi", "adidași", "sneakers",
+  "tenisi", "teniși", "ghete", "cizme", "sandale", "papuci", "bocanci", "balerini",
+  "geanta", "geantă", "genti", "genți", "rucsac", "portofel", "ochelari", "ceas", "curea",
+  "nike", "adidas", "jordan", "new balance", "puma", "reebok", "converse", "vans", "asics",
+  "skechers", "timberland", "birkenstock", "ugg", "zara", "h&m", "hm", "tommy", "levis"
 ];
 
 function getCarModelPathAlias(query) {
@@ -178,6 +201,21 @@ export function isRefurbishedTechQuery(query = "") {
     .replace(/[\u0300-\u036f]/g, "");
   const tokens = new Set(normalized.split(/[^a-z0-9]+/).filter(Boolean));
   return REFURBISHED_TECH_KEYWORDS.some((keyword) => tokens.has(keyword));
+}
+
+export function isFashionQuery(query = "") {
+  const normalized = normalizeMarketplaceQuery(query)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return FASHION_KEYWORDS.some((keyword) => normalized.includes(keyword.normalize("NFD").replace(/[\u0300-\u036f]/g, "")));
+}
+
+export function getPremiumSiteKeys(query = "") {
+  return [
+    ...PREMIUM_CORE_SITE_KEYS,
+    ...(isFashionQuery(query) ? PREMIUM_FASHION_SITE_KEYS : [])
+  ];
 }
 
 export const SITES = {
@@ -720,6 +758,183 @@ export const SITES = {
     },
     prompt(query, limit) {
       return buildBasePrompt("CEL.ro", query, limit, "This is a retailer search page. Keep only product cards with visible prices.");
+    }
+  },
+  "sizeer.ro": {
+    key: "sizeer.ro",
+    label: "Sizeer",
+    priority: 16,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 36,
+    maxPages: 1,
+    defaultLimit: 36,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://sizeer.ro/search?query%5Bmenu_item%5D=&query%5Bquerystring%5D=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) { return this.searchUrl(query); },
+    prompt(query, limit) {
+      return buildBasePrompt("Sizeer Romania", query, limit, "This is a sneaker and streetwear retailer. Keep purchasable product cards and prefer the current sale price over crossed-out or historical prices.");
+    }
+  },
+  "epantofi.ro": {
+    key: "epantofi.ro",
+    label: "ePantofi",
+    priority: 17,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 36,
+    maxPages: 1,
+    defaultLimit: 36,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      const encoded = encodeSearchText(query);
+      return `https://epantofi.ro/s/${encoded}?q=${encoded}`;
+    },
+    pagedSearchUrl(query) { return this.searchUrl(query); },
+    prompt(query, limit) {
+      return buildBasePrompt("ePantofi Romania", query, limit, "This is a footwear, bags, and accessories retailer. Keep purchasable product cards and their current payable price.");
+    }
+  },
+  "fashiondays.ro": {
+    key: "fashiondays.ro",
+    label: "Fashion Days",
+    priority: 18,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 36,
+    maxPages: 1,
+    defaultLimit: 36,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.fashiondays.ro/g/search/?q=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) { return this.searchUrl(query); },
+    prompt(query, limit) {
+      return buildBasePrompt("Fashion Days Romania", query, limit, "This is a fashion retailer. Keep purchasable fashion product cards, excluding campaign banners and category navigation.");
+    }
+  },
+  "zalando.ro": {
+    key: "zalando.ro",
+    label: "Zalando",
+    priority: 19,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 36,
+    maxPages: 1,
+    defaultLimit: 36,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.zalando.ro/catalog/?q=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) { return this.searchUrl(query); },
+    prompt(query, limit) {
+      return buildBasePrompt("Zalando Romania", query, limit, "This is a fashion retailer. Keep product cards with an in-stock current price; ignore editorial and navigation content.");
+    }
+  },
+  "aboutyou.ro": {
+    key: "aboutyou.ro",
+    label: "ABOUT YOU",
+    priority: 20,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 36,
+    maxPages: 1,
+    defaultLimit: 36,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://www.aboutyou.ro/suche?term=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) { return this.searchUrl(query); },
+    prompt(query, limit) {
+      return buildBasePrompt("ABOUT YOU Romania", query, limit, "This is a fashion retailer. Keep current purchasable product cards and exclude style-editorial cards.");
+    }
+  },
+  "answear.ro": {
+    key: "answear.ro",
+    label: "Answear",
+    priority: 21,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 36,
+    maxPages: 1,
+    defaultLimit: 36,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      return `https://answear.ro/k?search=${encodeSearchText(query)}`;
+    },
+    pagedSearchUrl(query) { return this.searchUrl(query); },
+    prompt(query, limit) {
+      return buildBasePrompt("Answear Romania", query, limit, "This is a fashion retailer. Keep purchasable product cards and their current price, not promotional tiles.");
+    }
+  },
+  "modivo.ro": {
+    key: "modivo.ro",
+    label: "MODIVO",
+    priority: 22,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 36,
+    maxPages: 1,
+    defaultLimit: 36,
+    defaultMaxPages: 1,
+    searchUrl(query) {
+      const encoded = encodeSearchText(query);
+      return `https://modivo.ro/s/${encoded}?q=${encoded}`;
+    },
+    pagedSearchUrl(query) { return this.searchUrl(query); },
+    prompt(query, limit) {
+      return buildBasePrompt("MODIVO Romania", query, limit, "This is a fashion retailer. Keep product cards with the current payable price and exclude filters and sponsored navigation.");
     }
   }
 
