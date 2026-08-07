@@ -3,7 +3,7 @@
 import { Fragment, Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ClipboardCheck, Crown, ExternalLink, Lock, MapPin, MessageSquare, ShieldCheck, Tag } from "lucide-react"
+import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ChevronDown as ChevronDownIcon, ClipboardCheck, Crown, ExternalLink, Lock, MapPin, MessageSquare, ShieldCheck, Tag } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import {
@@ -734,6 +734,30 @@ function DealQualitySummary({ item, compact = false }: { item: SearchResultItem;
   )
 }
 
+function LoaderExpandablePanel({ title, meta, accent = false, children }: { title: string; meta: string; accent?: boolean; children: ReactNode }) {
+  return (
+    <details
+      className="group"
+      data-testid={`loader-panel-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+      style={{ border: `1px solid ${INK}`, background: "white" }}
+    >
+      <summary
+        className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-[9px] font-bold uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+        style={{ background: accent ? PINK : MODAL_BG }}
+      >
+        <span>{title}</span>
+        <span className="flex items-center gap-2 text-right" style={{ color: `${INK}88` }}>
+          {meta}
+          <ChevronDownIcon size={13} className="flex-none transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+        </span>
+      </summary>
+      <div className="p-3 text-[9px] uppercase leading-relaxed" style={{ borderTop: `1px solid ${INK}`, background: "white" }}>
+        {children}
+      </div>
+    </details>
+  )
+}
+
 // — Loading Overlay —
 function LoadingOverlay({ progress, done, query, tier, isPremiumAccount }: { progress: number; done: boolean; query: string; tier: SearchTier; isPremiumAccount: boolean }) {
   const [tick, setTick] = useState(0)
@@ -763,6 +787,7 @@ function LoadingOverlay({ progress, done, query, tier, isPremiumAccount }: { pro
       ]
   const phaseIndex = done ? phases.length - 1 : progress < 32 ? 0 : progress < 64 ? 1 : progress < 88 ? 2 : 3
   const activePhase = phases[phaseIndex]
+  const activeFilterCount = [18, 48, 72].filter((threshold) => progress > threshold).length
   const premiumInsightIndex = Math.floor(tick / 6) % PREMIUM_WAITING_INSIGHTS.length
   const activeSources = [
     ...FREE_SOURCE_TIMING,
@@ -843,12 +868,56 @@ function LoadingOverlay({ progress, done, query, tier, isPremiumAccount }: { pro
             </div>
           </div>
 
+          {/* Compact interactive search details */}
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3 text-[9px] font-bold uppercase">
+              <span>Explorează căutarea</span>
+              <span style={{ color: `${INK}77` }}>deschide panourile</span>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <LoaderExpandablePanel title="Ce filtrăm" meta={`${activeFilterCount}/3 active`} accent={phaseIndex === 2}>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { label: "Potrivirea exactă cu produsul", active: progress > 18 },
+                    { label: "Duplicate, accesorii și rezultate greșite", active: progress > 48 },
+                    { label: "Prețuri suspecte și informații lipsă", active: progress > 72 },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center gap-2">
+                      <span style={{ color: item.active ? GREEN : `${INK}44` }}>{item.active ? "●" : "○"}</span>
+                      <span style={{ color: item.active ? INK : `${INK}66` }}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </LoaderExpandablePanel>
+
+              <LoaderExpandablePanel title="Cum alegem" meta={tier === "premium" ? "scor extins" : "scor relevanță"} accent={phaseIndex === 3}>
+                <ol className="flex flex-col gap-2">
+                  <li><strong>01.</strong> Produsul trebuie să corespundă intenției tale.</li>
+                  <li><strong>02.</strong> Comparăm prețul cu ofertele similare și produsul nou.</li>
+                  <li><strong>03.</strong> Punem mai sus ofertele verificabile, complete și apropiate.</li>
+                </ol>
+              </LoaderExpandablePanel>
+
+              <div className="sm:col-span-2">
+                <LoaderExpandablePanel title="Detalii sesiune" meta={`etapa ${phaseIndex + 1}/${phases.length}`}>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <span style={{ color: `${INK}66` }}>Căutare</span><strong className="truncate text-right">{query}</strong>
+                    <span style={{ color: `${INK}66` }}>Mod</span><strong className="text-right">{tier === "premium" ? "Premium" : "Free"}</strong>
+                    <span style={{ color: `${INK}66` }}>Surse pregătite</span><strong className="text-right">{activeSources.length + (tier === "premium" ? PREMIUM_SOURCES.length : 0)}</strong>
+                    <span style={{ color: `${INK}66` }}>Timp activ</span><strong className="text-right">{elapsedSeconds}s</strong>
+                  </div>
+                </LoaderExpandablePanel>
+              </div>
+            </div>
+          </div>
+
           {/* Expandable source progress */}
           <details className="group" style={{ border: `1px solid ${INK}`, background: "white" }}>
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-[10px] font-bold uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: tier === "premium" ? PINK : MODAL_BG }}>
               <span>{tier === "premium" ? "Unde caută Premium" : "Marketplace-uri verificate"}</span>
-              <span className="text-right" style={{ color: `${INK}99` }}>
+              <span className="flex items-center gap-2 text-right" style={{ color: `${INK}99` }}>
                 {activeSources.length + (tier === "premium" ? PREMIUM_SOURCES.length : 0)} surse · apasă pentru detalii
+                <ChevronDownIcon size={14} className="flex-none transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
               </span>
             </summary>
             <div className="flex flex-col gap-4 p-3 sm:p-4" style={{ borderTop: `1px solid ${INK}` }}>
