@@ -15,6 +15,11 @@ const DEFAULT_SAVED_SEARCHES_TABLE = "saved_searches";
 const DEFAULT_WHATSAPP_MESSAGES_TABLE = "whatsapp_messages";
 const DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE = "vehicle_price_observations";
 const DEFAULT_SHOP_SUGGESTIONS_TABLE = "shop_suggestions";
+const DEFAULT_USER_ENTITLEMENTS_TABLE = "user_entitlements";
+const DEFAULT_ALERT_PROFILES_TABLE = "alert_profiles";
+const DEFAULT_ALERT_LISTING_STATE_TABLE = "alert_listing_state";
+const DEFAULT_ALERT_EVENTS_TABLE = "alert_events";
+const DEFAULT_NOTIFICATION_DELIVERIES_TABLE = "notification_deliveries";
 
 function trimTrailingSlash(value = "") {
   return value.replace(/\/+$/, "");
@@ -37,12 +42,17 @@ function getSupabaseConfig(env = process.env) {
   const whatsappMessagesTable = normalizePublicRestTableName(env.SUPABASE_WHATSAPP_MESSAGES_TABLE, DEFAULT_WHATSAPP_MESSAGES_TABLE);
   const vehiclePriceObservationsTable = normalizePublicRestTableName(env.SUPABASE_VEHICLE_PRICE_OBSERVATIONS_TABLE, DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE);
   const shopSuggestionsTable = normalizePublicRestTableName(env.SUPABASE_SHOP_SUGGESTIONS_TABLE, DEFAULT_SHOP_SUGGESTIONS_TABLE);
+  const userEntitlementsTable = normalizePublicRestTableName(env.SUPABASE_USER_ENTITLEMENTS_TABLE, DEFAULT_USER_ENTITLEMENTS_TABLE);
+  const alertProfilesTable = normalizePublicRestTableName(env.SUPABASE_ALERT_PROFILES_TABLE, DEFAULT_ALERT_PROFILES_TABLE);
+  const alertListingStateTable = normalizePublicRestTableName(env.SUPABASE_ALERT_LISTING_STATE_TABLE, DEFAULT_ALERT_LISTING_STATE_TABLE);
+  const alertEventsTable = normalizePublicRestTableName(env.SUPABASE_ALERT_EVENTS_TABLE, DEFAULT_ALERT_EVENTS_TABLE);
+  const notificationDeliveriesTable = normalizePublicRestTableName(env.SUPABASE_NOTIFICATION_DELIVERIES_TABLE, DEFAULT_NOTIFICATION_DELIVERIES_TABLE);
 
   if (!url || !apiKey) {
     return null;
   }
 
-  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable, vehiclePriceObservationsTable, shopSuggestionsTable };
+  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable, vehiclePriceObservationsTable, shopSuggestionsTable, userEntitlementsTable, alertProfilesTable, alertListingStateTable, alertEventsTable, notificationDeliveriesTable };
 }
 
 function getRequestHeaders(apiKey) {
@@ -367,6 +377,143 @@ export async function readVehiclePriceHistoryFromSupabase(listingUrl, env = proc
     priceChangeRon: latest.priceRon - initial.priceRon,
     priceChangePct: initial.priceRon ? Math.round(((latest.priceRon - initial.priceRon) / initial.priceRon) * 1000) / 10 : null
   };
+}
+
+export async function readPremiumEntitlement(userId, email = "", env = process.env) {
+  const allowlist = String(env.LIBERGENT_PREMIUM_EMAILS || "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+  if (email && allowlist.includes(String(email).toLowerCase())) return { active: true, plan: "premium", source: "allowlist" };
+  if (env.LIBERGENT_PREMIUM_ALERTS_BETA === "1") return { active: true, plan: "premium", source: "beta" };
+  const config = getSupabaseConfig(env);
+  if (!config || !userId) return { active: false, plan: "free", source: "none" };
+  const query = new URLSearchParams({
+    select: "plan,status,expires_at",
+    user_id: `eq.${userId}`,
+    limit: "1"
+  });
+  const rows = await requestSupabase(`${config.userEntitlementsTable}?${query.toString()}`, { method: "GET" }, env);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  const unexpired = !row?.expires_at || new Date(row.expires_at).getTime() > Date.now();
+  return { active: row?.plan === "premium" && row?.status === "active" && unexpired, plan: row?.plan || "free", source: "database", expiresAt: row?.expires_at || null };
+}
+
+export async function listAlertProfilesFromSupabase(userId, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return [];
+  const query = new URLSearchParams({ select: "*", user_id: `eq.${userId}`, order: "created_at.desc", limit: "100" });
+  const rows = await requestSupabase(`${config.alertProfilesTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function createAlertProfileInSupabase(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const rows = await requestSupabase(config.alertProfilesTable, {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      user_id: entry.userId,
+      email: String(entry.email || "").toLowerCase(),
+      query: entry.query,
+      criteria: entry.criteria || {},
+      events: entry.events || {},
+      frequency: entry.frequency || "daily",
+      channel: entry.channel || "email_and_in_app",
+      status: entry.status || "active",
+      next_check_at: new Date().toISOString()
+    })
+  }, env);
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
+export async function updateAlertProfileInSupabase({ id, userId, changes }, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ id: `eq.${id}`, user_id: `eq.${userId}` });
+  const rows = await requestSupabase(`${config.alertProfilesTable}?${query.toString()}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ ...changes, updated_at: new Date().toISOString() })
+  }, env);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+export async function deleteAlertProfileInSupabase({ id, userId }, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return false;
+  const query = new URLSearchParams({ id: `eq.${id}`, user_id: `eq.${userId}` });
+  await requestSupabase(`${config.alertProfilesTable}?${query.toString()}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }, env);
+  return true;
+}
+
+export async function listAlertEventsFromSupabase(userId, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return [];
+  const query = new URLSearchParams({ select: "*", user_id: `eq.${userId}`, order: "created_at.desc", limit: "100" });
+  const rows = await requestSupabase(`${config.alertEventsTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function markAlertEventReadInSupabase({ id, userId }, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return false;
+  const query = new URLSearchParams({ id: `eq.${id}`, user_id: `eq.${userId}` });
+  await requestSupabase(`${config.alertEventsTable}?${query.toString()}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ read_at: new Date().toISOString() }) }, env);
+  return true;
+}
+
+export async function listDueAlertProfilesFromSupabase({ limit = 20 } = {}, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return [];
+  const query = new URLSearchParams({ select: "*", status: "eq.active", next_check_at: `lte.${new Date().toISOString()}`, order: "next_check_at.asc", limit: String(limit) });
+  const rows = await requestSupabase(`${config.alertProfilesTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function listAlertListingStatesFromSupabase(alertId, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return [];
+  const query = new URLSearchParams({ select: "*", alert_id: `eq.${alertId}`, limit: "1000" });
+  const rows = await requestSupabase(`${config.alertListingStateTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function upsertAlertListingStatesInSupabase(alertId, listings, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config || !listings.length) return false;
+  const now = new Date().toISOString();
+  const rows = listings.map((item) => ({
+    alert_id: alertId,
+    listing_url: item.url,
+    latest_price_ron: Math.round(Number(item.priceRon ?? item.numericPrice ?? item.price)),
+    last_seen_at: now,
+    snapshot: item
+  }));
+  await requestSupabase(`${config.alertListingStateTable}?on_conflict=alert_id,listing_url`, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(rows) }, env);
+  return true;
+}
+
+export async function insertAlertEventsInSupabase(profile, events, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config || !events.length) return [];
+  const rows = events.map((event) => ({ alert_id: profile.id, user_id: profile.user_id, event_type: event.type, event_key: event.eventKey, listing_url: event.listingUrl, payload: event.payload }));
+  const inserted = await requestSupabase(`${config.alertEventsTable}?on_conflict=event_key`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify(rows) }, env);
+  return Array.isArray(inserted) ? inserted : [];
+}
+
+export async function recordNotificationDeliveryInSupabase(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return false;
+  await requestSupabase(config.notificationDeliveriesTable, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ event_id: entry.eventId, user_id: entry.userId, channel: entry.channel, status: entry.status, provider_message_id: entry.providerMessageId || "", error: entry.error || "", sent_at: entry.status === "sent" ? new Date().toISOString() : null }) }, env);
+  return true;
+}
+
+export async function completeAlertProfileCheck(id, frequency = "daily", error = "", env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return false;
+  const delayMs = frequency === "immediate" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  const query = new URLSearchParams({ id: `eq.${id}` });
+  await requestSupabase(`${config.alertProfilesTable}?${query.toString()}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ last_checked_at: new Date().toISOString(), next_check_at: new Date(Date.now() + delayMs).toISOString(), last_error: error, updated_at: new Date().toISOString() }) }, env);
+  return true;
 }
 
 export async function insertWhatsAppInboundToSupabase(entry, env = process.env) {

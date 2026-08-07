@@ -312,6 +312,9 @@ Counts vary by query and source availability. Failed marketplaces remain represe
 | `GET /api/history` | Aggregated search history and trends |
 | `POST /api/leads` | Email lead capture |
 | `POST /api/saved-searches` | Saved-search subscription data |
+| `GET/POST /api/alerts` | Authenticated Premium alert profiles and inbox |
+| `PATCH/DELETE /api/alerts/:id` | Pause, resume, or delete a Premium alert |
+| `PATCH /api/alerts/events/:id` | Mark an in-account alert event as read |
 | `GET /api/marketplace/details` | Lazy listing enrichment |
 | `GET /api/marketplace/contact` | Supported listing contact lookup |
 | `POST /api/feedback` | Offer feedback |
@@ -331,7 +334,14 @@ SUPABASE_URL=...
 SUPABASE_SECRET_KEY=...
 SUPABASE_SEARCH_EVENTS_TABLE=search_events
 SUPABASE_EMAIL_LEADS_TABLE=email_leads
+SUPABASE_USER_ENTITLEMENTS_TABLE=user_entitlements
+SUPABASE_ALERT_PROFILES_TABLE=alert_profiles
+SUPABASE_ALERT_LISTING_STATE_TABLE=alert_listing_state
+SUPABASE_ALERT_EVENTS_TABLE=alert_events
+SUPABASE_NOTIFICATION_DELIVERIES_TABLE=notification_deliveries
 ```
+
+Premium alerts run from the hourly Cloudflare cron. A new alert's first scan creates its baseline without notifying for old inventory; later scans can produce `new_strong_match`, `price_drop`, and `better_than_shortlist` events. Events always appear in the account inbox. Email is additionally delivered when `ALERT_EMAIL_WEBHOOK_URL` is configured. Premium access is read from `user_entitlements`; `LIBERGENT_PREMIUM_EMAILS` can allow selected beta testers before billing is connected.
 
 Run the relevant SQL files in `supabase/` before enabling these features. Use the unqualified table name `email_leads`, not `public.email_leads`, in `SUPABASE_EMAIL_LEADS_TABLE`.
 
@@ -375,6 +385,7 @@ Production deployment is also automated by [.github/workflows/deploy-cloudflare.
 
 ## Project documents
 
+- [Premium alerts and billing TODO](docs/premium-alerts-todo.md)
 - [Marketplace integration TODO](docs/marketplace-integration-todo.md)
 - [Classified marketplace feature plan](docs/classified-marketplace-feature-plan.md)
 - [Search E2E QA](docs/lib-23-qa-website-search-e2e.md)

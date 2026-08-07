@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadEnv } from "./env.js";
 import { runMarketplaceHealthChecks } from "./health.js";
+import { runShopValidation } from "./shop-validation.js";
 import { searchAcrossSites } from "./app.js";
 import { getSite, getSiteKeysForAllSearch, SITES } from "./sites.js";
 import { formatRon } from "./normalize.js";
@@ -16,6 +17,7 @@ Usage:
   node src/cli.js search --site <site> --query "<text>" [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 150] [--pages 3] [--out results/file.json]
   node src/cli.js search --site all --query "<text>" [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 150] [--pages 3] [--out results/file.json]
   node src/cli.js health --query "iphone 15 pro" [--provider ${SEARCH_PROVIDERS.join("|")}]
+  node src/cli.js validate-shops [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 3] [--niche fashion]
   npm run search:live -- --query "<text>"
 
 Supported sites:
@@ -262,6 +264,23 @@ async function main() {
     const provider = normalizeSearchProvider(args.provider || "auto");
     const payload = await runMarketplaceHealthChecks({ query, provider });
     console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+
+  if (command === "validate-shops") {
+    const provider = normalizeSearchProvider(args.provider || "direct");
+    const limit = Number.parseInt(args.limit || "3", 10);
+    if (!Number.isFinite(limit) || limit <= 0) throw new Error("Expected --limit to be a positive integer");
+    const report = await runShopValidation({ provider, limit, maxPages: 1, niches: args.niche });
+    const output = JSON.stringify(report, null, 2);
+    if (args.out) {
+      const outputPath = path.resolve(process.cwd(), args.out);
+      ensureDirForFile(outputPath);
+      fs.writeFileSync(outputPath, `${output}\n`, "utf8");
+      console.log(`Wrote ${outputPath}`);
+    } else {
+      console.log(output);
+    }
     return;
   }
 

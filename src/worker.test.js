@@ -73,6 +73,47 @@ test("allows Premium testing without a token and requires Browser Run", async ()
   assert.match(payload.error, /browser run/i);
 });
 
+test("keeps automatic alerts behind Premium entitlement", async (t) => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    if (requestUrl === "https://supabase.example/auth/v1/user") return new Response(JSON.stringify({ id: "user-free", email: "free@example.test" }), { status: 200 });
+    if (requestUrl.includes("/rest/v1/user_entitlements")) return new Response("[]", { status: 200 });
+    return new Response("[]", { status: 200 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const response = await worker.fetch(new Request("https://libergent.test/api/alerts", { headers: { authorization: "Bearer user-token" } }), {
+    SUPABASE_URL: "https://supabase.example",
+    SUPABASE_SECRET_KEY: "service-secret"
+  });
+  const payload = await response.json();
+  assert.equal(response.status, 403);
+  assert.equal(payload.code, "premium_required");
+});
+
+test("returns Premium alert profiles and inbox events for entitled users", async (t) => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    if (requestUrl === "https://supabase.example/auth/v1/user") return new Response(JSON.stringify({ id: "user-premium", email: "premium@example.test" }), { status: 200 });
+    if (requestUrl.includes("/rest/v1/alert_profiles")) return new Response(JSON.stringify([{ id: "alert-1", query: "BMW 320d", status: "active" }]), { status: 200 });
+    if (requestUrl.includes("/rest/v1/alert_events")) return new Response(JSON.stringify([{ id: "event-1", event_type: "price_drop" }]), { status: 200 });
+    return new Response("[]", { status: 200 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const response = await worker.fetch(new Request("https://libergent.test/api/alerts", { headers: { authorization: "Bearer user-token" } }), {
+    SUPABASE_URL: "https://supabase.example",
+    SUPABASE_SECRET_KEY: "service-secret",
+    LIBERGENT_PREMIUM_EMAILS: "premium@example.test"
+  });
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.alerts[0].id, "alert-1");
+  assert.equal(payload.events[0].event_type, "price_drop");
+});
+
 test("Premium search skips Browser Run when direct marketplace results are usable", async (t) => {
   const originalMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
   t.after(() => {

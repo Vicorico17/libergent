@@ -4,6 +4,10 @@ Date: 2026-05-13 (UTC)
 Branch: chore/lib-23-qa-search-e2e
 Scope: Manual end-to-end verification of website search API flow and aggregation behavior.
 
+> Superseded as an active roadmap item by the search-engine rebuild. This is retained
+> as historical QA evidence only: current regression tests cover a non-null qualifying
+> `bestOffer` and reject conflicting phone variants such as `Pro` versus `Pro Max`.
+
 ## Environment
 
 - Repo: `https://github.com/Vicorico17/libergent`
@@ -49,7 +53,7 @@ Scope: Manual end-to-end verification of website search API flow and aggregation
 - Impact: recommendation quality may drift for users searching exact device trims.
 - Suggested fix: tighten token weighting or add negative weighting for conflicting variant tokens in relevance scorer.
 
-## Recommendation
+## Historical recommendation
 
-- Treat finding #1 as next engineering fix before claiming recommendation UX is complete.
-- Keep this QA issue as complete once follow-up implementation issue(s) are linked and assigned.
+The recommendations below applied to the pre-rebuild implementation and are complete;
+they must not be carried into the current roadmap.

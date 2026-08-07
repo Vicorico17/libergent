@@ -23,6 +23,16 @@ export type AccountAlertRecord = {
   enabled: boolean;
   createdAt: string;
   syncStatus: "synced" | "local";
+  frequency?: "daily" | "immediate";
+  criteria?: {
+    priceMaxRon?: number | null;
+    yearFrom?: number | null;
+    mileageMaxKm?: number | null;
+    location?: string;
+    radiusKm?: number | null;
+  };
+  lastCheckedAt?: string;
+  lastError?: string;
 };
 
 export type AccountActivityRecord = {

@@ -98,6 +98,66 @@ create table if not exists public.vehicle_price_observations (
   unique (listing_url, observed_day)
 );
 
+create table if not exists public.user_entitlements (
+  user_id uuid primary key,
+  plan text not null default 'free' check (plan in ('free', 'premium')),
+  status text not null default 'active' check (status in ('active', 'past_due', 'cancelled')),
+  expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.alert_profiles (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  email text not null,
+  query text not null,
+  criteria jsonb not null default '{}'::jsonb,
+  events jsonb not null default '{}'::jsonb,
+  frequency text not null default 'daily' check (frequency in ('daily', 'immediate')),
+  channel text not null default 'email_and_in_app',
+  status text not null default 'active' check (status in ('active', 'paused')),
+  last_checked_at timestamptz,
+  next_check_at timestamptz not null default now(),
+  last_error text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.alert_listing_state (
+  alert_id uuid not null references public.alert_profiles(id) on delete cascade,
+  listing_url text not null,
+  latest_price_ron numeric not null,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  snapshot jsonb not null default '{}'::jsonb,
+  primary key (alert_id, listing_url)
+);
+
+create table if not exists public.alert_events (
+  id uuid primary key default gen_random_uuid(),
+  alert_id uuid not null references public.alert_profiles(id) on delete cascade,
+  user_id uuid not null,
+  event_type text not null check (event_type in ('new_strong_match', 'price_drop', 'better_than_shortlist')),
+  event_key text not null unique,
+  listing_url text not null,
+  payload jsonb not null default '{}'::jsonb,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.notification_deliveries (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references public.alert_events(id) on delete cascade,
+  user_id uuid not null,
+  channel text not null,
+  status text not null check (status in ('queued', 'sent', 'failed', 'skipped')),
+  provider_message_id text not null default '',
+  error text not null default '',
+  sent_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 alter table public.email_leads
   drop constraint if exists email_leads_email_check,
   drop constraint if exists email_leads_email_format_check;
@@ -113,6 +173,11 @@ alter table public.email_leads
 
 alter table public.email_leads enable row level security;
 alter table public.saved_searches enable row level security;
+alter table public.user_entitlements enable row level security;
+alter table public.alert_profiles enable row level security;
+alter table public.alert_listing_state enable row level security;
+alter table public.alert_events enable row level security;
+alter table public.notification_deliveries enable row level security;
 
 create index if not exists search_events_searched_at_idx
   on public.search_events (searched_at desc);
@@ -152,6 +217,11 @@ create index if not exists saved_searches_notifications_idx
 
 create index if not exists vehicle_price_observations_listing_date_idx
   on public.vehicle_price_observations (listing_url, observed_at asc);
+
+create index if not exists alert_profiles_due_idx on public.alert_profiles (status, next_check_at);
+create index if not exists alert_profiles_user_idx on public.alert_profiles (user_id, created_at desc);
+create index if not exists alert_events_user_idx on public.alert_events (user_id, created_at desc);
+create index if not exists notification_deliveries_user_idx on public.notification_deliveries (user_id, created_at desc);
 
 create or replace function public.log_search_event(
   query_value text,
@@ -236,6 +306,16 @@ revoke all on table public.email_leads from anon, authenticated;
 grant all on table public.email_leads to service_role;
 revoke all on table public.saved_searches from anon, authenticated;
 grant all on table public.saved_searches to service_role;
+revoke all on table public.user_entitlements from anon, authenticated;
+revoke all on table public.alert_profiles from anon, authenticated;
+revoke all on table public.alert_listing_state from anon, authenticated;
+revoke all on table public.alert_events from anon, authenticated;
+revoke all on table public.notification_deliveries from anon, authenticated;
+grant all on table public.user_entitlements to service_role;
+grant all on table public.alert_profiles to service_role;
+grant all on table public.alert_listing_state to service_role;
+grant all on table public.alert_events to service_role;
+grant all on table public.notification_deliveries to service_role;
 grant execute on function public.log_search_event(
   text,
   text,

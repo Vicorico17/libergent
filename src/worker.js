@@ -6,7 +6,8 @@ import { runMarketplaceHealthChecks } from "./health.js";
 import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
-import { findWhatsAppConversationOwner, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listShopSuggestionsFromSupabase, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, updateShopSuggestionStatusInSupabase } from "./supabase.js";
+import { buildAlertEvents, MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
+import { completeAlertProfileCheck, createAlertProfileInSupabase, deleteAlertProfileInSupabase, findWhatsAppConversationOwner, insertAlertEventsInSupabase, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertListingStatesFromSupabase, listAlertProfilesFromSupabase, listDueAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, readPremiumEntitlement, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, recordNotificationDeliveryInSupabase, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase, upsertAlertListingStatesInSupabase } from "./supabase.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getDefaultSiteKeys, getPremiumSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
@@ -419,6 +420,106 @@ async function persistVehiclePriceHistory(results, env) {
   }
 }
 
+function escapeHtml(value = "") {
+  return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
+}
+
+async function deliverAlertEmail(profile, event, env) {
+  if (!env.ALERT_EMAIL_WEBHOOK_URL) return { status: "skipped", error: "ALERT_EMAIL_WEBHOOK_URL is not configured." };
+  const payload = event.payload || {};
+  const subject = event.event_type === "price_drop" ? `Preț redus: ${payload.title}` : `Alertă LiberGent: ${payload.title}`;
+  const listingUrl = event.listing_url;
+  const response = await fetch(env.ALERT_EMAIL_WEBHOOK_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(env.ALERT_EMAIL_WEBHOOK_TOKEN ? { authorization: `Bearer ${env.ALERT_EMAIL_WEBHOOK_TOKEN}` } : {})
+    },
+    body: JSON.stringify({
+      to: profile.email,
+      subject,
+      text: `${payload.reason || "Am găsit o schimbare relevantă."}\n${payload.title || ""}\n${payload.priceRon ? `${payload.priceRon} RON` : ""}\n${listingUrl}`,
+      html: `<h1>${escapeHtml(payload.title || "Alertă LiberGent")}</h1><p>${escapeHtml(payload.reason || "Am găsit o schimbare relevantă.")}</p><p><strong>${escapeHtml(payload.priceRon ? `${payload.priceRon} RON` : "")}</strong></p><p><a href="${escapeHtml(listingUrl)}">Vezi oferta</a></p><p>Poți pune alerta pe pauză din contul LiberGent.</p>`,
+      metadata: { alertId: profile.id, eventId: event.id, eventType: event.event_type }
+    })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) return { status: "failed", error: result.error || `Email webhook failed (${response.status}).` };
+  return { status: "sent", providerMessageId: result.id || result.messageId || "" };
+}
+
+async function deliverAlertDigest(profile, events, env) {
+  if (!env.ALERT_EMAIL_WEBHOOK_URL) return { status: "skipped", error: "ALERT_EMAIL_WEBHOOK_URL is not configured." };
+  const items = events.map((event) => event.payload || {});
+  const response = await fetch(env.ALERT_EMAIL_WEBHOOK_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...(env.ALERT_EMAIL_WEBHOOK_TOKEN ? { authorization: `Bearer ${env.ALERT_EMAIL_WEBHOOK_TOKEN}` } : {}) },
+    body: JSON.stringify({
+      to: profile.email,
+      subject: `${events.length} schimbări în alerta „${profile.query}”`,
+      text: items.map((item, index) => `${index + 1}. ${item.title || "Ofertă"} — ${item.reason || "schimbare relevantă"}`).join("\n"),
+      html: `<h1>${escapeHtml(profile.query)}</h1><p>${events.length} schimbări relevante:</p><ol>${events.map((event) => `<li><a href="${escapeHtml(event.listing_url)}">${escapeHtml(event.payload?.title || "Ofertă")}</a> — ${escapeHtml(event.payload?.reason || "schimbare relevantă")}</li>`).join("")}</ol><p>Poți gestiona alerta din contul LiberGent.</p>`,
+      metadata: { alertId: profile.id, eventIds: events.map((event) => event.id), digest: true }
+    })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) return { status: "failed", error: result.error || `Email webhook failed (${response.status}).` };
+  return { status: "sent", providerMessageId: result.id || result.messageId || "" };
+}
+
+async function runAlertProfile(profile, env) {
+  const entitlement = await readPremiumEntitlement(profile.user_id, profile.email, env);
+  if (!entitlement.active) {
+    await updateAlertProfileInSupabase({ id: profile.id, userId: profile.user_id, changes: { status: "paused", last_error: "Premium entitlement is inactive." } }, env);
+    return { id: profile.id, status: "paused", events: 0 };
+  }
+
+  try {
+    const payload = await searchAcrossSites({ query: profile.query, provider: "direct", limit: 80, maxPages: 1, siteKeys: ["autovit.ro", "bestauto.ro"] });
+    const listings = (payload.results || []).flatMap((result) => result?.items || []);
+    const states = await listAlertListingStatesFromSupabase(profile.id, env);
+    const stateMap = new Map(states.map((state) => [state.listing_url, state]));
+    const normalizedProfile = { ...profile, criteria: profile.criteria || {}, events: profile.events || {} };
+    const evaluated = buildAlertEvents(normalizedProfile, listings, stateMap);
+    const eventsToInsert = profile.last_checked_at ? evaluated.events : [];
+    const insertedEvents = await insertAlertEventsInSupabase(profile, eventsToInsert, env);
+    await upsertAlertListingStatesInSupabase(profile.id, evaluated.matching, env);
+
+    if (insertedEvents.length && profile.frequency === "daily") {
+      const delivery = await deliverAlertDigest(profile, insertedEvents, env).catch((error) => ({ status: "failed", error: error instanceof Error ? error.message : String(error) }));
+      for (const event of insertedEvents) await recordNotificationDeliveryInSupabase({ eventId: event.id, userId: profile.user_id, channel: "email", ...delivery }, env);
+    } else {
+      for (const event of insertedEvents) {
+        const delivery = await deliverAlertEmail(profile, event, env).catch((error) => ({ status: "failed", error: error instanceof Error ? error.message : String(error) }));
+        await recordNotificationDeliveryInSupabase({ eventId: event.id, userId: profile.user_id, channel: "email", ...delivery }, env);
+      }
+    }
+
+    await completeAlertProfileCheck(profile.id, profile.frequency, "", env);
+    return { id: profile.id, status: "checked", listings: evaluated.matching.length, events: insertedEvents.length };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await completeAlertProfileCheck(profile.id, profile.frequency, message, env);
+    return { id: profile.id, status: "failed", error: message, events: 0 };
+  }
+}
+
+async function runDuePremiumAlerts(env) {
+  if (!isSupabaseConfigured(env)) return { checked: 0, results: [] };
+  const profiles = await listDueAlertProfilesFromSupabase({ limit: 20 }, env);
+  const results = [];
+  for (const profile of profiles) results.push(await runAlertProfile(profile, env));
+  return { checked: profiles.length, results };
+}
+
+async function authenticatePremiumAlertUser(request, env) {
+  const auth = await authenticateSupabaseUser(request, env);
+  if (!auth.user) return { response: json({ error: auth.error }, auth.status) };
+  const entitlement = await readPremiumEntitlement(auth.user.id, auth.user.email || "", env).catch(() => ({ active: false, plan: "free" }));
+  if (!entitlement.active) return { response: json({ error: "Alertele automate sunt disponibile în Premium.", code: "premium_required" }, 403) };
+  return { user: auth.user, entitlement };
+}
+
 async function readRequestTextWithLimit(request, maxBytes) {
   const contentLength = Number.parseInt(request.headers.get("content-length") || "", 10);
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
@@ -784,6 +885,63 @@ async function handleApi(request, env, context) {
         : 500;
       return json({ error: message }, statusCode);
     }
+  }
+
+  if (apiPath === "/api/alerts" || apiPath.startsWith("/api/alerts/")) {
+    const premium = await authenticatePremiumAlertUser(request, env);
+    if (premium.response) return premium.response;
+    const userId = premium.user.id;
+    const eventMatch = apiPath.match(/^\/api\/alerts\/events(?:\/([^/]+))?$/);
+    if (eventMatch) {
+      if (request.method === "GET" && !eventMatch[1]) return json({ ok: true, events: await listAlertEventsFromSupabase(userId, env) }, 200);
+      if (request.method === "PATCH" && eventMatch[1]) {
+        await markAlertEventReadInSupabase({ id: decodeURIComponent(eventMatch[1]), userId }, env);
+        return json({ ok: true }, 200);
+      }
+      return json({ error: "Method not allowed" }, 405);
+    }
+
+    const profileMatch = apiPath.match(/^\/api\/alerts\/([^/]+)$/);
+    if (request.method === "GET" && apiPath === "/api/alerts") {
+      const [alerts, events] = await Promise.all([listAlertProfilesFromSupabase(userId, env), listAlertEventsFromSupabase(userId, env)]);
+      return json({ ok: true, entitlement: premium.entitlement, alerts, events }, 200);
+    }
+    if (request.method === "POST" && apiPath === "/api/alerts") {
+      const parsedBody = await parseJsonRequest(request);
+      if (parsedBody.error) return json({ error: parsedBody.error }, 400);
+      try {
+        const existing = await listAlertProfilesFromSupabase(userId, env);
+        if (existing.filter((alert) => alert.status === "active").length >= MAX_ACTIVE_ALERTS) return json({ error: `Planul Premium permite maximum ${MAX_ACTIVE_ALERTS} alerte active.` }, 409);
+        const profile = normalizeAlertProfile(parsedBody.data || {});
+        const created = await createAlertProfileInSupabase({ ...profile, userId, email: premium.user.email || "" }, env);
+        return json({ ok: true, alert: created }, 201);
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
+    }
+    if (profileMatch && request.method === "PATCH") {
+      const parsedBody = await parseJsonRequest(request);
+      if (parsedBody.error) return json({ error: parsedBody.error }, 400);
+      const body = parsedBody.data || {};
+      const changes = {};
+      if (["active", "paused"].includes(body.status)) changes.status = body.status;
+      if (["daily", "immediate"].includes(body.frequency)) changes.frequency = body.frequency;
+      if (body.events && typeof body.events === "object") changes.events = body.events;
+      if (!Object.keys(changes).length) return json({ error: "No supported alert changes supplied." }, 400);
+      const updated = await updateAlertProfileInSupabase({ id: decodeURIComponent(profileMatch[1]), userId, changes }, env);
+      return updated ? json({ ok: true, alert: updated }, 200) : json({ error: "Alert not found." }, 404);
+    }
+    if (profileMatch && request.method === "DELETE") {
+      await deleteAlertProfileInSupabase({ id: decodeURIComponent(profileMatch[1]), userId }, env);
+      return json({ ok: true }, 200);
+    }
+    return json({ error: "Method not allowed" }, 405);
+  }
+
+  if (apiPath === "/api/admin/alerts/run") {
+    if (!isAuthorizedAdminRequest(request, url, env)) return json({ error: "Unauthorized" }, 401);
+    if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    return json({ ok: true, ...(await runDuePremiumAlerts(env)) }, 200);
   }
 
   if (apiPath === "/api/saved-searches" || apiPath === "/api/saved_searches") {
@@ -1199,5 +1357,9 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
+  },
+  async scheduled(_controller, env, context) {
+    applyEnv(env);
+    context.waitUntil(runDuePremiumAlerts(env));
   }
 };

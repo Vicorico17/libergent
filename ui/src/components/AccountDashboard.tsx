@@ -50,6 +50,15 @@ type SellerConversation = {
   messages: ConversationMessage[];
 };
 
+type AlertEvent = {
+  id: string;
+  event_type: "new_strong_match" | "price_drop" | "better_than_shortlist";
+  listing_url: string;
+  payload: { title?: string; priceRon?: number; reason?: string; source?: string };
+  read_at?: string | null;
+  created_at: string;
+};
+
 const STATUS_LABELS: Record<string, string> = {
   contacted: "Contactat",
   replied: "A răspuns",
@@ -109,6 +118,13 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
   const [conversationError, setConversationError] = useState("");
   const [alertQuery, setAlertQuery] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
+  const [alertPriceMax, setAlertPriceMax] = useState("");
+  const [alertYearFrom, setAlertYearFrom] = useState("");
+  const [alertMileageMax, setAlertMileageMax] = useState("");
+  const [alertLocation, setAlertLocation] = useState("");
+  const [alertFrequency, setAlertFrequency] = useState<"daily" | "immediate">("daily");
+  const [alertEvents, setAlertEvents] = useState<AlertEvent[]>([]);
+  const [alertAccess, setAlertAccess] = useState<"loading" | "premium" | "required" | "error">("loading");
   const [signingOut, setSigningOut] = useState(false);
   const selectedConversation = conversations.find((item) => item.id === selectedConversationId) || conversations[0] || null;
 
@@ -119,6 +135,39 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
       setActivity(readAccountActivity(account.userId));
     });
   }, [account.userId]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadAlerts() {
+      const supabase = getSupabaseBrowserClient();
+      const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+      if (!session?.access_token) return;
+      try {
+        const response = await fetch("/api/alerts", { headers: { authorization: `Bearer ${session.access_token}` } });
+        const payload = await response.json().catch(() => ({}));
+        if (!active) return;
+        if (response.status === 403 && payload.code === "premium_required") {
+          setAlertAccess("required");
+          return;
+        }
+        if (!response.ok) throw new Error(payload.error || "Alertele nu au putut fi încărcate.");
+        const mapped = (Array.isArray(payload.alerts) ? payload.alerts : []).map((alert: Record<string, unknown>) => ({
+          id: String(alert.id || ""), query: String(alert.query || ""), email: String(alert.email || account.email || ""),
+          enabled: alert.status === "active", createdAt: String(alert.created_at || new Date().toISOString()), syncStatus: "synced" as const,
+          frequency: alert.frequency === "immediate" ? "immediate" as const : "daily" as const,
+          criteria: (alert.criteria || {}) as AccountAlertRecord["criteria"], lastCheckedAt: String(alert.last_checked_at || ""), lastError: String(alert.last_error || "")
+        }));
+        setAlerts(mapped);
+        writeAccountAlerts(account.userId, mapped);
+        setAlertEvents(Array.isArray(payload.events) ? payload.events : []);
+        setAlertAccess("premium");
+      } catch {
+        if (active) setAlertAccess("error");
+      }
+    }
+    loadAlerts();
+    return () => { active = false; };
+  }, [account.email, account.userId]);
 
   useEffect(() => {
     let active = true;
@@ -176,27 +225,53 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
   async function createAlert(event: FormEvent) {
     event.preventDefault();
     const query = alertQuery.trim();
-    if (!query || !account.email) return;
-    const createdAt = new Date().toISOString();
-    const id = `${query.toLowerCase()}:${createdAt}`;
-    const localAlert: AccountAlertRecord = { id, query, email: account.email, enabled: true, createdAt, syncStatus: "local" };
-    updateAlerts([localAlert, ...alerts]);
-    setAlertQuery("");
-    setAlertMessage("Alerta a fost salvată în cont. Verificăm sincronizarea notificărilor...");
+    if (!query || !account.email || alertAccess !== "premium") return;
+    setAlertMessage("Salvăm monitorizarea Premium...");
     try {
-      const response = await fetch("/api/saved-searches", {
+      const supabase = getSupabaseBrowserClient();
+      const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+      if (!session?.access_token) throw new Error("Sesiunea a expirat.");
+      const response = await fetch("/api/alerts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: account.email, query, source: "account_alert", pagePath: "/account", notificationsEnabled: true }),
+        headers: { "Content-Type": "application/json", authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          query,
+          criteria: { priceMaxRon: alertPriceMax, yearFrom: alertYearFrom, mileageMaxKm: alertMileageMax, location: alertLocation },
+          events: { newStrongMatch: true, priceDrop: true, betterThanShortlist: true },
+          frequency: alertFrequency
+        }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.ok) throw new Error(payload.error || "Serviciul de alerte nu este conectat încă.");
-      const synced = [localAlert, ...alerts].map((alert) => alert.id === id ? { ...alert, syncStatus: "synced" as const } : alert);
-      updateAlerts(synced);
-      setAlertMessage("Alerta este sincronizată pentru notificări.");
+      if (!response.ok || !payload.alert) throw new Error(payload.error || "Alerta nu a putut fi creată.");
+      const created: AccountAlertRecord = {
+        id: payload.alert.id, query: payload.alert.query, email: payload.alert.email, enabled: true,
+        createdAt: payload.alert.created_at, syncStatus: "synced", frequency: payload.alert.frequency,
+        criteria: payload.alert.criteria || {}, lastCheckedAt: payload.alert.last_checked_at || "", lastError: payload.alert.last_error || ""
+      };
+      updateAlerts([created, ...alerts]);
+      setAlertQuery(""); setAlertPriceMax(""); setAlertYearFrom(""); setAlertMileageMax(""); setAlertLocation("");
+      setAlertMessage("Alerta Premium este activă. Prima scanare stabilește baza; următoarele detectează schimbările.");
     } catch (error) {
-      setAlertMessage(`${error instanceof Error ? error.message : "Serviciul de alerte nu este conectat încă."} Alerta rămâne salvată local.`);
+      setAlertMessage(error instanceof Error ? error.message : "Alerta nu a putut fi creată.");
     }
+  }
+
+  async function mutateAlert(id: string, method: "PATCH" | "DELETE", body?: object) {
+    const supabase = getSupabaseBrowserClient();
+    const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+    if (!session?.access_token) return;
+    const response = await fetch(`/api/alerts/${encodeURIComponent(id)}`, { method, headers: { authorization: `Bearer ${session.access_token}`, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    if (!response.ok) return;
+    if (method === "DELETE") updateAlerts(alerts.filter((entry) => entry.id !== id));
+    else updateAlerts(alerts.map((entry) => entry.id === id ? { ...entry, enabled: (body as { status?: string })?.status === "active" } : entry));
+  }
+
+  async function markAlertEventRead(eventId: string) {
+    const supabase = getSupabaseBrowserClient();
+    const session = supabase ? (await supabase.auth.getSession()).data.session : null;
+    if (!session?.access_token) return;
+    await fetch(`/api/alerts/events/${encodeURIComponent(eventId)}`, { method: "PATCH", headers: { authorization: `Bearer ${session.access_token}` } });
+    setAlertEvents((current) => current.map((event) => event.id === eventId ? { ...event, read_at: new Date().toISOString() } : event));
   }
 
   async function signOut() {
@@ -266,9 +341,31 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
 
           {section === "alerts" && (
             <div className="flex flex-col gap-7">
-              <SectionHeader eyebrow="Monitoring" title="Alerte de căutare" description="Salvează ce urmărești. Fiecare alertă arată separat dacă este sincronizată cu serviciul de notificări sau păstrată doar în acest browser." />
-              <form onSubmit={createAlert} className="grid gap-3 p-4 sm:grid-cols-[1fr_auto]" style={{ border: `1px solid ${INK}`, background: "white" }}><label className="grid gap-2 text-[9px] font-bold uppercase">Ce produs urmărești?<input value={alertQuery} onChange={(event) => setAlertQuery(event.target.value)} required maxLength={240} placeholder="ex: iPhone 15 Pro 256GB" className="min-h-11 px-3 text-[11px] outline-none" style={{ border: `1px solid ${INK}` }} /></label><button type="submit" className="flex min-h-11 items-center justify-center gap-2 self-end px-4 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: PINK }}><Plus size={13} />Creează alertă</button>{alertMessage ? <p role="status" className="text-[9px] uppercase leading-relaxed sm:col-span-2" style={{ color: `${INK}99` }}>{alertMessage}</p> : null}</form>
-              {alerts.length ? <div className="grid gap-3">{alerts.map((alert) => <article key={alert.id} className="grid items-center gap-4 p-4 sm:grid-cols-[1fr_auto_auto]" style={{ border: `1px solid ${INK}`, background: "white" }}><div><div className="text-[12px] font-bold uppercase">{alert.query}</div><div className="mt-1 text-[9px] uppercase" style={{ color: `${INK}77` }}>{alert.email} · creată {formatDate(alert.createdAt)}</div></div><span className="w-fit px-2 py-1 text-[8px] font-bold uppercase" style={{ border: `1px solid ${alert.syncStatus === "synced" ? GREEN : PINK}`, color: alert.syncStatus === "synced" ? GREEN : PINK }}>{alert.syncStatus === "synced" ? "Sincronizată" : "Doar local"}</span><div className="flex gap-2"><button type="button" onClick={() => updateAlerts(alerts.map((entry) => entry.id === alert.id ? { ...entry, enabled: !entry.enabled } : entry))} className="px-3 py-2 text-[8px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: alert.enabled ? INK : "white", color: alert.enabled ? "white" : INK }}>{alert.enabled ? "Activă" : "Pauză"}</button><button type="button" onClick={() => updateAlerts(alerts.filter((entry) => entry.id !== alert.id))} aria-label={`Șterge alerta ${alert.query}`} className="p-2" style={{ border: `1px solid ${INK}` }}><Trash2 size={12} /></button></div></article>)}</div> : <EmptyState title="Nicio alertă salvată" description="Creează o monitorizare pentru produsul și configurația exactă pe care le cauți." />}
+              <SectionHeader eyebrow="Premium monitoring" title="Alerte auto inteligente" description="Monitorizăm Autovit și BestAuto pentru potriviri noi, reduceri de preț și oferte mai bune decât cele deja urmărite." />
+              {alertAccess === "required" ? (
+                <EmptyState title="Funcție Premium" description="Alertele automate rulează căutări programate și sunt disponibile conturilor Premium." action={<Link href="/pricing" className="px-4 py-3 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Vezi Premium</Link>} />
+              ) : alertAccess === "loading" ? (
+                <EmptyState title="Verificăm accesul Premium" description="Încărcăm monitorizările și inboxul de alerte." />
+              ) : alertAccess === "error" ? (
+                <EmptyState title="Alertele nu pot fi încărcate" description={alertMessage || "Serviciul de alerte nu este disponibil momentan. Încearcă din nou mai târziu."} />
+              ) : (
+                <>
+                  <form onSubmit={createAlert} className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3" style={{ border: `1px solid ${INK}`, background: "white" }}>
+                    <label className="grid gap-2 text-[9px] font-bold uppercase sm:col-span-2 lg:col-span-3">Mașina urmărită<input value={alertQuery} onChange={(event) => setAlertQuery(event.target.value)} required maxLength={240} placeholder="ex: BMW 320d 2019 automat" className="min-h-11 px-3 text-[11px] outline-none" style={{ border: `1px solid ${INK}` }} /></label>
+                    <label className="grid gap-2 text-[9px] font-bold uppercase">Preț maxim RON<input value={alertPriceMax} onChange={(event) => setAlertPriceMax(event.target.value)} inputMode="numeric" placeholder="90000" className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }} /></label>
+                    <label className="grid gap-2 text-[9px] font-bold uppercase">An minim<input value={alertYearFrom} onChange={(event) => setAlertYearFrom(event.target.value)} inputMode="numeric" placeholder="2018" className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }} /></label>
+                    <label className="grid gap-2 text-[9px] font-bold uppercase">Kilometri maximi<input value={alertMileageMax} onChange={(event) => setAlertMileageMax(event.target.value)} inputMode="numeric" placeholder="180000" className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }} /></label>
+                    <label className="grid gap-2 text-[9px] font-bold uppercase">Locație<input value={alertLocation} onChange={(event) => setAlertLocation(event.target.value)} placeholder="București" className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }} /></label>
+                    <label className="grid gap-2 text-[9px] font-bold uppercase">Frecvență<select value={alertFrequency} onChange={(event) => setAlertFrequency(event.target.value === "immediate" ? "immediate" : "daily")} className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }}><option value="daily">Rezumat zilnic</option><option value="immediate">Verificare orară</option></select></label>
+                    <button type="submit" disabled={alertAccess !== "premium"} className="flex min-h-11 items-center justify-center gap-2 self-end px-4 text-[9px] font-bold uppercase disabled:opacity-50" style={{ border: `1px solid ${INK}`, background: PINK }}><Plus size={13} />Creează alertă</button>
+                    {alertMessage ? <p role="status" className="text-[9px] uppercase leading-relaxed sm:col-span-2 lg:col-span-3" style={{ color: `${INK}99` }}>{alertMessage}</p> : null}
+                  </form>
+
+                  {alerts.length ? <div className="grid gap-3">{alerts.map((alert) => <article key={alert.id} className="grid items-center gap-4 p-4 sm:grid-cols-[1fr_auto_auto]" style={{ border: `1px solid ${INK}`, background: "white" }}><div><div className="text-[12px] font-bold uppercase">{alert.query}</div><div className="mt-1 text-[9px] uppercase" style={{ color: `${INK}77` }}>{alert.frequency === "immediate" ? "orar" : "zilnic"} · {alert.criteria?.priceMaxRon ? `max ${Number(alert.criteria.priceMaxRon).toLocaleString("ro-RO")} RON · ` : ""}{alert.lastCheckedAt ? `verificată ${formatDate(alert.lastCheckedAt)}` : "prima scanare în așteptare"}</div>{alert.lastError ? <div className="mt-2 text-[9px]" style={{ color: PINK }}>! {alert.lastError}</div> : null}</div><span className="w-fit px-2 py-1 text-[8px] font-bold uppercase" style={{ border: `1px solid ${alert.enabled ? GREEN : PINK}`, color: alert.enabled ? GREEN : PINK }}>{alert.enabled ? "Activă" : "Pauză"}</span><div className="flex gap-2"><button type="button" onClick={() => mutateAlert(alert.id, "PATCH", { status: alert.enabled ? "paused" : "active" })} className="px-3 py-2 text-[8px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: alert.enabled ? INK : "white", color: alert.enabled ? "white" : INK }}>{alert.enabled ? "Pauză" : "Activează"}</button><button type="button" onClick={() => mutateAlert(alert.id, "DELETE")} aria-label={`Șterge alerta ${alert.query}`} className="p-2" style={{ border: `1px solid ${INK}` }}><Trash2 size={12} /></button></div></article>)}</div> : <EmptyState title="Nicio alertă Premium" description="Creează prima monitorizare. Scanarea inițială stabilește ofertele existente fără să trimită notificări vechi." />}
+
+                  <section className="grid gap-3"><div className="flex items-end justify-between border-b border-black pb-3"><div><div className="text-[9px] font-bold uppercase" style={{ color: PINK }}>Notification center</div><h2 className="text-[17px] font-bold uppercase">Inbox alerte</h2></div><span className="text-[9px] font-bold uppercase">{alertEvents.filter((event) => !event.read_at).length} necitite</span></div>{alertEvents.length ? alertEvents.map((event) => <article key={event.id} className="grid gap-3 p-4 sm:grid-cols-[1fr_auto]" style={{ border: `1px solid ${INK}`, background: event.read_at ? CREAM : "white", boxShadow: event.read_at ? "none" : `3px 3px 0 ${PINK}` }}><div><div className="text-[8px] font-bold uppercase" style={{ color: PINK }}>{event.event_type.replaceAll("_", " ")}</div><div className="mt-1 text-[12px] font-bold uppercase">{event.payload?.title || "Schimbare relevantă"}</div><div className="mt-2 text-[10px]">{event.payload?.reason}</div><div className="mt-2 text-[9px] uppercase" style={{ color: `${INK}77` }}>{event.payload?.source} · {event.payload?.priceRon ? `${Number(event.payload.priceRon).toLocaleString("ro-RO")} RON · ` : ""}{formatDate(event.created_at)}</div></div><div className="flex items-center gap-2">{!event.read_at ? <button type="button" onClick={() => markAlertEventRead(event.id)} className="px-3 py-2 text-[8px] font-bold uppercase" style={{ border: `1px solid ${INK}` }}>Marchează citită</button> : null}<a href={event.listing_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 text-[8px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Oferta <ExternalLink size={11} /></a></div></article>) : <p className="p-4 text-[10px] uppercase" style={{ border: `1px dashed ${INK}55`, color: `${INK}77` }}>Evenimentele noi, reducerile și ofertele mai bune vor apărea aici.</p>}</section>
+                </>
+              )}
             </div>
           )}
 

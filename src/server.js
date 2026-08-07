@@ -11,7 +11,8 @@ import { buildHistoryPayload, logSearchEvent } from "./history.js";
 import { PREMIUM_SITE_KEYS, getDefaultSiteKeys, getPremiumSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
-import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertShopSuggestionToSupabase, isSupabaseConfigured, listShopSuggestionsFromSupabase, updateShopSuggestionStatusInSupabase } from "./supabase.js";
+import { MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
+import { createAlertProfileInSupabase, deleteAlertProfileInSupabase, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertShopSuggestionToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, readPremiumEntitlement, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase } from "./supabase.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
@@ -54,6 +55,25 @@ function getAdminTokenFromRequest(req, url) {
 function isAuthorizedAdminRequest(req, url) {
   const expectedToken = process.env.LIBERGENT_ADMIN_TOKEN || "";
   return Boolean(expectedToken) && getAdminTokenFromRequest(req, url) === expectedToken;
+}
+
+async function authenticatePremiumAlertUser(req) {
+  const authorization = String(req.headers.authorization || "");
+  const token = authorization.toLowerCase().startsWith("bearer ") ? authorization.slice(7).trim() : "";
+  if (!token) return { error: "Authentication required.", status: 401 };
+  const supabaseUrl = String(process.env.SUPABASE_URL || "").replace(/\/+$/, "");
+  const apiKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!supabaseUrl || !apiKey) return { error: "Supabase authentication is not configured.", status: 503 };
+  try {
+    const response = await fetch(`${supabaseUrl}/auth/v1/user`, { headers: { apikey: apiKey, authorization: `Bearer ${token}` } });
+    const user = await response.json().catch(() => null);
+    if (!response.ok || !user?.id) return { error: "Invalid or expired session.", status: 401 };
+    const entitlement = await readPremiumEntitlement(user.id, user.email || "");
+    if (!entitlement.active) return { error: "Alertele automate sunt disponibile în Premium.", code: "premium_required", status: 403 };
+    return { user, entitlement };
+  } catch {
+    return { error: "Authentication service unavailable.", status: 503 };
+  }
 }
 
 async function proxyImage(res, imageUrl) {
@@ -293,6 +313,65 @@ const server = http.createServer(async (req, res) => {
       const message = error instanceof Error ? error.message : String(error);
       sendJson(res, message.startsWith("Expected ") || message.startsWith("Unsupported ") ? 400 : 500, { error: message });
     }
+    return;
+  }
+
+  if (apiPath === "/api/alerts" || apiPath.startsWith("/api/alerts/")) {
+    const premium = await authenticatePremiumAlertUser(req);
+    if (!premium.user) {
+      sendJson(res, premium.status, { error: premium.error, ...(premium.code ? { code: premium.code } : {}) });
+      return;
+    }
+    const userId = premium.user.id;
+    const eventMatch = apiPath.match(/^\/api\/alerts\/events(?:\/([^/]+))?$/);
+    if (eventMatch) {
+      if (req.method === "GET" && !eventMatch[1]) sendJson(res, 200, { ok: true, events: await listAlertEventsFromSupabase(userId) });
+      else if (req.method === "PATCH" && eventMatch[1]) { await markAlertEventReadInSupabase({ id: decodeURIComponent(eventMatch[1]), userId }); sendJson(res, 200, { ok: true }); }
+      else sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+    const profileMatch = apiPath.match(/^\/api\/alerts\/([^/]+)$/);
+    if (req.method === "GET" && apiPath === "/api/alerts") {
+      const [alerts, events] = await Promise.all([listAlertProfilesFromSupabase(userId), listAlertEventsFromSupabase(userId)]);
+      sendJson(res, 200, { ok: true, entitlement: premium.entitlement, alerts, events });
+      return;
+    }
+    if (req.method === "POST" && apiPath === "/api/alerts") {
+      const parsedBody = await readJsonBody(req);
+      if (parsedBody.error) { sendJson(res, 400, { error: parsedBody.error }); return; }
+      try {
+        const existing = await listAlertProfilesFromSupabase(userId);
+        if (existing.filter((alert) => alert.status === "active").length >= MAX_ACTIVE_ALERTS) { sendJson(res, 409, { error: `Planul Premium permite maximum ${MAX_ACTIVE_ALERTS} alerte active.` }); return; }
+        const profile = normalizeAlertProfile(parsedBody.data || {});
+        const alert = await createAlertProfileInSupabase({ ...profile, userId, email: premium.user.email || "" });
+        sendJson(res, 201, { ok: true, alert });
+      } catch (error) {
+        sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+      }
+      return;
+    }
+    if (profileMatch && req.method === "PATCH") {
+      const parsedBody = await readJsonBody(req);
+      if (parsedBody.error) { sendJson(res, 400, { error: parsedBody.error }); return; }
+      const body = parsedBody.data || {};
+      const changes = {};
+      if (["active", "paused"].includes(body.status)) changes.status = body.status;
+      if (["daily", "immediate"].includes(body.frequency)) changes.frequency = body.frequency;
+      if (body.events && typeof body.events === "object") changes.events = body.events;
+      if (!Object.keys(changes).length) {
+        sendJson(res, 400, { error: "No supported alert changes supplied." });
+        return;
+      }
+      const alert = await updateAlertProfileInSupabase({ id: decodeURIComponent(profileMatch[1]), userId, changes });
+      sendJson(res, alert ? 200 : 404, alert ? { ok: true, alert } : { error: "Alert not found." });
+      return;
+    }
+    if (profileMatch && req.method === "DELETE") {
+      await deleteAlertProfileInSupabase({ id: decodeURIComponent(profileMatch[1]), userId });
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    sendJson(res, 405, { error: "Method not allowed" });
     return;
   }
 
