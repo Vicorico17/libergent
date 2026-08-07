@@ -3,7 +3,7 @@
 import { Fragment, Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ClipboardCheck, Copy, ExternalLink, Lock, MapPin, MessageSquare, ShieldCheck, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
+import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ClipboardCheck, ExternalLink, Lock, MapPin, MessageSquare, ShieldCheck, Tag } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import {
@@ -1369,29 +1369,13 @@ function useListingImage(item: Pick<SearchResultItem, "id" | "image" | "images">
   }
 }
 
-function SellerMessageActions({ item, query, compact = false }: { item: SearchResultItem; query: string; compact?: boolean }) {
+function SellerMessageActions({ item, query }: { item: SearchResultItem; query: string }) {
   const message = buildSellerMessage(item, query)
-  const [copied, setCopied] = useState(false)
   const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle")
   const [sendError, setSendError] = useState("")
   const [sentTarget, setSentTarget] = useState("")
   const [sentMessageId, setSentMessageId] = useState("")
   const [contactLookupDebug, setContactLookupDebug] = useState("")
-
-  async function copyMessage() {
-    try {
-      await navigator.clipboard.writeText(message)
-      setCopied(true)
-      trackSearchEvent("copy_seller_message", {
-        search_term: query,
-        marketplace: item.source,
-        listing_title: item.title,
-      })
-      window.setTimeout(() => setCopied(false), 1400)
-    } catch {
-      setCopied(false)
-    }
-  }
 
   function trackOpenContact() {
     trackSearchEvent("open_seller_contact", {
@@ -1523,17 +1507,7 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
   }
 
   return (
-    <div className={`flex ${compact ? "flex-col sm:flex-row" : "flex-col sm:flex-row"} gap-2`}>
-      <button
-        type="button"
-        onClick={copyMessage}
-        className="flex min-h-10 flex-1 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase transition-colors duration-150"
-        style={{ border: `1px solid ${INK}`, background: "white", color: INK, fontFamily: MONO }}
-        title={message}
-      >
-        <Copy size={13} strokeWidth={2.2} />
-        {copied ? "Copiat" : "Copiază mesaj"}
-      </button>
+    <div className="flex flex-col gap-2 sm:flex-row">
       {item.url ? (
         <button
           type="button"
@@ -1567,103 +1541,6 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
           Conectează-te cu Google
         </Link>
       )}
-    </div>
-  )
-}
-
-function OfferFeedbackActions({ item, query }: { item: SearchResultItem; query: string }) {
-  const [selected, setSelected] = useState<"like" | "dislike" | null>(null)
-  const [selectedReason, setSelectedReason] = useState("")
-  const [pending, setPending] = useState(false)
-
-  async function sendFeedback(feedback: "like" | "dislike", reason = "") {
-    setSelected(feedback)
-    setSelectedReason(reason)
-    setPending(true)
-    trackSearchEvent("offer_feedback", {
-      search_term: query,
-      marketplace: item.source,
-      feedback,
-      reason,
-      listing_title: item.title,
-    })
-
-    try {
-      await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query,
-          feedback,
-          reason,
-          offer: {
-            title: item.title,
-            url: item.url,
-            site: item.source,
-            priceRon: item.price,
-            score: item.score,
-            rank: item.rank,
-            reason,
-            listingType: item.listingType,
-            rejectionReasons: item.rejectionReasons,
-          },
-        }),
-      })
-    } finally {
-      setPending(false)
-    }
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-[10px] font-bold uppercase" style={{ color: `${INK}66` }}>
-        Ajută rankingul:
-      </span>
-      {[
-        { value: "like" as const, label: "Bun", icon: <ThumbsUp size={13} strokeWidth={2.2} /> },
-        { value: "dislike" as const, label: "Slab", icon: <ThumbsDown size={13} strokeWidth={2.2} /> },
-      ].map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          disabled={pending}
-          onClick={() => option.value === "dislike" ? setSelected("dislike") : sendFeedback("like")}
-          className="inline-flex min-h-8 items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase disabled:opacity-60"
-          style={{
-            border: `1px solid ${INK}`,
-            background: selected === option.value ? INK : "white",
-            color: selected === option.value ? "white" : INK,
-            fontFamily: MONO,
-          }}
-        >
-          {option.icon}
-          {option.label}
-        </button>
-      ))}
-      {selected === "dislike" && !selectedReason && (
-        <div className="basis-full flex flex-wrap gap-1.5 pt-1">
-          {[
-            ["wrong_product", "Produs greșit"],
-            ["part_or_accessory", "Piesă / accesoriu"],
-            ["wrong_model", "Model greșit"],
-            ["bad_price", "Preț slab"],
-            ["duplicate", "Duplicat"],
-            ["unavailable", "Indisponibil"],
-          ].map(([reason, label]) => (
-            <button
-              key={reason}
-              type="button"
-              disabled={pending}
-              onClick={() => sendFeedback("dislike", reason)}
-              className="px-2 py-1 text-[9px] font-bold uppercase disabled:opacity-60"
-              style={{ border: `1px solid ${INK}66`, background: CREAM, color: INK }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-      {selectedReason && <span className="basis-full text-[9px] font-bold uppercase" style={{ color: GREEN }}>Feedback salvat · {formatSignalLabel(selectedReason)}</span>}
     </div>
   )
 }
@@ -1797,7 +1674,7 @@ function ResultCard({
               <Bookmark size={12} strokeWidth={2.2} />
               {isSaved ? "Salvat" : "Salvează în favorite"}
             </button>
-            <SellerMessageActions item={item} query={query} compact />
+            <SellerMessageActions item={item} query={query} />
           </>
         ) : (
           <AccountFeatureNotice query={query} tier={searchTier} compact />
@@ -1945,10 +1822,7 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
                 Analiză Libergent
               </button>
               {isLoggedIn ? (
-                <>
-                  <SellerMessageActions item={item} query={query} />
-                  <OfferFeedbackActions item={item} query={query} />
-                </>
+                <SellerMessageActions item={item} query={query} />
               ) : (
                 <AccountFeatureNotice query={query} tier={searchTier} />
               )}
@@ -2175,10 +2049,7 @@ function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversation
               <ConversationStatusBadge status={conversationStatus} />
               <DealQualitySummary item={item} />
               {isLoggedIn ? (
-                <>
-                  <SellerMessageActions item={item} query={query} />
-                  <OfferFeedbackActions item={item} query={query} />
-                </>
+                <SellerMessageActions item={item} query={query} />
               ) : (
                 <AccountFeatureNotice query={query} tier={searchTier} />
               )}
