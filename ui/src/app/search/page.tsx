@@ -842,7 +842,15 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
             </div>
           </div>
 
-          {/* Free source rows */}
+          {/* Expandable source progress */}
+          <details className="group" style={{ border: `1px solid ${INK}`, background: "white" }}>
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-[10px] font-bold uppercase focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: tier === "premium" ? PINK : MODAL_BG }}>
+              <span>{tier === "premium" ? "Unde caută Premium" : "Marketplace-uri verificate"}</span>
+              <span className="text-right" style={{ color: `${INK}99` }}>
+                {activeSources.length + (tier === "premium" ? PREMIUM_SOURCES.length : 0)} surse · apasă pentru detalii
+              </span>
+            </summary>
+            <div className="flex flex-col gap-4 p-3 sm:p-4" style={{ borderTop: `1px solid ${INK}` }}>
           <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:flex sm:flex-col sm:gap-2.5">
             <div className="col-span-2 flex items-center justify-between gap-3 pb-1 text-[10px] font-bold uppercase">
               <span>Căutare {tier === "premium" ? "Premium" : "Free"}</span>
@@ -1018,6 +1026,8 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
               </div>
             )}
           </div>
+            </div>
+          </details>
 
           {/* Checklist */}
           <div
