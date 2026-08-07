@@ -1,7 +1,19 @@
 import { searchAcrossSites } from "./app.js";
-import { getSiteKeysForAllSearch } from "./sites.js";
+import { getSite, getSiteKeysForAllSearch } from "./sites.js";
 
 const DEFAULT_HEALTH_QUERY = "iphone 15 pro";
+
+function getSourceMetadata(siteKey) {
+  try {
+    const site = getSite(siteKey);
+    return {
+      niches: site.niches || [],
+      integrationStatus: site.integrationStatus || "experimental"
+    };
+  } catch {
+    return { niches: [], integrationStatus: "experimental" };
+  }
+}
 
 export async function runMarketplaceHealthChecks({
   query = DEFAULT_HEALTH_QUERY,
@@ -28,6 +40,7 @@ export async function runMarketplaceHealthChecks({
     },
     sources: (payload.results || []).map((result) => ({
       site: result.site,
+      ...getSourceMetadata(result.site),
       ok: Boolean(result.ok),
       provider: result.provider,
       parsedItemCount: result.parsedItemCount ?? result.rawItemCount ?? 0,

@@ -13,6 +13,8 @@ const DEFAULT_FEEDBACK_TABLE = "offer_feedback";
 const DEFAULT_EMAIL_LEADS_TABLE = "email_leads";
 const DEFAULT_SAVED_SEARCHES_TABLE = "saved_searches";
 const DEFAULT_WHATSAPP_MESSAGES_TABLE = "whatsapp_messages";
+const DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE = "vehicle_price_observations";
+const DEFAULT_SHOP_SUGGESTIONS_TABLE = "shop_suggestions";
 
 function trimTrailingSlash(value = "") {
   return value.replace(/\/+$/, "");
@@ -33,12 +35,14 @@ function getSupabaseConfig(env = process.env) {
   const emailLeadsTable = normalizePublicRestTableName(env.SUPABASE_EMAIL_LEADS_TABLE, DEFAULT_EMAIL_LEADS_TABLE);
   const savedSearchesTable = normalizePublicRestTableName(env.SUPABASE_SAVED_SEARCHES_TABLE, DEFAULT_SAVED_SEARCHES_TABLE);
   const whatsappMessagesTable = normalizePublicRestTableName(env.SUPABASE_WHATSAPP_MESSAGES_TABLE, DEFAULT_WHATSAPP_MESSAGES_TABLE);
+  const vehiclePriceObservationsTable = normalizePublicRestTableName(env.SUPABASE_VEHICLE_PRICE_OBSERVATIONS_TABLE, DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE);
+  const shopSuggestionsTable = normalizePublicRestTableName(env.SUPABASE_SHOP_SUGGESTIONS_TABLE, DEFAULT_SHOP_SUGGESTIONS_TABLE);
 
   if (!url || !apiKey) {
     return null;
   }
 
-  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable };
+  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable, vehiclePriceObservationsTable, shopSuggestionsTable };
 }
 
 function getRequestHeaders(apiKey) {
@@ -152,6 +156,34 @@ async function requestSupabaseCount(path, env = process.env) {
 
 export function isSupabaseConfigured(env = process.env) {
   return Boolean(getSupabaseConfig(env));
+}
+
+export async function insertShopSuggestionToSupabase(suggestion, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return false;
+  await requestSupabase(config.shopSuggestionsTable, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify(suggestion)
+  }, env);
+  return true;
+}
+
+export async function listShopSuggestionsFromSupabase(env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  return requestSupabase(`${config.shopSuggestionsTable}?select=*&order=created_at.desc`, {}, env);
+}
+
+export async function updateShopSuggestionStatusInSupabase(id, status, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  await requestSupabase(`${config.shopSuggestionsTable}?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ status, reviewed_at: new Date().toISOString() })
+  }, env);
+  return true;
 }
 
 export async function insertSearchEventToSupabase(entry, env = process.env) {
@@ -283,6 +315,58 @@ export async function insertSavedSearchToSupabase(entry, env = process.env) {
   }, env);
 
   return true;
+}
+
+export async function insertVehiclePriceObservations(listings = [], env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return false;
+  const observedAt = new Date().toISOString();
+  const observedDay = observedAt.slice(0, 10);
+  const rows = listings
+    .filter((listing) => listing?.url && Number.isFinite(Number(listing.price ?? listing.priceRon ?? listing.numericPrice)))
+    .map((listing) => ({
+      listing_url: String(listing.url),
+      source: String(listing.site || ""),
+      title: String(listing.title || ""),
+      price_ron: Math.round(Number(listing.priceRon ?? listing.numericPrice ?? listing.price)),
+      observed_at: observedAt,
+      observed_day: observedDay
+    }));
+  if (!rows.length) return false;
+  await requestSupabase(`${config.vehiclePriceObservationsTable}?on_conflict=listing_url,observed_day`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(rows)
+  }, env);
+  return true;
+}
+
+export async function readVehiclePriceHistoryFromSupabase(listingUrl, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config || !listingUrl) return null;
+  const query = new URLSearchParams({
+    select: "price_ron,observed_at,observed_day",
+    listing_url: `eq.${listingUrl}`,
+    order: "observed_at.asc",
+    limit: "180"
+  });
+  const rows = await requestSupabase(`${config.vehiclePriceObservationsTable}?${query.toString()}`, { method: "GET" }, env);
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const observations = rows.map((row) => ({ priceRon: Number(row.price_ron), observedAt: row.observed_at || row.observed_day })).filter((row) => Number.isFinite(row.priceRon));
+  if (!observations.length) return null;
+  const initial = observations[0];
+  const latest = observations[observations.length - 1];
+  const firstMs = new Date(initial.observedAt).getTime();
+  return {
+    observations,
+    firstObservedAt: initial.observedAt,
+    lastObservedAt: latest.observedAt,
+    daysOnMarket: Number.isFinite(firstMs) ? Math.max(0, Math.floor((Date.now() - firstMs) / 86400000)) : null,
+    initialPriceRon: initial.priceRon,
+    latestPriceRon: latest.priceRon,
+    priceChangeRon: latest.priceRon - initial.priceRon,
+    priceChangePct: initial.priceRon ? Math.round(((latest.priceRon - initial.priceRon) / initial.priceRon) * 1000) / 10 : null
+  };
 }
 
 export async function insertWhatsAppInboundToSupabase(entry, env = process.env) {

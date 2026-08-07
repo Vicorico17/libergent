@@ -106,7 +106,67 @@ export const PREMIUM_FASHION_SITE_KEYS = [
   "modivo.ro"
 ];
 
-export const PREMIUM_SITE_KEYS = [...PREMIUM_CORE_SITE_KEYS, ...PREMIUM_FASHION_SITE_KEYS];
+export const PREMIUM_HOME_SITE_KEYS = ["ikea.com", "jysk.ro", "mobexpert.ro"];
+export const PREMIUM_DIY_SITE_KEYS = ["dedeman.ro", "leroymerlin.ro", "hornbach.ro"];
+export const PREMIUM_SPORT_SITE_KEYS = ["decathlon.ro", "sportvision.ro", "intersport.ro"];
+export const PREMIUM_PHOTO_SITE_KEYS = ["f64.ro", "photosetup.ro"];
+export const PREMIUM_MUSIC_SITE_KEYS = ["soundcreation.ro", "mcmusic.ro"];
+export const PREMIUM_BOOKS_SITE_KEYS = ["carturesti.ro", "libris.ro"];
+export const PREMIUM_BABY_SITE_KEYS = ["noriel.ro", "nichiduta.ro", "bebetei.ro"];
+export const PREMIUM_BEAUTY_SITE_KEYS = ["notino.ro", "douglas.ro", "sephora.ro"];
+export const PREMIUM_PET_SITE_KEYS = ["zooplus.ro", "animax.ro", "petmart.ro"];
+export const PREMIUM_HOBBY_SITE_KEYS = ["redgoblin.ro", "regatuljocurilor.ro", "bricksdepot.ro"];
+// Broad experimental batch: retained as explicit data so health checks can promote,
+// fix, or remove stores without changing niche routing code.
+export const EXPERIMENTAL_EXPANSION = {
+  fashion: ["ccc.eu", "deichmann.com", "jdsports.ro", "footshop.ro", "buzzsneakers.ro", "sneakerindustry.ro", "fashionhouse.ro", "modlet.ro"],
+  home: ["somproduct.ro", "bonami.ro", "xxxlutz.ro", "thehome.ro", "mezoni.ro", "kondela.ro", "dormeo.ro", "altex.ro"],
+  diy: ["mathaus.ro", "ambient.ro", "arabesque.ro", "bricodepot.ro", "ferex.ro", "miculmester.ro", "scule.ro", "egradini.ro"],
+  sport: ["hervis.ro", "sportisimo.ro", "4fstore.ro", "intersport.ro", "sportano.ro", "tenis-shop.ro", "bike24.ro", "playbike.ro"],
+  tech: ["vexio.ro", "forit.ro", "itgalaxy.ro", "badabum.ro", "mediagalaxy.ro", "evomag.ro", "avstore.ro", "a2t.ro"],
+  auto: ["epiesa.ro", "autokarma.ro", "autodoc.ro", "unixauto.ro", "autohut.ro", "pieseauto.ro", "automag.ro", "roata.ro"],
+  beauty: ["esteto.ro", "makeup.ro", "farmec.ro", "drmax.ro", "helpnet.ro", "springfarma.com", "notino.ro", "elefant.ro"],
+  pet: ["epetshop.ro", "petmax.ro", "petguru.ro", "animax.ro", "petmart.ro", "zooplus.ro"],
+  books: ["elefant.ro", "bookzone.ro", "nemira.ro", "librarie.net", "pravaliacucarti.ro", "okian.ro"],
+  music: ["zeedo.ro", "senia.ro", "mcmusic.ro", "soundcreation.ro", "thomann.de", "musicshop.ro"]
+};
+export const EXPERIMENTAL_EXPANSION_SITE_KEYS = [...new Set(Object.values(EXPERIMENTAL_EXPANSION).flat())];
+
+export const PREMIUM_SITE_KEYS = [
+  ...PREMIUM_CORE_SITE_KEYS,
+  ...PREMIUM_FASHION_SITE_KEYS,
+  ...PREMIUM_HOME_SITE_KEYS,
+  ...PREMIUM_DIY_SITE_KEYS,
+  ...PREMIUM_SPORT_SITE_KEYS,
+  ...PREMIUM_PHOTO_SITE_KEYS,
+  ...PREMIUM_MUSIC_SITE_KEYS,
+  ...PREMIUM_BOOKS_SITE_KEYS,
+  ...PREMIUM_BABY_SITE_KEYS, ...PREMIUM_BEAUTY_SITE_KEYS, ...PREMIUM_PET_SITE_KEYS, ...PREMIUM_HOBBY_SITE_KEYS
+  ,...EXPERIMENTAL_EXPANSION_SITE_KEYS
+];
+
+export const NICHE_CATALOG = [
+  { key: "marketplaces", label: "General marketplace & second-hand", mode: "always" },
+  { key: "tech", label: "Technology", mode: "query-routed" },
+  { key: "automotive", label: "Vehicles", mode: "query-routed" },
+  { key: "fashion", label: "Fashion & sneakers", mode: "query-routed" },
+  { key: "home", label: "Home & furniture", mode: "query-routed" },
+  { key: "diy", label: "DIY & tools", mode: "query-routed" },
+  { key: "sport", label: "Sport & outdoor", mode: "query-routed" },
+  { key: "photo", label: "Photo & video", mode: "query-routed" },
+  { key: "music", label: "Music & audio", mode: "query-routed" },
+  { key: "books", label: "Books, games & collectibles", mode: "query-routed" }
+  ,{ key: "baby", label: "Baby & kids", mode: "query-routed" }
+  ,{ key: "beauty", label: "Beauty & personal care", mode: "query-routed" }
+  ,{ key: "pet", label: "Pet supplies", mode: "query-routed" }
+  ,{ key: "hobby", label: "Toys & hobby", mode: "query-routed" }
+];
+
+export const SOURCE_INTEGRATION_STATES = {
+  active: "active",
+  experimental: "experimental",
+  catalog: "catalog"
+};
 
 export const PREMIUM_BROWSER_SITE_KEYS = [
   "compari.ro",
@@ -130,6 +190,34 @@ const FASHION_KEYWORDS = [
   "nike", "adidas", "jordan", "new balance", "puma", "reebok", "converse", "vans", "asics",
   "skechers", "timberland", "birkenstock", "ugg", "zara", "h&m", "hm", "tommy", "levis"
 ];
+
+const HOME_KEYWORDS = [
+  "mobila", "mobilă", "canapea", "fotoliu", "masa", "masă", "scaun", "birou", "dulap",
+  "comoda", "comodă", "pat", "saltea", "biblioteca", "bibliotecă", "raft", "etajera", "etajeră",
+  "noptiera", "covor", "perdea", "lustra", "lustră", "decoratiuni", "decorațiuni"
+];
+
+const DIY_KEYWORDS = [
+  "bormasina", "bormașină", "masina de gaurit", "mașina de găurit", "flex", "polizor", "fierastrau",
+  "fierăstrău", "surubelnita", "șurubelniță", "burghiu", "ciocan", "compresor", "generator", "aparat sudura",
+  "unealta", "unealtă", "scule", "vopsea", "gresie", "faianta", "faianță", "parchet", "centrala",
+  "centrală", "calorifer", "robinet", "chiuveta", "chiuvetă", "wc", "gradina", "grădină", "drujba", "drujbă"
+];
+
+const SPORT_KEYWORDS = [
+  "bicicleta", "bicicletă", "mtb", "cursiera", "cursieră", "trotineta", "trotinetă", "cort", "camping",
+  "drumetie", "drumeție", "rucsac trekking", "schi", "snowboard", "pescuit", "fitness", "gantere",
+  "banda alergare", "bandă alergare", "alergare", "fotbal", "baschet", "volei", "tenis", "padel",
+  "racheta", "rachetă", "role", "patine", "caiac", "surf", "yoga"
+];
+
+const PHOTO_KEYWORDS = ["camera foto", "aparat foto", "mirrorless", "dslr", "obiectiv foto", "obiectiv canon", "obiectiv nikon", "obiectiv sony", "trepied", "drone", "drona", "cameră video", "gopro"];
+const MUSIC_KEYWORDS = ["chitara", "chitară", "pian", "clape", "sintetizator", "tobe", "vioara", "vioară", "microfon", "amplificator", "interfata audio", "interfață audio", "boxa activa", "boxă activă", "dj controller"];
+const BOOKS_KEYWORDS = ["carte", "carti", "cărți", "roman", "manual", "isbn", "manga", "comics", "benzi desenate", "joc de societate", "board game", "lego", "puzzle"];
+const BABY_KEYWORDS = ["bebelus", "bebeluș", "carucior", "cărucior", "scaun masa copii", "scăunel copii", "patut", "pătuț", "jucarii copii", "jucării copii"];
+const BEAUTY_KEYWORDS = ["parfum", "machiaj", "ruj", "fond de ten", "skincare", "crema fata", "cremă față", "cosmetice"];
+const PET_KEYWORDS = ["caine", "câine", "pisica", "pisică", "acvariu", "hrana animale", "hrană animale", "litiera", "litieră"];
+const HOBBY_KEYWORDS = ["lego", "warhammer", "pokemon", "magic the gathering", "figurina", "figurină", "board game", "joc de societate", "puzzle"];
 
 function getCarModelPathAlias(query) {
   return understandMarketplaceQuery(query).canonicalPath || "";
@@ -211,11 +299,64 @@ export function isFashionQuery(query = "") {
   return FASHION_KEYWORDS.some((keyword) => normalized.includes(keyword.normalize("NFD").replace(/[\u0300-\u036f]/g, "")));
 }
 
+function matchesNiche(query, keywords) {
+  const normalized = normalizeMarketplaceQuery(query)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return keywords.some((keyword) => normalized.includes(keyword.normalize("NFD").replace(/[\u0300-\u036f]/g, "")));
+}
+
+export function isHomeQuery(query = "") { return matchesNiche(query, HOME_KEYWORDS); }
+export function isDiyQuery(query = "") { return matchesNiche(query, DIY_KEYWORDS); }
+export function isSportQuery(query = "") { return matchesNiche(query, SPORT_KEYWORDS); }
+export function isPhotoQuery(query = "") { return matchesNiche(query, PHOTO_KEYWORDS); }
+export function isMusicQuery(query = "") { return matchesNiche(query, MUSIC_KEYWORDS); }
+export function isBooksQuery(query = "") { return matchesNiche(query, BOOKS_KEYWORDS); }
+export function isBabyQuery(query = "") { return matchesNiche(query, BABY_KEYWORDS); }
+export function isBeautyQuery(query = "") { return matchesNiche(query, BEAUTY_KEYWORDS); }
+export function isPetQuery(query = "") { return matchesNiche(query, PET_KEYWORDS); }
+export function isHobbyQuery(query = "") { return matchesNiche(query, HOBBY_KEYWORDS); }
+
 export function getPremiumSiteKeys(query = "") {
   return [
     ...PREMIUM_CORE_SITE_KEYS,
-    ...(isFashionQuery(query) ? PREMIUM_FASHION_SITE_KEYS : [])
+    ...(isFashionQuery(query) ? PREMIUM_FASHION_SITE_KEYS : []),
+    ...(isHomeQuery(query) ? PREMIUM_HOME_SITE_KEYS : []),
+    ...(isDiyQuery(query) ? PREMIUM_DIY_SITE_KEYS : []),
+    ...(isSportQuery(query) ? PREMIUM_SPORT_SITE_KEYS : []),
+    ...(isPhotoQuery(query) ? PREMIUM_PHOTO_SITE_KEYS : []),
+    ...(isMusicQuery(query) ? PREMIUM_MUSIC_SITE_KEYS : []),
+    ...(isBooksQuery(query) ? PREMIUM_BOOKS_SITE_KEYS : []),
+    ...(isBabyQuery(query) ? PREMIUM_BABY_SITE_KEYS : []), ...(isBeautyQuery(query) ? PREMIUM_BEAUTY_SITE_KEYS : []), ...(isPetQuery(query) ? PREMIUM_PET_SITE_KEYS : []), ...(isHobbyQuery(query) ? PREMIUM_HOBBY_SITE_KEYS : []),
+    ...(isFashionQuery(query) ? EXPERIMENTAL_EXPANSION.fashion : []), ...(isHomeQuery(query) ? EXPERIMENTAL_EXPANSION.home : []), ...(isDiyQuery(query) ? EXPERIMENTAL_EXPANSION.diy : []), ...(isSportQuery(query) ? EXPERIMENTAL_EXPANSION.sport : []), ...(isPhotoQuery(query) || isRefurbishedTechQuery(query) ? EXPERIMENTAL_EXPANSION.tech : []), ...(isCarQuery(query) ? EXPERIMENTAL_EXPANSION.auto : []), ...(isBeautyQuery(query) ? EXPERIMENTAL_EXPANSION.beauty : []), ...(isPetQuery(query) ? EXPERIMENTAL_EXPANSION.pet : []), ...(isBooksQuery(query) ? EXPERIMENTAL_EXPANSION.books : []), ...(isMusicQuery(query) ? EXPERIMENTAL_EXPANSION.music : [])
   ];
+}
+
+function createCategoryRetailer({ key, label, priority, searchUrl, focus }) {
+  return {
+    key,
+    label,
+    priority,
+    defaultEnabled: false,
+    provider: "direct",
+    strategy: "direct-html-retail",
+    sourceType: "retailer",
+    defaultCondition: "Nou",
+    defaultSellerType: "Retailer",
+    estimatedCreditsPerPage: 0,
+    waitForMs: 0,
+    timeoutMs: 18000,
+    pageSize: 30,
+    maxPages: 1,
+    defaultLimit: 30,
+    defaultMaxPages: 1,
+    searchUrl,
+    pagedSearchUrl(query) { return this.searchUrl(query); },
+    prompt(query, limit) {
+      return buildBasePrompt(label, query, limit, `This is a ${focus} retailer. Keep purchasable product cards with the current payable price; exclude editorial content, category navigation, and promotional banners.`);
+    }
+  };
 }
 
 export const SITES = {
@@ -936,9 +1077,124 @@ export const SITES = {
     prompt(query, limit) {
       return buildBasePrompt("MODIVO Romania", query, limit, "This is a fashion retailer. Keep product cards with the current payable price and exclude filters and sponsored navigation.");
     }
-  }
+  },
+  ...Object.fromEntries([
+    createCategoryRetailer({
+      key: "ikea.com", label: "IKEA", priority: 23, focus: "furniture and home",
+      searchUrl: (query) => `https://www.ikea.com/ro/ro/search/?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "jysk.ro", label: "JYSK", priority: 24, focus: "furniture and home",
+      searchUrl: (query) => `https://jysk.ro/cauta?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "mobexpert.ro", label: "Mobexpert", priority: 25, focus: "furniture and home",
+      searchUrl: (query) => `https://mobexpert.ro/search?query=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "dedeman.ro", label: "Dedeman", priority: 26, focus: "DIY, tools, and home improvement",
+      searchUrl: (query) => `https://www.dedeman.ro/ro/cauta/s/${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "leroymerlin.ro", label: "Leroy Merlin", priority: 27, focus: "DIY, tools, and home improvement",
+      searchUrl: (query) => `https://www.leroymerlin.ro/products?query=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "hornbach.ro", label: "HORNBACH", priority: 28, focus: "DIY, tools, and home improvement",
+      searchUrl: (query) => `https://www.hornbach.ro/cauta/?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "decathlon.ro", label: "Decathlon", priority: 29, focus: "sports and outdoor",
+      searchUrl: (query) => `https://www.decathlon.ro/search?query=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "sportvision.ro", label: "Sport Vision", priority: 30, focus: "sports and outdoor",
+      searchUrl: (query) => `https://www.sportvision.ro/catalogsearch/result/?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "intersport.ro", label: "INTERSPORT", priority: 31, focus: "sports and outdoor",
+      searchUrl: (query) => `https://www.intersport.ro/catalogsearch/result/?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "f64.ro", label: "F64", priority: 32, focus: "photo and video equipment",
+      searchUrl: (query) => `https://www.f64.ro/${encodeSearchText(query)}?map=ft`
+    }),
+    createCategoryRetailer({
+      key: "photosetup.ro", label: "Photosetup", priority: 33, focus: "photo and video equipment",
+      searchUrl: (query) => `https://www.photosetup.ro/catalogsearch/result/?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "soundcreation.ro", label: "SoundCreation", priority: 34, focus: "musical instruments and pro audio",
+      searchUrl: (query) => `https://www.soundcreation.ro/catalogsearch/result/?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "mcmusic.ro", label: "M&C Musical Instruments", priority: 35, focus: "musical instruments and pro audio",
+      searchUrl: (query) => `https://www.mcmusic.ro/catalogsearch/result/?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "carturesti.ro", label: "Cărturești", priority: 36, focus: "books, games, and collectibles",
+      searchUrl: (query) => `https://carturesti.ro/search?query=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "libris.ro", label: "Libris", priority: 37, focus: "books, games, and collectibles",
+      searchUrl: (query) => `https://www.libris.ro/search?query=${encodeSearchText(query)}`
+    }),
+    ...[
+      ["noriel.ro", "Noriel", "baby and kids"], ["nichiduta.ro", "Nichiduta", "baby and kids"], ["bebetei.ro", "Bebe Tei", "baby and kids"],
+      ["notino.ro", "Notino", "beauty and personal care"], ["douglas.ro", "Douglas", "beauty and personal care"], ["sephora.ro", "Sephora", "beauty and personal care"],
+      ["zooplus.ro", "Zooplus", "pet supplies"], ["animax.ro", "Animax", "pet supplies"], ["petmart.ro", "PetMart", "pet supplies"],
+      ["redgoblin.ro", "Red Goblin", "toys and hobby"], ["regatuljocurilor.ro", "Regatul Jocurilor", "toys and hobby"], ["bricksdepot.ro", "Bricks Depot", "toys and hobby"]
+    ].map(([key, label, focus], index) => createCategoryRetailer({
+      key, label, focus, priority: 38 + index,
+      searchUrl: (query) => `https://www.${key}/catalogsearch/result/?q=${encodeSearchText(query)}`
+    })),
+    ...EXPERIMENTAL_EXPANSION_SITE_KEYS.filter((key) => !["altex.ro", "intersport.ro", "evomag.ro", "notino.ro", "animax.ro", "petmart.ro", "zooplus.ro", "mcmusic.ro", "soundcreation.ro"].includes(key)).map((key, index) => createCategoryRetailer({
+      key,
+      label: key.replace(/^www\./, "").replace(/\.(ro|com|eu|de)$/, ""),
+      priority: 60 + index,
+      focus: "experimental niche retail",
+      searchUrl: (query) => `https://www.${key}/catalogsearch/result/?q=${encodeSearchText(query)}`
+    }))
+  ].map((site) => [site.key, site]))
 
 };
+
+const SITE_NICHE_KEYS = new Map([
+  ["marketplaces", ["olx.ro", "vinted.ro", "lajumate.ro", "okazii.ro", "publi24.ro", "anuntul.ro", "price.ro", "shopmania.ro", "compari.ro"]],
+  ["tech", ["flip.ro", "klap.ro", "emag.ro", "evomag.ro", "cel.ro", "pcgarage.ro", "flanco.ro", "altex.ro"]],
+  ["automotive", ["autovit.ro", "bestauto.ro"]],
+  ["fashion", PREMIUM_FASHION_SITE_KEYS],
+  ["home", PREMIUM_HOME_SITE_KEYS],
+  ["diy", PREMIUM_DIY_SITE_KEYS],
+  ["sport", PREMIUM_SPORT_SITE_KEYS],
+  ["photo", PREMIUM_PHOTO_SITE_KEYS],
+  ["music", PREMIUM_MUSIC_SITE_KEYS],
+  ["books", PREMIUM_BOOKS_SITE_KEYS], ["baby", PREMIUM_BABY_SITE_KEYS], ["beauty", PREMIUM_BEAUTY_SITE_KEYS], ["pet", PREMIUM_PET_SITE_KEYS], ["hobby", PREMIUM_HOBBY_SITE_KEYS]
+]);
+
+for (const [niche, siteKeys] of SITE_NICHE_KEYS) {
+  for (const siteKey of siteKeys) {
+    if (SITES[siteKey]) SITES[siteKey].niches = [...new Set([...(SITES[siteKey].niches || []), niche])];
+  }
+}
+
+for (const [niche, siteKeys] of Object.entries(EXPERIMENTAL_EXPANSION)) {
+  for (const siteKey of siteKeys) {
+    if (SITES[siteKey]) SITES[siteKey].niches = [...new Set([...(SITES[siteKey].niches || []), niche])];
+  }
+}
+
+const ACTIVE_SOURCE_KEYS = new Set([
+  ...FREE_DEFAULT_SITE_KEYS,
+  ...FREE_CAR_SITE_KEYS,
+  ...FREE_TECH_SITE_KEYS
+]);
+
+for (const [siteKey, site] of Object.entries(SITES)) {
+  site.integrationStatus = ACTIVE_SOURCE_KEYS.has(siteKey)
+    ? SOURCE_INTEGRATION_STATES.active
+    : SOURCE_INTEGRATION_STATES.experimental;
+}
 
 export function getSite(siteKey) {
   const site = SITES[siteKey];

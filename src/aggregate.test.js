@@ -655,3 +655,41 @@ test("rejects phone variants when the query asks for the base model", () => {
   assert.deepEqual(urls, ["https://price.ro/base"]);
   assert.equal(aggregated.results[0].secondaryMatches[0].keywordSignals.variantMismatch, "extra_pro");
 });
+
+test("keeps the best overall offer separate from the closest strong match", () => {
+  const query = "iphone 15 128GB";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "Apple iPhone 15 128GB impecabil cu garanție",
+        price: "2500 lei",
+        condition: "folosit",
+        location: "Cluj-Napoca",
+        postedAt: "Azi",
+        url: "https://olx.ro/iphone-cluj"
+      },
+      {
+        title: "Apple iPhone 15 128GB stare bună",
+        price: "2700 lei",
+        condition: "folosit",
+        location: "Voluntari (Ilfov)",
+        postedAt: "Azi",
+        url: "https://olx.ro/iphone-voluntari"
+      }
+    ])
+  ], {
+    viewerLocation: {
+      city: "București",
+      countryCode: "RO",
+      latitude: 44.4268,
+      longitude: 26.1025,
+      source: "edge",
+      isApproximate: true
+    }
+  });
+
+  assert.equal(aggregated.summary.viewerLocation.city, "București");
+  assert.equal(aggregated.summary.closestUsedOffer.url, "https://olx.ro/iphone-voluntari");
+  assert.ok(aggregated.summary.closestUsedOffer.proximity.distanceKm < 20);
+  assert.ok(aggregated.summary.bestUsedOffer);
+});

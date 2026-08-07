@@ -62,12 +62,12 @@ This file tracks marketplaces we still need to add or harden before advertising 
 
 ## Coverage and Provider Audit (2026-07-20)
 
-There are 26 registered adapters in `src/sites.js`. Twelve are Free standard or conditional, and fourteen are Premium:
+There are 43 registered adapters in `src/sites.js`. Twelve are Free standard or conditional, and thirty-one are Premium:
 
 - Classified / used: OLX, Vinted, Lajumate, Okazii, Publi24, Anuntul, Autovit and BestAuto for car-like queries, plus Flip and Klap for refurbished-tech queries.
 - New-price benchmarks: Price.ro and ShopMania.
 
-The general Premium adapters are Compari, eMAG, evoMAG, PC Garage, Altex, Flanco, and CEL.ro. Fashion-related Premium searches additionally include Sizeer, ePantofi, Fashion Days, Zalando, ABOUT YOU, Answear, and MODIVO. Premium is an access/coverage tier, not a provider choice: all sources run direct first, and only the explicit browser allowlist can start Browser Run.
+The general Premium adapters are Compari, eMAG, evoMAG, PC Garage, Altex, Flanco, and CEL.ro. Fashion-related Premium searches additionally include Sizeer, ePantofi, Fashion Days, Zalando, ABOUT YOU, Answear, and MODIVO; home/furniture searches add IKEA, JYSK, and Mobexpert; DIY/tool searches add Dedeman, Leroy Merlin, and HORNBACH; sport/outdoor searches add Decathlon, Sport Vision, and INTERSPORT; photo/video searches add F64 and Photosetup; music/audio searches add SoundCreation and M&C Musical Instruments; book/game/collectible searches add Cărturești and Libris. Premium is an access/coverage tier, not a provider choice: all sources run direct first, and only the explicit browser allowlist can start Browser Run.
 
 A live direct search for `iphone 15 pro` returned usable listings from OLX, Vinted, Lajumate, and Publi24 with zero provider credits. Okazii returned a Cloudflare challenge. Anuntul, Price.ro, and ShopMania completed without a transport error but returned no included listings. This is a one-query smoke test, not a general availability score, but it means the current "active" list should not be treated as nine equally healthy sources.
 

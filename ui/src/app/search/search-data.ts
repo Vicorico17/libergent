@@ -78,6 +78,12 @@ export type ApiListing = {
     conditionSignals?: string[];
   } | null;
   whyThisDeal?: string[];
+  proximity?: {
+    distanceKm?: number;
+    listingCity?: string;
+    label?: string;
+    isApproximate?: boolean;
+  } | null;
   relevanceScore?: number;
   listingType?: string;
   queryType?: string;
@@ -123,6 +129,13 @@ export type SearchPayload = {
       refinements?: string[];
     };
     recommendationMode?: "deal" | "match";
+    viewerLocation?: {
+      city?: string;
+      region?: string;
+      countryCode?: string;
+      source?: "edge" | "manual" | "demo";
+      isApproximate?: boolean;
+    } | null;
     totalListings?: number;
     searchedAt?: string;
     marketplaces?: number;
@@ -152,6 +165,7 @@ export type SearchPayload = {
     duplicateListings?: number;
     bestOffer?: ApiListing | null;
     bestUsedOffer?: ApiListing | null;
+    closestUsedOffer?: ApiListing | null;
     bestNewBenchmark?: ApiListing | null;
   };
   error?: string;
@@ -236,6 +250,12 @@ export type SearchResultItem = {
     conditionSignals: string[];
   } | null;
   whyThisDeal: string[];
+  proximity: {
+    distanceKm: number;
+    listingCity: string;
+    label: string;
+    isApproximate: boolean;
+  } | null;
   relevanceScore: number;
   listingType: string;
   queryType: string;
@@ -321,6 +341,21 @@ const platformLabels: Record<string, string> = {
   "aboutyou.ro": "ABOUT YOU",
   "answear.ro": "ANSWEAR",
   "modivo.ro": "MODIVO",
+  "ikea.com": "IKEA",
+  "jysk.ro": "JYSK",
+  "mobexpert.ro": "MOBEXPERT",
+  "dedeman.ro": "DEDEMAN",
+  "leroymerlin.ro": "LEROY MERLIN",
+  "hornbach.ro": "HORNBACH",
+  "decathlon.ro": "DECATHLON",
+  "sportvision.ro": "SPORT VISION",
+  "intersport.ro": "INTERSPORT",
+  "f64.ro": "F64",
+  "photosetup.ro": "PHOTOSETUP",
+  "soundcreation.ro": "SOUNDCREATION",
+  "mcmusic.ro": "M&C MUSIC",
+  "carturesti.ro": "CĂRTUREȘTI",
+  "libris.ro": "LIBRIS",
 };
 
 export function mapSearchResults(payload: SearchPayload): SearchResultItem[] {
@@ -401,6 +436,14 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     priceInsight: normalizePriceInsight(item.priceInsight),
     phoneSpecs: normalizePhoneSpecs(item.phoneSpecs),
     whyThisDeal: normalizeStringList(item.whyThisDeal),
+    proximity: item.proximity && Number.isFinite(item.proximity.distanceKm)
+      ? {
+          distanceKm: Number(item.proximity.distanceKm),
+          listingCity: String(item.proximity.listingCity || item.location || ""),
+          label: String(item.proximity.label || `aprox. ${item.proximity.distanceKm} km`),
+          isApproximate: item.proximity.isApproximate !== false,
+        }
+      : null,
     relevanceScore: pickRelevanceScore(item),
     listingType: item.listingType || "main_product",
     queryType: item.queryType || "main_product",

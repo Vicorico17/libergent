@@ -23,7 +23,7 @@ The search page keeps diagnostics collapsed under **Raport Căutare**. That pane
 
 ## Marketplace coverage
 
-There are 26 registered adapters. A source being registered does not guarantee that it will return listings for every query; marketplace availability, markup, and anti-bot behavior can change independently.
+There are 43 registered adapters. A source being registered does not guarantee that it will return listings for every query; marketplace availability, markup, and anti-bot behavior can change independently.
 
 ### Free
 
@@ -60,11 +60,16 @@ Premium includes the query-routed Free sources, seven general retail/price-bench
 
 Fashion queries (for example sneakers, shoes, clothing, bags, or fashion brands) also search Sizeer, ePantofi, Fashion Days, Zalando, ABOUT YOU, Answear, and MODIVO as direct-first new-price benchmarks. They are intentionally skipped for unrelated searches.
 
+Home/furniture searches also add IKEA, JYSK, and Mobexpert; DIY/tool searches add Dedeman, Leroy Merlin, and HORNBACH; sport/outdoor searches add Decathlon, Sport Vision, and INTERSPORT. These niche retailers are direct-first benchmarks and are only selected when the query matches their category.
+
+Photo/video searches add F64 and Photosetup; music/audio searches add SoundCreation and M&C Musical Instruments; book/game/collectible searches add Cărturești and Libris.
+
 Okazii is the only Free source eligible for the same conditional browser fallback during a Premium search. All eligible sources share one bounded browser session. Browser automation is never started when the direct result already contains usable cards.
 
 CEL was tested with Browser Run after direct timeouts, but the browser timed out without extracting cards as well. It intentionally remains direct-only so it does not add browser cost and latency without improving coverage.
 
 See [docs/marketplace-integration-todo.md](docs/marketplace-integration-todo.md) for live-source findings, candidate marketplaces, and integration priorities.
+See [docs/niche-catalog.md](docs/niche-catalog.md) for the category-to-shop catalog and the contribution path for new shops.
 
 ## How search results are processed
 
@@ -98,6 +103,14 @@ The implementation is product-agnostic rather than Mustang-specific:
 Unknown products still use the generic token-matching path, but a one-word unknown query cannot receive the same confidence as a recognized exact entity. To add another product family, extend the catalog and family rules in `src/query-understanding.js`, add its category-specific eligibility rules in `src/relevance.js` if needed, then cover the interpretation, routing, exclusions, and comparable cohort in the corresponding tests.
 
 The search response exposes `summary.queryUnderstanding` and `summary.recommendationMode`. The UI labels a result **Best Used Deal** only when comparable price evidence supports that claim; otherwise it uses the more conservative **Top Match**. Feedback can include a structured reason, allowing search-quality failures such as wrong product, wrong variant, accessory/part, suspicious price, or stale listing to be measured separately.
+
+### Closest relevant deal
+
+On Cloudflare, LiberGent uses the request's coarse edge location to estimate the user's city. It never reads, returns, or stores the visitor's raw IP address. Recognized cities are reduced to fixed city-center coordinates before distance calculation, and listing locations are resolved locally from the marketplace's public city text.
+
+Proximity does not change the main recommendation score. The API keeps **Best Used Deal** as the strongest overall offer and separately exposes `summary.closestUsedOffer`, chosen only from sufficiently relevant used offers with a resolvable city. The UI labels all distances as approximate and asks the buyer to confirm the exact location with the seller. Premium cache entries include only a normalized coarse-location key, preventing one city's closest result from being served to another city.
+
+For local demonstrations, `npm run dev` uses București as the explicitly labeled demo city. Override it with `LIBERGENT_DEMO_CITY`, or append `near=<Romanian city>` to a search API/page URL. Production uses Cloudflare request metadata automatically and needs no geolocation API key.
 
 ## Ranking and price intelligence
 
@@ -264,8 +277,14 @@ An aggregated response contains per-source results plus a summary similar to:
       "category": "phone",
       "confidence": "high"
     },
-    "recommendationMode": "best-used-deal",
+    "recommendationMode": "deal",
+    "viewerLocation": {
+      "city": "București",
+      "source": "edge",
+      "isApproximate": true
+    },
     "bestUsedOffer": {},
+    "closestUsedOffer": {},
     "bestNewBenchmark": {},
     "priceIntelligence": {}
   },

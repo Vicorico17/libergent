@@ -11,9 +11,11 @@ import { buildHistoryPayload, logSearchEvent } from "./history.js";
 import { PREMIUM_SITE_KEYS, getDefaultSiteKeys, getPremiumSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
-import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, isSupabaseConfigured } from "./supabase.js";
+import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertShopSuggestionToSupabase, isSupabaseConfigured, listShopSuggestionsFromSupabase, updateShopSuggestionStatusInSupabase } from "./supabase.js";
+import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
+import { resolveViewerLocation } from "./location-intelligence.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -210,6 +212,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
+      const viewerLocation = resolveViewerLocation({
+        headers: req.headers,
+        overrideCity: url.searchParams.get("near") || "",
+        fallbackCity: process.env.LIBERGENT_DEMO_CITY || ""
+      });
       const limit = parseBoundedPositiveInteger(limitParam, {
         name: "limit",
         max: MAX_API_SEARCH_LIMIT
@@ -223,7 +230,7 @@ const server = http.createServer(async (req, res) => {
         : site === "default"
           ? getDefaultSiteKeys()
           : [getSite(site).key];
-      const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys });
+      const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys, viewerLocation });
       await logSearchEvent({ query, condition, provider, siteKeys, payload });
       sendJson(res, 200, payload);
     } catch (error) {
@@ -252,6 +259,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
+      const viewerLocation = resolveViewerLocation({
+        headers: req.headers,
+        overrideCity: url.searchParams.get("near") || "",
+        fallbackCity: process.env.LIBERGENT_DEMO_CITY || ""
+      });
       if (site !== "all" && site !== "default") {
         sendJson(res, 400, { error: "Premium search currently supports site=all or site=default." });
         return;
@@ -268,7 +280,8 @@ const server = http.createServer(async (req, res) => {
       const payload = aggregateMarketplaceResults([...freePayload.results, ...premiumPayload.results], {
         condition,
         creditBudget: freePayload.summary?.creditBudget || 0,
-        creditsUsed: freePayload.summary?.creditsUsed || 0
+        creditsUsed: freePayload.summary?.creditsUsed || 0,
+        viewerLocation
       });
       payload.searchTier = "premium";
       payload.summary.premiumMarketplaces = premiumSiteKeys.length;
@@ -395,6 +408,30 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
     }
+    return;
+  }
+
+  if (apiPath === "/api/shop-suggestions") {
+    if (req.method !== "POST") { sendJson(res, 405, { error: "Method not allowed" }); return; }
+    const parsedBody = await readJsonBody(req);
+    try {
+      const suggestion = normalizeShopSuggestion(parsedBody.data || {});
+      await insertShopSuggestionToSupabase(suggestion);
+      sendJson(res, 201, { ok: true, status: "pending" });
+    } catch (error) { sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) }); }
+    return;
+  }
+
+  if (apiPath === "/api/admin/shop-suggestions") {
+    if (!isAuthorizedAdminRequest(req, url)) { sendJson(res, 401, { error: "Unauthorized" }); return; }
+    try {
+      if (req.method === "GET") sendJson(res, 200, { suggestions: await listShopSuggestionsFromSupabase() });
+      else if (req.method === "PATCH") {
+        const parsedBody = await readJsonBody(req);
+        await updateShopSuggestionStatusInSupabase(String(parsedBody.data?.id || ""), normalizeShopSuggestionStatus(parsedBody.data?.status));
+        sendJson(res, 200, { ok: true });
+      } else sendJson(res, 405, { error: "Method not allowed" });
+    } catch (error) { sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) }); }
     return;
   }
 

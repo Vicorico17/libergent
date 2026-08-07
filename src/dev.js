@@ -6,7 +6,8 @@ const processes = [
     env: {
       ...process.env,
       HOST: process.env.HOST || "127.0.0.1",
-      PORT: process.env.PORT || "8787"
+      PORT: process.env.PORT || "8787",
+      LIBERGENT_DEMO_CITY: process.env.LIBERGENT_DEMO_CITY || "București"
     }
   }),
   spawn("npm", ["--prefix", "ui", "run", "dev"], {

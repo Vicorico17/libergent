@@ -1,6 +1,21 @@
 create extension if not exists pgcrypto;
 create extension if not exists unaccent;
 
+-- Fresh-install baseline for moderated catalog growth. Existing deployments can run
+-- supabase/shop_suggestions.sql independently; statements are idempotent.
+create table if not exists public.shop_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(name) between 2 and 100),
+  url text not null check (url ~* '^https?://'),
+  niche text not null check (char_length(niche) between 2 and 40),
+  note text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+alter table public.shop_suggestions enable row level security;
+create index if not exists shop_suggestions_status_created_at_idx on public.shop_suggestions (status, created_at desc);
+
 create table if not exists public.search_events (
   id uuid primary key default gen_random_uuid(),
   query text not null,
@@ -71,6 +86,18 @@ create table if not exists public.saved_searches (
   unique (email, query)
 );
 
+create table if not exists public.vehicle_price_observations (
+  id uuid primary key default gen_random_uuid(),
+  listing_url text not null,
+  source text not null default '',
+  title text not null default '',
+  price_ron numeric not null check (price_ron >= 0),
+  observed_day date not null default current_date,
+  observed_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (listing_url, observed_day)
+);
+
 alter table public.email_leads
   drop constraint if exists email_leads_email_check,
   drop constraint if exists email_leads_email_format_check;
@@ -122,6 +149,9 @@ create index if not exists saved_searches_updated_at_idx
 
 create index if not exists saved_searches_notifications_idx
   on public.saved_searches (notifications_enabled, last_checked_at);
+
+create index if not exists vehicle_price_observations_listing_date_idx
+  on public.vehicle_price_observations (listing_url, observed_at asc);
 
 create or replace function public.log_search_event(
   query_value text,

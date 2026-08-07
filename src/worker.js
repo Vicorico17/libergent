@@ -6,13 +6,15 @@ import { runMarketplaceHealthChecks } from "./health.js";
 import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
-import { findWhatsAppConversationOwner, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload, readWhatsAppMessagesFromSupabase } from "./supabase.js";
+import { findWhatsAppConversationOwner, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listShopSuggestionsFromSupabase, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, updateShopSuggestionStatusInSupabase } from "./supabase.js";
+import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getDefaultSiteKeys, getPremiumSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
 import { benchmarkMarketplaceWithBrowser, revealOlxPhonesWithBrowser, searchMarketplacesWithBrowser } from "./providers/cloudflare-browser.js";
 import { parseListingDetailsHtml } from "./listing-details.js";
+import { resolveViewerLocation, viewerLocationCacheKey } from "./location-intelligence.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -92,7 +94,7 @@ function preferBrowserFallback(directResult, browserResult) {
   return browserResult;
 }
 
-function buildPremiumCacheRequest(request, params) {
+function buildPremiumCacheRequest(request, params, viewerLocation = null) {
   const cacheUrl = new URL("/api/search/premium-cache/v5", request.url);
   cacheUrl.searchParams.set("q", params.query.trim().toLocaleLowerCase("ro-RO"));
   cacheUrl.searchParams.set("condition", params.condition);
@@ -100,6 +102,7 @@ function buildPremiumCacheRequest(request, params) {
   cacheUrl.searchParams.set("site", params.site);
   cacheUrl.searchParams.set("limit", String(params.limit ?? ""));
   cacheUrl.searchParams.set("pages", String(params.maxPages ?? ""));
+  cacheUrl.searchParams.set("near", viewerLocationCacheKey(viewerLocation));
   return new Request(cacheUrl, { method: "GET" });
 }
 
@@ -404,6 +407,18 @@ async function persistSearchEvent(entry, env) {
   }
 }
 
+async function persistVehiclePriceHistory(results, env) {
+  if (!isSupabaseConfigured(env)) return;
+  const listings = results.flatMap((result) => result?.items || [])
+    .filter((item) => ["autovit.ro", "bestauto.ro"].includes(item?.site));
+  if (!listings.length) return;
+  try {
+    await insertVehiclePriceObservations(listings, env);
+  } catch (error) {
+    console.warn("Failed to persist vehicle price observations:", error instanceof Error ? error.message : String(error));
+  }
+}
+
 async function readRequestTextWithLimit(request, maxBytes) {
   const contentLength = Number.parseInt(request.headers.get("content-length") || "", 10);
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
@@ -666,6 +681,11 @@ async function handleApi(request, env, context) {
   if (apiPath === "/api/search" || apiPath === "/api/search/free") {
     try {
       const { query, condition, provider, site, limit, maxPages } = getSearchRequestParams(url);
+      const viewerLocation = resolveViewerLocation({
+        cf: request.cf,
+        headers: request.headers,
+        overrideCity: url.searchParams.get("near") || ""
+      });
       const siteKeys = getFreeSearchSiteKeys(site, query);
       const freeProvider = provider === "auto" ? "direct" : provider;
 
@@ -675,10 +695,12 @@ async function handleApi(request, env, context) {
         provider: freeProvider,
         limit,
         maxPages,
-        siteKeys
+        siteKeys,
+        viewerLocation
       });
 
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider: freeProvider, siteKeys, payload }), env);
+      await persistVehiclePriceHistory(payload.results || [], env);
       return json({ ...payload, searchTier: "free" }, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -699,11 +721,16 @@ async function handleApi(request, env, context) {
     try {
       const params = getSearchRequestParams(url);
       const { query, condition, provider, site, limit, maxPages } = params;
+      const viewerLocation = resolveViewerLocation({
+        cf: request.cf,
+        headers: request.headers,
+        overrideCity: url.searchParams.get("near") || ""
+      });
       if (site !== "all" && site !== "default") {
         return json({ error: "Premium search currently supports site=all or site=default." }, 400);
       }
 
-      const cacheRequest = buildPremiumCacheRequest(request, params);
+      const cacheRequest = buildPremiumCacheRequest(request, params, viewerLocation);
       const cachedResponse = await readPremiumSearchCache(cacheRequest);
       if (cachedResponse) return cachedResponse;
 
@@ -728,7 +755,8 @@ async function handleApi(request, env, context) {
         {
           condition,
           creditBudget: freePayload.summary?.creditBudget || 0,
-          creditsUsed: freePayload.summary?.creditsUsed || 0
+          creditsUsed: freePayload.summary?.creditsUsed || 0,
+          viewerLocation
         }
       );
       payload.searchTier = "premium";
@@ -744,6 +772,7 @@ async function handleApi(request, env, context) {
 
       const siteKeys = [...freeSiteKeys, ...premiumSiteKeys];
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider: "premium-browser", siteKeys, payload }), env);
+      await persistVehiclePriceHistory([...freeResults, ...premiumResults], env);
       writePremiumSearchCache(cacheRequest, payload, context);
       return json(payload, 200);
     } catch (error) {
@@ -850,6 +879,28 @@ async function handleApi(request, env, context) {
       const statusCode = message.includes("not configured") ? 501 : message.includes("large") ? 413 : 400;
       return json({ ok: false, error: message }, statusCode);
     }
+  }
+
+  if (apiPath === "/api/shop-suggestions") {
+    if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    const parsedBody = await parseJsonRequest(request);
+    try {
+      await insertShopSuggestionToSupabase(normalizeShopSuggestion(parsedBody.data || {}), env);
+      return json({ ok: true, status: "pending" }, 201);
+    } catch (error) { return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400); }
+  }
+
+  if (apiPath === "/api/admin/shop-suggestions") {
+    if (!isAuthorizedAdminRequest(request, url, env)) return json({ error: "Unauthorized" }, 401);
+    try {
+      if (request.method === "GET") return json({ suggestions: await listShopSuggestionsFromSupabase(env) }, 200);
+      if (request.method === "PATCH") {
+        const parsedBody = await parseJsonRequest(request);
+        await updateShopSuggestionStatusInSupabase(String(parsedBody.data?.id || ""), normalizeShopSuggestionStatus(parsedBody.data?.status), env);
+        return json({ ok: true }, 200);
+      }
+      return json({ error: "Method not allowed" }, 405);
+    } catch (error) { return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400); }
   }
 
   if (apiPath === "/api/history") {
@@ -995,6 +1046,17 @@ async function handleApi(request, env, context) {
       }, 200);
     } catch (error) {
       return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 502);
+    }
+  }
+
+  if (apiPath === "/api/vehicle/price-history") {
+    if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+    try {
+      const targetUrl = parseSupportedMarketplaceUrl(url.searchParams.get("url"));
+      const history = await readVehiclePriceHistoryFromSupabase(targetUrl.toString(), env);
+      return json({ ok: true, history }, 200);
+    } catch (error) {
+      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400);
     }
   }
 

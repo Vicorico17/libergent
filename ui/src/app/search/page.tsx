@@ -1,9 +1,9 @@
 "use client"
 
-import { Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
+import { Fragment, Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { Bookmark, CalendarDays, Copy, ExternalLink, Lock, MapPin, MessageSquare, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
+import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ClipboardCheck, Copy, ExternalLink, Lock, MapPin, MessageSquare, ShieldCheck, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import {
@@ -33,6 +33,16 @@ const FREE_SOURCES_LIST = [
 const PREMIUM_FILTER_SOURCES = [
   "EMAG", "EVOMAG", "CEL.RO", "COMPARI.RO", "PC GARAGE", "FLANCO", "ALTEX",
   "SIZEER", "EPANTOFI", "FASHION DAYS", "ZALANDO", "ABOUT YOU", "ANSWEAR", "MODIVO",
+  "IKEA", "JYSK", "MOBEXPERT", "DEDEMAN", "LEROY MERLIN", "HORNBACH",
+  "DECATHLON", "SPORT VISION", "INTERSPORT",
+  "F64", "PHOTOSETUP", "SOUNDCREATION", "M&C MUSIC", "CĂRTUREȘTI", "LIBRIS",
+]
+const PREMIUM_SOURCE_GROUPS = [
+  { label: "Tech & general", items: ["EMAG", "EVOMAG", "CEL.RO", "COMPARI.RO", "PC GARAGE", "FLANCO", "ALTEX"] },
+  { label: "Fashion & sneakers", items: ["SIZEER", "EPANTOFI", "FASHION DAYS", "ZALANDO", "ABOUT YOU", "ANSWEAR", "MODIVO"] },
+  { label: "Casă & DIY", items: ["IKEA", "JYSK", "MOBEXPERT", "DEDEMAN", "LEROY MERLIN", "HORNBACH"] },
+  { label: "Sport & outdoor", items: ["DECATHLON", "SPORT VISION", "INTERSPORT"] },
+  { label: "Foto, muzică & colecții", items: ["F64", "PHOTOSETUP", "SOUNDCREATION", "M&C MUSIC", "CĂRTUREȘTI", "LIBRIS"] },
 ]
 const SOURCES_LIST = [...FREE_SOURCES_LIST, ...PREMIUM_FILTER_SOURCES]
 const SORT_OPTIONS = ["relevanță", "potrivire cuvinte cheie", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
@@ -51,6 +61,16 @@ type MarketplaceStatus = {
 }
 
 type PriceBenchmark = NonNullable<NonNullable<SearchPayload["summary"]>["priceIntelligence"]>
+type VehiclePriceHistory = {
+  firstObservedAt: string
+  lastObservedAt: string
+  daysOnMarket: number | null
+  initialPriceRon: number
+  latestPriceRon: number
+  priceChangeRon: number
+  priceChangePct: number | null
+  observations: Array<{ priceRon: number; observedAt: string }>
+}
 type QueryUnderstanding = NonNullable<NonNullable<SearchPayload["summary"]>["queryUnderstanding"]>
 
 // — Loader config —
@@ -93,6 +113,8 @@ const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const PREMIUM_WAITING_INSIGHTS = [
   "Comparăm ofertele second-hand cu prețurile produselor noi.",
   "Pentru căutările de fashion, verificăm și retaileri de sneakers, încălțăminte și îmbrăcăminte.",
+  "Pentru casă, DIY și sport, alegem retaileri potriviți categoriei căutate.",
+  "Pentru foto, muzică și cărți, comparăm ofertele noi cu anunțurile relevante din marketplace-uri.",
   "Eliminăm duplicatele, accesoriile și rezultatele care nu corespund căutării.",
   "Luăm în calcul prețul, starea, livrarea, locația și datele despre seller.",
   "Pregătim o recomandare clară, nu doar o listă lungă de anunțuri.",
@@ -231,11 +253,149 @@ function severityColor(severity = "neutral") {
 
 function buildSellerMessage(item: SearchResultItem, query: string) {
   const product = item.title || query || "produsul din anunț"
+  if (isLikelyVehicleSearch(`${query} ${item.title}`)) {
+    return [
+      `Bună! Mă interesează ${product}, văzut pe ${item.source}. Mai este disponibilă?`,
+      `Îmi puteți trimite VIN-ul pentru verificare și să-mi spuneți dacă există istoric service/facturi, daune sau revopsiri?`,
+      "Acceptați o verificare într-un service ales de cumpărător înainte de cumpărare? Care este prețul final?",
+    ].join(" ")
+  }
   return [
     `Bună! Sunt un asistent AI LiberGent și am văzut anunțul pentru ${product} pe ${item.source}.`,
     `Mai este disponibil? Prețul afișat este ${item.priceLabel}. Aș vrea să discut câteva detalii despre stare și dacă există flexibilitate la preț.`,
     "Dacă preferi să nu mai primești mesaje, spune-mi și mă opresc.",
   ].join(" ")
+}
+
+function CarBuyerJourney({ query, results }: { query: string; results: SearchResultItem[] }) {
+  const [monthlyBudget, setMonthlyBudget] = useState("1500")
+  const [months, setMonths] = useState("48")
+  const monthly = Number(monthlyBudget) || 0
+  const term = Math.max(1, Number(months) || 1)
+  // A conservative planning heuristic: 15% purchase costs and 20% of monthly budget reserved for ownership.
+  const targetPrice = Math.max(0, Math.round(monthly * 0.8 * term / 1.15 / 100) * 100)
+  const priced = results.filter((item) => typeof item.price === "number")
+  const withinBudget = priced.filter((item) => (item.price || 0) <= targetPrice).length
+
+  return (
+    <section className="flex flex-col gap-4 p-4" style={{ border: `1px solid ${INK}`, background: "white", boxShadow: `3px 3px 0 ${INK}`, fontFamily: MONO }}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase" style={{ color: PINK }}><Calculator size={13} /> Plan de cumpărare auto</div>
+          <h2 className="mt-1 text-[14px] font-bold uppercase">Alege următorul pas, nu doar anunțul</h2>
+        </div>
+        <span className="text-[9px] font-bold uppercase" style={{ color: `${INK}66` }}>{query}</span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <label className="text-[10px] font-bold uppercase">Buget lunar (RON)
+          <input value={monthlyBudget} onChange={(event) => setMonthlyBudget(event.target.value)} inputMode="numeric" className="mt-1 h-10 w-full px-3 text-[12px]" style={{ border: `1px solid ${INK}`, background: CREAM }} />
+        </label>
+        <label className="text-[10px] font-bold uppercase">Durată (luni)
+          <input value={months} onChange={(event) => setMonths(event.target.value)} inputMode="numeric" className="mt-1 h-10 w-full px-3 text-[12px]" style={{ border: `1px solid ${INK}`, background: CREAM }} />
+        </label>
+        <div className="flex flex-col justify-end">
+          <div className="h-10 px-3 flex items-center text-[11px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Țintă: {formatRon(targetPrice)}</div>
+        </div>
+      </div>
+      <p className="text-[10px] leading-relaxed" style={{ color: `${INK}99` }}>
+        Estimare de planificare: păstrează 20% din buget pentru costuri de utilizare și 15% pentru acte, verificare și rezervă. Nu este o ofertă de credit.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {[
+          { icon: BadgeCheck, title: "1. Scurtlist", text: `${withinBudget} oferte afișate sunt în ținta ta de preț.` },
+          { icon: ClipboardCheck, title: "2. Verifică", text: "Cere VIN-ul, istoricul și inspecția înainte de avans." },
+          { icon: ShieldCheck, title: "3. Decizie", text: "Compară prețul, riscurile și costul total înainte de contact." },
+        ].map(({ icon: Icon, title, text }) => <div key={title} className="p-3" style={{ border: `1px solid ${INK}33`, background: CREAM }}><Icon size={15} style={{ color: PINK }} /><div className="mt-2 text-[10px] font-bold uppercase">{title}</div><p className="mt-1 text-[10px] leading-relaxed" style={{ color: `${INK}99` }}>{text}</p></div>)}
+      </div>
+    </section>
+  )
+}
+
+function VehicleTrustChecklist({ item }: { item: SearchResultItem }) {
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const checks = [
+    ["vin", "Am primit VIN-ul și îl verific înainte de avans."],
+    ["history", "Am văzut istoricul service, facturile și eventualele daune."],
+    ["inspection", "Vânzătorul acceptă verificare într-un service ales de mine."],
+    ["documents", "Am verificat actele, proprietarul și condițiile de transfer."],
+  ] as const
+  const toggle = (key: string) => setChecked((current) => {
+    const next = new Set(current)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    trackSearchEvent("vehicle_trust_check", { check: key, listing_source: item.source, checked: next.has(key) })
+    return next
+  })
+  return (
+    <section className="flex flex-col gap-3">
+      <PanelHeader title="Încredere înainte de contact" />
+      <div className="p-4" style={{ border: `1px solid ${INK}`, background: CREAM }}>
+        <div className="mb-3 flex items-center justify-between gap-3"><span className="text-[10px] font-bold uppercase">Checklist cumpărător</span><span className="text-[10px] font-bold" style={{ color: checked.size === checks.length ? GREEN : PINK }}>{checked.size}/{checks.length}</span></div>
+        <div className="grid gap-2">
+          {checks.map(([key, label]) => <button key={key} type="button" onClick={() => toggle(key)} className="flex items-start gap-2 p-2 text-left text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}33`, background: "white" }}><span className="mt-0.5 flex h-4 w-4 flex-none items-center justify-center" style={{ border: `1px solid ${INK}`, background: checked.has(key) ? GREEN : "white" }}>{checked.has(key) && <Check size={11} />}</span>{label}</button>)}
+        </div>
+        <p className="mt-3 text-[9px] leading-relaxed" style={{ color: `${INK}77` }}>LiberGent semnalează informațiile disponibile din anunț; verificarea tehnică și juridică rămâne responsabilitatea cumpărătorului.</p>
+      </div>
+    </section>
+  )
+}
+
+function DealerEvidenceSnapshot({ item, details }: { item: SearchResultItem; details: ListingDetails | null }) {
+  const sellerLabel = details?.seller?.name || item.sellerType || "seller neidentificat"
+  const declaredProfessional = /profesionist|dealer|firm[aă]|companie/i.test(`${item.sellerType} ${sellerLabel}`)
+  const sellerRating = formatRating(details?.seller?.rating, details?.seller?.ratingScale, details?.seller?.reviewCount)
+  const evidence = [
+    { label: "Tip declarat", value: item.sellerType || "nepublicat", verified: Boolean(item.sellerType) },
+    { label: "Identitate seller", value: details?.seller?.name || "nu este disponibilă în datele extrase", verified: Boolean(details?.seller?.name) },
+    { label: "Rating marketplace", value: sellerRating, verified: sellerRating !== "n/a" },
+    { label: "Locație listing", value: details?.location || item.city || "nepublicată", verified: Boolean(details?.location || item.city) },
+  ]
+  return (
+    <section className="flex flex-col gap-3">
+      <PanelHeader title={declaredProfessional ? "Snapshot dealer" : "Snapshot seller"} />
+      <div className="p-4" style={{ border: `1px solid ${INK}`, background: "white" }}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><div className="text-[12px] font-bold uppercase">{sellerLabel}</div><div className="mt-1 text-[9px] font-bold uppercase" style={{ color: declaredProfessional ? GREEN : `${INK}66` }}>{declaredProfessional ? "seller profesional declarat" : "tip seller neconfirmat"}</div></div>
+          <span className="px-2 py-1 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: CREAM }}>{item.source}</span>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {evidence.map((entry) => <div key={entry.label} className="p-2" style={{ border: `1px solid ${INK}22`, background: CREAM }}><div className="flex items-center gap-1 text-[9px] font-bold uppercase" style={{ color: entry.verified ? GREEN : PINK }}>{entry.verified ? <BadgeCheck size={11} /> : "!"}{entry.label}</div><div className="mt-1 text-[10px] leading-relaxed">{entry.value}</div></div>)}
+        </div>
+        <div className="mt-3 p-3 text-[9px] leading-relaxed" style={{ border: `1px solid ${PINK}55`, background: `${PINK}0D` }}>
+          Acest profil descrie doar datele acestui anunț și marketplace. LiberGent nu unește încă anunțuri de pe platforme diferite fără o identitate de companie verificabilă.
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function VehicleCompareTray({ items, onRemove, onInspect }: { items: SearchResultItem[]; onRemove: (item: SearchResultItem) => void; onInspect: (item: SearchResultItem) => void }) {
+  if (!items.length) return null
+  const rows = [
+    { label: "Preț", value: (item: SearchResultItem) => item.priceLabel },
+    { label: "Verdict preț", value: (item: SearchResultItem) => item.priceInsight.label || "date insuficiente" },
+    { label: "Deal", value: (item: SearchResultItem) => `${item.dealQuality.label} · ${item.dealQuality.score}%` },
+    { label: "Risc", value: (item: SearchResultItem) => item.riskFlags.length ? item.riskFlags.slice(0, 2).map((flag) => flag.label).join(" · ") : "risc redus" },
+    { label: "Încredere date", value: (item: SearchResultItem) => `${item.evidenceConfidence.score}% · ${item.evidenceConfidence.label}` },
+    { label: "Seller", value: (item: SearchResultItem) => item.sellerType || "nespecificat" },
+    { label: "Publicat", value: (item: SearchResultItem) => item.postedDateLabel },
+    { label: "Față de piață", value: (item: SearchResultItem) => formatSignedPercent(item.priceInsight.priceDeltaPct) || "n/a" },
+  ]
+  return (
+    <section style={{ border: `1px solid ${INK}`, background: "white", fontFamily: MONO }}>
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3" style={{ borderBottom: `1px solid ${INK}` }}>
+        <div><div className="text-[10px] font-bold uppercase" style={{ color: PINK }}>Decizie</div><h2 className="text-[14px] font-bold uppercase">Compară {items.length} mașini</h2></div>
+        <span className="text-[9px] font-bold uppercase" style={{ color: `${INK}66` }}>maxim 3 · local în sesiunea curentă</span>
+      </div>
+      <div className="overflow-x-auto">
+        <div className="grid min-w-[660px]" style={{ gridTemplateColumns: `160px repeat(${items.length}, minmax(220px, 1fr))` }}>
+          <div className="p-3 text-[10px] font-bold uppercase" style={{ background: CREAM, borderRight: `1px solid ${INK}22` }}>Criteriu</div>
+          {items.map((item) => <div key={item.id} className="p-3" style={{ borderRight: `1px solid ${INK}22` }}><div className="line-clamp-2 text-[10px] font-bold uppercase">{item.title}</div><div className="mt-2 flex gap-2"><button type="button" onClick={() => onInspect(item)} className="px-2 py-1 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: "white" }}>Analiză</button><button type="button" onClick={() => onRemove(item)} className="px-2 py-1 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: CREAM }}>Scoate</button></div></div>)}
+          {rows.map((row) => <Fragment key={row.label}><div className="p-3 text-[10px] font-bold uppercase" style={{ background: CREAM, borderTop: `1px solid ${INK}22`, borderRight: `1px solid ${INK}22` }}>{row.label}</div>{items.map((item) => <div key={`${row.label}-${item.id}`} className="p-3 text-[10px] leading-relaxed" style={{ borderTop: `1px solid ${INK}22`, borderRight: `1px solid ${INK}22`, color: row.label === "Risc" && item.riskFlags.length ? PINK : INK }}>{row.value(item)}</div>)}</Fragment>)}
+        </div>
+      </div>
+    </section>
+  )
 }
 
 function trackSearchEvent(eventName: string, params: Record<string, string | number | boolean | undefined | null> = {}) {
@@ -1069,11 +1229,11 @@ function FilterPanel({ sort, setSort, sources, toggleSource, sourceTypes, toggle
           <FilterLabel>Surse</FilterLabel>
           <div className="flex flex-col gap-4">
             {[
-              { label: "Free", items: FREE_SOURCES_LIST },
-              { label: "Premium", items: PREMIUM_FILTER_SOURCES },
+              { label: "Free · marketplace-uri", items: FREE_SOURCES_LIST },
+              ...PREMIUM_SOURCE_GROUPS.map((group) => ({ ...group, label: `Premium · ${group.label}` })),
             ].map((group) => (
               <div key={group.label} className="flex flex-col gap-2.5">
-                <span className="text-[9px] font-bold uppercase" style={{ color: group.label === "Premium" ? PINK : `${INK}66` }}>
+                <span className="text-[9px] font-bold uppercase" style={{ color: group.label.startsWith("Premium") ? PINK : `${INK}66` }}>
                   {group.label}
                 </span>
                 {group.items.map((src) => (
@@ -1524,6 +1684,8 @@ function ResultCard({
   onInspect,
   isSaved,
   onToggleSaved,
+  isCompared = false,
+  onToggleCompare,
 }: {
   item: ResultItem
   query: string
@@ -1533,6 +1695,8 @@ function ResultCard({
   onInspect: (item: SearchResultItem) => void
   isSaved: boolean
   onToggleSaved: (item: SearchResultItem) => void
+  isCompared?: boolean
+  onToggleCompare?: (item: SearchResultItem) => void
 }) {
   const [hov, setHov] = useState(false)
   const { image, handleImageError } = useListingImage(item)
@@ -1602,6 +1766,16 @@ function ResultCard({
         >
           Analiză Libergent
         </button>
+        {onToggleCompare && isLikelyVehicleSearch(`${query} ${item.title}`) && (
+          <button
+            type="button"
+            onClick={() => onToggleCompare(item)}
+            className="flex min-h-9 items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-bold uppercase"
+            style={{ border: `1px solid ${INK}`, background: isCompared ? PINK : CREAM, color: isCompared ? "white" : INK, fontFamily: MONO }}
+          >
+            <ClipboardCheck size={12} strokeWidth={2.2} /> {isCompared ? "În comparație" : "Compară"}
+          </button>
+        )}
         {isLoggedIn ? (
           <>
           <button
@@ -1777,6 +1951,34 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
   )
 }
 
+function ClosestDealCard({ item, viewerCity, isBestOverall, onInspect }: { item: SearchResultItem; viewerCity: string; isBestOverall: boolean; onInspect: (item: SearchResultItem) => void }) {
+  return (
+    <section data-testid="closest-deal" style={{ border: `1px solid ${INK}`, background: "white", boxShadow: `3px 3px 0 ${INK}`, fontFamily: MONO }}>
+      <PanelHeader title={isBestOverall ? "Best Deal · Și cel mai aproape" : "Cel mai apropiat match bun"} />
+      <div className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center" style={{ background: CREAM }}>
+        <div className="min-w-0">
+          <div className="mb-3 flex flex-wrap gap-2">
+            <MetaChip tone="dark"><MapPin size={10} /> {item.proximity?.label || "distanță aproximativă"}</MetaChip>
+            <MetaChip>{item.proximity?.listingCity || item.city}</MetaChip>
+            <MetaChip tone="muted">din zona {viewerCity}</MetaChip>
+          </div>
+          <h3 className="text-[16px] font-bold uppercase leading-snug">{item.title}</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <span className="text-[20px] font-bold" style={{ color: PINK }}>{item.priceLabel}</span>
+            <span className="text-[10px] font-bold uppercase">{item.source} · scor {item.score}%</span>
+          </div>
+          <p className="mt-3 text-[9px] leading-relaxed" style={{ color: `${INK}77` }}>
+            Distanță estimată la nivel de oraș. Locația exactă și disponibilitatea trebuie confirmate cu vânzătorul.
+          </p>
+        </div>
+        <button type="button" onClick={() => onInspect(item)} className="min-h-11 px-5 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>
+          Analizează oferta
+        </button>
+      </div>
+    </section>
+  )
+}
+
 function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: SearchResultItem; usedItem: SearchResultItem | null; priceBenchmark?: PriceBenchmark; onInspect: (item: SearchResultItem) => void }) {
   const savings = priceBenchmark?.savingsVsNewPct
   const usedPrice = usedItem?.price ?? null
@@ -1864,6 +2066,7 @@ function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversation
   const [details, setDetails] = useState<ListingDetails | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(Boolean(item?.url))
   const [detailsError, setDetailsError] = useState("")
+  const [priceHistory, setPriceHistory] = useState<VehiclePriceHistory | null>(null)
   const { image, handleImageError } = useListingImage(item || {
     id: "empty",
     images: [],
@@ -1892,6 +2095,16 @@ function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversation
     return () => controller.abort()
   }, [item?.url])
 
+  useEffect(() => {
+    if (!item?.url || !isLikelyVehicleSearch(`${query} ${item.title}`)) return
+    const controller = new AbortController()
+    fetch(`/api/vehicle/price-history?url=${encodeURIComponent(item.url)}`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => { if (!controller.signal.aborted) setPriceHistory(payload?.history || null) })
+      .catch(() => { if (!controller.signal.aborted) setPriceHistory(null) })
+    return () => controller.abort()
+  }, [item?.title, item?.url, query])
+
   if (!item) return null
 
   const phone = item.phoneSpecs
@@ -1903,6 +2116,7 @@ function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversation
     ["Garanție", phone.warranty ? "da" : "n/a"],
     ["Factură", phone.invoice ? "da" : "n/a"],
   ] : []
+  const isVehicle = isLikelyVehicleSearch(`${query} ${item.title}`)
 
   return (
     <div className="fixed inset-0 z-[120] flex justify-end" role="dialog" aria-modal="true">
@@ -2058,6 +2272,27 @@ function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversation
                 <div className="flex flex-wrap gap-1.5">
                   {phone.conditionSignals.map((signal) => <MetaChip key={signal}>{signal}</MetaChip>)}
                 </div>
+              )}
+            </section>
+          )}
+
+          {isVehicle && <VehicleTrustChecklist item={item} />}
+
+          {isVehicle && <DealerEvidenceSnapshot item={item} details={details} />}
+
+          {isVehicle && (
+            <section className="flex flex-col gap-3">
+              <PanelHeader title="Istoric preț & timp în piață" />
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <DetailMetric label="Prima observare" value={priceHistory?.firstObservedAt ? formatDateTime(priceHistory.firstObservedAt) : "se colectează"} />
+                <DetailMetric label="Zile urmărite" value={priceHistory?.daysOnMarket === null || priceHistory?.daysOnMarket === undefined ? "se colectează" : String(priceHistory.daysOnMarket)} />
+                <DetailMetric label="Schimbare preț" value={priceHistory ? `${priceHistory.priceChangeRon > 0 ? "+" : ""}${formatRon(priceHistory.priceChangeRon)}` : "fără istoric"} />
+                <DetailMetric label="Evoluție" value={priceHistory?.priceChangePct === null || priceHistory?.priceChangePct === undefined ? "fără istoric" : formatSignedPercent(priceHistory.priceChangePct)} />
+              </div>
+              {priceHistory?.observations && priceHistory.observations.length > 1 ? (
+                <p className="p-3 text-[10px] leading-relaxed" style={{ border: `1px solid ${INK}22`, background: CREAM }}>Preț urmărit de la {formatRon(priceHistory.initialPriceRon)} la {formatRon(priceHistory.latestPriceRon)}, în {priceHistory.observations.length} scanări. Timpul indică observarea de LiberGent, nu data publicării anunțului.</p>
+              ) : (
+                <p className="p-3 text-[10px] leading-relaxed" style={{ border: `1px solid ${INK}22`, background: CREAM }}>LiberGent începe să urmărească acest anunț când îl vede în scanările marketplace-urilor. Revino după următoarea scanare pentru preț și timp observat.</p>
               )}
             </section>
           )}
@@ -2265,6 +2500,7 @@ function SearchResultsContent() {
   const isLoggedIn = account.status === "signed_in"
   const query = String(searchParams.get("q") || "").trim()
   const searchTier: SearchTier = searchParams.get("tier") === "premium" ? "premium" : "free"
+  const near = String(searchParams.get("near") || "").trim()
 
   const [sort, setSort]             = useState(() => readSearchFiltersStorage().sort)
   const [sources, setSources]       = useState<Set<string>>(() => readSearchFiltersStorage().sources)
@@ -2275,7 +2511,9 @@ function SearchResultsContent() {
   const [time, setTime]             = useState(() => formatSearchTime())
   const [results, setResults]       = useState<SearchResultItem[]>([])
   const [bestUsedOffer, setBestUsedOffer] = useState<SearchResultItem | null>(null)
+  const [closestUsedOffer, setClosestUsedOffer] = useState<SearchResultItem | null>(null)
   const [bestNewBenchmark, setBestNewBenchmark] = useState<SearchResultItem | null>(null)
+  const [viewerLocation, setViewerLocation] = useState<{ city: string; source: string } | null>(null)
   const [duplicateListings, setDuplicateListings] = useState(0)
   const [priceBenchmark, setPriceBenchmark] = useState<PriceBenchmark | undefined>()
   const [queryUnderstanding, setQueryUnderstanding] = useState<QueryUnderstanding | null>(null)
@@ -2293,6 +2531,7 @@ function SearchResultsContent() {
   const [searchReportOpen, setSearchReportOpen] = useState(false)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_RESULTS)
   const [selectedListing, setSelectedListing] = useState<SearchResultItem | null>(null)
+  const [comparedListings, setComparedListings] = useState<SearchResultItem[]>([])
   const [conversationState, setConversationState] = useState<{ ownerId: string; statuses: Record<string, string> }>({ ownerId: "", statuses: {} })
   const [savedListings, setSavedListings] = useState<Set<string>>(new Set())
   const [savedListingsOwnerId, setSavedListingsOwnerId] = useState("")
@@ -2378,7 +2617,9 @@ function SearchResultsContent() {
       if (!query) {
         setResults([])
         setBestUsedOffer(null)
+        setClosestUsedOffer(null)
         setBestNewBenchmark(null)
+        setViewerLocation(null)
         setDuplicateListings(0)
         setPriceBenchmark(undefined)
         setQueryUnderstanding(null)
@@ -2426,6 +2667,7 @@ function SearchResultsContent() {
         limit: String(SEARCH_RESULT_LIMIT),
         pages: String(SEARCH_PAGE_LIMIT),
       })
+      if (near) params.set("near", near)
 
       const searchEndpoint = searchTier === "premium" ? "/api/search/premium" : "/api/search/free"
       fetch(`${searchEndpoint}?${params.toString()}`, { signal: controller.signal })
@@ -2438,7 +2680,11 @@ function SearchResultsContent() {
           const mapped = mapSearchResults(payload).slice(0, SEARCH_RESULT_LIMIT)
           setResults(mapped)
           setBestUsedOffer(mapOffer(payload.summary?.bestUsedOffer, mapped) || mapped.find((item) => item.sourceKind === "used") || null)
+          setClosestUsedOffer(mapOffer(payload.summary?.closestUsedOffer, mapped))
           setBestNewBenchmark(mapOffer(payload.summary?.bestNewBenchmark, mapped) || mapped.find((item) => item.sourceKind === "new") || null)
+          setViewerLocation(payload.summary?.viewerLocation?.city
+            ? { city: payload.summary.viewerLocation.city, source: payload.summary.viewerLocation.source || "edge" }
+            : null)
           setDuplicateListings(payload.summary?.duplicateListings ?? 0)
           setPriceBenchmark(payload.summary?.priceIntelligence)
           setQueryUnderstanding(payload.summary?.queryUnderstanding || null)
@@ -2468,7 +2714,9 @@ function SearchResultsContent() {
           if (controller.signal.aborted) return
           setResults([])
           setBestUsedOffer(null)
+          setClosestUsedOffer(null)
           setBestNewBenchmark(null)
+          setViewerLocation(null)
           setDuplicateListings(0)
           setPriceBenchmark(undefined)
           setSearchedAt("")
@@ -2502,7 +2750,7 @@ function SearchResultsContent() {
       controller.abort()
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
     }
-  }, [query, searchTier])
+  }, [near, query, searchTier])
 
   useEffect(() => {
     const id = setInterval(() => setTime(formatSearchTime()), 30_000)
@@ -2552,9 +2800,23 @@ function SearchResultsContent() {
       removeSavedListing(account.userId, id)
     }
   }
+  const toggleComparedListing = (item: SearchResultItem) => {
+    setComparedListings((current) => {
+      const active = current.filter((entry) => results.some((result) => result.id === entry.id))
+      if (active.some((entry) => entry.id === item.id)) {
+        trackSearchEvent("vehicle_compare_remove", { listing_source: item.source })
+        return active.filter((entry) => entry.id !== item.id)
+      }
+      if (active.length >= 3) return active
+      trackSearchEvent("vehicle_compare_add", { listing_source: item.source, listing_title: item.title })
+      return [...active, item]
+    })
+  }
   const filteredResults = useMemo(() => {
     const base = results.filter((item) => {
-      if (sources.size > 0 && !sources.has(item.source)) return false
+      // Newly added experimental sources remain visible by default, even before
+      // they receive their own checkbox in the curated source list.
+      if (sources.size > 0 && SOURCES_LIST.includes(item.source) && !sources.has(item.source)) return false
       if (sourceTypes.size > 0 && !sourceTypes.has(item.sourceGroup)) return false
       if (conditions.size > 0 && !conditions.has(item.condition.toLowerCase())) return false
       if (priceMin && priceForSort(item, Number.NEGATIVE_INFINITY) < Number(priceMin)) return false
@@ -2582,22 +2844,31 @@ function SearchResultsContent() {
     return filteredResults.find((item) => item.id === bestNewBenchmark.id) || bestNewBenchmark
   }, [bestNewBenchmark, filteredResults])
 
+  const shownClosestOffer = useMemo(() => {
+    if (!closestUsedOffer) return null
+    return filteredResults.find((item) => item.id === closestUsedOffer.id) || closestUsedOffer
+  }, [closestUsedOffer, filteredResults])
+
   const regularResults = useMemo(() => {
     return filteredResults.filter((item) =>
-      item.id !== shownBestOffer?.id && item.id !== shownNewBenchmark?.id
+      item.id !== shownBestOffer?.id &&
+      item.id !== shownClosestOffer?.id &&
+      item.id !== shownNewBenchmark?.id
     )
-  }, [filteredResults, shownBestOffer, shownNewBenchmark])
+  }, [filteredResults, shownBestOffer, shownClosestOffer, shownNewBenchmark])
 
   const usedRegularResults = regularResults.filter((item) => item.sourceKind === "used")
   const newBenchmarkResults = regularResults.filter((item) => item.sourceKind === "new")
   const visibleUsedResults = usedRegularResults.slice(0, visibleCount)
   const visibleNewBenchmarkResults = newBenchmarkResults.slice(0, Math.max(12, Math.floor(visibleCount / 2)))
   const savedVisibleCount = results.filter((item) => savedListings.has(listingStorageId(item))).length
+  const activeComparedListings = comparedListings.filter((entry) => results.some((item) => item.id === entry.id))
   const conversationStatuses = conversationState.ownerId === account.userId ? conversationState.statuses : {}
 
   const sourceBreakdown = useMemo(() => {
     const total = Math.max(results.length, 1)
-    return SOURCES_LIST.map((name) => {
+    const sourceNames = [...new Set([...SOURCES_LIST, ...results.map((item) => item.source)])]
+    return sourceNames.map((name) => {
       const count = results.filter((item) => item.source === name).length
       return { name, count, pct: Math.round((count / total) * 100) }
     }).filter((entry) => entry.count > 0)
@@ -2660,6 +2931,11 @@ function SearchResultsContent() {
           <span style={{ color: PINK }}>{filteredResults.length} Matches Found</span>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {viewerLocation && (
+            <div className="flex items-center gap-2 px-3 py-2 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: "white" }} title="Locație aproximativă la nivel de oraș; IP-ul nu este stocat.">
+              <MapPin size={11} /> Aproape de {viewerLocation.city}
+            </div>
+          )}
           <div className="flex" style={{ border: `1px solid ${INK}` }}>
             {(["free", "premium"] as SearchTier[]).map((tier) => (
               <button
@@ -2873,7 +3149,17 @@ function SearchResultsContent() {
           )}
 
           {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} />}
+          {shownClosestOffer && viewerLocation && (
+            <ClosestDealCard
+              item={shownClosestOffer}
+              viewerCity={viewerLocation.city}
+              isBestOverall={shownClosestOffer.id === shownBestOffer?.id}
+              onInspect={setSelectedListing}
+            />
+          )}
           {shownNewBenchmark && <BenchmarkCard item={shownNewBenchmark} usedItem={shownBestOffer} priceBenchmark={priceBenchmark} onInspect={setSelectedListing} />}
+          {isLikelyVehicleSearch(query) && <CarBuyerJourney query={query} results={filteredResults} />}
+          <VehicleCompareTray items={activeComparedListings} onRemove={toggleComparedListing} onInspect={setSelectedListing} />
 
           {/* Results + Insights */}
           <div className="flex flex-col xl:flex-row gap-6 items-start">
@@ -2901,6 +3187,8 @@ function SearchResultsContent() {
                         onInspect={setSelectedListing}
                         isSaved={savedListings.has(listingStorageId(item))}
                         onToggleSaved={toggleSavedListing}
+                        isCompared={activeComparedListings.some((entry) => entry.id === item.id)}
+                        onToggleCompare={toggleComparedListing}
                       />
                     ))}
                   </div>
@@ -2931,6 +3219,8 @@ function SearchResultsContent() {
                         onInspect={setSelectedListing}
                         isSaved={savedListings.has(listingStorageId(item))}
                         onToggleSaved={toggleSavedListing}
+                        isCompared={activeComparedListings.some((entry) => entry.id === item.id)}
+                        onToggleCompare={toggleComparedListing}
                       />
                     ))}
                   </div>
