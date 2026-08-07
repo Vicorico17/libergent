@@ -5,7 +5,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Bookmark, Clock3, ExternalLink, LayoutDashboard, LogOut, MessageSquare, Plus, Search, Trash2, UserRound } from "lucide-react";
+import { Bell, Bookmark, Clock3, Crown, ExternalLink, LayoutDashboard, LogOut, MessageSquare, Plus, Search, Trash2, UserRound } from "lucide-react";
 import { LogoIcon } from "@/components/LogoIcon";
 import {
   readAccountActivity,
@@ -28,6 +28,7 @@ const GREEN = "#198754";
 const MONO = "var(--font-mono-var), monospace";
 
 type AccountSection = "overview" | "favorites" | "alerts" | "conversations" | "history";
+type AccountPlanStatus = "loading" | "premium" | "required" | "error";
 
 type ConversationMessage = {
   id: string;
@@ -106,6 +107,16 @@ function MetricCard({ label, value, note, onClick }: { label: string; value: num
   );
 }
 
+function PlanBadge({ status }: { status: AccountPlanStatus }) {
+  const premium = status === "premium";
+  const label = premium ? "Plan Premium" : status === "required" ? "Plan Free" : status === "loading" ? "Verificăm planul" : "Plan indisponibil";
+  return (
+    <span className="inline-flex w-fit items-center gap-2 px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-[0.12em]" style={{ border: `1px solid ${INK}`, background: premium ? PINK : status === "required" ? CREAM : "white", color: INK }}>
+      <Crown size={11} fill={premium ? INK : "none"} />{label}
+    </span>
+  );
+}
+
 export function AccountDashboard({ account, next }: { account: AccountSessionState; next: string }) {
   const router = useRouter();
   const [section, setSection] = useState<AccountSection>("overview");
@@ -124,7 +135,7 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
   const [alertLocation, setAlertLocation] = useState("");
   const [alertFrequency, setAlertFrequency] = useState<"daily" | "immediate">("daily");
   const [alertEvents, setAlertEvents] = useState<AlertEvent[]>([]);
-  const [alertAccess, setAlertAccess] = useState<"loading" | "premium" | "required" | "error">("loading");
+  const [alertAccess, setAlertAccess] = useState<AccountPlanStatus>("loading");
   const [signingOut, setSigningOut] = useState(false);
   const selectedConversation = conversations.find((item) => item.id === selectedConversationId) || conversations[0] || null;
 
@@ -141,7 +152,10 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
     async function loadAlerts() {
       const supabase = getSupabaseBrowserClient();
       const session = supabase ? (await supabase.auth.getSession()).data.session : null;
-      if (!session?.access_token) return;
+      if (!session?.access_token) {
+        if (active) setAlertAccess("error");
+        return;
+      }
       try {
         const response = await fetch("/api/alerts", { headers: { authorization: `Bearer ${session.access_token}` } });
         const payload = await response.json().catch(() => ({}));
@@ -297,7 +311,7 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
         <aside className="flex flex-col border-b border-black bg-white lg:border-b-0 lg:border-r">
           <div className="flex items-center gap-3 p-5" style={{ borderBottom: `1px solid ${INK}` }}>
             <div className="flex h-11 w-11 items-center justify-center text-[16px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: PINK }}>{(account.displayName || account.email || "L").slice(0, 1)}</div>
-            <div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase">{account.displayName || "Cont LiberGent"}</div><div className="truncate text-[9px]" style={{ color: `${INK}88` }}>{account.email}</div></div>
+            <div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase">{account.displayName || "Cont LiberGent"}</div><div className="truncate text-[9px]" style={{ color: `${INK}88` }}>{account.email}</div><div className="mt-2"><PlanBadge status={alertAccess} /></div></div>
           </div>
           <nav className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-1" aria-label="Meniu cont">
             {navItems.map((item) => {
@@ -319,6 +333,10 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
           {section === "overview" && (
             <div className="flex flex-col gap-8">
               <SectionHeader eyebrow="Account control center" title={`Salut, ${account.displayName || "bine ai revenit"}`} description="Toate deciziile tale de cumpărare într-un singur loc: favorite, monitorizări, selleri și istoricul recomandărilor." />
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between" style={{ border: `2px solid ${INK}`, background: alertAccess === "premium" ? PINK : "white", boxShadow: `4px 4px 0 ${INK}` }}>
+                <div className="flex items-start gap-3"><Crown size={22} fill={alertAccess === "premium" ? INK : "none"} /><div><div className="text-[13px] font-bold uppercase">{alertAccess === "premium" ? "Premium activ" : alertAccess === "required" ? "Cont Free" : alertAccess === "loading" ? "Verificăm abonamentul" : "Statutul planului nu este disponibil"}</div><p className="mt-1 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}99` }}>{alertAccess === "premium" ? "Ai acces la monitorizări auto, alerte orare și inboxul Premium." : alertAccess === "required" ? "Căutarea rămâne disponibilă; alertele automate necesită Premium." : "Reîncarcă pagina dacă verificarea nu se finalizează."}</p></div></div>
+                {alertAccess === "required" ? <Link href="/pricing" className="shrink-0 px-4 py-3 text-center text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Vezi Premium</Link> : <PlanBadge status={alertAccess} />}
+              </div>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard label="Anunțuri apreciate" value={favorites.length} note="Produse păstrate pentru comparație" onClick={() => setSection("favorites")} />
                 <MetricCard label="Alerte active" value={alerts.filter((alert) => alert.enabled).length} note="Căutări urmărite în cont" onClick={() => setSection("alerts")} />
