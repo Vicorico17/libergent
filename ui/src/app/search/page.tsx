@@ -1963,29 +1963,29 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
 
 function ClosestDealCard({ item, viewerCity, isBestOverall, onInspect }: { item: SearchResultItem; viewerCity: string; isBestOverall: boolean; onInspect: (item: SearchResultItem) => void }) {
   return (
-    <section data-testid="closest-deal" style={{ border: `1px solid ${INK}`, background: "white", boxShadow: `3px 3px 0 ${INK}`, fontFamily: MONO }}>
+    <article data-testid="closest-deal" className="flex h-full flex-col overflow-hidden sm:aspect-square" style={{ border: `2px solid ${INK}`, background: "white", boxShadow: `5px 5px 0 ${INK}`, fontFamily: MONO }}>
       <PanelHeader title={isBestOverall ? "Best Deal · Și cel mai aproape" : "Cel mai apropiat match bun"} />
-      <div className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center" style={{ background: CREAM }}>
-        <div className="min-w-0">
+      <div className="flex flex-1 flex-col p-5 sm:p-6" style={{ background: CREAM }}>
+        <div className="min-w-0 flex-1">
           <div className="mb-3 flex flex-wrap gap-2">
             <MetaChip tone="dark"><MapPin size={10} /> {item.proximity?.label || "distanță aproximativă"}</MetaChip>
             <MetaChip>{item.proximity?.listingCity || item.city}</MetaChip>
             <MetaChip tone="muted">din zona {viewerCity}</MetaChip>
           </div>
-          <h3 className="text-[16px] font-bold uppercase leading-snug">{item.title}</h3>
+          <h3 className="text-[17px] font-bold uppercase leading-snug sm:text-[20px]">{item.title}</h3>
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <span className="text-[20px] font-bold" style={{ color: PINK }}>{item.priceLabel}</span>
+            <span className="text-[24px] font-bold" style={{ color: PINK }}>{item.priceLabel}</span>
             <span className="text-[10px] font-bold uppercase">{item.source} · scor {item.score}%</span>
           </div>
-          <p className="mt-3 text-[9px] leading-relaxed" style={{ color: `${INK}77` }}>
+          <p className="mt-4 text-[9px] leading-relaxed" style={{ color: `${INK}77` }}>
             Distanță estimată la nivel de oraș. Locația exactă și disponibilitatea trebuie confirmate cu vânzătorul.
           </p>
         </div>
-        <button type="button" onClick={() => onInspect(item)} className="min-h-11 px-5 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>
+        <button type="button" onClick={() => onInspect(item)} className="mt-5 min-h-12 w-full px-5 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>
           Analizează oferta
         </button>
       </div>
-    </section>
+    </article>
   )
 }
 
@@ -1994,21 +1994,21 @@ function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: Se
   const usedPrice = usedItem?.price ?? null
 
   return (
-    <section style={{ border: "1px solid " + INK, background: "white", fontFamily: MONO }}>
+    <article className="flex h-full flex-col overflow-hidden sm:aspect-square" style={{ border: `2px solid ${INK}`, background: "white", boxShadow: `5px 5px 0 ${PINK}`, fontFamily: MONO }}>
       <PanelHeader title="New Price Benchmark" />
-      <div className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center" style={{ background: CREAM }}>
-        <div className="min-w-0">
+      <div className="flex flex-1 flex-col p-5 sm:p-6" style={{ background: "white" }}>
+        <div className="min-w-0 flex-1">
           <div className="mb-3 flex flex-wrap gap-2">
             <MetaChip tone="dark">preț nou</MetaChip>
             <MetaChip>{item.source}</MetaChip>
             <MetaChip tone="muted">{item.sourceKindLabel}</MetaChip>
           </div>
-          <h3 className="mb-2 text-[16px] font-bold uppercase leading-snug">{item.title}</h3>
-          <p className="text-[22px] font-bold" style={{ color: PINK }}>{item.priceLabel}</p>
-          <div className="mt-3 grid gap-2 text-[10px] font-bold uppercase sm:grid-cols-3">
-            <span>nou minim: {formatRon(priceBenchmark?.newLowestRon ?? item.price)}</span>
-            <span>nou median: {formatRon(priceBenchmark?.newMedianRon ?? null)}</span>
-            <span>used median: {formatRon(priceBenchmark?.usedMedianRon ?? null)}</span>
+          <h3 className="mb-2 text-[17px] font-bold uppercase leading-snug sm:text-[20px]">{item.title}</h3>
+          <p className="text-[24px] font-bold" style={{ color: PINK }}>{item.priceLabel}</p>
+          <div className="mt-4 grid grid-cols-1 gap-2 text-[9px] font-bold uppercase sm:grid-cols-3">
+            <span className="p-2" style={{ border: `1px solid ${INK}22`, background: CREAM }}>nou minim<br />{formatRon(priceBenchmark?.newLowestRon ?? item.price)}</span>
+            <span className="p-2" style={{ border: `1px solid ${INK}22`, background: CREAM }}>nou median<br />{formatRon(priceBenchmark?.newMedianRon ?? null)}</span>
+            <span className="p-2" style={{ border: `1px solid ${INK}22`, background: CREAM }}>used median<br />{formatRon(priceBenchmark?.usedMedianRon ?? null)}</span>
           </div>
           {typeof savings === "number" && usedPrice !== null && (
             <p className="mt-3 text-[11px] font-bold uppercase" style={{ color: savings > 0 ? GREEN : PINK }}>
@@ -2016,7 +2016,7 @@ function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: Se
             </p>
           )}
         </div>
-        <div className="flex flex-col gap-2 md:w-48">
+        <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => onInspect(item)}
@@ -2028,7 +2028,7 @@ function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: Se
           <MarketplaceVisitButton item={item} compact />
         </div>
       </div>
-    </section>
+    </article>
   )
 }
 
@@ -3159,15 +3159,25 @@ function SearchResultsContent() {
           )}
 
           {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} />}
-          {shownClosestOffer && viewerLocation && (
-            <ClosestDealCard
-              item={shownClosestOffer}
-              viewerCity={viewerLocation.city}
-              isBestOverall={shownClosestOffer.id === shownBestOffer?.id}
-              onInspect={setSelectedListing}
-            />
+          {((shownClosestOffer && viewerLocation) || shownNewBenchmark) && (
+            <section className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1 px-1">
+                <span className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: PINK }}>Selecții în afara listei obișnuite</span>
+                <h2 className="text-[15px] font-bold uppercase">Rezultate speciale</h2>
+              </div>
+              <div className="grid items-stretch gap-5 md:grid-cols-2">
+                {shownClosestOffer && viewerLocation && (
+                  <ClosestDealCard
+                    item={shownClosestOffer}
+                    viewerCity={viewerLocation.city}
+                    isBestOverall={shownClosestOffer.id === shownBestOffer?.id}
+                    onInspect={setSelectedListing}
+                  />
+                )}
+                {shownNewBenchmark && <BenchmarkCard item={shownNewBenchmark} usedItem={shownBestOffer} priceBenchmark={priceBenchmark} onInspect={setSelectedListing} />}
+              </div>
+            </section>
           )}
-          {shownNewBenchmark && <BenchmarkCard item={shownNewBenchmark} usedItem={shownBestOffer} priceBenchmark={priceBenchmark} onInspect={setSelectedListing} />}
           {isLikelyVehicleSearch(query) && <CarBuyerJourney query={query} results={filteredResults} />}
           <VehicleCompareTray items={activeComparedListings} onRemove={toggleComparedListing} onInspect={setSelectedListing} />
 
