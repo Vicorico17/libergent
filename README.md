@@ -252,10 +252,11 @@ curl "http://127.0.0.1:8787/api/search/free?q=iphone%2015&site=all&limit=30&page
 ### Premium search
 
 ```bash
-curl "http://127.0.0.1:8787/api/search/premium?q=iphone%2015&site=all&limit=30&pages=1"
+curl -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  "http://127.0.0.1:8787/api/search/premium?q=iphone%2015&site=all&limit=30&pages=1"
 ```
 
-On the deployed Cloudflare Worker, Premium testing requires the `BROWSER` binding but does not require a payment token. The local Node API now supports direct-only Premium aggregation without Browser Run; it cannot provide the Worker's conditional browser fallback. `PREMIUM_BROWSER_FALLBACK_LIMIT` can lower the maximum number of conditional browser sources; the current full allowlist contains five sources including Okazii.
+Premium search requires a valid Supabase session and an active Premium entitlement. Signed-out requests return `401`; signed-in Free accounts return `403` with `code: "premium_required"`. The UI keeps Premium visibly locked for those accounts and falls back to Free results instead of starting a Premium request. On the deployed Cloudflare Worker, Premium also requires the `BROWSER` binding. The local Node API supports direct-only Premium aggregation without Browser Run; it cannot provide the Worker's conditional browser fallback. `PREMIUM_BROWSER_FALLBACK_LIMIT` can lower the maximum number of conditional browser sources; the current full allowlist contains five sources including Okazii.
 
 ### Response summary
 
@@ -341,7 +342,16 @@ SUPABASE_ALERT_EVENTS_TABLE=alert_events
 SUPABASE_NOTIFICATION_DELIVERIES_TABLE=notification_deliveries
 ```
 
-Premium alerts run from the hourly Cloudflare cron. A new alert's first scan creates its baseline without notifying for old inventory; later scans can produce `new_strong_match`, `price_drop`, and `better_than_shortlist` events. Events always appear in the account inbox. Email is additionally delivered when `ALERT_EMAIL_WEBHOOK_URL` is configured. Premium access is read from `user_entitlements`; `LIBERGENT_PREMIUM_EMAILS` can allow selected beta testers before billing is connected.
+Premium search and alerts use the same server-side entitlement check. Access is read from `user_entitlements`; `LIBERGENT_PREMIUM_EMAILS` can allow selected beta testers before billing is connected. To grant or renew Premium for a Supabase Auth user, run:
+
+```sql
+insert into public.user_entitlements (user_id, plan, status, expires_at)
+values ('USER_UUID_FROM_AUTH_USERS', 'premium', 'active', null)
+on conflict (user_id) do update
+set plan = 'premium', status = 'active', expires_at = excluded.expires_at, updated_at = now();
+```
+
+To revoke access, change the row to `plan = 'free'` or `status = 'cancelled'`. Premium alerts run from the hourly Cloudflare cron. A new alert's first scan creates its baseline without notifying for old inventory; later scans can produce `new_strong_match`, `price_drop`, and `better_than_shortlist` events. Events always appear in the account inbox. Email is additionally delivered when `ALERT_EMAIL_WEBHOOK_URL` is configured.
 
 Run the relevant SQL files in `supabase/` before enabling these features. Use the unqualified table name `email_leads`, not `public.email_leads`, in `SUPABASE_EMAIL_LEADS_TABLE`.
 

@@ -512,11 +512,11 @@ async function runDuePremiumAlerts(env) {
   return { checked: profiles.length, results };
 }
 
-async function authenticatePremiumAlertUser(request, env) {
+async function authenticatePremiumUser(request, env, premiumMessage = "Premium este disponibil doar pentru conturile Premium.") {
   const auth = await authenticateSupabaseUser(request, env);
   if (!auth.user) return { response: json({ error: auth.error }, auth.status) };
   const entitlement = await readPremiumEntitlement(auth.user.id, auth.user.email || "", env).catch(() => ({ active: false, plan: "free" }));
-  if (!entitlement.active) return { response: json({ error: "Alertele automate sunt disponibile în Premium.", code: "premium_required" }, 403) };
+  if (!entitlement.active) return { response: json({ error: premiumMessage, code: "premium_required" }, 403) };
   return { user: auth.user, entitlement };
 }
 
@@ -815,6 +815,9 @@ async function handleApi(request, env, context) {
   }
 
   if (apiPath === "/api/search/premium") {
+    const premium = await authenticatePremiumUser(request, env);
+    if (premium.response) return premium.response;
+
     if (!env.BROWSER) {
       return json({ error: "Cloudflare Browser Run is not configured." }, 503);
     }
@@ -888,7 +891,7 @@ async function handleApi(request, env, context) {
   }
 
   if (apiPath === "/api/alerts" || apiPath.startsWith("/api/alerts/")) {
-    const premium = await authenticatePremiumAlertUser(request, env);
+    const premium = await authenticatePremiumUser(request, env, "Alertele automate sunt disponibile în Premium.");
     if (premium.response) return premium.response;
     const userId = premium.user.id;
     const eventMatch = apiPath.match(/^\/api\/alerts\/events(?:\/([^/]+))?$/);

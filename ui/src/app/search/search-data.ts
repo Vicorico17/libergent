@@ -115,6 +115,7 @@ export type ApiResult = {
 };
 
 export type SearchPayload = {
+  code?: string;
   searchTier?: "free" | "premium";
   results?: ApiResult[];
   summary?: {

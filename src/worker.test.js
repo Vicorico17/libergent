@@ -62,15 +62,38 @@ test("rejects unsupported hosts for listing enrichment", async () => {
   assert.match(payload.error, /not supported/i);
 });
 
-test("allows Premium testing without a token and requires Browser Run", async () => {
+test("requires authentication before Premium search", async () => {
   const response = await worker.fetch(
     new Request("https://libergent.test/api/search/premium?q=iphone&site=all"),
     {}
   );
   const payload = await response.json();
 
-  assert.equal(response.status, 503);
-  assert.match(payload.error, /browser run/i);
+  assert.equal(response.status, 401);
+  assert.match(payload.error, /authentication/i);
+});
+
+test("keeps Premium search locked for a signed-in free account", async (t) => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    if (requestUrl === "https://supabase.example/auth/v1/user") return new Response(JSON.stringify({ id: "user-free", email: "free@example.test" }), { status: 200 });
+    if (requestUrl.includes("/rest/v1/user_entitlements")) return new Response("[]", { status: 200 });
+    return new Response("[]", { status: 200 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const response = await worker.fetch(new Request("https://libergent.test/api/search/premium?q=iphone&site=all", {
+    headers: { authorization: "Bearer user-token" }
+  }), {
+    SUPABASE_URL: "https://supabase.example",
+    SUPABASE_SECRET_KEY: "service-secret",
+    BROWSER: {}
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.equal(payload.code, "premium_required");
 });
 
 test("keeps automatic alerts behind Premium entitlement", async (t) => {
@@ -116,7 +139,15 @@ test("returns Premium alert profiles and inbox events for entitled users", async
 
 test("Premium search skips Browser Run when direct marketplace results are usable", async (t) => {
   const originalMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url) === "https://supabase.example/auth/v1/user") {
+      return new Response(JSON.stringify({ id: "user-premium", email: "premium@example.test" }), { status: 200 });
+    }
+    return new Response("[]", { status: 200 });
+  };
   t.after(() => {
+    globalThis.fetch = originalFetch;
     if (originalMockSearch === undefined) {
       delete process.env.LIBERGENT_MOCK_SEARCH;
     } else {
@@ -125,8 +156,16 @@ test("Premium search skips Browser Run when direct marketplace results are usabl
   });
 
   const response = await worker.fetch(
-    new Request("https://libergent.test/api/search/premium?q=iphone&site=all&limit=5"),
-    { BROWSER: {}, LIBERGENT_MOCK_SEARCH: "1" }
+    new Request("https://libergent.test/api/search/premium?q=iphone&site=all&limit=5", {
+      headers: { authorization: "Bearer user-token" }
+    }),
+    {
+      BROWSER: {},
+      LIBERGENT_MOCK_SEARCH: "1",
+      SUPABASE_URL: "https://supabase.example",
+      SUPABASE_SECRET_KEY: "service-secret",
+      LIBERGENT_PREMIUM_EMAILS: "premium@example.test"
+    }
   );
   const payload = await response.json();
 

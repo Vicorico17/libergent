@@ -3,7 +3,7 @@
 import { Fragment, Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ClipboardCheck, ExternalLink, Lock, MapPin, MessageSquare, ShieldCheck, Tag } from "lucide-react"
+import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ClipboardCheck, Crown, ExternalLink, Lock, MapPin, MessageSquare, ShieldCheck, Tag } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import {
@@ -127,6 +127,7 @@ const INITIAL_VISIBLE_RESULTS = 48
 const VISIBLE_RESULT_STEP = 48
 const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v3"
 type SearchTier = "free" | "premium"
+type AccountPlanStatus = "checking" | "premium" | "free" | "unknown"
 type MarketplaceCoverage = {
   site: string
   provider: string
@@ -734,7 +735,7 @@ function DealQualitySummary({ item, compact = false }: { item: SearchResultItem;
 }
 
 // — Loading Overlay —
-function LoadingOverlay({ progress, done, query, tier }: { progress: number; done: boolean; query: string; tier: SearchTier }) {
+function LoadingOverlay({ progress, done, query, tier, isPremiumAccount }: { progress: number; done: boolean; query: string; tier: SearchTier; isPremiumAccount: boolean }) {
   const [tick, setTick] = useState(0)
 
   useEffect(() => {
@@ -993,11 +994,11 @@ function LoadingOverlay({ progress, done, query, tier }: { progress: number; don
               </div>
             )}
             <p className="mt-3 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}88` }}>
-              {tier === "premium"
-                ? "Premium verifică mai multe oferte pentru a-ți oferi o comparație mai completă și o recomandare mai sigură."
+              {tier === "premium" || isPremiumAccount
+                ? "Planul tău Premium este activ. Ai acces la comparația extinsă atunci când alegi căutarea Premium."
                 : "Premium verifică mai multe oferte, compară prețurile mai profund și te ajută să nu ratezi alegerea potrivită."}
             </p>
-            {tier === "free" && (
+            {tier === "free" && !isPremiumAccount && (
               <Link
                 href="/pricing"
                 onClick={() => trackSearchEvent("premium_upsell_click", { placement: "free_search_loader", search_term: query })}
@@ -2379,6 +2380,7 @@ function SearchResultsContent() {
   const router = useRouter()
   const account = useAccountSession()
   const isLoggedIn = account.status === "signed_in"
+  const [accountPlan, setAccountPlan] = useState<AccountPlanStatus>("checking")
   const query = String(searchParams.get("q") || "").trim()
   const searchTier: SearchTier = searchParams.get("tier") === "premium" ? "premium" : "free"
   const near = String(searchParams.get("near") || "").trim()
@@ -2422,6 +2424,40 @@ function SearchResultsContent() {
   const [loaderProgress, setLoaderProgress] = useState(0)
   const [loaderDone, setLoaderDone]       = useState(false)
   const loaderTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    let active = true
+    async function loadAccountPlan() {
+      if (account.status === "checking") return
+      if (account.status !== "signed_in") {
+        if (active) setAccountPlan("free")
+        return
+      }
+      const supabase = getSupabaseBrowserClient()
+      const session = supabase ? (await supabase.auth.getSession()).data.session : null
+      if (!session?.access_token) {
+        if (active) setAccountPlan("unknown")
+        return
+      }
+      try {
+        const response = await fetch("/api/alerts", { headers: { authorization: `Bearer ${session.access_token}` } })
+        const payload = await response.json().catch(() => ({}))
+        if (!active) return
+        if (response.ok) setAccountPlan("premium")
+        else if (response.status === 403 && payload.code === "premium_required") setAccountPlan("free")
+        else setAccountPlan("unknown")
+      } catch {
+        if (active) setAccountPlan("unknown")
+      }
+    }
+    setAccountPlan(account.status === "checking" ? "checking" : "unknown")
+    void loadAccountPlan()
+    return () => { active = false }
+  }, [account.status, account.userId])
+
+  const isPremiumAccount = accountPlan === "premium"
+  const effectiveSearchTier: SearchTier = searchTier === "premium" && isPremiumAccount ? "premium" : "free"
+  const premiumLocked = searchTier === "premium" && accountPlan !== "checking" && !isPremiumAccount
 
   function selectSearchTier(nextTier: SearchTier) {
     const params = new URLSearchParams(searchParams.toString())
@@ -2491,6 +2527,8 @@ function SearchResultsContent() {
   }, [conditions, priceMax, priceMin, sort, sourceTypes, sources])
 
   useEffect(() => {
+    if (searchTier === "premium" && accountPlan === "checking") return
+
     const controller = new AbortController()
 
     const searchId = setTimeout(() => {
@@ -2550,11 +2588,28 @@ function SearchResultsContent() {
       })
       if (near) params.set("near", near)
 
-      const searchEndpoint = searchTier === "premium" ? "/api/search/premium" : "/api/search/free"
-      fetch(`${searchEndpoint}?${params.toString()}`, { signal: controller.signal })
+      const searchEndpoint = effectiveSearchTier === "premium" ? "/api/search/premium" : "/api/search/free"
+      const runSearch = async () => {
+        const headers: HeadersInit = {}
+        if (effectiveSearchTier === "premium") {
+          const supabase = getSupabaseBrowserClient()
+          const session = supabase ? (await supabase.auth.getSession()).data.session : null
+          if (!session?.access_token) {
+            setAccountPlan("unknown")
+            throw new Error("Sesiunea a expirat. Autentifică-te din nou pentru Premium.")
+          }
+          headers.authorization = `Bearer ${session.access_token}`
+        }
+        return fetch(`${searchEndpoint}?${params.toString()}`, { signal: controller.signal, headers })
+      }
+
+      runSearch()
         .then(async (response) => {
           const payload = await readJsonResponse(response)
           if (!response.ok || payload.error) {
+            if (response.status === 401 || (response.status === 403 && payload.code === "premium_required")) {
+              setAccountPlan(response.status === 403 ? "free" : "unknown")
+            }
             throw new Error(payload.error || "Căutarea nu a putut fi finalizată.")
           }
 
@@ -2631,7 +2686,7 @@ function SearchResultsContent() {
       controller.abort()
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
     }
-  }, [near, query, searchTier])
+  }, [accountPlan, effectiveSearchTier, near, query, searchTier])
 
   useEffect(() => {
     const id = setInterval(() => setTime(formatSearchTime()), 30_000)
@@ -2789,7 +2844,7 @@ function SearchResultsContent() {
     <div className="flex flex-col flex-1 pb-14" style={{ background: CREAM, fontFamily: MONO, color: INK }}>
 
       {/* Loading overlay — rendered above everything */}
-      {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} tier={searchTier} />}
+      {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} tier={effectiveSearchTier} isPremiumAccount={isPremiumAccount} />}
       <ListingDetailDrawer key={selectedListing?.url || "closed"} item={selectedListing} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} />
       <ConversationCenter key={account.userId || "signed-out"} enabled={isLoggedIn} onStatusesChange={(statuses) => setConversationState((current) => ({ ownerId: account.userId, statuses: current.ownerId === account.userId ? { ...current.statuses, ...statuses } : statuses }))} />
       <EmailCapturePopup
@@ -2799,7 +2854,7 @@ function SearchResultsContent() {
         bestOfferSource={shownBestOffer?.source}
       />
 
-      <SearchNav query={query} tier={searchTier} isLoggedIn={isLoggedIn} />
+      <SearchNav query={query} tier={effectiveSearchTier} isLoggedIn={isLoggedIn} />
 
       {/* Session header */}
       <header
@@ -2825,15 +2880,22 @@ function SearchResultsContent() {
                 onClick={() => selectSearchTier(tier)}
                 className="px-3 py-2 text-[10px] font-bold uppercase"
                 style={{
-                  background: searchTier === tier ? (tier === "premium" ? PINK : INK) : "white",
-                  color: searchTier === tier ? "white" : INK,
+                  background: effectiveSearchTier === tier ? (tier === "premium" ? PINK : INK) : "white",
+                  color: effectiveSearchTier === tier ? "white" : INK,
                   borderLeft: tier === "premium" ? `1px solid ${INK}` : "none",
+                  opacity: tier === "premium" && !isPremiumAccount ? 0.72 : 1,
                 }}
+                aria-label={tier === "premium" && !isPremiumAccount ? "Premium blocat" : `Căutare ${tier}`}
               >
-                {tier === "premium" ? "Premium" : "Free"}
+                {tier === "premium" ? <span className="flex items-center gap-1.5">{isPremiumAccount ? <Crown size={11} /> : <Lock size={11} />} Premium</span> : "Free"}
               </button>
             ))}
           </div>
+          {isPremiumAccount && (
+            <Link href="/account" className="flex items-center gap-1.5 px-3 py-2 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: PINK, color: INK }}>
+              <Crown size={12} fill={INK} /> Premium activ
+            </Link>
+          )}
           <div className="flex items-center gap-3 text-[11px] uppercase font-bold px-3 py-1.5" style={{ background: "white", border: `1px solid ${INK}` }}>
             <div className="w-2 h-2 animate-pulse" style={{ background: "#22C55E" }} />
             <span>Live <span className="mx-2">|</span> {updatedLabel === "în timp real" ? time : updatedLabel}</span>
@@ -2870,7 +2932,28 @@ function SearchResultsContent() {
         </section>
       )}
 
-      {searchTier === "free" && query && !isLoading && !showLoader && (
+      {premiumLocked && query && !isLoading && !showLoader && (
+        <section className="mx-6 mt-5 flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between" style={{ border: `1px solid ${INK}`, background: PINK, boxShadow: `3px 3px 0 ${INK}` }}>
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 flex-none items-center justify-center" style={{ border: `1px solid ${INK}`, background: "white" }}><Lock size={15} strokeWidth={2.4} /></div>
+            <div>
+              <div className="text-[10px] font-bold uppercase">Căutarea Premium este blocată</div>
+              <p className="mt-1 max-w-3xl text-[10px] uppercase leading-relaxed" style={{ color: `${INK}AA` }}>
+                {isLoggedIn ? "Contul tău nu are Premium activ. Rezultatele afișate sunt din căutarea Free." : "Autentifică-te cu un cont Premium pentru comparația extinsă. Rezultatele afișate sunt din căutarea Free."}
+              </p>
+            </div>
+          </div>
+          <Link
+            href={isLoggedIn ? "/pricing" : `/auth?next=${encodeURIComponent(`/search?${searchParams.toString()}`)}`}
+            className="flex min-h-11 flex-none items-center justify-center gap-2 px-4 py-2 text-[9px] font-bold uppercase"
+            style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}
+          >
+            {isLoggedIn ? "Vezi Premium" : "Autentifică-te"} <Arrow size={11} />
+          </Link>
+        </section>
+      )}
+
+      {searchTier === "free" && !isPremiumAccount && accountPlan !== "checking" && accountPlan !== "unknown" && query && !isLoading && !showLoader && (
         <section className="mx-6 mt-5 flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between" style={{ border: `1px solid ${INK}`, background: "white", boxShadow: `3px 3px 0 ${INK}` }}>
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 flex-none items-center justify-center" style={{ border: `1px solid ${INK}`, background: PINK }}><Lock size={15} strokeWidth={2.4} /></div>

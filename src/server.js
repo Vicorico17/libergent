@@ -57,7 +57,7 @@ function isAuthorizedAdminRequest(req, url) {
   return Boolean(expectedToken) && getAdminTokenFromRequest(req, url) === expectedToken;
 }
 
-async function authenticatePremiumAlertUser(req) {
+async function authenticatePremiumUser(req, premiumMessage = "Premium este disponibil doar pentru conturile Premium.") {
   const authorization = String(req.headers.authorization || "");
   const token = authorization.toLowerCase().startsWith("bearer ") ? authorization.slice(7).trim() : "";
   if (!token) return { error: "Authentication required.", status: 401 };
@@ -69,7 +69,7 @@ async function authenticatePremiumAlertUser(req) {
     const user = await response.json().catch(() => null);
     if (!response.ok || !user?.id) return { error: "Invalid or expired session.", status: 401 };
     const entitlement = await readPremiumEntitlement(user.id, user.email || "");
-    if (!entitlement.active) return { error: "Alertele automate sunt disponibile în Premium.", code: "premium_required", status: 403 };
+    if (!entitlement.active) return { error: premiumMessage, code: "premium_required", status: 403 };
     return { user, entitlement };
   } catch {
     return { error: "Authentication service unavailable.", status: 503 };
@@ -266,6 +266,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (apiPath === "/api/search/premium") {
+    const premium = await authenticatePremiumUser(req);
+    if (!premium.user) {
+      sendJson(res, premium.status, { error: premium.error, ...(premium.code ? { code: premium.code } : {}) });
+      return;
+    }
+
     const query = url.searchParams.get("q")?.trim();
     const condition = url.searchParams.get("condition") || "any";
     const provider = url.searchParams.get("provider") || "auto";
@@ -317,7 +323,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (apiPath === "/api/alerts" || apiPath.startsWith("/api/alerts/")) {
-    const premium = await authenticatePremiumAlertUser(req);
+    const premium = await authenticatePremiumUser(req, "Alertele automate sunt disponibile în Premium.");
     if (!premium.user) {
       sendJson(res, premium.status, { error: premium.error, ...(premium.code ? { code: premium.code } : {}) });
       return;
