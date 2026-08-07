@@ -395,7 +395,7 @@ Production deployment is also automated by [.github/workflows/deploy-cloudflare.
 
 ## Project documents
 
-- [Premium alerts and billing TODO](docs/premium-alerts-todo.md)
+- [Premium, product, and launch TODO](docs/premium-alerts-todo.md)
 - [Marketplace integration TODO](docs/marketplace-integration-todo.md)
 - [Classified marketplace feature plan](docs/classified-marketplace-feature-plan.md)
 - [Search E2E QA](docs/lib-23-qa-website-search-e2e.md)

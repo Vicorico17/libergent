@@ -1,11 +1,65 @@
-# Premium Alerts and Billing TODO
+# Premium, Product, and Launch TODO
 
 Last reviewed: 2026-08-07
 
-This is the source of truth for launching Premium vehicle alerts and completing
-paid Premium subscriptions. A checked item is implemented or has been explicitly
-confirmed in the target environment; unchecked operational items must be completed
-before the corresponding test or launch.
+This is the source of truth for launching Premium vehicle alerts, completing
+paid Premium subscriptions, and tracking the next product work. A checked item
+is implemented or has been explicitly confirmed in the target environment;
+unchecked operational items must be completed before the corresponding test or
+launch.
+
+## Recently completed product work
+
+- [x] Show a clear Premium or Free marker on the account page.
+- [x] Require a valid Premium entitlement for Premium search.
+- [x] Make the Premium loading screen expandable so users can inspect searched sources.
+- [x] Present the closest good match and new-price benchmark as separate special-result cards.
+- [x] Remove the unsupported `Ajută rankingul: Bun / Slab` controls from search results.
+- [x] Remove the `Copiază mesaj` button and its unused clipboard logic.
+
+## Product and customer-acquisition backlog
+
+### Login, signup, and purchase flow
+
+- [ ] Rework the login/signup email experience, including validation, OTP feedback, loading states, error messages, resend behavior, and callback handling.
+- [ ] Test Google login and email OTP end to end on production, mobile, and desktop.
+- [ ] Design the complete customer-acquisition funnel: landing page → pricing → signup/login → checkout → Premium entitlement → onboarding → first Premium search or alert.
+- [ ] Define acquisition analytics and conversion events for every funnel step.
+- [ ] Add abandoned-checkout and failed-payment recovery paths.
+- [ ] Add a post-purchase confirmation page that clearly explains the active plan and next action.
+
+### Search and marketplace access
+
+- [ ] Add search by picture: upload an image, identify the product, let the user edit extracted keywords, and then run the normal search pipeline.
+- [ ] Publish a clear customer-facing list of Free and Premium marketplaces.
+- [ ] Explain why each source is Free or Premium: access method, query relevance, reliability, browser/API requirements, and operational cost.
+- [ ] Measure cost per search and cost per useful result for each paid/browser-backed marketplace before finalizing the Premium source list.
+- [ ] Validate every advertised source with representative searches and demote sources that repeatedly return no useful results.
+- [ ] Evaluate the installed Facebook Marketplace search skill for a compliant, user-authorized, read-only Libergent integration.
+- [ ] Define Facebook Marketplace session, location, privacy, rate-limit, reliability, and seller-contact rules before exposing it in production.
+- [ ] Keep the detailed source inventory and integration status synchronized with `docs/marketplace-integration-todo.md`.
+
+### Libergent operating-cost model
+
+- [ ] Build a monthly fixed-versus-variable cost breakdown and calculate cost per active user, search, Premium search, alert scan, message, and call.
+- [ ] Record phone-number rental, verification, and messaging charges.
+- [ ] Record Libergent text-model API input, output, tool, and search costs.
+- [ ] Record Libergent voice-model API transcription, synthesis, realtime, and call-minute costs.
+- [ ] Record the OpenClaw VPS cost, storage, bandwidth, backups, and monitoring.
+- [ ] Record Cloudflare Workers, Browser Rendering, requests, CPU, storage, queues, and related API costs.
+- [ ] Include Supabase, email delivery, billing-provider fees, observability, domains, and other production services.
+- [ ] Compare total service cost with the Premium price and define a target gross margin and fair-usage limits.
+
+### Seller messaging and calls
+
+- [x] Allow seller messaging actions only for logged-in users.
+- [x] Group message chat and history by listing for the owning account.
+- [ ] Test the full “reach out for me” flow in production: contact discovery, user confirmation, outbound delivery, provider receipt, inbound reply, history, and failure recovery.
+- [ ] Make delivery state explicit: queued, sent, delivered, failed, replied, or unavailable.
+- [ ] Confirm each marketplace permits the selected contact mechanism and preserve link-out contact where direct sending is unsupported.
+- [ ] Add calls as the next communication channel only after messaging delivery and consent are reliable.
+- [ ] Define call consent, disclosure, recording, retention, phone-number ownership, abuse prevention, handoff, and escalation rules.
+- [ ] Add per-listing call history, status, duration, cost, transcript/summary, and follow-up action.
 
 ## Implemented in the repository
 
@@ -26,11 +80,11 @@ before the corresponding test or launch.
 ## Required before alert testing
 
 - [x] Run `supabase/search_tracking.sql` in the target Supabase project.
-- [ ] Add the test account to `user_entitlements` with `plan = 'premium'` and `status = 'active'`.
-- [ ] Confirm the entitlement query returns the intended test-account email.
-- [ ] Configure the Worker secret `SUPABASE_URL`.
-- [ ] Configure the Worker secret `SUPABASE_SECRET_KEY` with the Supabase secret/service-role key.
-- [ ] Configure the Worker secret `LIBERGENT_ADMIN_TOKEN` for manual alert-run testing.
+- [x] Add the test account to `user_entitlements` with `plan = 'premium'` and `status = 'active'`.
+- [x] Confirm the entitlement is recognized for the intended Premium test account.
+- [x] Configure the Worker secret `SUPABASE_URL`.
+- [x] Configure the Worker secret `SUPABASE_SECRET_KEY` with the Supabase secret/service-role key.
+- [x] Configure the Worker secret `LIBERGENT_ADMIN_TOKEN` for manual alert-run testing.
 - [ ] Decide whether the first test is inbox-only or includes email delivery.
 - [ ] If testing email, configure `ALERT_EMAIL_WEBHOOK_URL` and, if required, `ALERT_EMAIL_WEBHOOK_TOKEN`.
 - [x] Run `npm run build:ui` successfully in the pre-deployment or CI environment.
