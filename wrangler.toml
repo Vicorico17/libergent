@@ -3,9 +3,6 @@ main = "src/worker.js"
 compatibility_date = "2026-03-13"
 compatibility_flags = ["nodejs_compat"]
 
-[build]
-command = "npm run build:ui"
-
 [assets]
 directory = "./ui/out"
 binding = "ASSETS"

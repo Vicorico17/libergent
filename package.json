@@ -11,12 +11,13 @@
     "test": "node --test src/*.test.js src/parsers/*.test.js src/providers/*.test.js",
     "check": "npm run check:cli && npm run test",
     "build:ui": "npm --prefix ui ci && npm --prefix ui run build",
+    "verify:ui-auth-config": "node scripts/verify-ui-auth-config.js",
     "lint:ui:ci": "npm --prefix ui ci --include=dev && npm --prefix ui run lint:ci",
     "dev": "node src/dev.js",
     "dev:api": "node src/server.js",
     "dev:ui": "npm --prefix ui run dev",
     "dev:worker": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "npm run build:ui && npm run verify:ui-auth-config && wrangler deploy"
   },
   "engines": {
     "node": ">=22"

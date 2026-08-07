@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { getSafeNextPath } from "@/lib/auth-path";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
-type AuthState = "checking" | "signed_out" | "sending" | "email_sent";
+type AuthState = "signed_out" | "sending" | "email_sent";
 type SocialProvider = "google";
 
 function friendlyAuthError(message = "") {
@@ -18,7 +18,7 @@ function friendlyAuthError(message = "") {
 
 export function SignInOptions({ submitLabel = "Trimite link de conectare" }: { submitLabel?: string }) {
   const router = useRouter();
-  const [state, setState] = useState<AuthState>("checking");
+  const [state, setState] = useState<AuthState>("signed_out");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
 
@@ -109,7 +109,7 @@ export function SignInOptions({ submitLabel = "Trimite link de conectare" }: { s
     setMessage(`Am trimis linkul către ${normalizedEmail}. Verifică și folderul Spam.`);
   }
 
-  const busy = state === "checking" || state === "sending";
+  const busy = state === "sending";
 
   return (
     <div className="flex flex-col gap-3">
