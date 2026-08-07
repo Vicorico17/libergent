@@ -6,8 +6,9 @@ import { loadEnv } from "./env.js";
 import { runMarketplaceHealthChecks } from "./health.js";
 import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
 import { searchAcrossSites } from "./app.js";
+import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildHistoryPayload, logSearchEvent } from "./history.js";
-import { getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { PREMIUM_SITE_KEYS, getDefaultSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, isSupabaseConfigured } from "./supabase.js";
@@ -238,9 +239,46 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (apiPath === "/api/search/premium") {
-    sendJson(res, 501, {
-      error: "Premium search requires the deployed Cloudflare Worker Browser Run binding."
-    });
+    const query = url.searchParams.get("q")?.trim();
+    const condition = url.searchParams.get("condition") || "any";
+    const provider = url.searchParams.get("provider") || "auto";
+    const site = url.searchParams.get("site") || "default";
+    const limitParam = url.searchParams.get("limit");
+    const pagesParam = url.searchParams.get("pages");
+
+    if (!query) {
+      sendJson(res, 400, { error: "Missing q parameter" });
+      return;
+    }
+
+    try {
+      if (site !== "all" && site !== "default") {
+        sendJson(res, 400, { error: "Premium search currently supports site=all or site=default." });
+        return;
+      }
+      const limit = parseBoundedPositiveInteger(limitParam, { name: "limit", max: MAX_API_SEARCH_LIMIT });
+      const maxPages = parseBoundedPositiveInteger(pagesParam, { name: "pages", max: MAX_API_SEARCH_PAGES });
+      const freeSiteKeys = (site === "all" ? getSiteKeysForAllSearch(query) : getDefaultSiteKeys())
+        .filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey));
+      const [freePayload, premiumPayload] = await Promise.all([
+        searchAcrossSites({ query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages, siteKeys: freeSiteKeys }),
+        searchAcrossSites({ query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages: 1, siteKeys: PREMIUM_SITE_KEYS })
+      ]);
+      const payload = aggregateMarketplaceResults([...freePayload.results, ...premiumPayload.results], {
+        condition,
+        creditBudget: freePayload.summary?.creditBudget || 0,
+        creditsUsed: freePayload.summary?.creditsUsed || 0
+      });
+      payload.searchTier = "premium";
+      payload.summary.premiumMarketplaces = PREMIUM_SITE_KEYS.length;
+      payload.summary.browserSessionsUsed = 0;
+      payload.summary.browserFallbackMarketplaces = [];
+      await logSearchEvent({ query, condition, provider: "premium-direct", siteKeys: [...freeSiteKeys, ...PREMIUM_SITE_KEYS], payload });
+      sendJson(res, 200, payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      sendJson(res, message.startsWith("Expected ") || message.startsWith("Unsupported ") ? 400 : 500, { error: message });
+    }
     return;
   }
 
@@ -387,6 +425,7 @@ const server = http.createServer(async (req, res) => {
       await insertOfferFeedbackToSupabase({
         query: body.query,
         feedback,
+        reason: body.reason,
         offer: body.offer
       });
       sendJson(res, 200, { ok: true });

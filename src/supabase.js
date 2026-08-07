@@ -181,6 +181,7 @@ export async function insertOfferFeedbackToSupabase(entry, env = process.env) {
   const feedbackRow = {
     query: entry.query || "",
     feedback: entry.feedback,
+    reason: entry.reason || entry.offer?.reason || "",
     offer: entry.offer || null,
     offer_title: entry.offer?.title || "",
     offer_site: entry.offer?.site || "",

@@ -36,12 +36,16 @@ create table if not exists public.offer_feedback (
   id uuid primary key default gen_random_uuid(),
   query text not null default '',
   feedback text not null check (feedback in ('like', 'dislike')),
+  reason text not null default '',
   offer jsonb,
   offer_title text not null default '',
   offer_site text not null default '',
   offer_url text not null default '',
   created_at timestamptz not null default now()
 );
+
+alter table public.offer_feedback
+  add column if not exists reason text not null default '';
 
 create table if not exists public.email_leads (
   email text primary key,

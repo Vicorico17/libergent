@@ -1115,6 +1115,7 @@ async function handleApi(request, env, context) {
       await insertOfferFeedbackToSupabase({
         query: body.query,
         feedback,
+        reason: body.reason,
         offer: body.offer
       }, env);
       return json({ ok: true }, 200);

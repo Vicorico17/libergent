@@ -79,6 +79,24 @@ For a query such as `iphone 15`, the numeric token `15` is mandatory. More speci
 
 A high “nepotrivite cu termenii” count usually means a marketplace page contained navigation cards, promotions, other catalog products, or loose search results. It does **not** mean that the same number of valid products was removed by the accessory/quality classifier.
 
+## Query understanding and recommendation quality
+
+Search begins with a lightweight, deterministic interpretation step in `src/query-understanding.js`. It produces a reusable profile containing the likely product category and entity, detected make/model, confidence, canonical marketplace path, comparable-product key, alternative interpretations, and useful refinement questions. Source routing, relevance filtering, ranking, the API summary, and the UI all use this same profile.
+
+For example, a search for `mustang` is interpreted as **Ford Mustang**, routes to vehicle-capable marketplaces, uses the canonical Autovit make/model path, and rejects clothing, scale models, spare parts, and unrelated uses of the word. The interface keeps the single search box and shows a compact interpretation strip with alternatives such as `macheta mustang` or `haine mustang`; selecting one runs that explicit search. Ambiguous searches can also show a few optional refinements instead of forcing a multi-step form.
+
+The implementation is product-agnostic rather than Mustang-specific:
+
+1. `understandQuery()` identifies known product entities and broader families such as vehicles, phones, consoles, appliances, luggage, apparel, and collectibles.
+2. `src/sites.js` uses the category to select marketplaces that can plausibly contain that product. Vehicle intent, for example, avoids fashion and generic retail price sources.
+3. `src/relevance.js` requires category-appropriate evidence and applies hard exclusion gates before scoring.
+4. `src/aggregate.js` ranks semantic match tiers before deal quality, so a cheap but weak match cannot outrank the requested product.
+5. Price claims are calculated only inside a defensible comparable cohort. Vehicle comparisons require the same entity and, when years are available, a maximum four-year gap. If the evidence is insufficient, the API withholds price intelligence instead of presenting a misleading “deal.”
+
+Unknown products still use the generic token-matching path, but a one-word unknown query cannot receive the same confidence as a recognized exact entity. To add another product family, extend the catalog and family rules in `src/query-understanding.js`, add its category-specific eligibility rules in `src/relevance.js` if needed, then cover the interpretation, routing, exclusions, and comparable cohort in the corresponding tests.
+
+The search response exposes `summary.queryUnderstanding` and `summary.recommendationMode`. The UI labels a result **Best Used Deal** only when comparable price evidence supports that claim; otherwise it uses the more conservative **Top Match**. Feedback can include a structured reason, allowing search-quality failures such as wrong product, wrong variant, accessory/part, suspicious price, or stale listing to be measured separately.
+
 ## Ranking and price intelligence
 
 Ranking is deterministic and runs locally after parsing. It considers:
@@ -222,7 +240,7 @@ curl "http://127.0.0.1:8787/api/search/free?q=iphone%2015&site=all&limit=30&page
 curl "http://127.0.0.1:8787/api/search/premium?q=iphone%2015&site=all&limit=30&pages=1"
 ```
 
-Premium testing currently requires the Cloudflare `BROWSER` binding but does not require a payment token. `PREMIUM_BROWSER_FALLBACK_LIMIT` can lower the maximum number of conditional browser sources; the current full allowlist contains five sources including Okazii.
+On the deployed Cloudflare Worker, Premium testing requires the `BROWSER` binding but does not require a payment token. The local Node API now supports direct-only Premium aggregation without Browser Run; it cannot provide the Worker's conditional browser fallback. `PREMIUM_BROWSER_FALLBACK_LIMIT` can lower the maximum number of conditional browser sources; the current full allowlist contains five sources including Okazii.
 
 ### Response summary
 
@@ -240,6 +258,11 @@ An aggregated response contains per-source results plus a summary similar to:
     "includedListings": 20,
     "excludedListings": 0,
     "duplicateListings": 0,
+    "queryUnderstanding": {
+      "category": "phone",
+      "confidence": "high"
+    },
+    "recommendationMode": "best-used-deal",
     "bestUsedOffer": {},
     "bestNewBenchmark": {},
     "priceIntelligence": {}
@@ -290,6 +313,29 @@ SUPABASE_EMAIL_LEADS_TABLE=email_leads
 ```
 
 Run the relevant SQL files in `supabase/` before enabling these features. Use the unqualified table name `email_leads`, not `public.email_leads`, in `SUPABASE_EMAIL_LEADS_TABLE`.
+
+### Search-quality database migration
+
+The structured feedback reason requires the `reason` column on `public.offer_feedback`. For an existing Supabase project, run the complete, idempotent [supabase/search_tracking.sql](supabase/search_tracking.sql) file in the Supabase SQL editor. It creates missing tracking objects, adds the column safely, and asks PostgREST to reload its schema cache.
+
+The minimal migration, if the rest of the tracking schema is already installed, is:
+
+```sql
+alter table public.offer_feedback
+  add column if not exists reason text not null default '';
+
+notify pgrst, 'reload schema';
+```
+
+No destructive migration or manual backfill is required: existing rows receive the empty-string default. The new query interpretation and recommendation-quality fields are stored inside the existing `search_events.best_offer` `jsonb` payload, so they do not require additional columns. Verify the feedback migration with:
+
+```sql
+select column_name, data_type, is_nullable, column_default
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'offer_feedback'
+  and column_name = 'reason';
+```
 
 Client-side Google Analytics is enabled only when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is present.
 

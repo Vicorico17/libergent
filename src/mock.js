@@ -1,4 +1,5 @@
 import { getSite } from "./sites.js";
+import { understandMarketplaceQuery } from "./query-understanding.js";
 
 function toSlug(value) {
   return value
@@ -12,27 +13,29 @@ function toSlug(value) {
 function buildMockItems(siteKey, query, condition) {
   const slug = toSlug(query || "produs");
   const baseTitle = query.trim() || "Produs";
-  const isCarQuery = /\bjeep\s+compass\b/i.test(query);
+  const queryUnderstanding = understandMarketplaceQuery(query);
+  const isCarQuery = queryUnderstanding.category === "vehicle";
   const conditionLabel =
     condition === "new" ? "Nou" :
     condition === "used" ? "Utilizat" :
     "Utilizat";
 
   if (isCarQuery) {
+    const vehicleName = queryUnderstanding.canonicalQuery || baseTitle;
     return [
       {
-        title: "Jeep Compass 2.0 M-Jet 4x4 Limited",
-        price: siteKey === "autovit.ro" ? "7 500 EUR" : "37 500 lei",
+        title: `${vehicleName} 2.0 GT 2019`,
+        price: siteKey === "autovit.ro" ? "27 500 EUR" : "137 500 lei",
         currency: siteKey === "autovit.ro" ? "EUR" : "lei",
         location: "Cluj-Napoca",
         postedAt: "azi",
-        condition: "179 000 km • Diesel • 2018",
+        condition: "79 000 km • Benzina • 2019",
         sellerType: "Persoana fizica",
         url: `https://${siteKey}/d/oferta/${slug}-1`,
         imageUrl: ""
       },
       {
-        title: "Bara fata Jeep Compass",
+        title: `Bara fata ${vehicleName}`,
         price: "600 lei",
         currency: "lei",
         location: "Bucuresti",
@@ -43,7 +46,7 @@ function buildMockItems(siteKey, query, condition) {
         imageUrl: ""
       },
       {
-        title: "Far dreapta Jeep Compass",
+        title: `Far dreapta ${vehicleName}`,
         price: "450 lei",
         currency: "lei",
         location: "Timisoara",

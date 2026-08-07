@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "search-marketplace": {
+      "source": "/Users/vicorico/.config/browserbase/skills/facebook.com/search-marketplace-m9gyrc",
+      "sourceType": "local",
+      "computedHash": "3fae887f16fc60a166be5b7a0d4aa2a0eb4233650a14642c19f2e1527f525909"
+    }
+  }
+}

@@ -48,6 +48,7 @@ type MarketplaceStatus = {
 }
 
 type PriceBenchmark = NonNullable<NonNullable<SearchPayload["summary"]>["priceIntelligence"]>
+type QueryUnderstanding = NonNullable<NonNullable<SearchPayload["summary"]>["queryUnderstanding"]>
 
 // — Loader config —
 const FREE_SOURCE_TIMING = [
@@ -1391,15 +1392,18 @@ function SellerMessageActions({ item, query, compact = false }: { item: SearchRe
 
 function OfferFeedbackActions({ item, query }: { item: SearchResultItem; query: string }) {
   const [selected, setSelected] = useState<"like" | "dislike" | null>(null)
+  const [selectedReason, setSelectedReason] = useState("")
   const [pending, setPending] = useState(false)
 
-  async function sendFeedback(feedback: "like" | "dislike") {
+  async function sendFeedback(feedback: "like" | "dislike", reason = "") {
     setSelected(feedback)
+    setSelectedReason(reason)
     setPending(true)
     trackSearchEvent("offer_feedback", {
       search_term: query,
       marketplace: item.source,
       feedback,
+      reason,
       listing_title: item.title,
     })
 
@@ -1410,6 +1414,7 @@ function OfferFeedbackActions({ item, query }: { item: SearchResultItem; query: 
         body: JSON.stringify({
           query,
           feedback,
+          reason,
           offer: {
             title: item.title,
             url: item.url,
@@ -1417,6 +1422,9 @@ function OfferFeedbackActions({ item, query }: { item: SearchResultItem; query: 
             priceRon: item.price,
             score: item.score,
             rank: item.rank,
+            reason,
+            listingType: item.listingType,
+            rejectionReasons: item.rejectionReasons,
           },
         }),
       })
@@ -1438,7 +1446,7 @@ function OfferFeedbackActions({ item, query }: { item: SearchResultItem; query: 
           key={option.value}
           type="button"
           disabled={pending}
-          onClick={() => sendFeedback(option.value)}
+          onClick={() => option.value === "dislike" ? setSelected("dislike") : sendFeedback("like")}
           className="inline-flex min-h-8 items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase disabled:opacity-60"
           style={{
             border: `1px solid ${INK}`,
@@ -1451,6 +1459,30 @@ function OfferFeedbackActions({ item, query }: { item: SearchResultItem; query: 
           {option.label}
         </button>
       ))}
+      {selected === "dislike" && !selectedReason && (
+        <div className="basis-full flex flex-wrap gap-1.5 pt-1">
+          {[
+            ["wrong_product", "Produs greșit"],
+            ["part_or_accessory", "Piesă / accesoriu"],
+            ["wrong_model", "Model greșit"],
+            ["bad_price", "Preț slab"],
+            ["duplicate", "Duplicat"],
+            ["unavailable", "Indisponibil"],
+          ].map(([reason, label]) => (
+            <button
+              key={reason}
+              type="button"
+              disabled={pending}
+              onClick={() => sendFeedback("dislike", reason)}
+              className="px-2 py-1 text-[9px] font-bold uppercase disabled:opacity-60"
+              style={{ border: `1px solid ${INK}66`, background: CREAM, color: INK }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {selectedReason && <span className="basis-full text-[9px] font-bold uppercase" style={{ color: GREEN }}>Feedback salvat · {formatSignalLabel(selectedReason)}</span>}
     </div>
   )
 }
@@ -2235,6 +2267,7 @@ function SearchResultsContent() {
   const [bestNewBenchmark, setBestNewBenchmark] = useState<SearchResultItem | null>(null)
   const [duplicateListings, setDuplicateListings] = useState(0)
   const [priceBenchmark, setPriceBenchmark] = useState<PriceBenchmark | undefined>()
+  const [queryUnderstanding, setQueryUnderstanding] = useState<QueryUnderstanding | null>(null)
   const [error, setError]           = useState("")
   const [searchedAt, setSearchedAt] = useState("")
   const [totalListings, setTotalListings] = useState(0)
@@ -2337,6 +2370,7 @@ function SearchResultsContent() {
         setBestNewBenchmark(null)
         setDuplicateListings(0)
         setPriceBenchmark(undefined)
+        setQueryUnderstanding(null)
         setError("")
         setSearchedAt("")
         setTotalListings(0)
@@ -2361,6 +2395,7 @@ function SearchResultsContent() {
       setLoaderProgress(8)
       setLoaderDone(false)
       setError("")
+      setQueryUnderstanding(null)
 
       let prog = 0
       const TICK = 250
@@ -2395,6 +2430,7 @@ function SearchResultsContent() {
           setBestNewBenchmark(mapOffer(payload.summary?.bestNewBenchmark, mapped) || mapped.find((item) => item.sourceKind === "new") || null)
           setDuplicateListings(payload.summary?.duplicateListings ?? 0)
           setPriceBenchmark(payload.summary?.priceIntelligence)
+          setQueryUnderstanding(payload.summary?.queryUnderstanding || null)
           setSearchedAt(payload.summary?.searchedAt || "")
           setTotalListings(payload.summary?.totalListings ?? mapped.length)
           setParsedListings(payload.summary?.parsedListings ?? payload.summary?.totalListings ?? mapped.length)
@@ -2581,7 +2617,7 @@ function SearchResultsContent() {
     { text: excludedListings ? `${excludedListings} accesorii, piese sau anunțuri nepotrivite excluse` : "niciun produs potrivit exclus de clasificare", pulse: false },
     { text: savedVisibleCount ? `${savedVisibleCount} rezultate salvate local` : "niciun rezultat salvat local", pulse: false },
     { text: "focus: second-hand + benchmark de preț nou", pulse: false },
-    { text: shownBestOffer ? `Best used deal on ${shownBestOffer.source}` : "Best used deal în așteptare", pulse: false },
+    { text: shownBestOffer ? `${shownBestOffer.recommendation.strong ? "Best used deal" : "Top used match"} on ${shownBestOffer.source}` : "Top used match în așteptare", pulse: false },
     { text: shownNewBenchmark ? `New benchmark on ${shownNewBenchmark.source}` : "New benchmark în așteptare", pulse: false },
     { text: isLoading ? "Recommendation updating live" : "Recommendation updated live", pulse: isLoading },
   ]
@@ -2636,6 +2672,35 @@ function SearchResultsContent() {
           </div>
         </div>
       </header>
+
+      {queryUnderstanding && (queryUnderstanding.category || queryUnderstanding.alternatives?.length) && query && !isLoading && !showLoader && (
+        <section className="mx-6 mt-5 flex flex-wrap items-center gap-2 p-3 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: "white" }}>
+          <span style={{ color: `${INK}77` }}>Am interpretat căutarea ca:</span>
+          <span className="px-2.5 py-1.5" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>
+            {queryUnderstanding.label || query}
+          </span>
+          {(queryUnderstanding.alternatives || []).map((alternative) => alternative.query && (
+            <button
+              key={alternative.query}
+              type="button"
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString())
+                params.set("q", alternative.query || query)
+                router.push(`/search?${params.toString()}`)
+              }}
+              className="px-2.5 py-1.5"
+              style={{ border: `1px solid ${INK}`, background: CREAM, color: INK }}
+            >
+              {alternative.label || alternative.query}
+            </button>
+          ))}
+          {Boolean(queryUnderstanding.refinements?.length) && (
+            <span className="ml-auto normal-case" style={{ color: `${INK}77` }}>
+              Poți rafina în căutare: {queryUnderstanding.refinements?.join(" · ")}
+            </span>
+          )}
+        </section>
+      )}
 
       {searchTier === "free" && query && !isLoading && !showLoader && (
         <section className="mx-6 mt-5 flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between" style={{ border: `1px solid ${INK}`, background: "white", boxShadow: `3px 3px 0 ${INK}` }}>

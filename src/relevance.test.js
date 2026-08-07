@@ -2,6 +2,33 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { classifyListingIntent } from "./relevance.js";
 
+test("standalone Mustang query keeps cars and rejects other Mustang products", () => {
+  const query = "mustang";
+  const vehicle = classifyListingIntent(
+    { title: "Ford Mustang GT 5.0 V8 2019", price: "150000 lei", priceRon: 150000 },
+    query
+  );
+  const noise = [
+    { title: "Adidași Mustang mărimea 42", priceRon: 250 },
+    { title: "Machetă Ford Mustang 1:24", priceRon: 120 },
+    { title: "Tricou Mustang", priceRon: 50 },
+    { title: "Mustang cal 2018", priceRon: 5000 }
+  ].map((item) => classifyListingIntent({ ...item, price: `${item.priceRon} lei` }, query));
+
+  assert.equal(vehicle.queryCategory, "vehicle");
+  assert.equal(vehicle.queryEntity, "ford_mustang");
+  assert.equal(vehicle.isRecommendedCandidate, true);
+  assert.equal(noise.every((item) => !item.isRecommendedCandidate), true);
+  assert.equal(noise.every((item) => item.relevanceScore < vehicle.relevanceScore), true);
+
+  const requestedCollectible = classifyListingIntent(
+    { title: "Machetă Ford Mustang 1967 1:24", price: "120 lei", priceRon: 120 },
+    "macheta mustang"
+  );
+  assert.equal(requestedCollectible.queryCategory, "collectible");
+  assert.equal(requestedCollectible.isRecommendedCandidate, true);
+});
+
 test("ranks exact pro above pro max for pro-only query", () => {
   const query = "iPhone 14 Pro";
   const exactPro = classifyListingIntent(

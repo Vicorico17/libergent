@@ -18,33 +18,32 @@ test("detects common car searches and routes all-search to Autovit first", () =>
   assert.equal(isCarQuery("Skoda Octavia 2.0 TDI"), true);
   assert.equal(isCarQuery("BMW X5 150 000 km"), true);
   assert.equal(isCarQuery("PASSAT CC"), true);
+  assert.equal(isCarQuery("mustang"), true);
   assert.deepEqual(getSiteKeysForAllSearch("Mercedes C Class 2019 diesel"), [
     "autovit.ro",
     "bestauto.ro",
     "olx.ro",
     "lajumate.ro",
-    "vinted.ro",
     "okazii.ro",
     "publi24.ro",
-    "anuntul.ro",
-    "price.ro",
-    "shopmania.ro"
+    "anuntul.ro"
   ]);
   assert.deepEqual(getSiteKeysForAllSearch("PASSAT CC"), [
     "autovit.ro",
     "bestauto.ro",
     "olx.ro",
     "lajumate.ro",
-    "vinted.ro",
     "okazii.ro",
     "publi24.ro",
-    "anuntul.ro",
-    "price.ro",
-    "shopmania.ro"
+    "anuntul.ro"
   ]);
   assert.equal(
     SITES["autovit.ro"].searchUrl("PASSAT CC"),
     "https://www.autovit.ro/autoturisme/volkswagen/passat-cc/"
+  );
+  assert.equal(
+    SITES["autovit.ro"].searchUrl("mustang"),
+    "https://www.autovit.ro/autoturisme/ford/mustang/"
   );
 });
 

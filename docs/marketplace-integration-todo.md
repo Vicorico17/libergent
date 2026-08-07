@@ -88,7 +88,7 @@ The same query against the seven configured Premium candidates split them into t
 | P2 | Animalutul | Pets and animal accessories | Homepage/query probe returned `200`, but no cards were extracted | Add only after Libergent intentionally supports pet queries | Only if JS rendering is proven necessary and allowed |
 | P2 | MarketplaceRomania | General new/used marketplace | `200`, but the tested WordPress-style search parameter did not return query-specific products | First validate inventory depth and discover the real browse/search endpoint | No evidence yet |
 | P2 | Refurbed Romania | Refurbished electronics benchmark | Direct probe returned `401` | Check official/public API, feed, terms, and Romanian inventory value before investing | Browser experiment only after those checks |
-| Hold | Facebook Marketplace | High-value private-seller inventory | Account/session-dependent and not suitable for anonymous server scraping | Pursue a compliant partner, user-authorized, or link-out workflow only | No unattended browser scraping |
+| Hold | Facebook Marketplace | High-value private-seller inventory | Account/session-dependent and not suitable for anonymous server scraping | Use the installed Browse skill through a verified, residential-proxy Browserbase session; keep the result read-only and link out to Facebook for seller contact | No unattended browser scraping |
 
 ### Provider rule for new sources
 
@@ -118,7 +118,12 @@ The same query against the seven configured Premium candidates split them into t
 
 - Facebook Marketplace
   - Goal: include listings because many private sellers post there first.
-  - Blocker: direct scraping is not a good path. Needs a compliant partner/feed, user-authorized flow, or link-out workflow.
+  - Current status: the Browse.sh `search-marketplace` skill is installed at `.agents/skills/search-marketplace/SKILL.md`; it returns normalized read-only listing JSON and can also resolve individual Marketplace item URLs.
+  - Method: create a verified + residential-proxy Browserbase session, open the location-slug search URL, extract the server-rendered first-page payload, and paginate only inside the same session by triggering Facebook's own lazy loading. Never replay session-bound GraphQL cursors across sessions.
+  - Input requirements: resolve and validate Facebook's canonical city slug before searching. Reject redirects to `/marketplace/category/search/` because those lose the requested location filter.
+  - Result handling: map listing IDs, title, price, location, condition, posted time, seller, photos, delivery methods, status, and canonical URL into Libergent's normalized listing shape. Preserve `partial` results and explicit reasons for login walls, unavailable regions, or failed location resolution.
+  - Detail handling: use the same browser session for optional item-detail enrichment; keep CDN image URLs short-lived and do not assume seller, condition, description, or posted time are present in search-page payloads.
+  - Blocker: direct scraping and anonymous server fetching are not a good path. Production activation still needs a compliant, user-authorized Browserbase runtime or partner/feed arrangement, terms/rate-limit review, and a link-out seller-contact flow.
   - UI rule: do not show as an actively searched source until backend can return real listings reliably.
 
 - Flip.ro

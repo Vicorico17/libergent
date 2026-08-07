@@ -1,3 +1,5 @@
+import { understandMarketplaceQuery } from "./query-understanding.js";
+
 const STOP_WORDS = new Set([
   "a",
   "al",
@@ -295,6 +297,13 @@ const VEHICLE_NON_VEHICLE_TERMS = [
   "sapka",
   "sneakersy",
   "spodnie",
+  "cal",
+  "camasa",
+  "geaca",
+  "hanorac",
+  "haine",
+  "parfum",
+  "tricou",
   "welly"
 ];
 
@@ -907,6 +916,7 @@ function getQueryProfile(query) {
   const brandTerms = getQueryBrandTerms(query);
   const categories = new Set();
   const taxonomy = getProductTaxonomy(normalized);
+  const understanding = understandMarketplaceQuery(query);
   const tokenSet = new Set(baseTokens);
   const hasVehicleBrand = [...VEHICLE_BRANDS].some((brand) => tokenSet.has(brand));
 
@@ -926,6 +936,12 @@ function getQueryProfile(query) {
   if (taxonomy?.category) {
     categories.add(taxonomy.category);
   }
+  if (understanding.category) {
+    categories.add(understanding.category);
+  }
+  for (const token of tokenize([understanding.make, understanding.model].filter(Boolean).join(" "))) {
+    expandedTokens.add(token);
+  }
   if (hasVehicleBrand) {
     categories.add("vehicle");
   }
@@ -937,8 +953,9 @@ function getQueryProfile(query) {
     brandTerms,
     categories: [...categories],
     taxonomy,
+    understanding,
     queryType: parseQueryType({ normalized, tokens: baseTokens, taxonomy }),
-    productHead: baseTokens.find((token) => {
+    productHead: understanding.model || baseTokens.find((token) => {
       const allAccessoryHeads = [
         ...ACCESSORY_HEADS,
         ...(taxonomy?.accessories || [])
@@ -946,6 +963,27 @@ function getQueryProfile(query) {
       return !allAccessoryHeads.includes(token) && !SPARE_PART_HEADS.map(normalizeText).includes(token);
     }) || baseTokens.at(-1) || ""
   };
+}
+
+function hasVehicleListingEvidence(text, queryProfile) {
+  if (!queryProfile.categories.includes("vehicle") || queryProfile.queryType !== "main_product") {
+    return true;
+  }
+
+  const normalized = normalizeText(text);
+  const tokens = new Set(tokenize(normalized));
+  const make = normalizeText(queryProfile.understanding?.make || "");
+  const model = normalizeText(queryProfile.understanding?.model || "");
+  const hasMake = Boolean(make && textHasTerm(normalized, tokens, make));
+  const hasModel = Boolean(model && textHasTerm(normalized, tokens, model));
+  const hasVehicleLanguage = [
+    "autoturism", "benzina", "cabrio", "coupe", "diesel", "dsg", "ecoboost",
+    "hibrid", "hybrid", "inmatriculat", "km", "quattro", "sedan", "tdi", "xdrive"
+  ].some((term) => textHasTerm(normalized, tokens, term));
+  const hasYear = /\b(?:19[8-9]\d|20[0-3]\d)\b/.test(normalized);
+  const hasEngineOrTrim = /\b(?:\d(?:[.,]\d)?\s*(?:tdi|dci|tsi|litri?)|v[468]|gt|gti|rs|amg|mhev|phev)\b/.test(normalized);
+
+  return hasMake || hasVehicleLanguage || (hasModel && (hasYear || hasEngineOrTrim));
 }
 
 function includesToken(tokens, term) {
@@ -1411,6 +1449,9 @@ export function classifyListingIntent(item, query) {
     item.sellerType
   ].filter(Boolean).join(" "));
   let negativeMatches = findNegativeMatches(text, queryProfile);
+  if (!hasVehicleListingEvidence(text, queryProfile)) {
+    negativeMatches.push({ intent: "irrelevant", term: "missing_vehicle_evidence" });
+  }
   for (const category of queryProfile.categories) {
     const priceFloor = CATEGORY_PRICE_FLOORS_RON[category];
     if (queryProfile.queryType === "main_product" && Number.isFinite(priceFloor) && Number.isFinite(item.priceRon) && item.priceRon < priceFloor) {
@@ -1433,13 +1474,16 @@ export function classifyListingIntent(item, query) {
     listingType === "main_product" || listingType === "bundle" ? "product" :
     listingType === "spare_part" ? "part" :
     listingType;
-  const relevanceScore = scoreRelevance({
+  let relevanceScore = scoreRelevance({
     item,
     queryProfile,
     negativeMatches,
     matchStats,
     typeCompatibilityScore
   }) - (variantMatch.mismatch ? 35 : 0) - (matchStats.missingCriticalTokens.length * 25);
+  if (!queryProfile.understanding.category && queryProfile.tokens.length === 1) {
+    relevanceScore = Math.min(relevanceScore, 70);
+  }
   const rejectionReasons = [];
 
   if (typeCompatibilityScore < 0.8) {
@@ -1492,6 +1536,10 @@ export function classifyListingIntent(item, query) {
     queryType: queryProfile.queryType,
     listingType,
     productHead: queryProfile.productHead,
+    queryCategory: queryProfile.understanding.category,
+    queryEntity: queryProfile.understanding.entityId,
+    queryConfidence: queryProfile.understanding.confidence,
+    comparableKey: queryProfile.understanding.comparableKey,
     anchorTerms: queryProfile.expandedTokens,
     brandTerms: queryProfile.brandTerms,
     keywordSignals,

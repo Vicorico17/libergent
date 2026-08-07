@@ -112,6 +112,17 @@ export type SearchPayload = {
   searchTier?: "free" | "premium";
   results?: ApiResult[];
   summary?: {
+    queryUnderstanding?: {
+      category?: string | null;
+      entityId?: string | null;
+      make?: string | null;
+      model?: string | null;
+      label?: string;
+      confidence?: number;
+      alternatives?: Array<{ label?: string; query?: string }>;
+      refinements?: string[];
+    };
+    recommendationMode?: "deal" | "match";
     totalListings?: number;
     searchedAt?: string;
     marketplaces?: number;
@@ -136,6 +147,7 @@ export type SearchPayload = {
       newLowestRon?: number | null;
       newPricedListingsRon?: number;
       savingsVsNewPct?: number | null;
+      comparable?: boolean;
     };
     duplicateListings?: number;
     bestOffer?: ApiListing | null;

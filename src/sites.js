@@ -1,4 +1,5 @@
 import { normalizeMarketplaceQuery } from "./query-normalization.js";
+import { understandMarketplaceQuery } from "./query-understanding.js";
 
 function slugifySpacesWithDash(value) {
   return value.trim().replace(/\s+/g, "-");
@@ -33,63 +34,6 @@ function buildBasePrompt(siteLabel, query, limit, extra = "") {
     .filter(Boolean)
     .join(" ");
 }
-
-const CAR_MAKES = [
-  "abarth",
-  "alfa",
-  "alfa-romeo",
-  "audi",
-  "bentley",
-  "bmw",
-  "byd",
-  "cadillac",
-  "chevrolet",
-  "chrysler",
-  "citroen",
-  "cupra",
-  "dacia",
-  "daewoo",
-  "dodge",
-  "ds",
-  "fiat",
-  "ford",
-  "honda",
-  "hyundai",
-  "infiniti",
-  "isuzu",
-  "iveco",
-  "jaguar",
-  "jeep",
-  "kia",
-  "lancia",
-  "land",
-  "land-rover",
-  "lexus",
-  "maserati",
-  "mazda",
-  "mercedes",
-  "mercedes-benz",
-  "mg",
-  "mini",
-  "mitsubishi",
-  "nissan",
-  "opel",
-  "peugeot",
-  "polestar",
-  "porsche",
-  "range",
-  "renault",
-  "saab",
-  "seat",
-  "skoda",
-  "smart",
-  "subaru",
-  "suzuki",
-  "tesla",
-  "toyota",
-  "volkswagen",
-  "volvo"
-];
 
 const CAR_KEYWORDS = [
   "masina",
@@ -164,33 +108,8 @@ const REFURBISHED_TECH_KEYWORDS = [
   "tablet", "ipad", "laptop", "macbook", "smartwatch", "ceas"
 ];
 
-const CAR_MODEL_PATH_ALIASES = [
-  {
-    patterns: [
-      /\bpassat\s+cc\b/,
-      /\bvw\s+passat\s+cc\b/,
-      /\bvolkswagen\s+passat\s+cc\b/
-    ],
-    slug: "volkswagen-passat-cc"
-  }
-];
-
-function normalizeCarText(value = "") {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function getCarModelPathAlias(query) {
-  const normalized = normalizeCarText(query);
-  return CAR_MODEL_PATH_ALIASES.find((alias) =>
-    alias.patterns.some((pattern) => pattern.test(normalized))
-  )?.slug || "";
+  return understandMarketplaceQuery(query).canonicalPath || "";
 }
 
 function slugifyCarPath(query) {
@@ -237,14 +156,9 @@ export function isCarQuery(query = "") {
   const hasMileage = /\b\d{1,3}(?:[ .]\d{3})?\s*km\b/.test(normalized);
   const hasVariantCode = /\b([a-z]\d{1,2}|\d\.\d)\b/.test(normalized);
   const hasCarKeyword = CAR_KEYWORDS.some((keyword) => tokenSet.has(keyword) || joined.includes(keyword));
-  const hasCarModel = Boolean(getCarModelPathAlias(normalized));
-
-  const hasCarMake = CAR_MAKES.some((make) => {
-    if (make.includes("-")) {
-      return joined.includes(make.replace("-", " "));
-    }
-    return tokenSet.has(make);
-  });
+  const queryUnderstanding = understandMarketplaceQuery(normalized);
+  const hasCarModel = Boolean(queryUnderstanding.model);
+  const hasCarMake = queryUnderstanding.category === "vehicle";
 
   if (hasCarKeyword || hasCarMake || hasCarModel || hasMileage) {
     return true;
@@ -824,8 +738,17 @@ export function getDefaultSiteKeys() {
 }
 
 export function getSiteKeysForAllSearch(query) {
+  if (isCarQuery(query)) {
+    return [
+      ...FREE_CAR_SITE_KEYS,
+      "olx.ro",
+      "lajumate.ro",
+      "okazii.ro",
+      "publi24.ro",
+      "anuntul.ro"
+    ];
+  }
   const conditionalSiteKeys = [
-    ...(isCarQuery(query) ? FREE_CAR_SITE_KEYS : []),
     ...(isRefurbishedTechQuery(query) ? FREE_TECH_SITE_KEYS : [])
   ];
   return [...conditionalSiteKeys, ...FREE_DEFAULT_SITE_KEYS];

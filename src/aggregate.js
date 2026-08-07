@@ -1,6 +1,7 @@
 import { normalizeListing } from "./normalize.js";
 import { classifyListingIntent, getQueryBrandTerms, tokenize } from "./relevance.js";
 import { classifyMarketSegment } from "./market-segment.js";
+import { understandMarketplaceQuery } from "./query-understanding.js";
 
 function median(values) {
   if (!values.length) {
@@ -908,6 +909,50 @@ function getReferenceMedianForItem(item, { usedMedianPriceRon, newMedianPriceRon
   return Number.isFinite(usedMedianPriceRon) ? usedMedianPriceRon : globalMedianPriceRon;
 }
 
+function extractVehicleYear(item = {}) {
+  if (item.queryCategory !== "vehicle") return null;
+  const match = `${item.title || ""} ${item.condition || ""}`.match(/\b(19[8-9]\d|20[0-3]\d)\b/);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+function isComparableCandidate(item, candidate) {
+  if (isNewProductSource(candidate) !== isNewProductSource(item)) return false;
+  if (item.comparableKey && candidate.comparableKey !== item.comparableKey) return false;
+
+  if (item.queryCategory === "vehicle") {
+    if (!item.queryEntity || item.queryEntity.startsWith("vehicle_make_")) {
+      return itemRankKey(candidate) === itemRankKey(item);
+    }
+    const itemYear = extractVehicleYear(item);
+    const candidateYear = extractVehicleYear(candidate);
+    if (!itemYear || !candidateYear) {
+      return itemRankKey(candidate) === itemRankKey(item);
+    }
+    return Math.abs(itemYear - candidateYear) <= 4;
+  }
+
+  return true;
+}
+
+function getComparableReferenceMedian(item, candidates, medianContext) {
+  const comparablePrices = candidates
+    .filter((candidate) => isComparableCandidate(item, candidate))
+    .map((candidate) => candidate.priceRon)
+    .filter((price) => Number.isFinite(price) && price > 0);
+
+  if (item.queryCategory === "vehicle") {
+    return comparablePrices.length >= 2 ? median(comparablePrices) : null;
+  }
+  return getReferenceMedianForItem(item, medianContext);
+}
+
+function semanticMatchTier(item) {
+  const relevance = Number.isFinite(item.relevanceScore) ? item.relevanceScore : 0;
+  if (relevance >= 90) return 3;
+  if (relevance >= 75) return 2;
+  return 1;
+}
+
 function buildPriceIntelligence({ usedMedianPriceRon, newMedianPriceRon, globalMedianPriceRon, usedPricedItems, newPricedItems, allPricedItems, bestUsedOffer, bestNewBenchmark }) {
   const benchmarkPriceRon = Number.isFinite(bestNewBenchmark?.priceRon) ? bestNewBenchmark.priceRon : null;
   const usedBestPriceRon = Number.isFinite(bestUsedOffer?.priceRon) ? bestUsedOffer.priceRon : null;
@@ -977,6 +1022,7 @@ function isBlockedMarketplaceResult(result) {
 }
 
 export function aggregateMarketplaceResults(results, { condition = "any", creditBudget = null, creditsUsed = null } = {}) {
+  const queryUnderstanding = understandMarketplaceQuery(results.find((result) => result?.query)?.query || "");
   const normalizedResults = results.map((result) => {
     if (!result.ok) {
       return result;
@@ -1065,7 +1111,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const newMedianPriceRon = median(newPricedItems.map((item) => item.priceRon));
   const medianContext = { usedMedianPriceRon, newMedianPriceRon, globalMedianPriceRon };
   const allBestCandidates = allScoredItems.map((item) => {
-    const referenceMedianRon = getReferenceMedianForItem(item, medianContext);
+    const referenceMedianRon = getComparableReferenceMedian(item, allScoredItems, medianContext);
     const enrichedItem = enrichItemWithDealIntelligence(item, referenceMedianRon, condition);
     return {
       ...enrichedItem,
@@ -1074,6 +1120,9 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   });
   const rankedBaseCandidates = allBestCandidates
     .sort((a, b) => {
+      if (semanticMatchTier(b) !== semanticMatchTier(a)) {
+        return semanticMatchTier(b) - semanticMatchTier(a);
+      }
       if (b.recommendationScore !== a.recommendationScore) {
         return b.recommendationScore - a.recommendationScore;
       }
@@ -1084,9 +1133,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       rank: index + 1
     }));
   const rankedCandidates = rankedBaseCandidates.map((item) => {
-    const comparisonPool = rankedBaseCandidates.filter(
-      (candidate) => isNewProductSource(candidate) === isNewProductSource(item)
-    );
+    const comparisonPool = rankedBaseCandidates.filter((candidate) => isComparableCandidate(item, candidate));
     const pricedComparisonCount = comparisonPool.filter(
       (candidate) => Number.isFinite(candidate.priceRon) && candidate.priceRon > 0
     ).length;
@@ -1151,7 +1198,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const queryMismatchListings = successfulResults.reduce((sum, result) => sum + (result.queryMismatchItemCount || 0), 0);
   const includedListings = successfulResults.reduce((sum, result) => sum + result.items.length, 0);
   const excludedListings = successfulResults.reduce((sum, result) => sum + (result.excludedItemCount || 0), 0);
-  const priceIntelligence = buildPriceIntelligence({
+  const basePriceIntelligence = buildPriceIntelligence({
     usedMedianPriceRon,
     newMedianPriceRon,
     globalMedianPriceRon,
@@ -1161,6 +1208,20 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     bestUsedOffer,
     bestNewBenchmark
   });
+  const hasComparablePriceEvidence = (bestUsedOffer?.recommendation?.comparedListings || 0) >= 2;
+  const priceIntelligence = queryUnderstanding.category === "vehicle" && !hasComparablePriceEvidence
+    ? {
+        ...basePriceIntelligence,
+        medianRon: null,
+        fairLowRon: null,
+        fairHighRon: null,
+        usedMedianRon: null,
+        usedFairLowRon: null,
+        usedFairHighRon: null,
+        savingsVsNewPct: null,
+        comparable: false
+      }
+    : { ...basePriceIntelligence, comparable: true };
 
   return {
     results: rankedResults,
@@ -1169,6 +1230,8 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       searchedAt: new Date().toISOString(),
       condition,
       conditionLabel: condition === "new" ? "Nou" : condition === "used" ? "Folosit" : "Oricare",
+      queryUnderstanding,
+      recommendationMode: bestUsedOffer?.recommendation?.strong ? "deal" : "match",
       creditBudget,
       creditsUsed,
       marketplaces: rankedResults.length,

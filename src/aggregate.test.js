@@ -12,6 +12,29 @@ function makeResult(site, query, items) {
   };
 }
 
+test("Mustang recommendations contain vehicles and avoid false cross-generation deal claims", () => {
+  const query = "mustang";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      { title: "Ford Mustang GT 5.0 V8 2019", price: "150000 lei", postedAt: "Azi", url: "https://olx.ro/mustang-car" },
+      { title: "Macheta Ford Mustang 1967 1:24", price: "120 lei", postedAt: "Azi", url: "https://olx.ro/mustang-toy" },
+      { title: "Tricou Mustang", price: "50 lei", postedAt: "Azi", url: "https://olx.ro/mustang-shirt" }
+    ]),
+    makeResult("autovit.ro", query, [
+      { title: "Ford Mustang 2.3 EcoBoost 2020", price: "165000 lei", postedAt: "Ieri", url: "https://autovit.ro/mustang-2020" },
+      { title: "Ford Mustang Fastback 1967", price: "240000 lei", postedAt: "Ieri", url: "https://autovit.ro/mustang-1967" }
+    ])
+  ]);
+
+  const urls = aggregated.results.flatMap((result) => result.items.map((item) => item.url));
+  assert.equal(urls.includes("https://olx.ro/mustang-toy"), false);
+  assert.equal(urls.includes("https://olx.ro/mustang-shirt"), false);
+  assert.equal(urls.includes("https://olx.ro/mustang-car"), true);
+  assert.equal(aggregated.summary.queryUnderstanding.entityId, "ford_mustang");
+  assert.equal(aggregated.summary.bestUsedOffer.recommendation.comparedListings, 2);
+  assert.equal(aggregated.results.flatMap((result) => result.items).find((item) => item.url.endsWith("1967")).recommendation.comparedListings, 1);
+});
+
 test("prefers trusted complete offer over suspiciously cheap defective listing", () => {
   const query = "iPhone 14 Pro";
   const aggregated = aggregateMarketplaceResults([

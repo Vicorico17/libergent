@@ -36,7 +36,19 @@ export function buildHistoryEntry({ query, condition, provider, siteKeys, payloa
           title: payload.summary.bestOffer.title || "",
           site: payload.summary.bestOffer.site || "",
           priceRon: payload.summary.bestOffer.priceRon ?? null,
-          url: payload.summary.bestOffer.url || ""
+          url: payload.summary.bestOffer.url || "",
+          recommendationScore: payload.summary.bestOffer.recommendationScore ?? null,
+          relevanceScore: payload.summary.bestOffer.relevanceScore ?? null,
+          listingType: payload.summary.bestOffer.listingType || "",
+          searchQuality: {
+            interpretation: payload.summary.queryUnderstanding || null,
+            recommendationMode: payload.summary.recommendationMode || "match",
+            parsedListings: payload.summary.parsedListings ?? 0,
+            matchedListings: payload.summary.matchedListings ?? 0,
+            includedListings: payload.summary.includedListings ?? 0,
+            excludedListings: payload.summary.excludedListings ?? 0,
+            duplicateListings: payload.summary.duplicateListings ?? 0
+          }
         }
       : null
   };
