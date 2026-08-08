@@ -73,6 +73,67 @@ test("requires authentication before Premium search", async () => {
   assert.match(payload.error, /authentication/i);
 });
 
+test("requires authentication before accepting search feedback", async () => {
+  const response = await worker.fetch(new Request("https://libergent.test/api/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query: "whiteboard", feedback: "dislike", reason: "part_or_accessory" })
+  }), {});
+  const payload = await response.json();
+
+  assert.equal(response.status, 401);
+  assert.match(payload.error, /authentication/i);
+});
+
+test("stores authenticated structured search feedback", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let storedRow;
+
+  globalThis.fetch = async (url, init = {}) => {
+    const requestUrl = String(url);
+    if (requestUrl === "https://supabase.example/auth/v1/user") {
+      return new Response(JSON.stringify({ id: "user-1", email: "buyer@example.test" }), { status: 200 });
+    }
+    if (requestUrl.startsWith("https://supabase.example/rest/v1/offer_feedback")) {
+      storedRow = JSON.parse(init.body);
+      return new Response(null, { status: 201 });
+    }
+    return new Response("[]", { status: 200 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  const response = await worker.fetch(new Request("https://libergent.test/api/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: "Bearer user-token" },
+    body: JSON.stringify({
+      query: "whiteboard",
+      feedback: "dislike",
+      reason: "part_or_accessory",
+      correctionText: "whiteboard magnetic 120x90",
+      sessionId: "session-1",
+      searchId: "search-1",
+      listingFingerprint: "olx:marker-1",
+      originalRank: 1,
+      appliedAction: "hide_similar",
+      queryUnderstanding: { target: "whiteboard" },
+      listingFeatures: { accessoryTerms: ["marker"] },
+      offer: { title: "Set markere whiteboard", site: "olx", url: "https://example.test/marker-1", priceRon: 25 }
+    })
+  }), {
+    SUPABASE_URL: "https://supabase.example",
+    SUPABASE_SECRET_KEY: "service-secret"
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(storedRow.user_id, "user-1");
+  assert.equal(storedRow.reason, "part_or_accessory");
+  assert.equal(storedRow.correction_text, "whiteboard magnetic 120x90");
+  assert.equal(storedRow.applied_action, "hide_similar");
+  assert.equal(storedRow.algorithm_version, "feedback-loop-v1");
+});
+
 test("keeps Premium search locked for a signed-in free account", async (t) => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
@@ -172,8 +233,64 @@ test("Premium search skips Browser Run when direct marketplace results are usabl
   assert.equal(response.status, 200);
   assert.equal(payload.summary.browserMarketplaces, 0);
   assert.equal(payload.summary.browserSessionsUsed, 0);
-  assert.equal(payload.summary.browserFallbackLimit, 5);
+  assert.equal(payload.summary.browserFallbackLimit, payload.summary.browserEligibleMarketplaces);
+  assert.equal(payload.summary.kitesurfEnabled, true);
+  assert.equal(payload.summary.successfulKitesurfMarketplaces, 0);
   assert.deepEqual(payload.summary.browserFallbackMarketplaces, []);
+  assert.deepEqual(payload.summary.kitesurfFallbackMarketplaces, []);
+  assert.deepEqual(payload.summary.chromiumFallbackMarketplaces, []);
+  assert.deepEqual(payload.summary.browserDiagnostics, []);
+});
+
+test("Premium search attempts Kitesurf for every empty selected source before bounded Chromium recovery", async (t) => {
+  const originalMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url) === "https://supabase.example/auth/v1/user") {
+      return new Response(JSON.stringify({ id: "user-premium", email: "premium@example.test" }), { status: 200 });
+    }
+    if (String(url).startsWith("https://supabase.example/")) {
+      return new Response("[]", { status: 200 });
+    }
+    return new Response("<html><body>No matching products</body></html>", {
+      status: 200,
+      headers: { "content-type": "text/html" }
+    });
+  };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalMockSearch === undefined) {
+      delete process.env.LIBERGENT_MOCK_SEARCH;
+    } else {
+      process.env.LIBERGENT_MOCK_SEARCH = originalMockSearch;
+    }
+  });
+
+  const browserBinding = {
+    fetch: async () => new Response("preview browser unavailable", { status: 503 })
+  };
+  const response = await worker.fetch(
+    new Request("https://libergent.test/api/search/premium?q=iphone&site=all&limit=5", {
+      headers: { authorization: "Bearer user-token" }
+    }),
+    {
+      BROWSER: browserBinding,
+      LIBERGENT_MOCK_SEARCH: "0",
+      SUPABASE_URL: "https://supabase.example",
+      SUPABASE_SECRET_KEY: "service-secret",
+      LIBERGENT_PREMIUM_EMAILS: "premium@example.test"
+    }
+  );
+  const payload = await response.json();
+  const kitesurfDiagnostics = payload.summary.browserDiagnostics.filter((entry) => entry.engine === "kitesurf");
+  const chromiumDiagnostics = payload.summary.browserDiagnostics.filter((entry) => entry.engine === "chromium");
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.summary.kitesurfFallbackMarketplaces.length, payload.summary.browserEligibleMarketplaces);
+  assert.equal(kitesurfDiagnostics.length, payload.summary.browserEligibleMarketplaces);
+  assert.equal(chromiumDiagnostics.length, 5);
+  assert.deepEqual(payload.summary.chromiumFallbackMarketplaces, ["okazii.ro", "compari.ro", "pcgarage.ro", "flanco.ro", "altex.ro"]);
+  assert.equal(kitesurfDiagnostics.every((entry) => entry.ok === false), true);
 });
 
 test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {

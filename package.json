@@ -7,6 +7,7 @@
   "scripts": {
     "search": "node src/cli.js search",
     "search:live": "LIBERGENT_MOCK_SEARCH=0 LIBERGENT_MOCK_PROVIDER=0 node src/cli.js search --site all --provider auto --pages 1 --pretty",
+    "benchmark:kitesurf": "node scripts/benchmark-kitesurf.js",
     "check:cli": "node src/cli.js --help",
     "test": "node --test src/*.test.js src/parsers/*.test.js src/providers/*.test.js",
     "check": "npm run check:cli && npm run test",
@@ -26,6 +27,6 @@
     "wrangler": "4.93.1"
   },
   "dependencies": {
-    "@cloudflare/puppeteer": "^1.1.0"
+    "@cloudflare/puppeteer": "^1.3.0"
   }
 }

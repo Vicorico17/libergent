@@ -153,8 +153,9 @@ The default policy is:
 1. fetch the marketplace search page directly with browser-like request headers
 2. parse and score HTML locally
 3. retry a small set of transient transport failures with the alternate direct header profile
-4. use Browser Run only for the explicit Premium allowlist and only after a failed or empty direct result
-5. never use Browser Run as a CAPTCHA or anti-bot bypass
+4. for Premium searches, try Kitesurf after a failed or empty direct result for every source selected by the query
+5. if Kitesurf still has no usable data, use Chromium only for the existing conservative fallback list
+6. never use either browser engine as a CAPTCHA or anti-bot bypass
 
 Important source-specific behavior:
 
@@ -174,7 +175,7 @@ The main cost driver is processed pages/browser duration, not the number of JSON
 - `src/sites.js` — marketplace registry, Free/Premium tiers, and conditional routing
 - `src/parsers/` — marketplace-specific and retail HTML parsers
 - `src/aggregate.js` — normalization, classification, deduplication, ranking, and price intelligence
-- `src/providers/cloudflare-browser.js` — bounded Cloudflare Browser Run fallback
+- `src/providers/cloudflare-browser.js` — Kitesurf and Chromium Browser Run fallback
 - `src/listing-details.js` — on-demand detail extraction
 - `ui/` — Next.js static frontend
 - `supabase/` — search tracking, leads, and private conversation schema
@@ -256,7 +257,19 @@ curl -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   "http://127.0.0.1:8787/api/search/premium?q=iphone%2015&site=all&limit=30&pages=1"
 ```
 
-Premium search requires a valid Supabase session and an active Premium entitlement. Signed-out requests return `401`; signed-in Free accounts return `403` with `code: "premium_required"`. The UI keeps Premium visibly locked for those accounts and falls back to Free results instead of starting a Premium request. On the deployed Cloudflare Worker, Premium also requires the `BROWSER` binding. The local Node API supports direct-only Premium aggregation without Browser Run; it cannot provide the Worker's conditional browser fallback. `PREMIUM_BROWSER_FALLBACK_LIMIT` can lower the maximum number of conditional browser sources; the current full allowlist contains five sources including Okazii.
+Premium search requires a valid Supabase session and an active Premium entitlement. Signed-out requests return `401`; signed-in Free accounts return `403` with `code: "premium_required"`. The UI keeps Premium visibly locked for those accounts and falls back to Free results instead of starting a Premium request. On the deployed Cloudflare Worker, Premium also requires the `BROWSER` binding. The local Node API supports direct-only Premium aggregation without Browser Run; it cannot provide the Worker's conditional browser fallback.
+
+Kitesurf is enabled by default for the experiment. It is attempted for every failed or empty source selected for that Premium query, not every unrelated category on every search. Runtime controls are:
+
+```bash
+PREMIUM_KITESURF_ENABLED=1
+PREMIUM_KITESURF_FALLBACK_LIMIT=100
+PREMIUM_KITESURF_CONCURRENCY=4
+PREMIUM_BROWSER_FALLBACK_LIMIT=5
+PREMIUM_BROWSER_CONCURRENCY=3
+```
+
+The `PREMIUM_BROWSER_*` settings apply to the final Chromium recovery layer. Set `PREMIUM_KITESURF_ENABLED=0` for an immediate rollback. Premium response summaries expose attempted sites, successful Kitesurf counts, Chromium recoveries, session usage, durations, parsed counts, challenge signals, and errors in `summary.browserDiagnostics`.
 
 ### Response summary
 
@@ -318,15 +331,32 @@ Counts vary by query and source availability. Failed marketplaces remain represe
 | `PATCH /api/alerts/events/:id` | Mark an in-account alert event as read |
 | `GET /api/marketplace/details` | Lazy listing enrichment |
 | `GET /api/marketplace/contact` | Supported listing contact lookup |
-| `POST /api/feedback` | Offer feedback |
+| `POST /api/feedback` | Authenticated structured offer feedback |
 | `GET /api/conversations` | Authenticated conversation list |
 | `POST /api/whatsapp/send` | Authenticated seller outreach through the configured bridge |
 
-The protected `/api/admin/browser-benchmark` endpoint renders one supported marketplace at a time and requires `LIBERGENT_ADMIN_TOKEN` plus the `BROWSER` binding.
+The protected `/api/admin/browser-benchmark` endpoint renders one supported marketplace at a time and requires `LIBERGENT_ADMIN_TOKEN` plus the `BROWSER` binding. It accepts `engine=kitesurf` or `engine=chromium`; Kitesurf is the default.
+
+To test the complete marketplace registry with category-appropriate queries after deploying the Worker:
+
+```bash
+export LIBERGENT_ADMIN_TOKEN='YOUR_DEPLOYED_ADMIN_TOKEN'
+npm run benchmark:kitesurf -- --base-url=https://libergent.com --state=all --concurrency=2
+```
+
+Use `--sites=emag.ro,altex.ro,olx.ro` for a small batch, `--state=active` for established sources, or `--engine=chromium` for a comparison run. The command returns JSON with `usableSites`, `challengedSites`, `failedSites`, relevant and rejected item counts, sample products, durations, and per-source errors. A rendered page without a usable title/URL/price sample is kept separate from a browser failure or challenge.
 
 ## Accounts, analytics, and Supabase
 
 Supabase Auth supports Google and passwordless email when they are configured. `/confirm` completes OAuth/magic-link callbacks, while `/account` provides an account dashboard for liked listings, saved alerts, private seller conversations, LiberGent activity history, identity details, and logout. `/signup` plus `/reset` use the same passwordless account flow. Signed-out visitors can search, inspect **Analiză LiberGent**, and open original marketplace listings. Favorites, feedback, WhatsApp outreach, listing statuses, and private conversation history require authentication.
+
+### Search feedback loop
+
+Signed-in users can mark an offer as useful or choose **Nu este ce căutam** and provide a structured reason: wrong product, accessory/part, wrong model, irrelevant price, duplicate, unavailable, or another reason. They can optionally explain what they actually wanted.
+
+A dislike has an immediate session-only effect: LiberGent hides the selected listing, may hide closely matching siblings when the feedback supplies a safe accessory/product signature, and recomputes the visible recommendation from the remaining eligible results. The correction can be undone in the current session. It does not immediately rewrite global ranking rules.
+
+The authenticated API stores the user, search/session identifiers, listing fingerprint, original rank, algorithm version, query interpretation, listing features, applied session action, and optional correction text. This provides enough evidence to aggregate feedback across distinct users and promote future global rules only after minimum-volume and offline quality checks.
 
 Search analytics and email capture require:
 
@@ -357,25 +387,36 @@ Run the relevant SQL files in `supabase/` before enabling these features. Use th
 
 ### Search-quality database migration
 
-The structured feedback reason requires the `reason` column on `public.offer_feedback`. For an existing Supabase project, run the complete, idempotent [supabase/search_tracking.sql](supabase/search_tracking.sql) file in the Supabase SQL editor. It creates missing tracking objects, adds the column safely, and asks PostgREST to reload its schema cache.
+The feedback loop requires the expanded `public.offer_feedback` schema. For an existing Supabase project, run the complete, idempotent [supabase/search_tracking.sql](supabase/search_tracking.sql) file in the Supabase SQL editor. It creates missing tracking objects, adds all learning-context columns safely, enables RLS, restricts direct access to the service role, and asks PostgREST to reload its schema cache.
 
 The minimal migration, if the rest of the tracking schema is already installed, is:
 
 ```sql
 alter table public.offer_feedback
-  add column if not exists reason text not null default '';
+  add column if not exists reason text not null default '',
+  add column if not exists user_id uuid,
+  add column if not exists correction_text text not null default '',
+  add column if not exists session_id text not null default '',
+  add column if not exists search_id text not null default '',
+  add column if not exists listing_fingerprint text not null default '',
+  add column if not exists original_rank integer,
+  add column if not exists algorithm_version text not null default '',
+  add column if not exists applied_action text not null default '',
+  add column if not exists query_understanding jsonb not null default '{}'::jsonb,
+  add column if not exists listing_features jsonb not null default '{}'::jsonb;
 
 notify pgrst, 'reload schema';
 ```
 
-No destructive migration or manual backfill is required: existing rows receive the empty-string default. The new query interpretation and recommendation-quality fields are stored inside the existing `search_events.best_offer` `jsonb` payload, so they do not require additional columns. Verify the feedback migration with:
+No destructive migration or manual backfill is required: existing rows receive safe empty defaults. Verify the feedback migration with:
 
 ```sql
 select column_name, data_type, is_nullable, column_default
 from information_schema.columns
 where table_schema = 'public'
   and table_name = 'offer_feedback'
-  and column_name = 'reason';
+  and column_name in ('reason', 'user_id', 'correction_text', 'listing_features', 'algorithm_version')
+order by column_name;
 ```
 
 Client-side Google Analytics is enabled only when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is present.
@@ -409,4 +450,5 @@ Production deployment is also automated by [.github/workflows/deploy-cloudflare.
 - CEL.ro can time out from Cloudflare infrastructure even when it responds from other networks; browser fallback was tested and intentionally rejected because it added latency without cards.
 - Some retail pages return promotional/navigation candidates that are correctly counted as parsed but rejected as query mismatches.
 - Browser Run cannot solve CAPTCHA or override marketplace access policy.
+- Kitesurf is a beta, non-pixel-perfect browser and cannot negotiate bot challenges with real Chromium TLS fingerprints; incompatible sources fall back only where Chromium is explicitly allowed.
 - Search-by-image remains an unfinished integration and should not be advertised as active.

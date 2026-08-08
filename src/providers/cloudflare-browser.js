@@ -1,8 +1,22 @@
 import puppeteer from "@cloudflare/puppeteer";
 import { extractRomanianMobilePhones } from "../phone-numbers.js";
 import { parseSiteHtml } from "../site-html-parser.js";
+import { filterRelevantItems } from "../search.js";
 
 const OLX_PHONE_RESPONSE_PATTERN = /\/offers\/\d+\/[^?]*phone/i;
+const BROWSER_ENGINES = new Set(["chromium", "kitesurf"]);
+
+export function normalizeBrowserEngine(value = "chromium") {
+  const engine = String(value || "chromium").trim().toLowerCase();
+  if (!BROWSER_ENGINES.has(engine)) throw new Error(`Unsupported browser engine "${engine}".`);
+  return engine;
+}
+
+async function launchBrowser(launch, browserBinding, engine) {
+  return engine === "kitesurf"
+    ? launch(browserBinding, { browser: "kitesurf" })
+    : launch(browserBinding);
+}
 
 function extractPhonesFromUnknownValue(value) {
   if (typeof value === "string") return extractRomanianMobilePhones(value);
@@ -145,12 +159,12 @@ export async function revealOlxPhonesWithBrowser(browserBinding, listingUrl, { l
 export async function benchmarkMarketplaceWithBrowser(
   browserBinding,
   { site, query, limit = 20 },
-  { launch = puppeteer.launch } = {}
+  { launch = puppeteer.launch, engine = "chromium" } = {}
 ) {
   const result = await searchMarketplaceWithBrowser(
     browserBinding,
     { site, query, limit },
-    { launch, includeBodyText: true }
+    { launch, includeBodyText: true, engine }
   );
 
   return {
@@ -163,9 +177,11 @@ export async function benchmarkMarketplaceWithBrowser(
     htmlBytes: result.htmlBytes,
     rawItemCount: result.rawItemCount,
     itemCount: result.itemCount,
+    queryMismatchItemCount: result.queryMismatchItemCount,
     totalResults: result.totalResults,
     hasNextPage: result.hasNextPage,
     challengeDetected: result.challengeDetected,
+    browserEngine: result.browserEngine,
     sample: result.items.slice(0, 5).map((item) => ({
       title: item.title || "",
       price: item.price || "",
@@ -178,13 +194,14 @@ export async function benchmarkMarketplaceWithBrowser(
 export async function searchMarketplaceWithBrowser(
   browserBinding,
   { site, query, limit = 20 },
-  { launch = puppeteer.launch, includeBodyText = false, browser: sharedBrowser = null } = {}
+  { launch = puppeteer.launch, includeBodyText = false, browser: sharedBrowser = null, engine = "chromium" } = {}
 ) {
   if (!browserBinding) throw new Error("Cloudflare Browser Run is not configured.");
 
+  const browserEngine = normalizeBrowserEngine(engine);
   const url = site.searchUrl(query);
   const startedAt = Date.now();
-  const browser = sharedBrowser || await launch(browserBinding);
+  const browser = sharedBrowser || await launchBrowser(launch, browserBinding, browserEngine);
   const ownsBrowser = !sharedBrowser;
   let page;
   try {
@@ -218,7 +235,11 @@ export async function searchMarketplaceWithBrowser(
     const bodyText = includeBodyText
       ? await page.evaluate(() => document.body?.innerText || "")
       : "";
-    const items = parsed.items.map((item) => ({
+    const challengeDetected = /captcha|verific[aă].{0,30}(om|robot)|access denied|just a moment|sorry, you have been blocked|unable to access/i.test(bodyText) ||
+      /<title[^>]*>\s*(just a moment|attention required[^<]*cloudflare)|cdn-cgi\/challenge-platform|id=["']cf-error-details|class=["'][^"']*captcha-container|access denied/i
+        .test(html.slice(0, 30000));
+    const relevantItems = site.disableQueryFilter ? parsed.items : filterRelevantItems(parsed.items, query);
+    const items = relevantItems.map((item) => ({
       ...item,
       sourceType: item.sourceType || site.sourceType || "classifieds",
       condition: item.condition || site.defaultCondition || "",
@@ -227,8 +248,9 @@ export async function searchMarketplaceWithBrowser(
 
     return {
       ok: true,
-      provider: "cloudflare-browser",
-      strategy: "browser-rendered-html:1-page",
+      provider: browserEngine === "kitesurf" ? "cloudflare-kitesurf" : "cloudflare-browser",
+      strategy: `${browserEngine}-rendered-html:1-page`,
+      browserEngine,
       site: site.key,
       query,
       url,
@@ -238,13 +260,14 @@ export async function searchMarketplaceWithBrowser(
       htmlBytes: new TextEncoder().encode(html).byteLength,
       rawItemCount: parsed.rawItemCount,
       itemCount: items.length,
+      queryMismatchItemCount: Math.max(0, parsed.rawItemCount - items.length),
       items,
       totalResults: parsed.totalResults,
       hasNextPage: parsed.hasNextPage,
       pagesUsed: 1,
       creditsUsed: 0,
       browserSessionsUsed: 1,
-      challengeDetected: /captcha|verific[aă].{0,30}(om|robot)|access denied|just a moment/i.test(bodyText),
+      challengeDetected,
     };
   } finally {
     if (page?.close) await page.close().catch(() => {});
@@ -255,10 +278,11 @@ export async function searchMarketplaceWithBrowser(
 export async function searchMarketplacesWithBrowser(
   browserBinding,
   searches,
-  { launch = puppeteer.launch, includeBodyText = false, concurrency = 2 } = {}
+  { launch = puppeteer.launch, includeBodyText = false, concurrency = 2, engine = "chromium" } = {}
 ) {
   if (!browserBinding) throw new Error("Cloudflare Browser Run is not configured.");
-  const browser = await launch(browserBinding);
+  const browserEngine = normalizeBrowserEngine(engine);
+  const browser = await launchBrowser(launch, browserBinding, browserEngine);
   const results = new Array(searches.length);
   let nextIndex = 0;
 
@@ -270,14 +294,16 @@ export async function searchMarketplacesWithBrowser(
       try {
         results[index] = await searchMarketplaceWithBrowser(browserBinding, search, {
           includeBodyText,
-          browser
+          browser,
+          engine: browserEngine
         });
       } catch (error) {
         results[index] = {
           ok: false,
           site: search.site.key,
           query: search.query,
-          provider: "cloudflare-browser",
+          provider: browserEngine === "kitesurf" ? "cloudflare-kitesurf" : "cloudflare-browser",
+          browserEngine,
           error: error instanceof Error ? error.message : String(error)
         };
       }

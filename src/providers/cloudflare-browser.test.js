@@ -131,6 +131,41 @@ test("searches multiple marketplaces with one shared browser session", async () 
   assert.equal(results.reduce((sum, result) => sum + result.browserSessionsUsed, 0), 1);
 });
 
+test("launches Kitesurf through the Browser Run binding and labels its results", async () => {
+  let launchOptions;
+  const launch = async (_binding, options) => {
+    launchOptions = options;
+    return {
+      newPage: async () => ({
+        setViewport: async () => {},
+        goto: async () => ({ status: () => 200 }),
+        content: async () => "<html><body>No products</body></html>",
+        evaluate: async () => "No products",
+        url: () => "https://example.test/search",
+        close: async () => {}
+      }),
+      close: async () => {}
+    };
+  };
+  const site = {
+    key: "example.ro",
+    strategy: "direct-html-retail",
+    timeoutMs: 1000,
+    searchUrl: () => "https://example.test/search"
+  };
+
+  const [result] = await searchMarketplacesWithBrowser(
+    {},
+    [{ site, query: "iphone", limit: 5 }],
+    { launch, engine: "kitesurf" }
+  );
+
+  assert.deepEqual(launchOptions, { browser: "kitesurf" });
+  assert.equal(result.browserEngine, "kitesurf");
+  assert.equal(result.provider, "cloudflare-kitesurf");
+  assert.equal(result.strategy, "kitesurf-rendered-html:1-page");
+});
+
 test("uses site-specific browser navigation readiness for long-lived retail pages", async () => {
   let gotoOptions;
   const launch = async () => ({
@@ -158,6 +193,34 @@ test("uses site-specific browser navigation readiness for long-lived retail page
   await searchMarketplaceWithBrowser({}, { site, query: "ps5", limit: 5 }, { launch });
 
   assert.deepEqual(gotoOptions, { waitUntil: "domcontentloaded", timeout: 16000 });
+});
+
+test("detects a browser challenge from rendered HTML when visible body text is empty", async () => {
+  const launch = async () => ({
+    newPage: async () => ({
+      setViewport: async () => {},
+      goto: async () => ({ status: () => 403 }),
+      content: async () => '<html><head><title>Just a moment...</title></head><body><script src="/cdn-cgi/challenge-platform/test"></script></body></html>',
+      evaluate: async () => "",
+      url: () => "https://challenge.example/search",
+      close: async () => {}
+    }),
+    close: async () => {}
+  });
+  const site = {
+    key: "challenge.ro",
+    strategy: "direct-html-retail",
+    timeoutMs: 1000,
+    searchUrl: () => "https://challenge.example/search"
+  };
+
+  const result = await searchMarketplaceWithBrowser(
+    {},
+    { site, query: "iphone", limit: 5 },
+    { launch, includeBodyText: true, engine: "kitesurf" }
+  );
+
+  assert.equal(result.challengeDetected, true);
 });
 
 test("parses a page whose navigation times out after reaching the marketplace", async () => {

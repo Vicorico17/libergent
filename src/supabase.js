@@ -221,9 +221,19 @@ export async function insertOfferFeedbackToSupabase(entry, env = process.env) {
 
   const createdAt = entry.createdAt || new Date().toISOString();
   const feedbackRow = {
+    user_id: entry.userId || null,
     query: entry.query || "",
     feedback: entry.feedback,
     reason: entry.reason || entry.offer?.reason || "",
+    correction_text: entry.correctionText || "",
+    session_id: entry.sessionId || "",
+    search_id: entry.searchId || "",
+    listing_fingerprint: entry.listingFingerprint || "",
+    original_rank: entry.originalRank || null,
+    algorithm_version: entry.algorithmVersion || "",
+    applied_action: entry.appliedAction || "",
+    query_understanding: entry.queryUnderstanding || {},
+    listing_features: entry.listingFeatures || {},
     offer: entry.offer || null,
     offer_title: entry.offer?.title || "",
     offer_site: entry.offer?.site || "",
@@ -262,6 +272,17 @@ export async function insertOfferFeedbackToSupabase(entry, env = process.env) {
         creditsUsed: 0,
         bestOffer: {
           feedback: entry.feedback,
+          reason: entry.reason || "",
+          correctionText: entry.correctionText || "",
+          userId: entry.userId || "",
+          sessionId: entry.sessionId || "",
+          searchId: entry.searchId || "",
+          listingFingerprint: entry.listingFingerprint || "",
+          originalRank: entry.originalRank || null,
+          algorithmVersion: entry.algorithmVersion || "",
+          appliedAction: entry.appliedAction || "",
+          queryUnderstanding: entry.queryUnderstanding || {},
+          listingFeatures: entry.listingFeatures || {},
           query: entry.query || "",
           offer: entry.offer || null,
           storageFallback: "search_events"

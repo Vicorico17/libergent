@@ -3,7 +3,7 @@
 import { Fragment, Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ChevronDown as ChevronDownIcon, ClipboardCheck, Crown, ExternalLink, Lock, MapPin, MessageSquare, ShieldCheck, Tag } from "lucide-react"
+import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ChevronDown as ChevronDownIcon, ClipboardCheck, Crown, ExternalLink, Lock, MapPin, MessageSquare, RotateCcw, ShieldCheck, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import {
@@ -128,6 +128,15 @@ const VISIBLE_RESULT_STEP = 48
 const SEARCH_FILTERS_STORAGE_KEY = "libergent-search-filters-v3"
 type SearchTier = "free" | "premium"
 type AccountPlanStatus = "checking" | "premium" | "free" | "unknown"
+type FeedbackReason = "relevant" | "wrong_product" | "part_or_accessory" | "wrong_model" | "bad_price" | "duplicate" | "unavailable" | "other"
+type FeedbackExclusion = {
+  id: string
+  listingId: string
+  reason: FeedbackReason
+  listingType: string
+  signatureTokens: string[]
+}
+type OfferFeedbackHandler = (item: SearchResultItem, feedback: "like" | "dislike", reason: FeedbackReason, correctionText?: string) => Promise<{ hiddenCount: number }>
 type MarketplaceCoverage = {
   site: string
   provider: string
@@ -195,6 +204,52 @@ function normalizeKeywordText(value = "") {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+}
+
+const FEEDBACK_ACCESSORY_TERMS = [
+  "accesoriu", "accesorii", "adaptor", "adapter", "baterie", "batterie", "cablu", "cable",
+  "carcasa", "case", "filtru", "filter", "husa", "marker", "markere", "markers", "montaj",
+  "pen", "pens", "piesa", "piese", "replacement", "rezerva", "suport", "stand", "stylus"
+]
+const FEEDBACK_SIGNATURE_STOP_WORDS = new Set([
+  "nou", "noua", "noi", "original", "originala", "set", "vand", "vanzare", "pentru", "produs",
+  "buc", "bucati", "profesional", "profesionala", "premium", "oferta", "livrare"
+])
+
+function feedbackTokensMatch(left: string, right: string) {
+  if (left === right) return true
+  return left.length >= 5 && right.length >= 5 && (left.startsWith(right) || right.startsWith(left))
+}
+
+function buildFeedbackExclusion(item: SearchResultItem, query: string, reason: FeedbackReason): FeedbackExclusion {
+  const queryTokens = tokenizeKeywords(query)
+  const titleTokens = [...new Set(tokenizeKeywords(item.title))]
+  const isQueryToken = (token: string) => queryTokens.some((queryToken) => feedbackTokensMatch(token, queryToken))
+  const extraTokens = titleTokens.filter((token) => token.length >= 4 && !isQueryToken(token) && !FEEDBACK_SIGNATURE_STOP_WORDS.has(token))
+  const accessoryTokens = extraTokens.filter((token) => FEEDBACK_ACCESSORY_TERMS.some((term) => feedbackTokensMatch(token, term)))
+  const signatureTokens = reason === "part_or_accessory"
+    ? accessoryTokens.slice(0, 3)
+    : reason === "wrong_product" || reason === "wrong_model"
+      ? extraTokens.slice(0, 2)
+      : []
+
+  return {
+    id: `${item.id}:${reason}:${Date.now()}`,
+    listingId: item.id,
+    reason,
+    listingType: item.listingType,
+    signatureTokens,
+  }
+}
+
+function isExcludedByFeedback(item: SearchResultItem, exclusion: FeedbackExclusion) {
+  if (item.id === exclusion.listingId) return true
+  if (!exclusion.signatureTokens.length && exclusion.reason === "part_or_accessory" && ["accessory", "spare_part"].includes(exclusion.listingType)) {
+    return item.listingType === exclusion.listingType
+  }
+  if (!exclusion.signatureTokens.length) return false
+  const titleTokens = tokenizeKeywords(item.title)
+  return exclusion.signatureTokens.some((signature) => titleTokens.some((token) => feedbackTokensMatch(token, signature)))
 }
 
 function tokenizeKeywords(value = "") {
@@ -1632,6 +1687,107 @@ function ConversationStatusBadge({ status }: { status?: string }) {
   )
 }
 
+const DISLIKE_REASON_OPTIONS: Array<{ value: FeedbackReason; label: string }> = [
+  { value: "wrong_product", label: "Produs greșit" },
+  { value: "part_or_accessory", label: "Accesoriu / piesă" },
+  { value: "wrong_model", label: "Model / variantă greșită" },
+  { value: "bad_price", label: "Preț nerelevant" },
+  { value: "duplicate", label: "Duplicat" },
+  { value: "unavailable", label: "Indisponibil" },
+  { value: "other", label: "Alt motiv" },
+]
+
+function OfferFeedbackActions({ item, onFeedback, compact = false }: { item: SearchResultItem; onFeedback: OfferFeedbackHandler; compact?: boolean }) {
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState<FeedbackReason | "">("")
+  const [correctionText, setCorrectionText] = useState("")
+  const [pending, setPending] = useState(false)
+  const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
+
+  async function submit(feedback: "like" | "dislike", selectedReason: FeedbackReason) {
+    setPending(true)
+    setError("")
+    try {
+      const result = await onFeedback(item, feedback, selectedReason, correctionText)
+      setMessage(feedback === "like" ? "Mulțumim — rezultat confirmat." : `${Math.max(1, result.hiddenCount)} rezultat(e) eliminate din sesiune.`)
+      setOpen(false)
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Feedback-ul nu a putut fi salvat.")
+    } finally {
+      setPending(false)
+    }
+  }
+
+  if (message) {
+    return <div className="text-[9px] font-bold uppercase" style={{ color: GREEN }}>{message}</div>
+  }
+
+  return (
+    <div className="flex flex-col gap-2" data-testid={`offer-feedback-${item.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`}>
+      <div className={`flex ${compact ? "flex-col" : "flex-col sm:flex-row"} gap-2`}>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => void submit("like", "relevant")}
+          className="flex min-h-9 flex-1 items-center justify-center gap-1.5 px-2 py-2 text-[9px] font-bold uppercase disabled:opacity-50"
+          style={{ border: `1px solid ${INK}`, background: "white", color: INK }}
+        >
+          <ThumbsUp size={12} /> Rezultat bun
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => setOpen((current) => !current)}
+          className="flex min-h-9 flex-1 items-center justify-center gap-1.5 px-2 py-2 text-[9px] font-bold uppercase disabled:opacity-50"
+          style={{ border: `1px solid ${INK}`, background: open ? PINK : CREAM, color: INK }}
+          aria-expanded={open}
+        >
+          <ThumbsDown size={12} /> Nu este ce căutam
+        </button>
+      </div>
+      {open && (
+        <div className="flex flex-col gap-3 p-3" style={{ border: `1px solid ${INK}`, background: CREAM }}>
+          <div className="text-[9px] font-bold uppercase">Spune-ne ce nu se potrivește:</div>
+          <div className="flex flex-wrap gap-1.5">
+            {DISLIKE_REASON_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setReason(option.value)}
+                className="px-2 py-1.5 text-[8px] font-bold uppercase"
+                style={{ border: `1px solid ${INK}88`, background: reason === option.value ? INK : "white", color: reason === option.value ? "white" : INK }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <label className="flex flex-col gap-1.5 text-[8px] font-bold uppercase">
+            Eu căutam de fapt (opțional)
+            <input
+              value={correctionText}
+              onChange={(event) => setCorrectionText(event.target.value.slice(0, 300))}
+              placeholder="Ex: tabla whiteboard, nu markere"
+              className="min-h-10 px-3 py-2 text-[10px] normal-case outline-none"
+              style={{ border: `1px solid ${INK}`, background: "white", color: INK }}
+            />
+          </label>
+          <button
+            type="button"
+            disabled={!reason || pending}
+            onClick={() => reason && void submit("dislike", reason)}
+            className="min-h-10 px-3 py-2 text-[9px] font-bold uppercase disabled:opacity-40"
+            style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}
+          >
+            {pending ? "Aplic feedback..." : "Elimină și îmbunătățește rezultatele"}
+          </button>
+        </div>
+      )}
+      {error && <div className="text-[9px] font-bold" style={{ color: PINK }}>{error}</div>}
+    </div>
+  )
+}
+
 function ResultCard({
   item,
   query,
@@ -1643,6 +1799,7 @@ function ResultCard({
   onToggleSaved,
   isCompared = false,
   onToggleCompare,
+  onFeedback,
 }: {
   item: ResultItem
   query: string
@@ -1654,6 +1811,7 @@ function ResultCard({
   onToggleSaved: (item: SearchResultItem) => void
   isCompared?: boolean
   onToggleCompare?: (item: SearchResultItem) => void
+  onFeedback: OfferFeedbackHandler
 }) {
   const [hov, setHov] = useState(false)
   const { image, handleImageError } = useListingImage(item)
@@ -1745,6 +1903,7 @@ function ResultCard({
               {isSaved ? "Salvat" : "Salvează în favorite"}
             </button>
             <SellerMessageActions item={item} query={query} />
+            <OfferFeedbackActions key={item.id} item={item} onFeedback={onFeedback} compact />
           </>
         ) : (
           <AccountFeatureNotice query={query} tier={searchTier} compact />
@@ -1774,12 +1933,13 @@ function PanelHeader({ title }: { title: string }) {
   )
 }
 
-function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationStatus, onInspect }: { item: SearchResultItem; query: string; searchTier: SearchTier; isLoggedIn: boolean; conversationStatus?: string; onInspect: (item: SearchResultItem) => void }) {
+function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationStatus, onInspect, onFeedback }: { item: SearchResultItem; query: string; searchTier: SearchTier; isLoggedIn: boolean; conversationStatus?: string; onInspect: (item: SearchResultItem) => void; onFeedback: OfferFeedbackHandler }) {
   const { image, handleImageError } = useListingImage(item)
   const keywordScore = getKeywordMatchScore(item, query)
 
   return (
     <div
+      data-testid="top-recommendation"
       className="hover:-translate-y-0.5 transition-all duration-300"
       style={{
         background: "linear-gradient(135deg, #111111 0%, #333333 50%, #111111 100%)",
@@ -1892,7 +2052,10 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
                 Analiză Libergent
               </button>
               {isLoggedIn ? (
-                <SellerMessageActions item={item} query={query} />
+                <>
+                  <SellerMessageActions item={item} query={query} />
+                  <OfferFeedbackActions key={item.id} item={item} onFeedback={onFeedback} />
+                </>
               ) : (
                 <AccountFeatureNotice query={query} tier={searchTier} />
               )}
@@ -2016,7 +2179,7 @@ function deliveryTimeLabel(details: ListingDetails) {
   return "nespecificat"
 }
 
-function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversationStatus, onClose }: { item: SearchResultItem | null; query: string; searchTier: SearchTier; isLoggedIn: boolean; conversationStatus?: string; onClose: () => void }) {
+function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversationStatus, onClose, onFeedback }: { item: SearchResultItem | null; query: string; searchTier: SearchTier; isLoggedIn: boolean; conversationStatus?: string; onClose: () => void; onFeedback: OfferFeedbackHandler }) {
   const [details, setDetails] = useState<ListingDetails | null>(null)
   const [detailsLoading, setDetailsLoading] = useState(Boolean(item?.url))
   const [detailsError, setDetailsError] = useState("")
@@ -2119,7 +2282,10 @@ function ListingDetailDrawer({ item, query, searchTier, isLoggedIn, conversation
               <ConversationStatusBadge status={conversationStatus} />
               <DealQualitySummary item={item} />
               {isLoggedIn ? (
-                <SellerMessageActions item={item} query={query} />
+                <>
+                  <SellerMessageActions item={item} query={query} />
+                  <OfferFeedbackActions key={item.id} item={item} onFeedback={onFeedback} />
+                </>
               ) : (
                 <AccountFeatureNotice query={query} tier={searchTier} />
               )}
@@ -2487,6 +2653,9 @@ function SearchResultsContent() {
   const [conversationState, setConversationState] = useState<{ ownerId: string; statuses: Record<string, string> }>({ ownerId: "", statuses: {} })
   const [savedListings, setSavedListings] = useState<Set<string>>(new Set())
   const [savedListingsOwnerId, setSavedListingsOwnerId] = useState("")
+  const [feedbackExclusions, setFeedbackExclusions] = useState<FeedbackExclusion[]>([])
+  const [feedbackNotice, setFeedbackNotice] = useState<{ message: string; exclusionId?: string; suggestedQuery?: string; error?: boolean } | null>(null)
+  const feedbackSessionIdRef = useRef("")
 
   // Loader state
   const [showLoader, setShowLoader]       = useState(false)
@@ -2532,6 +2701,79 @@ function SearchResultsContent() {
     const params = new URLSearchParams(searchParams.toString())
     params.set("tier", nextTier)
     router.push(`/search?${params.toString()}`)
+  }
+
+  async function handleOfferFeedback(item: SearchResultItem, feedback: "like" | "dislike", reason: FeedbackReason, correctionText = "") {
+    const exclusion = feedback === "dislike" ? buildFeedbackExclusion(item, query, reason) : null
+    const hiddenCount = exclusion ? results.filter((result) => isExcludedByFeedback(result, exclusion)).length : 0
+
+    if (exclusion) {
+      setFeedbackExclusions((current) => [...current.filter((entry) => entry.listingId !== item.id), exclusion])
+      setSelectedListing((current) => current?.id === item.id ? null : current)
+      setFeedbackNotice({
+        message: hiddenCount > 1
+          ? `${hiddenCount} rezultate similare au fost eliminate și lista a fost rerankată.`
+          : "Rezultatul a fost eliminat și lista a fost rerankată.",
+        exclusionId: exclusion.id,
+        suggestedQuery: correctionText.trim(),
+      })
+    }
+
+    const supabase = getSupabaseBrowserClient()
+    const session = supabase ? (await supabase.auth.getSession()).data.session : null
+    if (!session?.access_token) {
+      if (exclusion) setFeedbackNotice({ message: "Aplicat în această sesiune, dar autentificarea a expirat și feedback-ul nu a fost salvat.", exclusionId: exclusion.id, suggestedQuery: correctionText.trim(), error: true })
+      throw new Error("Autentifică-te din nou pentru a salva feedback-ul.")
+    }
+
+    if (!feedbackSessionIdRef.current) {
+      feedbackSessionIdRef.current = globalThis.crypto?.randomUUID?.() || `feedback-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    }
+
+    const response = await fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({
+        query,
+        feedback,
+        reason,
+        correctionText,
+        sessionId: feedbackSessionIdRef.current,
+        searchId: searchedAt || `${searchTier}:${query}`,
+        listingFingerprint: listingStorageId(item),
+        originalRank: item.rank,
+        appliedAction: exclusion ? (hiddenCount > 1 ? "hide_similar_and_rerank" : "hide_listing_and_rerank") : "confirm_relevant",
+        queryUnderstanding,
+        listingFeatures: {
+          listingType: item.listingType,
+          queryType: item.queryType,
+          sourceKind: item.sourceKind,
+          relevanceScore: item.relevanceScore,
+          keywordSignals: item.keywordSignals,
+          signatureTokens: exclusion?.signatureTokens || [],
+        },
+        offer: {
+          title: item.title,
+          url: item.url,
+          site: item.source,
+          priceRon: item.price,
+          score: item.score,
+          rank: item.rank,
+          listingType: item.listingType,
+          queryType: item.queryType,
+          rejectionReasons: item.rejectionReasons,
+        },
+      }),
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok || !payload.ok) {
+      if (exclusion) setFeedbackNotice({ message: "Rezultatele au fost corectate local, dar feedback-ul nu a putut fi salvat.", exclusionId: exclusion.id, suggestedQuery: correctionText.trim(), error: true })
+      throw new Error(payload.error || "Feedback-ul nu a putut fi salvat.")
+    }
+
+    trackSearchEvent("offer_feedback", { search_term: query, marketplace: item.source, feedback, reason, listing_title: item.title })
+    if (!exclusion) setFeedbackNotice({ message: "Mulțumim. Rezultatul a fost confirmat ca relevant." })
+    return { hiddenCount }
   }
 
   useEffect(() => {
@@ -2683,6 +2925,8 @@ function SearchResultsContent() {
           }
 
           const mapped = mapSearchResults(payload).slice(0, SEARCH_RESULT_LIMIT)
+          setFeedbackExclusions([])
+          setFeedbackNotice(null)
           setResults(mapped)
           setBestUsedOffer(mapOffer(payload.summary?.bestUsedOffer, mapped) || mapped.find((item) => item.sourceKind === "used") || null)
           setClosestUsedOffer(mapOffer(payload.summary?.closestUsedOffer, mapped))
@@ -2819,6 +3063,7 @@ function SearchResultsContent() {
   }
   const filteredResults = useMemo(() => {
     const base = results.filter((item) => {
+      if (feedbackExclusions.some((exclusion) => isExcludedByFeedback(item, exclusion))) return false
       // Newly added experimental sources remain visible by default, even before
       // they receive their own checkbox in the curated source list.
       if (sources.size > 0 && SOURCES_LIST.includes(item.source) && !sources.has(item.source)) return false
@@ -2837,21 +3082,21 @@ function SearchResultsContent() {
       if (sort === "potrivire cuvinte cheie") return getKeywordMatchScore(b, query) - getKeywordMatchScore(a, query) || compareByRank(a, b)
       return compareByRank(a, b)
     })
-  }, [conditions, priceMax, priceMin, query, results, sort, sourceTypes, sources])
+  }, [conditions, feedbackExclusions, priceMax, priceMin, query, results, sort, sourceTypes, sources])
 
   const shownBestOffer = useMemo(() => {
-    if (!bestUsedOffer) return null
-    return filteredResults.find((item) => item.id === bestUsedOffer.id) || bestUsedOffer
+    const original = bestUsedOffer ? filteredResults.find((item) => item.id === bestUsedOffer.id) : null
+    return original || filteredResults.find((item) => item.sourceKind === "used") || null
   }, [bestUsedOffer, filteredResults])
 
   const shownNewBenchmark = useMemo(() => {
-    if (!bestNewBenchmark) return null
-    return filteredResults.find((item) => item.id === bestNewBenchmark.id) || bestNewBenchmark
+    const original = bestNewBenchmark ? filteredResults.find((item) => item.id === bestNewBenchmark.id) : null
+    return original || filteredResults.find((item) => item.sourceKind === "new") || null
   }, [bestNewBenchmark, filteredResults])
 
   const shownClosestOffer = useMemo(() => {
     if (!closestUsedOffer) return null
-    return filteredResults.find((item) => item.id === closestUsedOffer.id) || closestUsedOffer
+    return filteredResults.find((item) => item.id === closestUsedOffer.id) || null
   }, [closestUsedOffer, filteredResults])
 
   const regularResults = useMemo(() => {
@@ -2914,7 +3159,7 @@ function SearchResultsContent() {
 
       {/* Loading overlay — rendered above everything */}
       {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} tier={effectiveSearchTier} isPremiumAccount={isPremiumAccount} />}
-      <ListingDetailDrawer key={selectedListing?.url || "closed"} item={selectedListing} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} />
+      <ListingDetailDrawer key={selectedListing?.url || "closed"} item={selectedListing} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} onFeedback={handleOfferFeedback} />
       <ConversationCenter key={account.userId || "signed-out"} enabled={isLoggedIn} onStatusesChange={(statuses) => setConversationState((current) => ({ ownerId: account.userId, statuses: current.ownerId === account.userId ? { ...current.statuses, ...statuses } : statuses }))} />
       <EmailCapturePopup
         enabled={isLoggedIn && Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
@@ -2998,6 +3243,45 @@ function SearchResultsContent() {
               Poți rafina în căutare: {queryUnderstanding.refinements?.join(" · ")}
             </span>
           )}
+        </section>
+      )}
+
+      {feedbackNotice && query && !showLoader && (
+        <section className="mx-6 mt-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between" style={{ border: `1px solid ${INK}`, background: feedbackNotice.error ? `${PINK}18` : "white", boxShadow: `3px 3px 0 ${feedbackNotice.error ? PINK : INK}` }} role="status">
+          <div>
+            <div className="text-[9px] font-bold uppercase" style={{ color: feedbackNotice.error ? PINK : GREEN }}>Feedback aplicat în sesiunea curentă</div>
+            <p className="mt-1 text-[10px] font-bold uppercase">{feedbackNotice.message}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {feedbackNotice.suggestedQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString())
+                  params.set("q", feedbackNotice.suggestedQuery || query)
+                  router.push(`/search?${params.toString()}`)
+                }}
+                className="min-h-9 px-3 py-2 text-[9px] font-bold uppercase"
+                style={{ border: `1px solid ${INK}`, background: PINK, color: INK }}
+              >
+                Caută: {feedbackNotice.suggestedQuery.slice(0, 60)}{feedbackNotice.suggestedQuery.length > 60 ? "…" : ""}
+              </button>
+            )}
+            {feedbackNotice.exclusionId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFeedbackExclusions((current) => current.filter((entry) => entry.id !== feedbackNotice.exclusionId))
+                  setFeedbackNotice(null)
+                }}
+                className="flex min-h-9 items-center justify-center gap-2 px-3 py-2 text-[9px] font-bold uppercase"
+                style={{ border: `1px solid ${INK}`, background: CREAM }}
+              >
+                <RotateCcw size={11} /> Anulează în sesiune
+              </button>
+            )}
+            <button type="button" onClick={() => setFeedbackNotice(null)} className="min-h-9 px-3 py-2 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Închide</button>
+          </div>
         </section>
       )}
 
@@ -3181,7 +3465,7 @@ function SearchResultsContent() {
             </section>
           )}
 
-          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} />}
+          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} onFeedback={handleOfferFeedback} />}
           {((shownClosestOffer && viewerLocation) || shownNewBenchmark) && (
             <section className="flex flex-col gap-4">
               <div className="flex flex-col gap-1 px-1">
@@ -3232,6 +3516,7 @@ function SearchResultsContent() {
                         onToggleSaved={toggleSavedListing}
                         isCompared={activeComparedListings.some((entry) => entry.id === item.id)}
                         onToggleCompare={toggleComparedListing}
+                        onFeedback={handleOfferFeedback}
                       />
                     ))}
                   </div>
@@ -3264,6 +3549,7 @@ function SearchResultsContent() {
                         onToggleSaved={toggleSavedListing}
                         isCompared={activeComparedListings.some((entry) => entry.id === item.id)}
                         onToggleCompare={toggleComparedListing}
+                        onFeedback={handleOfferFeedback}
                       />
                     ))}
                   </div>

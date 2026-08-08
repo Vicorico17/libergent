@@ -49,9 +49,19 @@ create table if not exists public.keyword_stats (
 
 create table if not exists public.offer_feedback (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid,
   query text not null default '',
   feedback text not null check (feedback in ('like', 'dislike')),
   reason text not null default '',
+  correction_text text not null default '',
+  session_id text not null default '',
+  search_id text not null default '',
+  listing_fingerprint text not null default '',
+  original_rank integer,
+  algorithm_version text not null default '',
+  applied_action text not null default '',
+  query_understanding jsonb not null default '{}'::jsonb,
+  listing_features jsonb not null default '{}'::jsonb,
   offer jsonb,
   offer_title text not null default '',
   offer_site text not null default '',
@@ -60,7 +70,17 @@ create table if not exists public.offer_feedback (
 );
 
 alter table public.offer_feedback
-  add column if not exists reason text not null default '';
+  add column if not exists reason text not null default '',
+  add column if not exists user_id uuid,
+  add column if not exists correction_text text not null default '',
+  add column if not exists session_id text not null default '',
+  add column if not exists search_id text not null default '',
+  add column if not exists listing_fingerprint text not null default '',
+  add column if not exists original_rank integer,
+  add column if not exists algorithm_version text not null default '',
+  add column if not exists applied_action text not null default '',
+  add column if not exists query_understanding jsonb not null default '{}'::jsonb,
+  add column if not exists listing_features jsonb not null default '{}'::jsonb;
 
 create table if not exists public.email_leads (
   email text primary key,
@@ -172,6 +192,7 @@ alter table public.email_leads
   );
 
 alter table public.email_leads enable row level security;
+alter table public.offer_feedback enable row level security;
 alter table public.saved_searches enable row level security;
 alter table public.user_entitlements enable row level security;
 alter table public.alert_profiles enable row level security;
@@ -199,6 +220,12 @@ create index if not exists offer_feedback_query_idx
 
 create index if not exists offer_feedback_site_idx
   on public.offer_feedback (offer_site);
+
+create index if not exists offer_feedback_user_created_at_idx
+  on public.offer_feedback (user_id, created_at desc);
+
+create index if not exists offer_feedback_reason_query_idx
+  on public.offer_feedback (reason, query);
 
 create index if not exists email_leads_updated_at_idx
   on public.email_leads (updated_at desc);
@@ -302,6 +329,7 @@ grant all on table public.search_events to service_role;
 grant all on table public.search_query_stats to service_role;
 grant all on table public.keyword_stats to service_role;
 grant all on table public.offer_feedback to service_role;
+revoke all on table public.offer_feedback from anon, authenticated;
 revoke all on table public.email_leads from anon, authenticated;
 grant all on table public.email_leads to service_role;
 revoke all on table public.saved_searches from anon, authenticated;

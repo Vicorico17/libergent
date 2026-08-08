@@ -90,7 +90,7 @@ function tokenMatchesQueryToken(titleTokens, queryToken) {
   return false;
 }
 
-function filterRelevantItems(items, query) {
+export function filterRelevantItems(items, query) {
   const queryTokens = tokenize(query).filter((token) => token.length > 1 || /^\d+$/.test(token));
   const brandTokens = getQueryBrandTerms(query);
   if (!queryTokens.length) {

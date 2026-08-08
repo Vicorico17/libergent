@@ -1,6 +1,38 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { findWhatsAppConversationOwner, insertEmailLeadToSupabase, insertWhatsAppInboundToSupabase } from "./supabase.js";
+import { findWhatsAppConversationOwner, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertWhatsAppInboundToSupabase } from "./supabase.js";
+
+test("insertOfferFeedbackToSupabase stores learning context", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let row;
+  globalThis.fetch = async (_url, init = {}) => {
+    row = JSON.parse(String(init.body || "{}"));
+    return new Response(null, { status: 201 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+
+  await insertOfferFeedbackToSupabase({
+    userId: "00000000-0000-0000-0000-000000000001",
+    query: "whiteboard",
+    feedback: "dislike",
+    reason: "part_or_accessory",
+    correctionText: "tabla, nu markere",
+    sessionId: "session-1",
+    searchId: "search-1",
+    listingFingerprint: "olx:marker-1",
+    originalRank: 2,
+    algorithmVersion: "feedback-loop-v1",
+    appliedAction: "hide_similar_and_rerank",
+    queryUnderstanding: { category: "office" },
+    listingFeatures: { signatureTokens: ["marker"] },
+    offer: { title: "Whiteboard markers", site: "olx.ro", url: "https://olx.ro/item" }
+  }, { SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "secret" });
+
+  assert.equal(row.user_id, "00000000-0000-0000-0000-000000000001");
+  assert.equal(row.reason, "part_or_accessory");
+  assert.equal(row.correction_text, "tabla, nu markere");
+  assert.deepEqual(row.listing_features.signatureTokens, ["marker"]);
+});
 
 test("insertEmailLeadToSupabase accepts a public-qualified email leads table setting", async (t) => {
   const previousFetch = globalThis.fetch;

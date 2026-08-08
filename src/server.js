@@ -14,6 +14,7 @@ import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
 import { createAlertProfileInSupabase, deleteAlertProfileInSupabase, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertShopSuggestionToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, readPremiumEntitlement, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase } from "./supabase.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
+import { normalizeOfferFeedbackPayload } from "./feedback.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { resolveViewerLocation } from "./location-intelligence.js";
@@ -57,7 +58,7 @@ function isAuthorizedAdminRequest(req, url) {
   return Boolean(expectedToken) && getAdminTokenFromRequest(req, url) === expectedToken;
 }
 
-async function authenticatePremiumUser(req, premiumMessage = "Premium este disponibil doar pentru conturile Premium.") {
+async function authenticateSupabaseUser(req) {
   const authorization = String(req.headers.authorization || "");
   const token = authorization.toLowerCase().startsWith("bearer ") ? authorization.slice(7).trim() : "";
   if (!token) return { error: "Authentication required.", status: 401 };
@@ -68,11 +69,21 @@ async function authenticatePremiumUser(req, premiumMessage = "Premium este dispo
     const response = await fetch(`${supabaseUrl}/auth/v1/user`, { headers: { apikey: apiKey, authorization: `Bearer ${token}` } });
     const user = await response.json().catch(() => null);
     if (!response.ok || !user?.id) return { error: "Invalid or expired session.", status: 401 };
-    const entitlement = await readPremiumEntitlement(user.id, user.email || "");
-    if (!entitlement.active) return { error: premiumMessage, code: "premium_required", status: 403 };
-    return { user, entitlement };
+    return { user };
   } catch {
     return { error: "Authentication service unavailable.", status: 503 };
+  }
+}
+
+async function authenticatePremiumUser(req, premiumMessage = "Premium este disponibil doar pentru conturile Premium.") {
+  const auth = await authenticateSupabaseUser(req);
+  if (!auth.user) return auth;
+  try {
+    const entitlement = await readPremiumEntitlement(auth.user.id, auth.user.email || "");
+    if (!entitlement.active) return { error: premiumMessage, code: "premium_required", status: 403 };
+    return { user: auth.user, entitlement };
+  } catch {
+    return { error: "Entitlement service unavailable.", status: 503 };
   }
 }
 
@@ -526,16 +537,15 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const parsedBody = await readJsonBody(req);
-    if (parsedBody.error) {
-      sendJson(res, parsedBody.error.includes("large") ? 413 : 400, { error: parsedBody.error });
+    const auth = await authenticateSupabaseUser(req);
+    if (!auth.user) {
+      sendJson(res, auth.status, { error: auth.error });
       return;
     }
 
-    const body = parsedBody.data;
-    const feedback = body?.feedback;
-    if (feedback !== "like" && feedback !== "dislike") {
-      sendJson(res, 400, { error: "Expected feedback to be like or dislike" });
+    const parsedBody = await readJsonBody(req);
+    if (parsedBody.error) {
+      sendJson(res, parsedBody.error.includes("large") ? 413 : 400, { error: parsedBody.error });
       return;
     }
 
@@ -545,15 +555,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      await insertOfferFeedbackToSupabase({
-        query: body.query,
-        feedback,
-        reason: body.reason,
-        offer: body.offer
-      });
+      const feedback = normalizeOfferFeedbackPayload(parsedBody.data, auth.user.id);
+      await insertOfferFeedbackToSupabase(feedback);
       sendJson(res, 200, { ok: true });
     } catch (error) {
-      sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
+      const message = error instanceof Error ? error.message : String(error);
+      sendJson(res, /Expected feedback|Unsupported feedback/.test(message) ? 400 : 500, { ok: false, error: message });
     }
     return;
   }
