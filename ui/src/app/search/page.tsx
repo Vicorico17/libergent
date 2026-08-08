@@ -2615,7 +2615,14 @@ function SearchResultsContent() {
   const router = useRouter()
   const account = useAccountSession()
   const isLoggedIn = account.status === "signed_in"
-  const [accountPlan, setAccountPlan] = useState<AccountPlanStatus>("checking")
+  const [resolvedAccountPlan, setResolvedAccountPlan] = useState<{ userId: string; status: AccountPlanStatus }>({ userId: "", status: "checking" })
+  const accountPlan: AccountPlanStatus = account.status === "checking"
+    ? "checking"
+    : account.status !== "signed_in"
+      ? "free"
+      : resolvedAccountPlan.userId === account.userId
+        ? resolvedAccountPlan.status
+        : "checking"
   const query = String(searchParams.get("q") || "").trim()
   const searchTier: SearchTier = searchParams.get("tier") === "premium" ? "premium" : "free"
   const near = String(searchParams.get("near") || "").trim()
@@ -2666,29 +2673,25 @@ function SearchResultsContent() {
   useEffect(() => {
     let active = true
     async function loadAccountPlan() {
-      if (account.status === "checking") return
-      if (account.status !== "signed_in") {
-        if (active) setAccountPlan("free")
-        return
-      }
+      if (account.status !== "signed_in") return
+      const userId = account.userId
       const supabase = getSupabaseBrowserClient()
       const session = supabase ? (await supabase.auth.getSession()).data.session : null
       if (!session?.access_token) {
-        if (active) setAccountPlan("unknown")
+        if (active) setResolvedAccountPlan({ userId, status: "unknown" })
         return
       }
       try {
         const response = await fetch("/api/alerts", { headers: { authorization: `Bearer ${session.access_token}` } })
         const payload = await response.json().catch(() => ({}))
         if (!active) return
-        if (response.ok) setAccountPlan("premium")
-        else if (response.status === 403 && payload.code === "premium_required") setAccountPlan("free")
-        else setAccountPlan("unknown")
+        if (response.ok) setResolvedAccountPlan({ userId, status: "premium" })
+        else if (response.status === 403 && payload.code === "premium_required") setResolvedAccountPlan({ userId, status: "free" })
+        else setResolvedAccountPlan({ userId, status: "unknown" })
       } catch {
-        if (active) setAccountPlan("unknown")
+        if (active) setResolvedAccountPlan({ userId, status: "unknown" })
       }
     }
-    setAccountPlan(account.status === "checking" ? "checking" : "unknown")
     void loadAccountPlan()
     return () => { active = false }
   }, [account.status, account.userId])
@@ -2906,7 +2909,7 @@ function SearchResultsContent() {
           const supabase = getSupabaseBrowserClient()
           const session = supabase ? (await supabase.auth.getSession()).data.session : null
           if (!session?.access_token) {
-            setAccountPlan("unknown")
+            setResolvedAccountPlan({ userId: account.userId, status: "unknown" })
             throw new Error("Sesiunea a expirat. Autentifică-te din nou pentru Premium.")
           }
           headers.authorization = `Bearer ${session.access_token}`
@@ -2919,7 +2922,7 @@ function SearchResultsContent() {
           const payload = await readJsonResponse(response)
           if (!response.ok || payload.error) {
             if (response.status === 401 || (response.status === 403 && payload.code === "premium_required")) {
-              setAccountPlan(response.status === 403 ? "free" : "unknown")
+              setResolvedAccountPlan({ userId: account.userId, status: response.status === 403 ? "free" : "unknown" })
             }
             throw new Error(payload.error || "Căutarea nu a putut fi finalizată.")
           }
@@ -2999,7 +3002,7 @@ function SearchResultsContent() {
       controller.abort()
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
     }
-  }, [accountPlan, effectiveSearchTier, near, query, searchTier])
+  }, [account.userId, accountPlan, effectiveSearchTier, near, query, searchTier])
 
   useEffect(() => {
     const id = setInterval(() => setTime(formatSearchTime()), 30_000)
