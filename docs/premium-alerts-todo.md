@@ -39,6 +39,17 @@ launch.
 - [ ] Define Facebook Marketplace session, location, privacy, rate-limit, reliability, and seller-contact rules before exposing it in production.
 - [ ] Keep the detailed source inventory and integration status synchronized with `docs/marketplace-integration-todo.md`.
 
+### Weak-match feedback loop
+
+- [ ] Define what counts as a poor match before restoring any public ranking-feedback controls.
+- [ ] Let logged-in users report a poor match with specific reasons such as wrong product, accessory/part, wrong model or variant, damaged item, duplicate, unavailable listing, misleading price, or wrong location.
+- [ ] Capture the search query, filters, listing snapshot, marketplace, rank, score explanation, and selected reason with each report.
+- [ ] Add an internal review view that groups repeated problems by query, source, product category, and feedback reason.
+- [ ] Turn reviewed reports into regression fixtures and offline ranking tests instead of changing live ranking directly from a single vote.
+- [ ] Measure whether each scoring change improves poor-match rate, top-result relevance, useful-result coverage, and marketplace balance before release.
+- [ ] Add abuse protection, deduplication, account ownership, retention, and privacy rules for feedback data.
+- [ ] Close the loop for users by acknowledging reports and, where useful, explaining that future results were improved from verified feedback.
+
 ### Libergent operating-cost model
 
 - [ ] Build a monthly fixed-versus-variable cost breakdown and calculate cost per active user, search, Premium search, alert scan, message, and call.
