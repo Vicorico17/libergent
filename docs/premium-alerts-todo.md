@@ -1,6 +1,6 @@
 # Premium, Product, and Launch TODO
 
-Last reviewed: 2026-08-07
+Last reviewed: 2026-08-08
 
 This is the source of truth for launching Premium vehicle alerts, completing
 paid Premium subscriptions, and tracking the next product work. A checked item
@@ -23,6 +23,11 @@ launch.
 
 - [ ] Rework the login/signup email experience, including validation, OTP feedback, loading states, error messages, resend behavior, and callback handling.
 - [ ] Test Google login and email OTP end to end on production, mobile, and desktop.
+- [ ] Enable Supabase Passkeys with `libergent.com` as the stable WebAuthn Relying Party ID and configure the exact production origins.
+- [ ] Add optional passkey sign-in to the login page while keeping Google and email as enrollment and recovery methods.
+- [ ] Add Account security controls to register, list, rename, and revoke passkeys for confirmed users.
+- [ ] Test passkeys across supported devices and browsers, including cancellation, multiple credentials, lost-device recovery, expired challenges, and revocation.
+- [ ] Keep passkeys labeled beta and monitor Supabase's experimental API for breaking changes before making them a primary login method.
 - [ ] Design the complete customer-acquisition funnel: landing page → pricing → signup/login → checkout → Premium entitlement → onboarding → first Premium search or alert.
 - [ ] Define acquisition analytics and conversion events for every funnel step.
 - [ ] Add abandoned-checkout and failed-payment recovery paths.
@@ -37,6 +42,8 @@ launch.
 - [ ] Validate every advertised source with representative searches and demote sources that repeatedly return no useful results.
 - [ ] Evaluate the installed Facebook Marketplace search skill for a compliant, user-authorized, read-only Libergent integration.
 - [ ] Define Facebook Marketplace session, location, privacy, rate-limit, reliability, and seller-contact rules before exposing it in production.
+- [ ] Review the Kitesurf fallback per marketplace against direct access and Chromium, measuring useful-result recovery, false successes, failures, latency, browser duration, and cost.
+- [ ] Tighten Kitesurf eligibility where repeated runs spend browser time without recovering useful results, and verify the Chromium recovery allowlist and instant rollback switch.
 - [ ] Keep the detailed source inventory and integration status synchronized with `docs/marketplace-integration-todo.md`.
 
 ### Weak-match feedback loop

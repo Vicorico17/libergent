@@ -271,6 +271,8 @@ PREMIUM_BROWSER_CONCURRENCY=3
 
 The `PREMIUM_BROWSER_*` settings apply to the final Chromium recovery layer. Set `PREMIUM_KITESURF_ENABLED=0` for an immediate rollback. Premium response summaries expose attempted sites, successful Kitesurf counts, Chromium recoveries, session usage, durations, parsed counts, challenge signals, and errors in `summary.browserDiagnostics`.
 
+Kitesurf still requires a deeper production review before it becomes a permanent default. Benchmark it per marketplace against direct access and Chromium, then record useful-result recovery, false success/empty-page rates, navigation failures, latency, browser duration, and cost. The review must also confirm that broad Kitesurf coverage does not spend browser time on sources that consistently remain blocked or irrelevant, and that the Chromium recovery allowlist and `PREMIUM_KITESURF_ENABLED=0` rollback continue to work as expected.
+
 ### Response summary
 
 An aggregated response contains per-source results plus a summary similar to:
@@ -349,6 +351,21 @@ Use `--sites=emag.ro,altex.ro,olx.ro` for a small batch, `--state=active` for es
 ## Accounts, analytics, and Supabase
 
 Supabase Auth supports Google and passwordless email when they are configured. `/confirm` completes OAuth/magic-link callbacks, while `/account` provides an account dashboard for liked listings, saved alerts, private seller conversations, LiberGent activity history, identity details, and logout. `/signup` plus `/reset` use the same passwordless account flow. Signed-out visitors can search, inspect **Analiză LiberGent**, and open original marketplace listings. Favorites, feedback, WhatsApp outreach, listing statuses, and private conversation history require authentication.
+
+### Planned passkey authentication
+
+Passkeys are planned as an optional beta login method alongside Google and email recovery. The installed `@supabase/supabase-js` version supports Supabase's experimental WebAuthn APIs, so passkey sign-in can issue the same Supabase session used by existing account, Premium, alert, feedback, and messaging authorization.
+
+The intended rollout is:
+
+1. enable Passkeys in Supabase Authentication with `libergent.com` as the permanent WebAuthn Relying Party ID and the exact production origins
+2. opt in with `auth.experimental.passkey = true` in the browser client
+3. add **Continuă cu passkey** on the login page
+4. let a confirmed, signed-in user register, list, rename, and remove passkeys from Account security settings
+5. keep Google and email login available for enrollment and account recovery
+6. test unsupported browsers, cancelled ceremonies, multiple devices, lost authenticators, expired challenges, and passkey revocation before broad promotion
+
+Do not change the Relying Party ID after enrollment begins because existing passkeys are cryptographically bound to it. Keep passkeys labeled beta while the Supabase API remains experimental.
 
 ### Search feedback loop
 
