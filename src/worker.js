@@ -10,6 +10,7 @@ import { buildAlertEvents, MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./al
 import { completeAlertProfileCheck, createAlertProfileInSupabase, deleteAlertProfileInSupabase, findWhatsAppConversationOwner, insertAlertEventsInSupabase, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertListingStatesFromSupabase, listAlertProfilesFromSupabase, listDueAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, readPremiumEntitlement, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, recordNotificationDeliveryInSupabase, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase, upsertAlertListingStatesInSupabase } from "./supabase.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { normalizeOfferFeedbackPayload } from "./feedback.js";
+import { buildSourceCatalog } from "./source-catalog.js";
 import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getDefaultSiteKeys, getPremiumSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
@@ -27,7 +28,7 @@ import {
 } from "./api-params.js";
 
 const LEAD_API_PATHS = new Set(["/api/leads", "/api/lead", "/api/email-leads", "/api/email_leads", "/api/waitlist"]);
-const PREMIUM_SEARCH_CACHE_SECONDS = 300;
+const SEARCH_CACHE_SECONDS = 300;
 const MARKETPLACE_CONTACT_CACHE_SECONDS = 900;
 const MARKETPLACE_DETAILS_CACHE_SECONDS = 1800;
 const MAX_MARKETPLACE_DETAILS_HTML_BYTES = 6 * 1024 * 1024;
@@ -113,8 +114,8 @@ function preferBrowserFallback(directResult, browserResult) {
   return browserResult;
 }
 
-function buildPremiumCacheRequest(request, params, viewerLocation = null) {
-  const cacheUrl = new URL("/api/search/premium-cache/v6", request.url);
+function buildSearchCacheRequest(request, params, viewerLocation = null, tier = "premium") {
+  const cacheUrl = new URL(`/api/search/${tier}-cache/v7`, request.url);
   cacheUrl.searchParams.set("q", params.query.trim().toLocaleLowerCase("ro-RO"));
   cacheUrl.searchParams.set("condition", params.condition);
   cacheUrl.searchParams.set("provider", params.provider);
@@ -122,13 +123,14 @@ function buildPremiumCacheRequest(request, params, viewerLocation = null) {
   cacheUrl.searchParams.set("limit", String(params.limit ?? ""));
   cacheUrl.searchParams.set("pages", String(params.maxPages ?? ""));
   cacheUrl.searchParams.set("near", viewerLocationCacheKey(viewerLocation));
+  cacheUrl.searchParams.set("mock", process.env.LIBERGENT_MOCK_SEARCH === "1" ? "1" : "0");
   return new Request(cacheUrl, { method: "GET" });
 }
 
-async function readPremiumSearchCache(cacheRequest) {
+async function readSearchCache(cacheRequest) {
   const cache = globalThis.caches?.default;
   if (!cache) return null;
-  const response = await cache.match(cacheRequest);
+  const response = await cache.match(cacheRequest).catch(() => null);
   if (!response) return null;
   const payload = await response.json().catch(() => null);
   if (!payload) return null;
@@ -136,14 +138,15 @@ async function readPremiumSearchCache(cacheRequest) {
   return json(payload, 200);
 }
 
-function writePremiumSearchCache(cacheRequest, payload, context) {
+function writeSearchCache(cacheRequest, payload, context) {
   const cache = globalThis.caches?.default;
-  if (!cache) return;
+  // Do not pin a transport failure or an empty search for the next five minutes.
+  if (!cache || !payload.results?.some((result) => result.ok && result.items?.length)) return;
   const response = new Response(JSON.stringify(payload), {
     status: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": `public, max-age=${PREMIUM_SEARCH_CACHE_SECONDS}`
+      "cache-control": `public, max-age=${SEARCH_CACHE_SECONDS}`
     }
   });
   const operation = cache.put(cacheRequest, response).catch(() => {});
@@ -798,6 +801,10 @@ async function handleApi(request, env, context) {
     }
   }
 
+  if (apiPath === "/api/sources" && request.method === "GET") {
+    return json({ sources: buildSourceCatalog() }, 200);
+  }
+
   if (apiPath === "/api/image") {
     return proxyImage(url.searchParams.get("url") || "");
   }
@@ -812,6 +819,15 @@ async function handleApi(request, env, context) {
       });
       const siteKeys = getFreeSearchSiteKeys(site, query);
       const freeProvider = provider === "auto" ? "direct" : provider;
+      const cacheRequest = buildSearchCacheRequest(request, {
+        query, condition, provider: freeProvider, site, limit, maxPages
+      }, viewerLocation, "free");
+      const cachedResponse = await readSearchCache(cacheRequest);
+      if (cachedResponse) {
+        const payload = await cachedResponse.clone().json();
+        await persistSearchEvent(buildHistoryEntry({ query, condition, provider: freeProvider, siteKeys, payload }), env);
+        return cachedResponse;
+      }
 
       const payload = await searchAcrossSites({
         query,
@@ -825,7 +841,10 @@ async function handleApi(request, env, context) {
 
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider: freeProvider, siteKeys, payload }), env);
       await persistVehiclePriceHistory(payload.results || [], env);
-      return json({ ...payload, searchTier: "free" }, 200);
+      payload.searchTier = "free";
+      payload.summary.cacheHit = false;
+      writeSearchCache(cacheRequest, payload, context);
+      return json(payload, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const statusCode = message === "Missing q parameter" || message.startsWith("Expected ") ||
@@ -857,8 +876,8 @@ async function handleApi(request, env, context) {
         return json({ error: "Premium search currently supports site=all or site=default." }, 400);
       }
 
-      const cacheRequest = buildPremiumCacheRequest(request, params, viewerLocation);
-      const cachedResponse = await readPremiumSearchCache(cacheRequest);
+      const cacheRequest = buildSearchCacheRequest(request, params, viewerLocation);
+      const cachedResponse = await readSearchCache(cacheRequest);
       if (cachedResponse) return cachedResponse;
 
       const premiumSiteKeys = [...new Set(getPremiumSiteKeys(query))];
@@ -940,7 +959,7 @@ async function handleApi(request, env, context) {
 
       await persistSearchEvent(buildHistoryEntry({ query, condition, provider: "premium-kitesurf", siteKeys: eligibleSiteKeys, payload }), env);
       await persistVehiclePriceHistory([...freeResults, ...premiumResults], env);
-      writePremiumSearchCache(cacheRequest, payload, context);
+      writeSearchCache(cacheRequest, payload, context);
       return json(payload, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

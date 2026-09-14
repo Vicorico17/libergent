@@ -12,6 +12,27 @@ function makeResult(site, query, items) {
   };
 }
 
+test("equal-score recommendations keep their rank when source and listing order changes", () => {
+  const listing = (url) => ({
+    title: "Apple iPhone 15 Pro 128GB", price: "2500 lei", condition: "utilizat",
+    postedAt: "Azi", location: "București", url
+  });
+  const sources = [
+    makeResult("olx.ro", "iphone 15 pro", [listing("https://olx.ro/b"), listing("https://olx.ro/a")]),
+    makeResult("publi24.ro", "iphone 15 pro", [listing("https://publi24.ro/c")])
+  ];
+  const first = aggregateMarketplaceResults(sources);
+  const second = aggregateMarketplaceResults([...sources].reverse().map((source) => ({
+    ...source, items: [...source.items].reverse()
+  })));
+  const ranks = (payload) => payload.results.flatMap((source) => source.items)
+    .sort((a, b) => a.rank - b.rank).map((item) => item.url);
+  assert.equal(ranks(first).length, 3);
+  assert.deepEqual(ranks(first), ranks(second));
+  assert.equal(first.summary.bestUsedOffer.url, second.summary.bestUsedOffer.url);
+  assert.deepEqual(first.summary.recommendedOffers.map((item) => item.url), second.summary.recommendedOffers.map((item) => item.url));
+});
+
 test("Mustang recommendations contain vehicles and avoid false cross-generation deal claims", () => {
   const query = "mustang";
   const aggregated = aggregateMarketplaceResults([

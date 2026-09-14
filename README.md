@@ -23,7 +23,7 @@ The search page keeps diagnostics collapsed under **Raport Căutare**. That pane
 
 ## Marketplace coverage
 
-There are 43 registered adapters. A source being registered does not guarantee that it will return listings for every query; marketplace availability, markup, and anti-bot behavior can change independently.
+There are 117 registered adapters as of the September 13 code audit: 12 Free and 105 Premium/experimental. A source being registered does not guarantee that it will return listings for every query; marketplace availability, markup, and anti-bot behavior can change independently. The registry-backed public list is available at `/pricing#surse` and `/api/sources`.
 
 ### Free
 
@@ -163,10 +163,17 @@ Important source-specific behavior:
 - Vinted receives one delayed retry when its first response is an intermittent Cloudflare challenge; failed challenge pages are not cached
 - direct Cloudflare origin errors `520`–`524` are retried with the alternate direct request profile
 - Altex browser navigation timeouts are recoverable only when the already-loaded DOM contains real product cards
-- identical Premium searches are cached for five minutes
+- identical Free and Premium Worker searches with useful results are cached for five minutes, separately by tier, query, filters, provider, and coarse location
 - listing contact lookups are cached for 15 minutes
 
 The main cost driver is processed pages/browser duration, not the number of JSON rows. New integrations should therefore prefer direct first-party HTML or public client data plus dedicated local parsers. Review each source's terms, robots policy, and permitted use before production activation.
+
+Equal-score ranking uses a stable listing identity as its final tie-breaker.
+Cloudflare cache entries are local to an edge location and may be evicted; they
+are not durable, globally shared search snapshots. Cache expiry, new inventory,
+and changing source availability can still change a later search. The local
+Node development server does not use the Worker Cache API. See
+[the launch audit](docs/launch-audit-2026-09-13.md) for the full remaining backlog.
 
 ## Architecture
 

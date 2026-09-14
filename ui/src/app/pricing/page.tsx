@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { LogoIcon } from "@/components/LogoIcon";
+import { SourceCatalog } from "@/components/SourceCatalog";
+import { PREMIUM_MONTHLY_PRICE_RON } from "@/lib/pricing";
 
 const BG   = "#F3F0E7";
 const INK  = "#111111";
@@ -316,17 +318,16 @@ export default function PricingPage() {
                   className="mb-2 inline-flex px-2 py-1 text-[10px] font-bold uppercase tracking-widest"
                   style={{ background: "#FCE7F3", border: `1px solid ${PINK}`, color: PINK }}
                 >
-                  Preț de lansare
+                  Abonament lunar
                 </div>
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <span className="text-[40px] font-bold tracking-tight md:text-[44px]" style={{ color: INK, fontFamily: MONO }}>39</span>
+                  <span className="text-[40px] font-bold tracking-tight md:text-[44px]" style={{ color: INK, fontFamily: MONO }}>{PREMIUM_MONTHLY_PRICE_RON}</span>
                   <span className="text-base uppercase md:text-lg" style={{ color: INK }}>RON / lună</span>
-                  <span className="text-xs uppercase line-through md:text-sm" style={{ color: `${INK}66` }}>99 RON / lună</span>
                 </div>
               </div>
 
               <p className="mb-4 text-[12px] leading-relaxed md:text-sm" style={{ color: `${INK}B3`, minHeight: 48 }}>
-                Include retaileri relevanți pentru fashion, casă, DIY, sport, foto, muzică și colecționabile.
+                Compară ofertele second-hand de tehnologie cu prețurile produselor noi din magazine și urmărește ofertele relevante.
               </p>
 
               {/* Locked notice */}
@@ -369,6 +370,8 @@ export default function PricingPage() {
 
           </div>
         </main>
+
+        <SourceCatalog />
 
         {/* Bottom strip */}
         <footer

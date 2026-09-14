@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PREMIUM_MONTHLY_PRICE_RON } from "@/lib/pricing";
 
 const BG   = "#F3F0E7";
 const INK  = "#111111";
@@ -206,12 +207,13 @@ export function Pricing() {
                 În pregătire
               </div>
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="font-bold uppercase" style={{ fontSize: 32, color: "#6B7280" }}>În curând</span>
+                <span className="font-bold uppercase" style={{ fontSize: 32, color: "#6B7280" }}>{PREMIUM_MONTHLY_PRICE_RON}</span>
+                <span className="text-lg uppercase" style={{ color: "#6B7280" }}>RON / lună</span>
               </div>
             </div>
 
             <p className="text-[13px] leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 44 }}>
-              Include retaileri relevanți pentru fashion, casă, DIY, sport, foto, muzică și colecționabile.
+              Compară ofertele second-hand de tehnologie cu prețurile produselor noi din magazine și urmărește ofertele relevante.
             </p>
 
             <div

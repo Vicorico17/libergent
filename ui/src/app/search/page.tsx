@@ -2068,10 +2068,25 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
   )
 }
 
+function SpecialResultImage({ item }: { item: SearchResultItem }) {
+  const { image, handleImageError } = useListingImage(item)
+  return (
+    <div className="flex h-48 shrink-0 items-center justify-center overflow-hidden" style={{ borderBottom: `1px solid ${INK}`, background: CREAM }}>
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image} alt={item.title} loading="lazy" className="h-full w-full object-contain" onError={handleImageError} />
+      ) : (
+        <span className="text-[10px] uppercase" style={{ color: `${INK}77` }}>Fotografie indisponibilă</span>
+      )}
+    </div>
+  )
+}
+
 function ClosestDealCard({ item, viewerCity, isBestOverall, onInspect }: { item: SearchResultItem; viewerCity: string; isBestOverall: boolean; onInspect: (item: SearchResultItem) => void }) {
   return (
-    <article data-testid="closest-deal" className="flex h-full flex-col overflow-hidden sm:aspect-square" style={{ border: `2px solid ${INK}`, background: "white", boxShadow: `5px 5px 0 ${INK}`, fontFamily: MONO }}>
+    <article data-testid="closest-deal" className="flex h-full flex-col overflow-hidden" style={{ border: `2px solid ${INK}`, background: "white", boxShadow: `5px 5px 0 ${INK}`, fontFamily: MONO }}>
       <PanelHeader title={isBestOverall ? "Best Deal · Și cel mai aproape" : "Cel mai apropiat match bun"} />
+      <SpecialResultImage item={item} />
       <div className="flex flex-1 flex-col p-5 sm:p-6" style={{ background: CREAM }}>
         <div className="min-w-0 flex-1">
           <div className="mb-3 flex flex-wrap gap-2">
@@ -2097,12 +2112,15 @@ function ClosestDealCard({ item, viewerCity, isBestOverall, onInspect }: { item:
 }
 
 function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: SearchResultItem; usedItem: SearchResultItem | null; priceBenchmark?: PriceBenchmark; onInspect: (item: SearchResultItem) => void }) {
-  const savings = priceBenchmark?.savingsVsNewPct
   const usedPrice = usedItem?.price ?? null
+  const difference = usedPrice !== null && item.price !== null && usedPrice > 0 && item.price > 0
+    ? item.price - usedPrice : null
+  const savings = difference !== null && item.price ? Math.round(difference / item.price * 100) : null
 
   return (
-    <article className="flex h-full flex-col overflow-hidden sm:aspect-square" style={{ border: `2px solid ${INK}`, background: "white", boxShadow: `5px 5px 0 ${PINK}`, fontFamily: MONO }}>
-      <PanelHeader title="New Price Benchmark" />
+    <article className="flex h-full flex-col overflow-hidden" style={{ border: `2px solid ${INK}`, background: "white", boxShadow: `5px 5px 0 ${PINK}`, fontFamily: MONO }}>
+      <PanelHeader title="Nou din magazin sau second-hand?" />
+      <SpecialResultImage item={item} />
       <div className="flex flex-1 flex-col p-5 sm:p-6" style={{ background: "white" }}>
         <div className="min-w-0 flex-1">
           <div className="mb-3 flex flex-wrap gap-2">
@@ -2112,16 +2130,22 @@ function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: Se
           </div>
           <h3 className="mb-2 text-[17px] font-bold uppercase leading-snug sm:text-[20px]">{item.title}</h3>
           <p className="text-[24px] font-bold" style={{ color: PINK }}>{item.priceLabel}</p>
-          <div className="mt-4 grid grid-cols-1 gap-2 text-[9px] font-bold uppercase sm:grid-cols-3">
-            <span className="p-2" style={{ border: `1px solid ${INK}22`, background: CREAM }}>nou minim<br />{formatRon(priceBenchmark?.newLowestRon ?? item.price)}</span>
-            <span className="p-2" style={{ border: `1px solid ${INK}22`, background: CREAM }}>nou median<br />{formatRon(priceBenchmark?.newMedianRon ?? null)}</span>
-            <span className="p-2" style={{ border: `1px solid ${INK}22`, background: CREAM }}>used median<br />{formatRon(priceBenchmark?.usedMedianRon ?? null)}</span>
+          <div className="mt-4 grid grid-cols-1 gap-2 text-[9px] font-bold uppercase sm:grid-cols-2">
+            <span className="p-3" style={{ border: `1px solid ${INK}22`, background: CREAM }}>Oferta second-hand afișată<br />{formatRon(usedPrice)}{usedItem && <span className="mt-1 block normal-case">{usedItem.title} · {usedItem.source}</span>}</span>
+            <span className="p-3" style={{ border: `1px solid ${INK}22`, background: CREAM }}>Cel mai mic preț nou găsit în sursele selectate<br />{formatRon(item.price)}<span className="mt-1 block normal-case">{item.source}</span></span>
           </div>
-          {typeof savings === "number" && usedPrice !== null && (
+          {savings !== null && difference !== null && (
             <p className="mt-3 text-[11px] font-bold uppercase" style={{ color: savings > 0 ? GREEN : PINK }}>
-              Best used este {Math.abs(savings)}% {savings >= 0 ? "sub" : "peste"} cel mai mic preț nou găsit.
+              {difference > 0 ? `Second-hand este cu ${formatRon(difference)} (${Math.abs(savings)}%) mai ieftin.`
+                : difference < 0 ? `Oferta nouă este cu ${formatRon(-difference)} mai ieftină decât cea second-hand.`
+                : "Același preț pentru ofertele afișate."}
             </p>
           )}
+          <p className="mt-3 text-[10px] leading-relaxed" style={{ color: `${INK}99` }}>
+            Comparație orientativă între prețurile afișate. Verifică același model, capacitatea de stocare, starea, garanția și costul livrării.
+            {difference !== null && difference <= 0 ? " Oferta nouă merită verificată înainte să alegi second-hand." : " Cântărește economia față de starea produsului și garanția oferită de magazin."}
+          </p>
+          {priceBenchmark?.newPricedListingsRon ? <p className="mt-2 text-[9px]" style={{ color: `${INK}77` }}>Prețuri noi găsite în căutare: {priceBenchmark.newPricedListingsRon}. Confirmă stocul și prețul final la magazin.</p> : null}
         </div>
         <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <button
@@ -3093,9 +3117,15 @@ function SearchResultsContent() {
   }, [bestUsedOffer, filteredResults])
 
   const shownNewBenchmark = useMemo(() => {
-    const original = bestNewBenchmark ? filteredResults.find((item) => item.id === bestNewBenchmark.id) : null
-    return original || filteredResults.find((item) => item.sourceKind === "new") || null
-  }, [bestNewBenchmark, filteredResults])
+    // A retail reference remains useful when shopping only for used products or
+    // within a used-product budget. Honor explicit source exclusions and feedback.
+    const candidates = [...results, ...(bestNewBenchmark ? [bestNewBenchmark] : [])].filter((item) =>
+      item.sourceKind === "new" && item.price !== null && item.price > 0 &&
+      !feedbackExclusions.some((exclusion) => isExcludedByFeedback(item, exclusion)) &&
+      !(sources.size > 0 && SOURCES_LIST.includes(item.source) && !sources.has(item.source))
+    )
+    return candidates.sort((a, b) => priceForSort(a, Infinity) - priceForSort(b, Infinity) || compareByRank(a, b))[0] || null
+  }, [bestNewBenchmark, feedbackExclusions, results, sources])
 
   const shownClosestOffer = useMemo(() => {
     if (!closestUsedOffer) return null
@@ -3215,7 +3245,7 @@ function SearchResultsContent() {
           )}
           <div className="flex items-center gap-3 text-[11px] uppercase font-bold px-3 py-1.5" style={{ background: "white", border: `1px solid ${INK}` }}>
             <div className="w-2 h-2 animate-pulse" style={{ background: "#22C55E" }} />
-            <span>Live <span className="mx-2">|</span> {updatedLabel === "în timp real" ? time : updatedLabel}</span>
+            <span title="Aceeași căutare poate reutiliza rezultatele timp de 5 minute. Ofertele și disponibilitatea surselor se pot schimba la actualizare.">Rezultate din <span className="mx-2">|</span> {updatedLabel === "în timp real" ? time : updatedLabel}</span>
           </div>
         </div>
       </header>
@@ -3469,6 +3499,11 @@ function SearchResultsContent() {
           )}
 
           {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} onFeedback={handleOfferFeedback} />}
+          {shownBestOffer && !shownNewBenchmark && (
+            <p className="p-4 text-[11px] leading-relaxed" style={{ border: `1px solid ${INK}33`, background: "white" }}>
+              Nu am găsit un preț nou pentru comparație în sursele selectate. Nu putem confirma economia față de retail pentru această ofertă second-hand.
+            </p>
+          )}
           {((shownClosestOffer && viewerLocation) || shownNewBenchmark) && (
             <section className="flex flex-col gap-4">
               <div className="flex flex-col gap-1 px-1">

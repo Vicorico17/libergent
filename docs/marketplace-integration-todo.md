@@ -2,7 +2,19 @@
 
 This file tracks marketplaces we still need to add or harden before advertising them as active Libergent sources.
 
+September 13 code audit: the registry now contains **117 adapters: 12 Free and
+105 Premium/experimental**. The July counts and probes below are historical,
+not current health measurements. `/api/sources` and `/pricing#surse` now expose
+the registry without treating registration as proof of reliability. See
+[launch audit](launch-audit-2026-09-13.md) for remaining validation work.
+
 ## Product Direction
+
+- Owner-confirmed first focus: **second-hand technology in Romania**. Retail
+  shops provide new-price context alongside used offers, helping buyers weigh
+  the saving against condition, storage/configuration, warranty and delivery.
+  Keep retail references visible when buyers filter used offers by condition
+  or budget. Show missing retail evidence explicitly.
 
 - Immediate priority: improve keyword matching
   - Make keyword matching the next product-quality workstream before adding more broad marketplace claims.

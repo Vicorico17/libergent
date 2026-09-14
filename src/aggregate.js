@@ -73,7 +73,7 @@ function compareDuplicateCandidates(candidate, current) {
     return candidateHasImage ? candidate : current;
   }
 
-  return current;
+  return compareListingIdentity(candidate, current) < 0 ? candidate : current;
 }
 
 function matchesCondition(item, condition) {
@@ -192,7 +192,7 @@ function recencyScore(postedAt = "") {
 }
 
 function sortItemsByFreshness(items) {
-  return [...items].sort((a, b) => recencyScore(b.postedAt) - recencyScore(a.postedAt));
+  return [...items].sort((a, b) => recencyScore(b.postedAt) - recencyScore(a.postedAt) || compareListingIdentity(a, b));
 }
 
 function priceValueScore(priceRon, medianPriceRon) {
@@ -571,6 +571,12 @@ function itemRankKey(item) {
   return item.url || `${item.site || ""}::${item.title || ""}::${item.price || ""}::${item.location || ""}`;
 }
 
+function compareListingIdentity(a, b) {
+  const left = `${itemRankKey(a)}::${a.site || ""}`;
+  const right = `${itemRankKey(b)}::${b.site || ""}`;
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 // Deterministic per-marketplace ranking:
 // - intent/relevance (token and brand match, listing-type penalties)
 // - condition preference
@@ -841,7 +847,7 @@ function pickTopRecommendationsByMarketplace(items, limit = 4) {
       if (b.recommendationScore !== a.recommendationScore) {
         return b.recommendationScore - a.recommendationScore;
       }
-      return safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon);
+      return safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon) || compareListingIdentity(a, b);
     })
     .slice(0, limit);
 }
@@ -1128,7 +1134,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       if (b.recommendationScore !== a.recommendationScore) {
         return b.recommendationScore - a.recommendationScore;
       }
-      return safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon);
+      return safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon) || compareListingIdentity(a, b);
     })
     .map((item, index) => ({
       ...item,

@@ -1,6 +1,10 @@
 # Premium, Product, and Launch TODO
 
-Last reviewed: 2026-08-08
+Last reviewed: 2026-09-13
+
+See [the September launch audit](launch-audit-2026-09-13.md) for the comparison
+with the owner's full list, current code evidence, dependencies, and newly
+identified gaps. Historical deployment checkmarks below were not reverified.
 
 This is the source of truth for launching Premium vehicle alerts, completing
 paid Premium subscriptions, and tracking the next product work. A checked item
@@ -14,6 +18,9 @@ launch.
 - [x] Require a valid Premium entitlement for Premium search.
 - [x] Make the Premium loading screen expandable so users can inspect searched sources.
 - [x] Present the closest good match and new-price benchmark as separate special-result cards.
+- [x] Render listing photos on both special-result cards, with image fallback and an unavailable state.
+- [x] Add deterministic final ranking tie-breakers and five-minute Free Worker search snapshots.
+- [x] Label search collection time instead of claiming cached results are live.
 - [x] Remove the unsupported `Ajută rankingul: Bun / Slab` controls from search results.
 - [x] Remove the `Copiază mesaj` button and its unused clipboard logic.
 
@@ -36,7 +43,7 @@ launch.
 ### Search and marketplace access
 
 - [ ] Add search by picture: upload an image, identify the product, let the user edit extracted keywords, and then run the normal search pipeline.
-- [ ] Publish a clear customer-facing list of Free and Premium marketplaces.
+- [x] Publish a registry-backed Free/Premium source list on pricing, labeling experimental sources.
 - [ ] Explain why each source is Free or Premium: access method, query relevance, reliability, browser/API requirements, and operational cost.
 - [ ] Measure cost per search and cost per useful result for each paid/browser-backed marketplace before finalizing the Premium source list.
 - [ ] Validate every advertised source with representative searches and demote sources that repeatedly return no useful results.
@@ -124,7 +131,8 @@ launch.
 
 ## Premium billing backlog
 
-- [ ] Confirm the paid plan name, price, currency, billing interval, trial policy, and alert limits.
+- [x] Owner confirmed LiberGent Premium at **99 RON/month**. Future Stripe Price: currency `ron`, unit amount `9900`, recurring interval `month`; server-owned price ID.
+- [ ] Confirm trial policy, tax treatment and alert limits before checkout activation.
 - [ ] Select and configure the billing provider; Stripe is the current expected integration.
 - [ ] Create production and test-mode Stripe Product and Price records.
 - [ ] Add authenticated Checkout Session creation and success/cancel return flows.

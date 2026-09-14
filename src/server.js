@@ -15,6 +15,7 @@ import { MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
 import { createAlertProfileInSupabase, deleteAlertProfileInSupabase, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertShopSuggestionToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, readPremiumEntitlement, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase } from "./supabase.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { normalizeOfferFeedbackPayload } from "./feedback.js";
+import { buildSourceCatalog } from "./source-catalog.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { resolveViewerLocation } from "./location-intelligence.js";
@@ -218,6 +219,11 @@ function readJsonBody(req, maxBytes = MAX_JSON_BODY_BYTES) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
   const apiPath = normalizeApiPathname(url.pathname);
+
+  if (apiPath === "/api/sources" && req.method === "GET") {
+    sendJson(res, 200, { sources: buildSourceCatalog() });
+    return;
+  }
 
   if (apiPath === "/api/image") {
     try {

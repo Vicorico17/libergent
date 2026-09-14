@@ -2,6 +2,42 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "./worker.js";
 
+test("Free searches reuse a five-minute snapshot with isolated location and filters", async (t) => {
+  const originalCaches = globalThis.caches;
+  const originalMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
+  t.after(() => {
+    globalThis.caches = originalCaches;
+    if (originalMockSearch === undefined) delete process.env.LIBERGENT_MOCK_SEARCH;
+    else process.env.LIBERGENT_MOCK_SEARCH = originalMockSearch;
+  });
+  const entries = new Map();
+  const writes = [];
+  globalThis.caches = { default: {
+    match: async (request) => entries.get(request.url)?.clone(),
+    put: async (request, response) => {
+      assert.equal(response.headers.get("cache-control"), "public, max-age=300");
+      entries.set(request.url, response.clone());
+    }
+  } };
+  const search = async (suffix = "", query = "iphone") => {
+    const response = await worker.fetch(new Request(`https://libergent.test/api/search/free?q=${query}&site=all${suffix}`),
+      { LIBERGENT_MOCK_SEARCH: "1" }, { waitUntil: (operation) => writes.push(operation) });
+    await Promise.all(writes);
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  const first = await search("&near=Bucuresti");
+  const repeated = await search("&near=Bucuresti", "IPHONE");
+  assert.equal(first.summary.cacheHit, false);
+  assert.equal(repeated.summary.cacheHit, true);
+  assert.equal(repeated.summary.searchedAt, first.summary.searchedAt);
+  assert.deepEqual(repeated.results, first.results);
+  assert.equal((await search("&near=Cluj-Napoca")).summary.cacheHit, false);
+  assert.equal((await search("&near=Bucuresti&condition=new")).summary.cacheHit, false);
+  entries.clear(); // Simulate Cache API expiry.
+  assert.equal((await search("&near=Bucuresti")).summary.cacheHit, false);
+});
+
 test("exposes the direct search contract at /api/search/free", async (t) => {
   const originalMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
   t.after(() => {
