@@ -1,5 +1,6 @@
 import { normalizeMarketplaceQuery } from "./query-normalization.js";
 import { understandMarketplaceQuery } from "./query-understanding.js";
+import { SOURCE_VALIDATION_SNAPSHOT } from "./source-validation-snapshot.js";
 
 function slugifySpacesWithDash(value) {
   return value.trim().replace(/\s+/g, "-");
@@ -1191,7 +1192,7 @@ const ACTIVE_SOURCE_KEYS = new Set([
 ]);
 
 for (const [siteKey, site] of Object.entries(SITES)) {
-  site.integrationStatus = ACTIVE_SOURCE_KEYS.has(siteKey)
+  site.integrationStatus = ACTIVE_SOURCE_KEYS.has(siteKey) && !SOURCE_VALIDATION_SNAPSHOT[siteKey]?.repeatedNoUsefulResults
     ? SOURCE_INTEGRATION_STATES.active
     : SOURCE_INTEGRATION_STATES.experimental;
 }

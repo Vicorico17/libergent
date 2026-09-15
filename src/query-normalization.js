@@ -4,6 +4,11 @@ const QUERY_TERM_REPLACEMENTS = new Map([
   ["anvlope", "anvelope"]
 ]);
 
+// Match storage/RAM formatting consistently without changing the displayed title.
+export function normalizeCapacityTerms(value = "") {
+  return String(value).replace(/\b(\d+)\s*(gb|tb)\b/gi, (_, amount, unit) => `${amount}${unit.toLowerCase()}`);
+}
+
 export function normalizeMarketplaceQuery(query = "") {
   return String(query)
     .replace(/\bchrome\s+hearths\b/gi, "chrome hearts")

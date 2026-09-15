@@ -40,3 +40,29 @@ test("marks a contacted listing unavailable from the seller reply", () => {
 
   assert.equal(conversation.status, "unavailable");
 });
+
+test("delivery status requires provider evidence and preserves failure and queue states", () => {
+  for (const [raw, expected] of [
+    [{}, "unknown"], [{ deliveryStatus: "queued" }, "queued"],
+    [{ bridge: { status: "delivered" } }, "delivered"],
+    [{ bridge: { result: { status: "sent" } } }, "sent"],
+    [{ bridge: { ok: false } }, "failed"]
+  ]) {
+    const [conversation] = buildConversationHistory([{ direction: "outbound", to_number: "+40722000000", text: "Salut", raw }]);
+    assert.equal(conversation.status, expected);
+    assert.equal(conversation.messages[0].deliveryStatus, expected);
+  }
+});
+
+test("explicit inbound listing metadata does not attach replies to another listing from the same seller", () => {
+  const base = { received_at: "2026-09-15T09:00:00Z", raw: { userId: "buyer" } };
+  const rows = [
+    { ...base, direction: "outbound", to_number: "+40722000000", raw: { userId: "buyer", listing: { url: "https://example.test/a" } } },
+    { ...base, direction: "outbound", to_number: "+40722000000", raw: { userId: "buyer", listing: { url: "https://example.test/b" } } },
+    { ...base, direction: "inbound", from_number: "+40722000000", text: "S-a vândut", raw: { userId: "buyer", listing: { url: "https://example.test/a" } } }
+  ];
+  const conversations = buildConversationHistory(rows, { userId: "buyer" });
+  assert.equal(conversations.find(c => c.listingUrl.endsWith("/a")).status, "unavailable");
+  assert.equal(conversations.find(c => c.listingUrl.endsWith("/b")).messages.length, 1);
+  assert.deepEqual(buildConversationHistory(rows, { userId: "other" }), []);
+});

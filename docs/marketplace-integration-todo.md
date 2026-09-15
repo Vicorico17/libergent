@@ -8,6 +8,17 @@ not current health measurements. `/api/sources` and `/pricing#surse` now expose
 the registry without treating registration as proof of reliability. See
 [launch audit](launch-audit-2026-09-13.md) for remaining validation work.
 
+## September 15 evidence update
+
+[The P0 report](p0-progress-2026-09-15.md) records two direct queries for all
+117 registered sources and two production Free queries covering 10 sources.
+Anuntul, Price.ro and ShopMania are now experimental after no accepted offers
+in both local and production checks. OLX and Okazii stay active: production
+returned offers despite local access failures. The source catalog exposes both
+sets of dated evidence. Search still attempts selected experimental sources and
+reports their errors. Status totals: **9 active / 108 experimental**, independently
+of the **12 Free / 105 Premium** access tiers. Older probes below remain historical.
+
 ## Current priorities — 2026-09-15
 
 Use the [product execution order](premium-alerts-todo.md#priority-and-execution-order)
@@ -69,7 +80,7 @@ BestAuto support stays maintained; additional vehicle coverage follows tech work
   - Start with generated Romanian message drafts, copy tracking, and open-contact tracking.
   - Add direct sending only through official APIs, partner flows, email relay, or explicit marketplace-supported contact mechanisms.
 
-## Active Now
+## Registered Free Sources (status follows September 15 evidence)
 
 - OLX
 - Vinted

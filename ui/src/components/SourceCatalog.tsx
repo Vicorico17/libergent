@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Source = { domain: string; tier: "free" | "premium"; status: string; selection: string };
+type Source = { domain: string; tier: "free" | "premium"; status: string; selection: string; productionValidation?: Array<{ checkedAt: string; accepted: number }>; directValidation?: { checkedAt: string; queriesChecked: number; queriesWithAcceptedOffers: number } };
 
 export function SourceCatalog() {
   const [sources, setSources] = useState<Source[]>([]);
@@ -29,6 +29,7 @@ export function SourceCatalog() {
       <p className="mt-2 max-w-3xl text-sm leading-relaxed">
         Sursele experimentale sunt în evaluare și pot să nu returneze oferte. Raportul fiecărei căutări arată ce surse au răspuns.
         Facebook Marketplace nu este integrat în căutarea automată.
+        Testele directe de mai jos sunt verificări punctuale din mediul de test, nu monitorizare continuă sau confirmare a prețurilor.
       </p>
       {failed ? <p role="status" className="mt-4">Lista surselor nu poate fi încărcată acum. Reîncarcă pagina pentru a încerca din nou.</p> : !sources.length ? <p role="status" className="mt-4">Se încarcă sursele…</p> : (
         <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -43,6 +44,8 @@ export function SourceCatalog() {
                       {source.status === "experimental" ? "Experimental · " : ""}
                       {source.selection === "vehicles" ? "Autoturisme" : source.selection === "refurbished-tech" ? "Tehnologie recondiționată" : "În funcție de căutare"}
                     </span>
+                    {source.directValidation && <span className="mt-1 block text-xs text-[#555]">Test direct {source.directValidation.checkedAt.slice(0, 10)}: {source.directValidation.queriesWithAcceptedOffers}/{source.directValidation.queriesChecked} căutări cu rezultate acceptate.</span>}
+                    {Boolean(source.productionValidation?.length) && <span className="mt-1 block text-xs text-[#555]">Test Free pe site {source.productionValidation![0].checkedAt.slice(0, 10)}: {source.productionValidation!.filter((check) => check.accepted > 0).length}/{source.productionValidation!.length} căutări cu rezultate acceptate.</span>}
                   </li>
                 ))}
               </ul>

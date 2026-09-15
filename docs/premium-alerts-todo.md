@@ -46,6 +46,16 @@ Unchecked tasks below carry a priority. Checked items retain their historical
 status; this prioritization does not reverify production configuration. The
 marketplace TODO uses the same priorities. The launch audit remains historical.
 
+## P0 progress — 2026-09-15
+
+See [the P0 implementation and evidence report](p0-progress-2026-09-15.md).
+Matching, login recovery, delivery-status display and dated source reporting are
+implemented locally. All 117 sources received two direct smoke queries; 10 Free
+sources were also checked through production search. These are bounded probes,
+not complete human price/relevance or authenticated production acceptance.
+Production browser login, controlled-recipient messaging, contact-policy evidence,
+and post-deployment visual acceptance remain open.
+
 ## Recently completed product work
 
 - [x] Show a clear Premium or Free marker on the account page.
@@ -65,7 +75,7 @@ marketplace TODO uses the same priorities. The launch audit remains historical.
 
 ### Login, signup, and purchase flow
 
-- [ ] **P0** — Rework the login/signup email experience, including validation, OTP feedback, loading states, error messages, resend behavior, and callback handling.
+- [x] **P0** — Rework email-link validation, feedback, separate loading states, recoverable errors, resend cooldown and callback handling (local implementation September 15; production acceptance below remains open).
 - [ ] **P0** — Test Google login and email OTP end to end on production, mobile, and desktop.
 - [ ] **P2** — Enable Supabase Passkeys with `libergent.com` as the stable WebAuthn Relying Party ID and configure the exact production origins.
 - [ ] **P2** — Add optional passkey sign-in to the login page while keeping Google and email as enrollment and recovery methods.
@@ -88,7 +98,7 @@ marketplace TODO uses the same priorities. The launch audit remains historical.
 - [ ] **P2** — Define Facebook Marketplace session, location, privacy, rate-limit, reliability, and seller-contact rules before exposing it in production.
 - [ ] **P1** — Review the Kitesurf fallback per marketplace against direct access and Chromium, measuring useful-result recovery, false successes, failures, latency, browser duration, and cost.
 - [ ] **P1** — Tighten Kitesurf eligibility where repeated runs spend browser time without recovering useful results, and verify the Chromium recovery allowlist and instant rollback switch.
-- [ ] **P0** — Keep the detailed source inventory and integration status synchronized with `docs/marketplace-integration-todo.md`.
+- [x] **P0** — Keep the detailed source inventory and integration status synchronized with `docs/marketplace-integration-todo.md`.
 
 ### Weak-match feedback loop
 
@@ -117,7 +127,7 @@ marketplace TODO uses the same priorities. The launch audit remains historical.
 - [x] Allow seller messaging actions only for logged-in users.
 - [x] Group message chat and history by listing for the owning account.
 - [ ] **P0** — Test the full “reach out for me” flow in production: contact discovery, user confirmation, outbound delivery, provider receipt, inbound reply, history, and failure recovery.
-- [ ] **P0** — Make delivery state explicit: queued, sent, delivered, failed, replied, or unavailable.
+- [x] **P0** — Display provider-evidenced queued, sent, delivered, failed, replied and unavailable states; preserve unknown delivery for historical records (September 15). Real provider receipt callbacks and production delivery acceptance remain open.
 - [ ] **P0** — Confirm each marketplace permits the selected contact mechanism and preserve link-out contact where direct sending is unsupported.
 - [ ] **P3** — Add calls as the next communication channel only after messaging delivery and consent are reliable.
 - [ ] **P3** — Define call consent, disclosure, recording, retention, phone-number ownership, abuse prevention, handoff, and escalation rules.

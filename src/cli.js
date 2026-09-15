@@ -17,7 +17,7 @@ Usage:
   node src/cli.js search --site <site> --query "<text>" [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 150] [--pages 3] [--out results/file.json]
   node src/cli.js search --site all --query "<text>" [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 150] [--pages 3] [--out results/file.json]
   node src/cli.js health --query "iphone 15 pro" [--provider ${SEARCH_PROVIDERS.join("|")}]
-  node src/cli.js validate-shops [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 3] [--niche fashion]
+  node src/cli.js validate-shops [--provider ${SEARCH_PROVIDERS.join("|")}] [--limit 20] [--niche fashion] [--site olx.ro,vinted.ro]
   npm run search:live -- --query "<text>"
 
 Supported sites:
@@ -269,9 +269,11 @@ async function main() {
 
   if (command === "validate-shops") {
     const provider = normalizeSearchProvider(args.provider || "direct");
-    const limit = Number.parseInt(args.limit || "3", 10);
+    const limit = Number.parseInt(args.limit || "20", 10);
     if (!Number.isFinite(limit) || limit <= 0) throw new Error("Expected --limit to be a positive integer");
-    const report = await runShopValidation({ provider, limit, maxPages: 1, niches: args.niche });
+    const siteKeys = args.site ? args.site.split(",").map((site) => site.trim()) : undefined;
+    if (siteKeys) siteKeys.forEach(getSite);
+    const report = await runShopValidation({ provider, limit, maxPages: 1, niches: args.niche, siteKeys });
     const output = JSON.stringify(report, null, 2);
     if (args.out) {
       const outputPath = path.resolve(process.cwd(), args.out);

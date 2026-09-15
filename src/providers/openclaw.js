@@ -1,4 +1,5 @@
 import { normalizeRomanianMobilePhone } from "../phone-numbers.js";
+import { normalizeDeliveryStatus } from "../conversations.js";
 
 export async function sendWhatsAppViaOpenClaw({ target, message, media, replyTo, env = process.env, fetchImpl = fetch } = {}) {
   const bridgeUrl = String(env.OPENCLAW_BRIDGE_URL || "").replace(/\/+$/, "");
@@ -17,6 +18,6 @@ export async function sendWhatsAppViaOpenClaw({ target, message, media, replyTo,
     body: JSON.stringify({ target: phone, message: String(message).trim(), media, replyTo })
   });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || `OpenClaw bridge failed (${response.status}).`);
+  if (!response.ok || !payload || normalizeDeliveryStatus(payload) === "failed") throw new Error(payload?.error || `OpenClaw bridge failed (${response.status}).`);
   return payload;
 }

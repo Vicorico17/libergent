@@ -22,3 +22,12 @@ test("corrected brand query survives final listing classification", () => {
   }]);
   assert.equal(payload.summary.totalListings, 1);
 });
+
+test("spaced capacity survives marketplace filtering and aggregation", async () => {
+  const { filterRelevantItems } = await import("./search.js");
+  for (const query of ["iphone 15 256GB", "iphone 15 256 GB"]) {
+    const items = filterRelevantItems([{ title: "iPhone 15 256 GB", price: "2000 lei", url: "https://www.olx.ro/d/oferta/phone.html" }], query);
+    const result = aggregateMarketplaceResults([{ ok: true, site: "olx.ro", query, items, itemCount: items.length }]);
+    assert.equal(result.summary.totalListings, 1, query);
+  }
+});

@@ -603,3 +603,31 @@ test("padel Nox query keeps Nox racket models with padel synonyms", () => {
   assert.equal(otherBrand.isRecommendedCandidate, false);
   assert.ok(otherBrand.rejectionReasons.includes("missing_brand"));
 });
+
+test("tech capacities match with or without spaces throughout query classification", () => {
+  for (const [query, title] of [
+    ["iphone 15 256GB", "iPhone 15 256 GB"],
+    ["iphone 15 256 GB", "iPhone 15 256GB"],
+    ["macbook air m2 256gb", "MacBook Air M2 256 GB"],
+    ["macbook air m2 1 TB", "MacBook Air M2 1TB"]
+  ]) {
+    const result = classifyListingIntent({ title, price: "3000 lei", priceRon: 3000 }, query);
+    assert.equal(result.isRecommendedCandidate, true, `${query}: ${result.rejectionReasons}`);
+  }
+});
+
+test("phone title model and storage cannot be overridden by description comparisons", () => {
+  for (const [query, title, description, reason] of [
+    ["iphone 15", "iPhone 14, baterie 100%, 15 luni garantie", "Upgrade la iPhone 15", "iphone_model_mismatch"],
+    ["iphone 15 256GB", "iPhone 15 128GB", "Schimb cu varianta 256GB", "storage_mismatch"],
+    ["samsung s24", "Samsung S24 Ultra 256GB", "", "extra_ultra"],
+    ["samsung galaxy s24", "Samsung Galaxy S23, comparabil cu S24", "Upgrade Samsung Galaxy S24", "galaxy_model_mismatch"],
+    ["iphone 16", "iPhone 16e 128GB", "iPhone 16 alternativa", "iphone_model_mismatch"]
+  ]) {
+    const result = classifyListingIntent({ title, description, price: "3000 lei", priceRon: 3000 }, query);
+    assert.equal(result.isRecommendedCandidate, false, title);
+    assert.ok(result.rejectionReasons.includes(`variant_mismatch:${reason}`), JSON.stringify(result.rejectionReasons));
+  }
+  const base = classifyListingIntent({ title: "iPhone 15 128GB", description: "Nu este Pro Max", price: "2500 lei", priceRon: 2500 }, "iphone 15");
+  assert.equal(base.isRecommendedCandidate, true);
+});

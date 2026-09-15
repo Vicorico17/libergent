@@ -1,4 +1,5 @@
 import { understandMarketplaceQuery } from "./query-understanding.js";
+import { normalizeCapacityTerms } from "./query-normalization.js";
 
 const STOP_WORDS = new Set([
   "a",
@@ -724,7 +725,7 @@ const SIZE_PHRASE_ANCHORS = new Set([
 ]);
 
 export function normalizeText(value = "") {
-  return String(value)
+  return normalizeCapacityTerms(value)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -1093,7 +1094,10 @@ function detectModelVariantMismatch({ title, text, queryProfile }) {
   const queryTokens = new Set(queryProfile.tokens);
   const titleTokens = new Set(tokenize(normalizedTitle));
   const textTokens = new Set(tokenize(normalizedText));
-  const listingTokens = new Set([...titleTokens, ...textTokens]);
+  // A description can mention upgrades and comparisons to other products.
+  // Explicit title specs take precedence over that secondary evidence.
+  const hasTitlePhoneModel = /\b(?:iphone\s*\d|(?:samsung\s*(?:galaxy\s*)?|galaxy\s*)[sa]\d)/.test(normalizedTitle);
+  const listingTokens = hasTitlePhoneModel ? titleTokens : new Set([...titleTokens, ...textTokens]);
 
   function findStorageGb(value) {
     return [...value.matchAll(/\b(64|128|256|512|1024)\s*(?:gb|g)\b/g)]
@@ -1101,29 +1105,32 @@ function detectModelVariantMismatch({ title, text, queryProfile }) {
   }
 
   function findIphoneModels(value) {
-    return [...value.matchAll(/\biphone\s*(\d{2})(?:e)?\b/g)]
+    return [...value.matchAll(/\biphone\s*(\d{1,2}e?)\b/g)]
       .map((match) => match[1]);
   }
 
   function findGalaxyModels(value) {
-    return [...value.matchAll(/\b(?:samsung\s*)?galaxy\s*(s\d{2}|a\d{2}|z\s*flip\s*\d|z\s*fold\s*\d)\b/g)]
+    return [...value.matchAll(/\b(?:samsung\s*(?:galaxy\s*)?|galaxy\s*)(s\d{2}|a\d{2}|z\s*flip\s*\d|z\s*fold\s*\d)\b/g)]
       .map((match) => normalizeText(match[1]));
   }
 
   const queryStorage = findStorageGb(queryProfile.normalized);
-  const listingStorage = findStorageGb(normalizedText);
+  const titleStorage = findStorageGb(normalizedTitle);
+  const listingStorage = titleStorage.length ? titleStorage : findStorageGb(normalizedText);
   if (queryStorage.length && listingStorage.length && !listingStorage.some((value) => queryStorage.includes(value))) {
     return { mismatch: true, reason: "storage_mismatch" };
   }
 
   const queryIphoneModels = findIphoneModels(queryProfile.normalized);
-  const listingIphoneModels = findIphoneModels(normalizedText);
+  const titleIphoneModels = findIphoneModels(normalizedTitle);
+  const listingIphoneModels = titleIphoneModels.length ? titleIphoneModels : findIphoneModels(normalizedText);
   if (queryIphoneModels.length && listingIphoneModels.length && !listingIphoneModels.some((model) => queryIphoneModels.includes(model))) {
     return { mismatch: true, reason: "iphone_model_mismatch" };
   }
 
   const queryGalaxyModels = findGalaxyModels(queryProfile.normalized);
-  const listingGalaxyModels = findGalaxyModels(normalizedText);
+  const titleGalaxyModels = findGalaxyModels(normalizedTitle);
+  const listingGalaxyModels = titleGalaxyModels.length ? titleGalaxyModels : findGalaxyModels(normalizedText);
   if (queryGalaxyModels.length && listingGalaxyModels.length && !listingGalaxyModels.some((model) => queryGalaxyModels.includes(model))) {
     return { mismatch: true, reason: "galaxy_model_mismatch" };
   }

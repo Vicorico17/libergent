@@ -470,6 +470,7 @@ Production deployment is also automated by [.github/workflows/deploy-cloudflare.
 
 ## Project documents
 
+- [P0 implementation and validation evidence](docs/p0-progress-2026-09-15.md)
 - [Premium, product, and launch TODO](docs/premium-alerts-todo.md)
 - [Marketplace integration TODO](docs/marketplace-integration-todo.md)
 - [Classified marketplace feature plan](docs/classified-marketplace-feature-plan.md)

@@ -371,6 +371,8 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
   assert.equal(payload.ok, true);
   assert.equal(payload.target, "+40722123456");
   assert.equal(payload.messageId, "msg_123");
+  assert.equal(payload.deliveryStatus, "queued");
+  assert.equal(storedMessage.raw.deliveryStatus, "queued");
   assert.match(payload.conversationId, /^wa_/);
   assert.equal(payload.historySaved, true);
   assert.equal(bridgeRequest.url, "https://bridge.example/whatsapp/send");
@@ -592,4 +594,22 @@ test("keeps OLX listing cookies when requesting the seller phone", async (t) => 
   assert.equal(payload.debug.cookieReceived, true);
   assert.equal(phoneRequest.headers.cookie, "device_id=public-session");
   assert.equal(phoneRequest.headers["x-requested-with"], "XMLHttpRequest");
+});
+
+test("does not report bridge application failures as successful delivery", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  let writes = 0;
+  globalThis.fetch = async (url) => {
+    if (String(url).endsWith("/auth/v1/user")) return Response.json({ id: "buyer" });
+    if (String(url).includes("/rest/")) writes++;
+    return Response.json({ ok: true, result: { ok: false, error: "delivery rejected" } });
+  };
+  const response = await worker.fetch(new Request("https://libergent.test/api/whatsapp/send", {
+    method: "POST", headers: { authorization: "Bearer token", "content-type": "application/json" },
+    body: JSON.stringify({ target: "+40722000000", message: "test" })
+  }), { SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "test", OPENCLAW_BRIDGE_URL: "https://bridge.example", OPENCLAW_BRIDGE_TOKEN: "test" });
+  assert.equal(response.status, 502);
+  assert.equal((await response.json()).ok, false);
+  assert.equal(writes, 0);
 });

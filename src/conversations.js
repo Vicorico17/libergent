@@ -28,11 +28,19 @@ function conversationId(phone, listingUrl = "") {
   return `wa_${stableHash(conversationKey(phone, listingUrl))}`;
 }
 
+export function normalizeDeliveryStatus(payload = {}, fallback = "unknown") {
+  if (payload.ok === false || payload.result?.ok === false) return "failed";
+  const status = String(payload.deliveryStatus || payload.status || payload.result?.status || "").toLowerCase();
+  if (["queued", "sent", "delivered", "failed", "unavailable"].includes(status)) return status;
+  if (status === "read") return "delivered";
+  return fallback;
+}
+
 function inferConversationStatus(messages) {
   const inbound = messages.filter((message) => message.direction === "inbound");
-  if (!inbound.length) return "contacted";
+  if (!inbound.length) return messages.at(-1)?.deliveryStatus || "unknown";
 
-  const text = inbound.map((message) => message.text.toLowerCase()).join(" ");
+  const text = inbound.at(-1).text.toLowerCase();
   if (/nu mai (este|e) disponibil|s-a vandut|s a vandut|vandut|vândut|indisponibil/.test(text)) return "unavailable";
   if (/de acord|ramane stabilit|rămâne stabilit|batut palma|bătut palma|ne-am inteles|ne am inteles/.test(text)) return "deal_agreed";
   if (/pret|preț|oferta|ofertă|negoci|ultimul pret|ultimul preț/.test(text)) return "negotiating";
@@ -73,7 +81,7 @@ export function buildConversationHistory(rows = [], { userId = "" } = {}) {
     const listing = getListingMetadata(row);
     const listingUrl = String(listing.url || "");
     let conversation;
-    if (direction === "outbound" && listingUrl) {
+    if (listingUrl) {
       const key = conversationKey(phone, listingUrl);
       conversation = conversations.get(key);
       if (!conversation) {
@@ -100,6 +108,8 @@ export function buildConversationHistory(rows = [], { userId = "" } = {}) {
       direction,
       role: direction === "inbound" ? "seller" : "agent",
       text: String(row.text || ""),
+      deliveryStatus: direction === "inbound" ? "replied"
+        : normalizeDeliveryStatus(row.raw || {}, normalizeDeliveryStatus(row.raw?.bridge || {})),
       timestamp
     });
     conversation.lastMessageAt = timestamp;

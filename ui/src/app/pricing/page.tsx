@@ -19,7 +19,7 @@ const NAV_LINKS = [
 
 const BETA_FEATURES = [
   "Căutare rapidă prin conexiuni directe",
-  "Marketplace-uri active și validate",
+  "Marketplace-uri cu raport de căutare și teste datate",
   "Rezultate normalizate și comparabile",
   "Filtre și sortare rapidă",
   "Scor agent și recomandări prioritare",

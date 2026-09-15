@@ -1499,8 +1499,8 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
   const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle")
   const [sendError, setSendError] = useState("")
   const [sentTarget, setSentTarget] = useState("")
-  const [sentMessageId, setSentMessageId] = useState("")
-  const [contactLookupDebug, setContactLookupDebug] = useState("")
+  const [deliveryStatus, setDeliveryStatus] = useState("unknown")
+  const sending = useRef(false)
 
   function trackOpenContact() {
     trackSearchEvent("open_seller_contact", {
@@ -1511,49 +1511,37 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
   }
 
   async function sendWhatsApp() {
-    const supabase = getSupabaseBrowserClient()
-    const session = supabase ? (await supabase.auth.getSession()).data.session : null
-    if (!session?.access_token) {
-      setSendState("error")
-      setSendError("Conectează-te pentru a trimite mesaje și a păstra conversația privată în contul tău.")
-      return
-    }
-
-    let phone = ""
-    setContactLookupDebug("")
-    if (item.url) {
-      setSendState("sending")
-      try {
-        const response = await fetch(`/api/marketplace/contact?url=${encodeURIComponent(item.url)}`)
-        const payload = await response.json().catch(() => ({}))
-        phone = Array.isArray(payload.phones) ? String(payload.phones[0] || "") : ""
-        const lookupStatus = String(payload.contactStatus || (phone ? "phone_found" : "phone_not_available"))
-        if (phone) {
-          setContactLookupDebug(`Contact pipeline: ${lookupStatus} · ${phone}`)
-        } else {
-          const detail = typeof payload.error === "string" ? ` · ${payload.error}` : " · no phone returned"
-          const debug = payload.debug ? ` · ${JSON.stringify(payload.debug)}` : ""
-          setContactLookupDebug(`Contact pipeline: ${lookupStatus} · HTTP ${response.status}${detail}${debug}`)
-        }
-      } catch {
-        phone = ""
-        setContactLookupDebug("Lookup: request failed before receiving a response")
-      }
-      setSendState("idle")
-    }
-    if (!phone) {
-      phone = item.sellerPhone || ""
-    }
-    if (!phone) {
-      phone = window.prompt("Numărul WhatsApp al sellerului (ex. 07xx xxx xxx):", "")?.trim() || ""
-    }
-    if (!phone) return
-    if (!window.confirm("Trimiți acest mesaj pe WhatsApp?\n\n" + message)) return
-
+    if (sending.current || sendState === "sent") return
+    sending.current = true
     setSendState("sending")
     setSendError("")
-    setSentMessageId("")
     try {
+      const supabase = getSupabaseBrowserClient()
+      const session = supabase ? (await supabase.auth.getSession()).data.session : null
+      if (!session?.access_token) throw new Error("Conectează-te pentru a trimite mesaje și a păstra conversația privată în contul tău.")
+
+      let phone = ""
+      if (item.url) {
+        try {
+          const response = await fetch(`/api/marketplace/contact?url=${encodeURIComponent(item.url)}`)
+          const payload = await response.json().catch(() => ({}))
+          phone = Array.isArray(payload.phones) ? String(payload.phones[0] || "") : ""
+        } catch {
+          phone = ""
+        }
+      }
+      if (!phone) {
+        phone = item.sellerPhone || ""
+      }
+      if (!phone) {
+        phone = window.prompt("Numărul WhatsApp al sellerului (ex. 07xx xxx xxx):", "")?.trim() || ""
+      }
+      if (!phone) return
+      if (!window.confirm("Trimiți acest mesaj pe WhatsApp?\n\n" + message)) return
+
+      setSendState("sending")
+      setSendError("")
+      setDeliveryStatus("unknown")
       const response = await fetch("/api/whatsapp/send", {
         method: "POST",
         headers: {
@@ -1578,7 +1566,7 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
         throw new Error(payload.error || "Mesajul nu a putut fi trimis.")
       }
       setSentTarget(String(payload.target || phone))
-      setSentMessageId(String(payload.messageId || ""))
+      setDeliveryStatus(String(payload.deliveryStatus || "unknown"))
       setSendState("sent")
       window.dispatchEvent(new CustomEvent("libergent:conversation-open", {
         detail: {
@@ -1592,6 +1580,7 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
           messageId: String(payload.messageId || ""),
           timestamp: new Date().toISOString(),
           historySaved: Boolean(payload.historySaved),
+          deliveryStatus: String(payload.deliveryStatus || "unknown"),
         },
       }))
       trackSearchEvent("whatsapp_message_sent", {
@@ -1603,6 +1592,9 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
     } catch (error) {
       setSendState("error")
       setSendError(error instanceof Error ? error.message : "Mesajul nu a putut fi trimis.")
+    } finally {
+      sending.current = false
+      setSendState((current) => current === "sending" ? "idle" : current)
     }
   }
 
@@ -1637,12 +1629,13 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
         <button
           type="button"
           onClick={sendWhatsApp}
+          disabled={sendState === "sending" || sendState === "sent"}
           className="flex min-h-10 flex-1 items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold uppercase transition-colors duration-150"
           style={{ border: `1px solid ${INK}`, background: INK, color: "white", fontFamily: MONO }}
           title={message}
         >
           <MessageSquare size={13} strokeWidth={2.2} />
-          {sendState === "sending" ? "Se trimite..." : sendState === "sent" ? "Trimis pe WhatsApp" : "Contactează sellerul"}
+          {sendState === "sending" ? "Se trimite..." : sendState === "sent" ? "Mesaj preluat" : "Contactează sellerul"}
         </button>
       ) : (
         <span
@@ -1656,10 +1649,10 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
       )}
       {sendState === "sent" && sentTarget && (
         <p className="basis-full text-[10px] text-[#22C55E]" style={{ fontFamily: MONO }}>
-          WhatsApp confirmat către {sentTarget}{sentMessageId ? ` · messageId ${sentMessageId}` : ""}
+          {CONVERSATION_STATUS_LABELS[deliveryStatus] || "Stare necunoscută"} · {sentTarget}. Livrarea este confirmată doar când furnizorul o raportează.
         </p>
       )}
-      {contactLookupDebug && <p className="basis-full text-[10px] text-[#B45309]" style={{ fontFamily: MONO }}>{contactLookupDebug}</p>}
+      {item.url && <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={trackOpenContact} className="min-h-10 px-3 py-2 text-[10px] font-bold uppercase underline">Contact pe marketplace</a>}
       {sendState === "error" && <p className="basis-full text-[10px] text-[#FF3366]" style={{ fontFamily: MONO }}>{sendError}</p>}
       {sendState === "error" && sendError.includes("Conectează-te") && (
         <Link href={`/auth?next=${encodeURIComponent(`/search?q=${query}`)}`} className="basis-full text-[10px] font-bold uppercase underline" style={{ color: PINK }}>
@@ -1672,6 +1665,11 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
 
 const CONVERSATION_STATUS_LABELS: Record<string, string> = {
   contacted: "Contactat",
+  queued: "În așteptarea trimiterii",
+  sent: "Trimis · livrare neconfirmată",
+  delivered: "Livrat",
+  failed: "Trimitere eșuată",
+  unknown: "Livrare neconfirmată",
   replied: "A răspuns",
   negotiating: "În negociere",
   unavailable: "Indisponibil",
@@ -2484,6 +2482,7 @@ type ConversationMessage = {
   role: "seller" | "agent"
   text: string
   timestamp: string
+  deliveryStatus?: string
 }
 
 type SellerConversation = {
@@ -2548,17 +2547,18 @@ function ConversationCenter({ enabled, onStatusesChange }: { enabled: boolean; o
         listingTitle: detail.listingTitle || "Conversație WhatsApp",
         listingImageUrl: "",
         listingPrice: detail.listingPrice || "",
-        status: "contacted",
+        status: detail.deliveryStatus || "unknown",
         lastMessageAt: detail.timestamp || new Date().toISOString(),
         lastMessage: detail.message || "",
         messageCount: 1,
-        messages: [{ id: detail.messageId || "pending", direction: "outbound", role: "agent", text: detail.message || "", timestamp: detail.timestamp || new Date().toISOString() }],
+        messages: [{ deliveryStatus: detail.deliveryStatus || "unknown", id: detail.messageId || "pending", direction: "outbound", role: "agent", text: detail.message || "", timestamp: detail.timestamp || new Date().toISOString() }],
       }
       setConversations((current) => [temporary, ...current.filter((conversation) => conversation.id !== temporary.id)])
       setSelectedId(temporary.id)
       setOpen(true)
-      if (temporary.listingUrl) onStatusesChange({ [temporary.listingUrl]: "contacted" })
-      window.setTimeout(() => loadConversations(temporary.id), 400)
+      if (temporary.listingUrl) onStatusesChange({ [temporary.listingUrl]: temporary.status })
+      if (detail.historySaved) window.setTimeout(() => loadConversations(temporary.id), 400)
+      else setError("Mesajul a fost preluat, dar istoricul nu a putut fi salvat. Nu retrimite automat mesajul.")
     }
     window.addEventListener("libergent:conversation-open", handleOpen)
     queueMicrotask(() => loadConversations())
@@ -2602,6 +2602,7 @@ function ConversationCenter({ enabled, onStatusesChange }: { enabled: boolean; o
                     <div className="mt-2 truncate text-[10px]">{conversation.lastMessage}</div>
                   </button>
                 ))}
+                {error && conversations.length > 0 && <p role="status" className="p-4 text-[10px]">{error}</p>}
                 {!conversations.length && <div className="p-5 text-[10px] font-bold uppercase" style={{ color: `${INK}66` }}>{error || "Nicio conversație încă."}</div>}
               </div>
             </section>
@@ -2617,7 +2618,7 @@ function ConversationCenter({ enabled, onStatusesChange }: { enabled: boolean; o
                         <div className="max-w-[80%] p-3 text-[11px] leading-relaxed" style={{ background: message.direction === "outbound" ? INK : "white", color: message.direction === "outbound" ? "white" : INK, border: `1px solid ${INK}` }}>
                           <div className="mb-1 text-[8px] font-bold uppercase" style={{ color: message.direction === "outbound" ? PINK : GREEN }}>{message.direction === "outbound" ? "Agent LiberGent" : "Seller"}</div>
                           <div>{message.text}</div>
-                          <div className="mt-2 text-[8px] opacity-60">{formatDateTime(message.timestamp)}</div>
+                          <div className="mt-2 text-[8px] opacity-60">{formatDateTime(message.timestamp)}{message.direction === "outbound" && ` · ${CONVERSATION_STATUS_LABELS[message.deliveryStatus || "unknown"] || "Livrare neconfirmată"}`}</div>
                         </div>
                       </div>
                     ))}

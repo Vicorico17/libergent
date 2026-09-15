@@ -1,6 +1,6 @@
 import { searchAcrossSites } from "./app.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
-import { buildConversationHistory, getConversationById } from "./conversations.js";
+import { buildConversationHistory, getConversationById, normalizeDeliveryStatus } from "./conversations.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
 import { runMarketplaceHealthChecks } from "./health.js";
 import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
@@ -1253,9 +1253,10 @@ async function handleApi(request, env, context) {
         body: JSON.stringify({ target, message })
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
+      if (!response.ok || normalizeDeliveryStatus(payload) === "failed") {
         return json({ ok: false, error: payload.error || `WhatsApp bridge failed (${response.status}).` }, 502);
       }
+      const deliveryStatus = normalizeDeliveryStatus(payload, "queued");
       const messageId = String(payload.messageId || payload.result?.messageId || `outbound:${target}:${Date.now()}`);
       const timestamp = new Date().toISOString();
       let historySaved = false;
@@ -1266,7 +1267,7 @@ async function handleApi(request, env, context) {
           to: target,
           text: message,
           timestamp,
-          raw: { userId: auth.user.id, listing, bridge: payload }
+          raw: { userId: auth.user.id, listing, bridge: payload, deliveryStatus }
         }, env);
       } catch (error) {
         historyError = error instanceof Error ? error.message : String(error);
@@ -1278,12 +1279,13 @@ async function handleApi(request, env, context) {
         to_number: target,
         text: message,
         received_at: timestamp,
-        raw: { userId: auth.user.id, listing }
+        raw: { userId: auth.user.id, listing, deliveryStatus }
       }], { userId: auth.user.id });
       return json({
         ok: true,
         target,
         messageId,
+        deliveryStatus,
         conversationId: conversation?.id || null,
         historySaved,
         historyError: historyError || null
