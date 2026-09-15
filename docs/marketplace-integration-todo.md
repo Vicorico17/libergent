@@ -8,6 +8,27 @@ not current health measurements. `/api/sources` and `/pricing#surse` now expose
 the registry without treating registration as proof of reliability. See
 [launch audit](launch-audit-2026-09-13.md) for remaining validation work.
 
+## Current priorities — 2026-09-15
+
+Use the [product execution order](premium-alerts-todo.md#priority-and-execution-order)
+for cross-product dependencies. This table governs all open work in this file;
+older dated probes are evidence from their recorded date, not current health.
+
+| Priority | Scope | Next action / acceptance |
+| --- | --- | --- |
+| P0 — Now | Keyword matching and tech relevance; used/new separation; UI reporting requirements | Verify exact model, storage, variant, condition, accessory exclusion, payable price and missing benchmarks with representative fixtures |
+| P0 — Now | Existing source reliability: OLX, Vinted, other advertised sources, Flip/Klap and tech retail benchmarks | Run dated representative queries; fix parsers/routes or demote unreliable sources; retain explicit blocked/empty/error states |
+| P0 — Now | Manual search health | `/health` and footer link implemented September 15; verify production behavior, cached responses, partial failures and empty results |
+| P0 — Now | Existing seller messaging | Complete production acceptance and supported contact checks in the product TODO |
+| P1 — Before paid launch | Kitesurf/Chromium eligibility, paid-source explanations and costs | Benchmark useful recovery, price accuracy, latency and browser cost; tune allowlist and verify rollback |
+| P1 — Before paid launch | Scheduled per-source health | Add daily queries, parsed/included counts, failure/latency tracking and repeated-zero alerts; manual `/health` does not provide scheduling |
+| P2 — After core quality | Flip pagination, Klap richer grades, Used Products, Refurbed, MarketplaceRomania | Demonstrate incremental useful tech inventory through a supported route; fix currently incorrect prices/conditions under P0 first |
+| P2 — After core quality | Facebook feasibility and picture search | Resolve runtime/location/access dependencies for Facebook; image provider and editable extracted keywords for picture search |
+| P3 — Later | BestBike, Animalutul, fashion, furniture, DIY, cycling, baby, books and other niche expansion | Finish initial tech acceptance before new adapters or niche-specific fixture expansion; defects in already advertised sources remain P0 |
+
+The source sections below are an inventory, not their execution order. Existing
+BestAuto support stays maintained; additional vehicle coverage follows tech work.
+
 ## Product Direction
 
 - Owner-confirmed first focus: **second-hand technology in Romania**. Retail
@@ -95,12 +116,12 @@ The same query against the seven configured Premium candidates split them into t
 | P0 · done | BestAuto | Cars; complements Autovit | `200`; shared Publi24-family parser extracts clean BMW listings | Added as a car-only Free/direct adapter with origin-aware parser coverage | No |
 | P0 · done | Flip | Refurbished phones, tablets, laptops, watches | `200`; catalog `__NEXT_DATA__` exposes final price, condition, inventory URL, and image | Added as a refurbished-tech Free/direct adapter; allowed catalog HTML is filtered locally and installment values are ignored | No |
 | P0 · done | Klap | Refurbished phones, tablets, laptops | `200`; WooCommerce cards expose current and crossed-out prices | Added as a refurbished-tech Free/direct adapter with a dedicated sale-price parser | No |
-| P1 | Used Products | Broad verified second-hand electronics and other durable goods | Initial HTML is `200` but the product catalog is client-rendered; generic parsing returns zero | Investigate the site's public client data/API or request a feed/partner route; parse that directly if permitted | No: its `robots.txt` explicitly blocks `CloudflareBrowserRenderingCrawler` |
-| P1 | BestBike | Motorcycles, scooters, ATVs, accessories | Homepage/query probe returned `200`, but no cards were extracted using the Publi24 parser | Find the stable search route and add a dedicated or shared-network parser | Only if JS rendering is proven necessary and allowed |
-| P2 | Animalutul | Pets and animal accessories | Homepage/query probe returned `200`, but no cards were extracted | Add only after Libergent intentionally supports pet queries | Only if JS rendering is proven necessary and allowed |
+| P2 | Used Products | Broad verified second-hand electronics and other durable goods | Initial HTML is `200` but the product catalog is client-rendered; generic parsing returns zero | Investigate the site's public client data/API or request a feed/partner route; parse that directly if permitted | No: its `robots.txt` explicitly blocks `CloudflareBrowserRenderingCrawler` |
+| P3 | BestBike | Motorcycles, scooters, ATVs, accessories | Homepage/query probe returned `200`, but no cards were extracted using the Publi24 parser | Find the stable search route and add a dedicated or shared-network parser | Only if JS rendering is proven necessary and allowed |
+| P3 | Animalutul | Pets and animal accessories | Homepage/query probe returned `200`, but no cards were extracted | Add only after Libergent intentionally supports pet queries | Only if JS rendering is proven necessary and allowed |
 | P2 | MarketplaceRomania | General new/used marketplace | `200`, but the tested WordPress-style search parameter did not return query-specific products | First validate inventory depth and discover the real browse/search endpoint | No evidence yet |
 | P2 | Refurbed Romania | Refurbished electronics benchmark | Direct probe returned `401` | Check official/public API, feed, terms, and Romanian inventory value before investing | Browser experiment only after those checks |
-| Hold | Facebook Marketplace | High-value private-seller inventory | Account/session-dependent and not suitable for anonymous server scraping | Use the installed Browse skill through a verified, residential-proxy Browserbase session; keep the result read-only and link out to Facebook for seller contact | No unattended browser scraping |
+| P2 · gated | Facebook Marketplace | High-value private-seller inventory | Account/session-dependent and not suitable for anonymous server scraping | Use the installed Browse skill through a verified, residential-proxy Browserbase session; keep the result read-only and link out to Facebook for seller contact | No unattended browser scraping |
 
 ### Provider rule for new sources
 
@@ -113,11 +134,14 @@ The same query against the seven configured Premium candidates split them into t
 
 ### Next implementation batch
 
-1. Done: BestAuto uses the direct path and the origin-aware Publi24-family parser.
-2. Done: Flip and Klap use dedicated direct parsers with final-price regression tests.
-3. Discover the Used Products client data contract or request a feed; do not spend Browser Run time on it.
-4. Re-run active-source smoke tests with at least one query per target niche and either fix or demote sources that repeatedly return zero or challenges.
-5. Benchmark Browser Run only for the remaining allowlisted sources and record browser seconds, raw cards, included cards, challenge status, and final-price accuracy.
+1. **P0:** Run representative second-hand tech queries against advertised sources; save dated evidence and fix or demote weak sources.
+2. **P0:** Improve keyword/model/variant matching and final-price parsing with regression fixtures; verify manual `/health` in production.
+3. **P1:** Benchmark allowlisted direct/Kitesurf/Chromium recovery and record browser time, useful cards, errors, payable-price accuracy and cost.
+4. **P1:** Add scheduled source health checks and repeated-failure alerts.
+5. **P2:** Discover the Used Products client data contract or request a supported feed once existing coverage is reliable.
+
+Completed foundation: BestAuto uses the origin-aware direct parser; Flip and
+Klap have dedicated direct parsers and final-price regression tests.
 
 ### Implementation validation (2026-07-20)
 
@@ -126,7 +150,7 @@ The same query against the seven configured Premium candidates split them into t
 - Klap direct `iphone 15 pro`: six exact iPhone 15 Pro variants returned with current payable prices from 2,599 to 3,299 RON.
 - Unit coverage verifies Free/Premium disjointness, complete adapter categorization, conditional car/tech routing, Flip final-price extraction, Klap sale-price extraction, and BestAuto shared-parser origin handling.
 
-## Add Next: Classified and Used Sources
+## Classified and Used Source Inventory
 
 - Facebook Marketplace
   - Goal: include listings because many private sellers post there first.
@@ -228,16 +252,19 @@ The same query against the seven configured Premium candidates split them into t
 
 ## Next Niche Research Queue
 
-These are intentionally **not enabled** yet. Each needs a permitted search route, a dedicated fixture, and query-specific quality checks before joining the active registry.
+This is a historical expansion queue; some candidates are now registered. Check
+`src/sites.js` before implementation. New niche expansion is **P3**; existing
+advertised-source defects remain **P0**. Registration alone does not establish
+reliability: each source needs a supported route, fixtures and quality checks.
 
 | Priority | Niche | Candidate retailers / marketplaces | Why it fits LiberGent |
 | --- | --- | --- | --- |
-| P1 | Sneakers and sportswear | Footshop, Buzz Sneakers, Sport Vision | Strong overlap with Vinted; product codes, brand, size, and current sale price are especially useful for used-vs-new comparisons. |
-| P1 | Furniture and home | IKEA, JYSK, Mobexpert | Makes the existing used furniture inventory comparable with a reliable new-price benchmark. |
-| P1 | DIY and home improvement | Dedeman, Leroy Merlin, Hornbach | High-price durable goods where local used listings and new alternatives are both meaningful. |
-| P2 | Cycling and outdoor | Decathlon, BikeXCS, PlayBike | Bikes and equipment have strong second-hand demand; keep full bikes separate from parts and accessories. |
-| P2 | Baby and children | Noriel, BabyNeeds, OLX/Vinted children categories | Parents frequently compare new and lightly used items; safety, age range, and completeness need dedicated relevance rules. |
-| P2 | Books, games, and collectibles | Cărturești, Libris, board-game specialists | ISBN, edition, language, and condition make a clean first sub-niche possible. |
+| P3 | Sneakers and sportswear | Footshop, Buzz Sneakers, Sport Vision | Strong overlap with Vinted; product codes, brand, size, and current sale price are especially useful for used-vs-new comparisons. |
+| P3 | Furniture and home | IKEA, JYSK, Mobexpert | Makes the existing used furniture inventory comparable with a reliable new-price benchmark. |
+| P3 | DIY and home improvement | Dedeman, Leroy Merlin, Hornbach | High-price durable goods where local used listings and new alternatives are both meaningful. |
+| P3 | Cycling and outdoor | Decathlon, BikeXCS, PlayBike | Bikes and equipment have strong second-hand demand; keep full bikes separate from parts and accessories. |
+| P3 | Baby and children | Noriel, BabyNeeds, OLX/Vinted children categories | Parents frequently compare new and lightly used items; safety, age range, and completeness need dedicated relevance rules. |
+| P3 | Books, games, and collectibles | Cărturești, Libris, board-game specialists | ISBN, edition, language, and condition make a clean first sub-niche possible. |
 
 ### Fashion follow-up
 
