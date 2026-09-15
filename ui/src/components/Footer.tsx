@@ -12,6 +12,7 @@ const NAV_LINKS = {
     { label: "Căutare", href: "/#cautare" },
     { label: "Prețuri", href: "/#pricing" },
     { label: "Trenduri", href: "/trenduri" },
+    { label: "Stare servicii", href: "/health" },
   ],
   Companie: [
     { label: "Despre LiberGent", href: "/#cum-functioneaza" },

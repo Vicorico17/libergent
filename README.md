@@ -4,6 +4,16 @@ LiberGent is a Romanian product-search and deal-ranking application. A user ente
 
 Production: [libergent.com](https://libergent.com)
 
+### Search healthcheck
+
+Open `/health` (also linked as **Stare servicii** in the footer) and run a test query.
+The page calls the public Free search API and shows source errors, parsed and accepted
+listing counts, response time, and cache status. Checks are manual; cached responses
+are explicitly labeled. Empty matches are not reported as proof of an outage.
+This checks Free search only, not Premium, authentication, payments, or alert delivery.
+For example, `chrome hearths` is normalized to `chrome hearts` before marketplace
+fetching and listing classification.
+
 ## What the app currently does
 
 - searches Romanian marketplaces through **Free** and **Premium test** modes

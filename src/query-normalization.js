@@ -6,6 +6,7 @@ const QUERY_TERM_REPLACEMENTS = new Map([
 
 export function normalizeMarketplaceQuery(query = "") {
   return String(query)
+    .replace(/\bchrome\s+hearths\b/gi, "chrome hearts")
     .split(/(\s+)/)
     .map((part) => {
       const normalized = part
