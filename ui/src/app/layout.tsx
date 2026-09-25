@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Press_Start_2P, Inter, Caveat, Space_Mono, DotGothic16, VT323, JetBrains_Mono, Geist_Mono } from "next/font/google";
+import { Press_Start_2P, Inter, Caveat, Space_Mono, DotGothic16, VT323, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import "./globals.css";
 
@@ -43,9 +44,10 @@ const vt323 = VT323({
   display: "swap",
 });
 
-const jetbrains = JetBrains_Mono({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
+const jetbrains = localFont({
+  src: "./fonts/JetBrainsMono-variable.ttf",
+  weight: "100 800",
+  style: "normal",
   variable: "--font-jetbrains-var",
   display: "swap",
 });
