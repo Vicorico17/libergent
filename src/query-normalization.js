@@ -4,10 +4,17 @@ const QUERY_TERM_REPLACEMENTS = new Map([
   ["anvlope", "anvelope"]
 ]);
 
-// GPU model spacing varies between user input and marketplace titles.
-// Keep the model digits intact so 5090 cannot become a match for 5080.
+// Normalize known product families in both user input and listing text.
+// Preserve model numbers and variant names instead of guessing another model.
 export function normalizeModelTerms(value = "") {
-  return String(value).replace(/\b(rtx|gtx)[\s-]*(\d{3,4})\b/gi, "$1 $2");
+  return String(value)
+    .replace(/\b(rtx|gtx)[\s-]*(\d{3,4})(?:[\s-]*(ti|super))?\b/gi,
+      (_, family, model, variant) => `${family} ${model}${variant ? ` ${variant}` : ""}`)
+    .replace(/\biphone[\s-]*(\d{1,2})(?:[\s-]*(pro[\s-]*max|pro|plus|mini|max))?\b/gi,
+      (_, model, variant) => `iphone ${model}${variant ? ` ${variant.replace(/pro[\s-]*max/i, "pro max")}` : ""}`)
+    .replace(/\b(samsung)[\s-]*(?=galaxy\b|galaxy[sa]\d|[sa][\s-]*\d{2}\b)/gi, "$1 ")
+    .replace(/\bgalaxy[\s-]*([sa])[\s-]*(\d{2})(?:[\s-]*(ultra|plus|fe))?\b/gi,
+      (_, family, model, variant) => `galaxy ${family}${model}${variant ? ` ${variant}` : ""}`);
 }
 
 // Match storage/RAM formatting consistently without changing the displayed title.
@@ -16,7 +23,7 @@ export function normalizeCapacityTerms(value = "") {
 }
 
 export function normalizeMarketplaceQuery(query = "") {
-  return normalizeModelTerms(query)
+  return normalizeCapacityTerms(normalizeModelTerms(query))
     .replace(/\bchrome\s+hearths\b/gi, "chrome hearts")
     .split(/(\s+)/)
     .map((part) => {

@@ -115,7 +115,7 @@ function preferBrowserFallback(directResult, browserResult) {
 }
 
 function buildSearchCacheRequest(request, params, viewerLocation = null, tier = "premium") {
-  const cacheUrl = new URL(`/api/search/${tier}-cache/v8`, request.url);
+  const cacheUrl = new URL(`/api/search/${tier}-cache/v9`, request.url);
   cacheUrl.searchParams.set("q", params.query.trim().toLocaleLowerCase("ro-RO"));
   cacheUrl.searchParams.set("condition", params.condition);
   cacheUrl.searchParams.set("provider", params.provider);
