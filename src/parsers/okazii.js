@@ -1,3 +1,4 @@
+import { hasForwardPage } from "./pagination.js";
 import { extractImageCandidate } from "./image.js";
 
 function cleanText(value = "") {
@@ -157,9 +158,6 @@ function parseSearchTotalResults(html) {
   return null;
 }
 
-function hasSearchNextPage(html) {
-  return /rel="next"/i.test(html) || /[?&]page=\d+/i.test(html);
-}
 
 function parseJsonLdOffers(html, limit) {
   const jsonLdObjects = parseJsonLdScripts(html);
@@ -190,14 +188,14 @@ function parseJsonLdOffers(html, limit) {
   };
 }
 
-export function parseOkaziiHtml(html, limit) {
+export function parseOkaziiHtml(html, limit, { url = "" } = {}) {
   const searchItems = parseSearchListingItems(html, limit);
   if (searchItems.length) {
     return {
       items: searchItems,
       totalResults: parseSearchTotalResults(html),
       rawItemCount: countListingBlocks(html),
-      hasNextPage: hasSearchNextPage(html)
+      hasNextPage: hasForwardPage(html, url)
     };
   }
 
@@ -205,6 +203,6 @@ export function parseOkaziiHtml(html, limit) {
   return {
     ...parsed,
     rawItemCount: parsed.items.length,
-    hasNextPage: parsed.totalResults ? parsed.totalResults > parsed.items.length : null
+    hasNextPage: hasForwardPage(html, url)
   };
 }

@@ -999,6 +999,21 @@ function isPhoneBatteryHealthSignal(text, queryProfile, term) {
   return /\b(?:baterie|battery|bh|akku|acumulator)[^\d]{0,12}\d{2,3}\s*%?|\b\d{2,3}\s*%?\s*(?:baterie|battery|bh|akku|acumulator)/i.test(text);
 }
 
+function productIntentEvidence(text, title, queryProfile) {
+  if (queryProfile.queryType !== "main_product") return text;
+  const normalizedTitle = normalizeText(title);
+  const phoneTitle = /^(?:(?:vand|telefon|mobil|smartphone|apple)\s+)*(?:iphone\s*\d|(?:samsung\s*(?:galaxy\s*)?|galaxy\s*)[sa]\d)/.test(normalizedTitle);
+  if (phoneTitle) {
+    return text
+      .replace(/\b(?:adus|importat) din usa\b|\bmodel usa\b/g, " ")
+      .replace(/\b(?:dual|single|nano) sim\b/g, " ")
+      .replace(/\b(?:baterie|acumulator|display|ecran) (?:noua?|schimbat[ae]?|inlocuit[ae]?)\b/g, " ");
+  }
+  const consoleTitle = /^(?:(?:vand|consola|sony|microsoft)\s+)*(?:ps[45]|playstation|xbox|nintendo)\b/.test(normalizedTitle);
+  if (consoleTitle) return text.replace(/\b(?:cu|include|inclus|plus) (?:\d+ |un |doua )?(?:controller(?:e)?|manet[ae]|jocuri|joc)(?: (?:si|cu) (?:\d+ )?(?:jocuri|controller(?:e)?|manet[ae]))?\b/g, " ");
+  return text;
+}
+
 function findNegativeMatches(text, queryProfile) {
   const queryTokenSet = new Set(queryProfile.expandedTokens);
   const textTokens = new Set(tokenize(text));
@@ -1097,7 +1112,19 @@ function detectModelVariantMismatch({ title, text, queryProfile }) {
   // A description can mention upgrades and comparisons to other products.
   // Explicit title specs take precedence over that secondary evidence.
   const hasTitlePhoneModel = /\b(?:iphone\s*\d|(?:samsung\s*(?:galaxy\s*)?|galaxy\s*)[sa]\d)/.test(normalizedTitle);
-  const listingTokens = hasTitlePhoneModel ? titleTokens : new Set([...titleTokens, ...textTokens]);
+  const explicitTitleVariant = ["pro", "max", "mini", "plus", "ultra"].some(token => titleTokens.has(token));
+  const description = normalizedText.slice(normalizedTitle.length).trim();
+  const variantEvidence = description
+    .split(/\b(?:nu este|nu e|nu sunt|fara|schimb|upgrade|comparabil|comparatie|similar|alternativa)\b/)[0];
+  const phoneModelPattern = /\b(iphone\s*\d{1,2}e?|(?:samsung\s*(?:galaxy\s*)?|galaxy\s*)[sa]\d{2})\b((?:\s+(?:pro|max|mini|plus|ultra)\b)*)/g;
+  const modelKey = value => value.replace(/(?:samsung|galaxy)\s*/g, "").replace(/\s+/g, "");
+  const titleModel = [...normalizedTitle.matchAll(phoneModelPattern)][0]?.[1];
+  const descriptionVariants = [...variantEvidence.matchAll(phoneModelPattern)]
+    .filter(match => titleModel && modelKey(match[1]) === modelKey(titleModel))
+    .flatMap(match => tokenize(match[2]));
+  const listingTokens = hasTitlePhoneModel
+    ? new Set([...titleTokens, ...(!explicitTitleVariant ? descriptionVariants : [])])
+    : new Set([...titleTokens, ...textTokens]);
 
   function findStorageGb(value) {
     return [...value.matchAll(/\b(64|128|256|512|1024)\s*(?:gb|g)\b/g)]
@@ -1144,6 +1171,10 @@ function detectModelVariantMismatch({ title, text, queryProfile }) {
   const queryWantsProMax = queryHasPro && queryHasMax;
   const titleIsProOnly = titleHasPro && !titleHasMax;
   const titleIsProMax = titleHasPro && titleHasMax;
+
+  if ((queryIphoneModels.length || queryGalaxyModels.length) && queryHasPro && !titleHasPro) {
+    return { mismatch: true, reason: "missing_pro" };
+  }
 
   if (queryWantsProOnly && titleIsProMax) {
     return { mismatch: true, reason: "pro_vs_pro_max" };
@@ -1455,7 +1486,8 @@ export function classifyListingIntent(item, query) {
     item.condition,
     item.sellerType
   ].filter(Boolean).join(" "));
-  let negativeMatches = findNegativeMatches(text, queryProfile);
+  const intentText = productIntentEvidence(text, title, queryProfile);
+  let negativeMatches = findNegativeMatches(intentText, queryProfile);
   if (!hasVehicleListingEvidence(text, queryProfile)) {
     negativeMatches.push({ intent: "irrelevant", term: "missing_vehicle_evidence" });
   }
@@ -1471,7 +1503,7 @@ export function classifyListingIntent(item, query) {
   if (catalogMismatch.mismatch) {
     negativeMatches.push({ intent: "commercial", term: catalogMismatch.reason });
   }
-  const listingType = getListingType({ title, text, queryProfile, negativeMatches });
+  const listingType = getListingType({ title: productIntentEvidence(normalizeText(title), title, queryProfile), text: intentText, queryProfile, negativeMatches });
   if (queryProfile.taxonomy === PRODUCT_TAXONOMY.basketball_hoop && listingType === "main_product") {
     negativeMatches = negativeMatches.filter((match) => !["plasa", "plase", "net", "set"].includes(match.term));
   }

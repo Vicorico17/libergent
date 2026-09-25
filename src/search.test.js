@@ -42,3 +42,29 @@ test("retries transient Cloudflare origin errors with the alternate header profi
     assert.equal(shouldRetryDirectFetchStatus(status), true);
   }
 });
+
+test("direct search stops at first or later terminal page without following previous links", async (t) => {
+  const { runSearch } = await import('./search.js');
+  const { SITES } = await import('./sites.js');
+  const originalFetch = globalThis.fetch;
+  const originalMock = process.env.LIBERGENT_MOCK_SEARCH;
+  process.env.LIBERGENT_MOCK_SEARCH = '0';
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalMock === undefined) delete process.env.LIBERGENT_MOCK_SEARCH;
+    else process.env.LIBERGENT_MOCK_SEARCH = originalMock;
+  });
+  for (const lastPage of [1, 2]) {
+    const fetched = [];
+    globalThis.fetch = async input => {
+      const page = Number(new URL(String(input)).searchParams.get('page') || 1);
+      fetched.push(page);
+      const pagination = page < lastPage ? `<a href="?page=${page + 1}">Next</a>` : '<a href="?page=1">Previous</a>';
+      return new Response(`<div data-cy="l-card" data-testid="l-card"><a href="/d/oferta/iphone-ID${page}.html"><h4>iPhone 15 128GB</h4></a><p data-testid="ad-price">2000 lei</p></div>${pagination}`);
+    };
+    const result = await runSearch({ provider: 'direct', site: { ...SITES['olx.ro'], pageSize: 1, maxPages: 4 }, query: 'iphone 15', limit: 10, maxPages: 4 });
+    assert.deepEqual(fetched, lastPage === 1 ? [1] : [1, 2]);
+    assert.equal(result.pagesUsed, lastPage);
+    assert.equal(result.exhaustedReason, 'no-next-page');
+  }
+});

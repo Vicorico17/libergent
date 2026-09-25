@@ -541,7 +541,12 @@ async function runDuePremiumAlerts(env) {
 async function authenticatePremiumUser(request, env, premiumMessage = "Premium este disponibil doar pentru conturile Premium.") {
   const auth = await authenticateSupabaseUser(request, env);
   if (!auth.user) return { response: json({ error: auth.error }, auth.status) };
-  const entitlement = await readPremiumEntitlement(auth.user.id, auth.user.email || "", env).catch(() => ({ active: false, plan: "free" }));
+  let entitlement;
+  try {
+    entitlement = await readPremiumEntitlement(auth.user.id, auth.user.email || "", env);
+  } catch {
+    return { response: json({ error: "Nu am putut verifica planul contului. Încearcă din nou.", code: "entitlement_unavailable" }, 503) };
+  }
   if (!entitlement.active) return { response: json({ error: premiumMessage, code: "premium_required" }, 403) };
   return { user: auth.user, entitlement };
 }
@@ -822,7 +827,7 @@ async function handleApi(request, env, context) {
       const cacheRequest = buildSearchCacheRequest(request, {
         query, condition, provider: freeProvider, site, limit, maxPages
       }, viewerLocation, "free");
-      const cachedResponse = await readSearchCache(cacheRequest);
+      const cachedResponse = url.searchParams.get("refresh") === "1" ? null : await readSearchCache(cacheRequest);
       if (cachedResponse) {
         const payload = await cachedResponse.clone().json();
         await persistSearchEvent(buildHistoryEntry({ query, condition, provider: freeProvider, siteKeys, payload }), env);
@@ -877,7 +882,7 @@ async function handleApi(request, env, context) {
       }
 
       const cacheRequest = buildSearchCacheRequest(request, params, viewerLocation);
-      const cachedResponse = await readSearchCache(cacheRequest);
+      const cachedResponse = url.searchParams.get("refresh") === "1" ? null : await readSearchCache(cacheRequest);
       if (cachedResponse) return cachedResponse;
 
       const premiumSiteKeys = [...new Set(getPremiumSiteKeys(query))];
@@ -1360,6 +1365,10 @@ async function handleApi(request, env, context) {
     if (request.method !== "GET") {
       return json({ error: "Method not allowed" }, 405);
     }
+
+    // Authenticate before cache reads, remote fetches, or browser recovery.
+    const auth = await authenticateSupabaseUser(request, env);
+    if (!auth.user) return json({ ok: false, error: auth.error }, auth.status);
 
     let targetUrl;
     try {

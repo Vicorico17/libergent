@@ -267,8 +267,10 @@ export function isCarQuery(query = "") {
   const hasYear = /\b(19[8-9]\d|20[0-3]\d)\b/.test(normalized);
   const hasMileage = /\b\d{1,3}(?:[ .]\d{3})?\s*km\b/.test(normalized);
   const hasVariantCode = /\b([a-z]\d{1,2}|\d\.\d)\b/.test(normalized);
-  const hasCarKeyword = CAR_KEYWORDS.some((keyword) => tokenSet.has(keyword) || joined.includes(keyword));
+  const hasCarKeyword = CAR_KEYWORDS.filter(keyword => !["diesel", "benzina", "hibrid", "hybrid", "electric", "electrica"].includes(keyword))
+    .some((keyword) => (` ${joined} `).includes(` ${keyword} `));
   const queryUnderstanding = understandMarketplaceQuery(normalized);
+  if (queryUnderstanding.category && queryUnderstanding.category !== "vehicle") return false;
   const hasCarModel = Boolean(queryUnderstanding.model);
   const hasCarMake = queryUnderstanding.category === "vehicle";
 
@@ -276,7 +278,7 @@ export function isCarQuery(query = "") {
     return true;
   }
 
-  if (tokens.length >= 2 && hasYear && hasVariantCode) {
+  if (tokens.length >= 2 && hasYear && hasVariantCode && /\b(?:tdi|dci|tsi|benzina|diesel|inmatriculat)\b/.test(normalized)) {
     return true;
   }
 
@@ -781,7 +783,7 @@ export const SITES = {
     defaultLimit: 24,
     defaultMaxPages: 1,
     searchUrl(query) {
-      return `https://www.evomag.ro/?searchString=${encodeSearchText(query)}`;
+      return `https://www.evomag.ro/produse/filtru/cautare:${encodeSearchText(query)}`;
     },
     pagedSearchUrl(query) {
       return this.searchUrl(query);

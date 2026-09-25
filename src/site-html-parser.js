@@ -13,17 +13,17 @@ export function parseSiteHtml({ site, html, url, limit, query = "" }) {
   if (site.key === "lajumate.ro") {
     parsed = parseLajumateHtml(html, limit);
   } else if (site.key === "okazii.ro") {
-    parsed = parseOkaziiHtml(html, limit);
+    parsed = parseOkaziiHtml(html, limit, { url });
   } else if (site.key === "olx.ro") {
-    parsed = parseOlxHtml(html, limit);
+    parsed = parseOlxHtml(html, limit, { url });
   } else if (site.key === "vinted.ro") {
-    parsed = parseVintedHtml(html, limit);
+    parsed = parseVintedHtml(html, limit, { url });
   } else if (site.key === "publi24.ro" || site.key === "bestauto.ro") {
-    parsed = parsePubli24Html(html, limit, { origin: new URL(url).origin });
+    parsed = parsePubli24Html(html, limit, { origin: new URL(url).origin, url });
   } else if (site.key === "autovit.ro") {
-    parsed = parseAutovitHtml(html, limit);
+    parsed = parseAutovitHtml(html, limit, { url });
   } else if (site.key === "anuntul.ro") {
-    parsed = parseAnuntulHtml(html, limit);
+    parsed = parseAnuntulHtml(html, limit, { url });
   } else if (site.key === "emag.ro") {
     parsed = parseEmagHtml(html, limit, { origin: new URL(url).origin });
   } else if (site.key === "evomag.ro") {
