@@ -1,19 +1,50 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, History } from "lucide-react";
-import {
-  clearRecentSearches,
-  getRecentSearchesServerSnapshot,
-  getRecentSearchesSnapshot,
-  parseRecentSearches,
-  subscribeToRecentSearches,
-} from "@/lib/recent-searches";
 
 export function RecentSearches() {
-  const snapshot = useSyncExternalStore(subscribeToRecentSearches, getRecentSearchesSnapshot, getRecentSearchesServerSnapshot);
-  const searches = parseRecentSearches(snapshot);
+  const [searches, setSearches] = useState<string[]>([]);
+  const [status, setStatus] = useState("Se încarcă ultimele căutări…");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+    let active = true;
+    async function loadSearches() {
+      try {
+        const response = await fetch("/api/history", { cache: "no-store", signal: controller.signal });
+        const payload = await response.json();
+        if (!response.ok || payload.error || !Array.isArray(payload.recentSearches)) throw new Error("History unavailable");
+        const seen = new Set<string>();
+        const queries: string[] = [];
+        // The Trends API returns searches ordered by searched_at descending.
+        for (const entry of payload.recentSearches) {
+          if (typeof entry?.query !== "string") continue;
+          const query = entry.query.trim().replace(/\s+/g, " ").slice(0, 120);
+          const key = query.toLocaleLowerCase("ro");
+          if (!query || seen.has(key)) continue;
+          seen.add(key);
+          queries.push(query);
+          if (queries.length === 5) break;
+        }
+        if (!active) return;
+        setSearches(queries);
+        setStatus("Încă nu există căutări recente. Începe cu produsul pe care îl cauți.");
+      } catch {
+        if (active) setStatus("Căutările recente nu sunt disponibile momentan. Poți căuta un produs mai sus.");
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    }
+    void loadSearches();
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, []);
 
   return (
     <section aria-labelledby="recent-searches-heading" className="w-full max-w-xl border-t border-[#101010]/15 pt-4 text-[#101010]">
@@ -22,12 +53,9 @@ export function RecentSearches() {
           <History size={14} aria-hidden="true" className="text-[#FF4F8B]" />
           Ultimele căutări
         </h2>
-        {searches.length > 0 && (
-          <button type="button" onClick={clearRecentSearches} aria-label="Șterge istoricul căutărilor de pe acest browser"
-            className="min-h-11 px-2 text-[11px] text-[#101010]/65 underline decoration-[#101010]/25 underline-offset-4 transition-colors hover:text-[#101010] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#101010]">
-            Șterge istoricul
-          </button>
-        )}
+        <Link href="/trenduri" className="flex min-h-11 items-center gap-1 px-2 text-[11px] text-[#101010]/65 underline decoration-[#101010]/25 underline-offset-4 transition-colors hover:text-[#101010] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#101010]">
+          Vezi trendurile <ArrowUpRight size={12} aria-hidden="true" />
+        </Link>
       </div>
       {searches.length > 0 ? (
         <>
@@ -43,10 +71,10 @@ export function RecentSearches() {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-[11px] leading-relaxed text-[#101010]/60">Pe acest browser. Reia o căutare cu un singur clic.</p>
+          <p className="mt-3 text-[11px] leading-relaxed text-[#101010]/60">Căutate recent pe LiberGent. Descoperă ofertele cu un singur clic.</p>
         </>
       ) : (
-        <p className="mt-3 text-xs leading-relaxed text-[#101010]/60">Ai ceva în minte? Caută mai sus — ultimele 5 căutări vor apărea aici.</p>
+        <p role="status" className="mt-3 text-xs leading-relaxed text-[#101010]/60">{status}</p>
       )}
     </section>
   );
