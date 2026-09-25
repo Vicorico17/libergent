@@ -54,8 +54,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-[12px] leading-relaxed" style={{ color: `${CREAM}55` }}>
-              Motor de căutare pentru produse noi sau folosite din România: OLX, Vinted,
-              LaJumate, Okazii, Publi24 și Autovit.
+              Cel mai puternic motor de căutare agentic pentru produse noi sau folosite din România.
             </p>
             <div className="flex items-center gap-2 text-[10px] tracking-widest uppercase" style={{ color: `${CREAM}33` }}>
               <div style={{ width: 4, height: 4, background: PINK, flexShrink: 0 }} />
