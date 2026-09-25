@@ -1,4 +1,5 @@
 export type ApiListing = {
+  isComparableNewBenchmark?: boolean;
   title?: string;
   price?: number | string | null;
   priceRon?: number | string | null;
@@ -173,6 +174,7 @@ export type SearchPayload = {
 };
 
 export type SearchResultItem = {
+  isComparableNewBenchmark?: boolean;
   id: string;
   title: string;
   price: number | null;
@@ -403,7 +405,7 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
   const priceRon = getPriceRon(item);
   const sourceType = normalizeSourceType(item.sourceType);
   const sourceGroup = getSourceGroup(sourceType);
-  const sourceKind = getSourceKind(sourceType);
+  const sourceKind = item.marketType === "secondary" ? "used" : item.marketType === "retail" ? "new" : getSourceKind(sourceType);
   const sellerType = String(item.sellerType || "").trim();
 
   return {
@@ -419,9 +421,10 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     sourceGroup,
     sourceKind,
     sourceKindLabel: getSourceKindLabel(sourceKind, sourceGroup),
+    isComparableNewBenchmark: item.isComparableNewBenchmark,
     sellerType,
     city: item.location || "România",
-    condition: normalizeCondition(item.condition, sourceType),
+    condition: normalizeCondition(item.condition),
     daysAgo: estimateDaysAgo(item.postedAt),
     postedDateLabel: formatPostedDateLabel(item.postedAt),
     image: images[0],
@@ -809,11 +812,11 @@ function getPlatformLabel(site: string) {
   return platformLabels[site] || site.toUpperCase();
 }
 
-function normalizeCondition(condition = "", sourceType = "classifieds") {
+function normalizeCondition(condition = "") {
   const value = condition.trim().toLowerCase();
-  if (!value && getSourceKind(sourceType) === "new") return "nou";
-  if (!value) return "acceptabil";
-  if (value.includes("ca nou")) return "ca nou";
+  if (!value) return "necunoscut";
+  if (value.includes("ca nou") || value.includes("like new")) return "ca nou";
+  if (/recondi|refurbished|resigilat|excelent|open.box/.test(value)) return "folosit";
   if (value.includes("nou") || value.includes("new")) return "nou";
   if (value.includes("bun") || value.includes("used") || value.includes("utilizat") || value.includes("folosit")) {
     return "folosit";

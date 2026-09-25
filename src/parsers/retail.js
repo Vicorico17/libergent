@@ -1,3 +1,5 @@
+import { productCondition } from "../product-condition.js";
+import { normalizeListing } from "../normalize.js";
 import { extractImageCandidate } from "./image.js";
 
 function decodeHtmlEntities(value = "") {
@@ -69,11 +71,16 @@ function normalizeJsonLdProduct(entry, origin) {
     return null;
   }
 
-  const offer = Array.isArray(product.offers) ? product.offers[0] : product.offers || product;
+  const offers = Array.isArray(product.offers) ? product.offers : [product.offers || product];
+  const offer = offers.find(candidate => candidate && typeof candidate === "object" &&
+    !/OutOfStock|SoldOut|Discontinued/i.test(String(candidate.availability || product.availability || "")) &&
+    !/DamagedCondition/i.test(String(candidate.itemCondition || product.itemCondition || "")) &&
+    Number(candidate.price ?? candidate.lowPrice ?? product.price ?? product.lowPrice) > 0);
+  if (!offer) return null;
   const imageValue = Array.isArray(product.image) ? product.image[0] : product.image;
   const title = cleanText(product.name || offer.name || "");
   const url = toAbsoluteUrl(product.url || offer.url || "", origin);
-  const priceValue = offer.lowPrice || offer.price || product.lowPrice || product.price || "";
+  const priceValue = offer.price ?? offer.lowPrice ?? product.price ?? product.lowPrice ?? "";
   const currency = cleanText(offer.priceCurrency || product.priceCurrency || "");
 
   if (!title || !url || !Number.isFinite(Number(priceValue)) || Number(priceValue) <= 0) {
@@ -86,10 +93,10 @@ function normalizeJsonLdProduct(entry, origin) {
     currency,
     location: "",
     postedAt: "",
-    condition: "Nou",
+    condition: productCondition(offer.itemCondition || product.itemCondition) === "used" ? "Recondiționat / folosit" : "Nou",
     sellerType: cleanText(offer.seller?.name || ""),
     url,
-    imageUrl: toAbsoluteUrl(imageValue || "", origin)
+    imageUrl: toAbsoluteUrl(typeof imageValue === "object" ? imageValue?.url || "" : imageValue || "", origin)
   };
 }
 
@@ -101,16 +108,60 @@ function parseJsonLdProducts(html, origin, limit) {
     .slice(0, limit);
 }
 
+// Balanced ranges keep neighboring product prices and images out of a card.
+function elementRanges(html) {
+  const stack = [];
+  const ranges = [];
+  const voidTags = new Set(["img", "input", "meta", "link", "br", "hr", "source", "area", "wbr"]);
+  for (const match of html.matchAll(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi)) {
+    const tag = match[1].toLowerCase();
+    if (match[0].startsWith("</")) {
+      const index = stack.findLastIndex(entry => entry.tag === tag);
+      if (index < 0) continue;
+      for (const entry of stack.splice(index)) ranges.push({ ...entry, end: match.index + match[0].length });
+    } else if (!voidTags.has(tag) && !match[0].endsWith("/>")) {
+      stack.push({ tag, start: match.index, open: match[0], contentStart: match.index + match[0].length });
+    }
+  }
+  return ranges;
+}
+
+function cardForAnchor(html, match, matches, ranges) {
+  const containing = ranges.filter(range => range.start <= match.index && range.end >= match.index + match[0].length &&
+    (["article", "li"].includes(range.tag) || (["div", "section"].includes(range.tag) &&
+      (range.open.match(/class=["']([^"']*)/i)?.[1] || "").split(/\s+/).some(name => ["product", "product-card", "product-item", "produs-lista", "card-v2"].includes(name)))));
+  const card = containing.sort((a, b) => (a.end - a.start) - (b.end - b.start))[0];
+  if (card) return html.slice(card.start, card.end);
+  // Unstructured fallback starts at this product and stops at the next URL.
+  const next = matches.find(candidate => candidate.index > match.index && candidate[1] !== match[1]);
+  return html.slice(match.index, Math.min(next?.index ?? html.length, match.index + match[0].length + 1200));
+}
+
 function findPrice(block) {
-  const text = stripTags(block);
-  const pattern = /(?:de la|pret de la|preț de la)?\s*(\d{1,3}(?:(?:[.\s]\d{3})+|(?:,\d{3})+)(?:[,.]\d{2})?|\d+(?:[,.]\d{2})?)\s*(lei|ron|€|eur)(?:\b|$)/gi;
-  const matches = [...text.matchAll(pattern)];
-  const match = matches[0];
-  if (!match) return "";
-  const numericValue = Number(match[1].replace(/\./g, "").replace(/,/g, "."));
-  return Number.isFinite(numericValue) && numericValue > 0
-    ? match[1].trim() + " " + match[2]
-    : "";
+  const excluded = /(?:old|regular|original|rrp|installment|monthly|shipping|delivery|transport|rate|rata|bonus|voucher)/i;
+  const ranges = elementRanges(block);
+  const ignored = ranges.filter(range => ["del", "s", "script", "style"].includes(range.tag) ||
+    excluded.test(range.open.match(/class=["']([^"']*)/i)?.[1] || ""));
+  const priceRanges = ranges.filter(range => /(?:itemprop=["']price["']|class=["'][^"']*(?:price|pret))/i.test(range.open) &&
+    !ignored.some(other => range.start >= other.start && range.end <= other.end));
+  let priceBlock = block;
+  for (const range of ignored) priceBlock = priceBlock.slice(0, range.start) + " ".repeat(range.end - range.start) + priceBlock.slice(range.end);
+  const leafPrices = priceRanges.filter(range => !priceRanges.some(child => child.start > range.start && child.end < range.end));
+  const candidates = leafPrices.length ? leafPrices.map(range => priceBlock.slice(range.start, range.end)) : [priceBlock];
+  for (const candidate of candidates) {
+    // Remove crossed-out amounts even inside a price wrapper.
+    const cleaned = candidate.replace(/<(del|s|script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, " ");
+    const text = stripTags(cleaned).replace(/(\d)\s+([,.])\s*(\d{2})\b/g, "$1$2$3");
+    const pattern = /(\d{1,3}(?:(?:[.\s]\d{3})+|(?:,\d{3})+)(?:[,.]\d{2})?|\d+(?:[,.]\d{2})?)\s*(lei|ron|€|eur)(?=\W|$)/gi;
+    for (const match of text.matchAll(pattern)) {
+      const before = text.slice(Math.max(0, match.index - 35), match.index);
+      const after = text.slice(match.index + match[0].length, match.index + match[0].length + 25);
+      if (/(?:transport|livrare|rata|rate|lunar|bonus|voucher|economis|pret vechi)[^.!;:]*:?\s*$/i.test(before) || /^\s*(?:\/\s*luna|pe luna|lunar|bonus|cashback|voucher)\b/i.test(after)) continue;
+      const price = `${match[1].trim()} ${match[2]}`;
+      if (normalizeListing({ price }).numericPrice > 0) return price;
+    }
+  }
+  return "";
 }
 
 function normalizeTitle(rawTitle = "") {
@@ -145,6 +196,7 @@ function parseAnchorProducts(html, origin, limit) {
   const matches = [...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
   const items = [];
   const seen = new Set();
+  const ranges = elementRanges(html);
 
   for (const match of matches) {
     if (items.length >= limit) {
@@ -156,9 +208,7 @@ function parseAnchorProducts(html, origin, limit) {
       continue;
     }
 
-    const start = Math.max(0, match.index - 900);
-    const end = Math.min(html.length, match.index + match[0].length + 5000);
-    const block = html.slice(start, end);
+    const block = cardForAnchor(html, match, matches, ranges);
     const title =
       normalizeTitle(match[0].match(/\b(?:title|aria-label)=["']([^"']+)["']/i)?.[1] || "") ||
       normalizeTitle(match[2].match(/\balt=["']([^"']+)["']/i)?.[1] || "") ||
@@ -176,7 +226,7 @@ function parseAnchorProducts(html, origin, limit) {
       currency: /\b(?:lei|ron)\b/i.test(price) ? "RON" : /€|eur/i.test(price) ? "EUR" : "",
       location: "",
       postedAt: "",
-      condition: "Nou",
+      condition: productCondition(title) === "used" ? "Recondiționat / folosit" : "Nou",
       sellerType: "",
       url,
       imageUrl: toAbsoluteUrl(extractImageCandidate(block), origin)
@@ -215,7 +265,7 @@ function parseProductListBlock(block, origin) {
     currency: /\b(?:lei|ron)\b/i.test(price) ? "RON" : /€|eur/i.test(price) ? "EUR" : "",
     location: "",
     postedAt: "",
-    condition: "Nou",
+    condition: productCondition(title) === "used" ? "Recondiționat / folosit" : "Nou",
     sellerType: "",
     url,
     imageUrl: toAbsoluteUrl(extractImageCandidate(block), origin)
@@ -264,7 +314,7 @@ function parseEmagProductBlock(block, origin) {
     currency,
     location: "",
     postedAt: "",
-    condition: "Nou",
+    condition: productCondition(title) === "used" ? "Recondiționat / folosit" : "Nou",
     sellerType: "Retailer / marketplace",
     url,
     imageUrl: toAbsoluteUrl(block.match(/<img\b[^>]+src=["']([^"']+)["']/i)?.[1] || "", origin)
@@ -279,18 +329,24 @@ function parseEmagBlocks(html, origin, limit) {
 }
 
 function parseEvomagProducts(html, origin, limit) {
+  // Search pages include navigation promotions before the actual result list.
+  // Never let those unrelated offers consume the result limit or supply prices.
+  const pageRanges = elementRanges(html);
+  const results = pageRanges.find(range =>
+    (range.open.match(/class=["']([^"']*)/i)?.[1] || "").split(/\s+/).includes("produse_liste_filter"));
+  if (results) html = html.slice(results.start, results.end);
+  else if (/class=["'][^"']*\bindex-category-menu\b/i.test(html)) return [];
   const matches = [...html.matchAll(/<a\b[^>]*href=["']([^"']+\.html)["'][^>]*>([\s\S]*?)<\/a>/gi)];
   const items = [];
   const seen = new Set();
+  const ranges = elementRanges(html);
 
   for (const match of matches) {
     if (items.length >= limit) break;
     const url = toAbsoluteUrl(match[1], origin);
     if (!url || seen.has(url) || !isLikelyProductUrl(url, origin)) continue;
 
-    const start = Math.max(0, match.index - 300);
-    const end = Math.min(html.length, match.index + match[0].length + 1200);
-    const block = html.slice(start, end);
+    const block = cardForAnchor(html, match, matches, ranges);
     const title =
       normalizeTitle(match[0].match(/\btitle=["']([^"']+)["']/i)?.[1] || "") ||
       normalizeTitle(match[2].match(/\balt=["']([^"']+)["']/i)?.[1] || "") ||
@@ -306,7 +362,7 @@ function parseEvomagProducts(html, origin, limit) {
       currency: /\b(?:lei|ron)\b/i.test(price) ? "RON" : /€|eur/i.test(price) ? "EUR" : "",
       location: "",
       postedAt: "",
-      condition: "Nou",
+      condition: productCondition(title) === "used" ? "Recondiționat / folosit" : "Nou",
       sellerType: "Retailer",
       url,
       imageUrl: toAbsoluteUrl(extractImageCandidate(block), origin)
@@ -353,11 +409,17 @@ function dedupeItems(items) {
 }
 
 export function parseRetailHtml(html, limit, { origin }) {
+  const unavailableUrls = new Set(parseJsonLdScripts(html).flatMap(flattenJsonLd).flatMap(entry => {
+    const product = entry?.item || entry;
+    const offers = Array.isArray(product?.offers) ? product.offers : [product?.offers || product];
+    return offers.length && offers.every(offer => /OutOfStock|SoldOut|Discontinued/i.test(String(offer?.availability || product?.availability || "")) || /DamagedCondition/i.test(String(offer?.itemCondition || product?.itemCondition || "")))
+      ? [toAbsoluteUrl(product.url || offers[0]?.url || "", origin)] : [];
+  }));
   const items = dedupeItems([
-    ...parseProductListBlocks(html, origin, limit),
     ...parseJsonLdProducts(html, origin, limit),
+    ...parseProductListBlocks(html, origin, limit),
     ...parseAnchorProducts(html, origin, limit)
-  ]).slice(0, limit);
+  ]).filter(item => !unavailableUrls.has(item.url)).slice(0, limit);
 
   return {
     items,

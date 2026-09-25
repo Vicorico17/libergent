@@ -193,6 +193,28 @@ test("keeps Premium search locked for a signed-in free account", async (t) => {
   assert.equal(payload.code, "premium_required");
 });
 
+test("entitlement outages do not classify paying accounts as Free", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    if (requestUrl === "https://supabase.example/auth/v1/user") {
+      return Response.json({ id: "user-premium", email: "premium@example.test" });
+    }
+    if (requestUrl.includes("/rest/v1/user_entitlements")) {
+      return new Response("Service unavailable", { status: 503 });
+    }
+    throw new Error(`Unexpected downstream request: ${requestUrl}`);
+  };
+  for (const path of ["/api/alerts", "/api/search/premium?q=iphone&site=all"]) {
+    const response = await worker.fetch(new Request(`https://libergent.test${path}`, {
+      headers: { authorization: "Bearer user-token" }
+    }), { SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "service-secret" });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, "entitlement_unavailable");
+  }
+});
+
 test("keeps automatic alerts behind Premium entitlement", async (t) => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
@@ -452,6 +474,7 @@ test("resolves OLX listing phones through the OLX offer phone endpoint", async (
   });
 
   globalThis.fetch = async (url) => {
+    if (String(url) === "https://supabase.example/auth/v1/user") return Response.json({ id: "user-1" });
     requestedUrls.push(String(url));
     if (String(url).includes("/api/v1/offers/299484800/phones/")) {
       return new Response(JSON.stringify({ data: { phones: ["076 720 9070"] } }), { status: 200 });
@@ -461,8 +484,10 @@ test("resolves OLX listing phones through the OLX offer phone endpoint", async (
 
   const listingUrl = "https://www.olx.ro/d/oferta/kirby-air-riders-nintendo-switch-2-nou-sigilat-IDkgBG0.html";
   const response = await worker.fetch(
-    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`),
-    {}
+    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`, {
+      headers: { authorization: "Bearer user-token" }
+    }),
+    { SUPABASE_URL: "https://supabase.example", SUPABASE_ANON_KEY: "test-key" }
   );
   const payload = await response.json();
 
@@ -483,6 +508,7 @@ test("resolves OLX listing phones when the ad JSON uses normal quotes and spacin
   });
 
   globalThis.fetch = async (url) => {
+    if (String(url) === "https://supabase.example/auth/v1/user") return Response.json({ id: "user-1" });
     requestedUrls.push(String(url));
     if (String(url).includes("/api/v1/offers/421337/phones/")) {
       return new Response(JSON.stringify({ data: { phones: ["0744 555 666"] } }), { status: 200 });
@@ -495,8 +521,10 @@ test("resolves OLX listing phones when the ad JSON uses normal quotes and spacin
 
   const listingUrl = "https://www.olx.ro/d/oferta/aparat-de-cafea-bialetti-new-venus-2-cani-IDkMfce.html";
   const response = await worker.fetch(
-    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`),
-    {}
+    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`, {
+      headers: { authorization: "Bearer user-token" }
+    }),
+    { SUPABASE_URL: "https://supabase.example", SUPABASE_ANON_KEY: "test-key" }
   );
   const payload = await response.json();
 
@@ -512,6 +540,7 @@ test("resolves OLX phones when the phone endpoint returns phone objects", async 
   });
 
   globalThis.fetch = async (url) => {
+    if (String(url) === "https://supabase.example/auth/v1/user") return Response.json({ id: "user-1" });
     if (String(url).includes("/api/v1/offers/421338/phones/")) {
       return new Response(JSON.stringify({ data: { phones: [{ phoneNumber: "0755 111 222" }] } }), { status: 200 });
     }
@@ -520,8 +549,10 @@ test("resolves OLX phones when the phone endpoint returns phone objects", async 
 
   const listingUrl = "https://www.olx.ro/d/oferta/aparat-IDtest.html";
   const response = await worker.fetch(
-    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`),
-    {}
+    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`, {
+      headers: { authorization: "Bearer user-token" }
+    }),
+    { SUPABASE_URL: "https://supabase.example", SUPABASE_ANON_KEY: "test-key" }
   );
   const payload = await response.json();
 
@@ -537,6 +568,7 @@ test("falls back to OLX limited-phones when the regular endpoint is empty", asyn
   });
 
   globalThis.fetch = async (url) => {
+    if (String(url) === "https://supabase.example/auth/v1/user") return Response.json({ id: "user-1" });
     const requestUrl = String(url);
     requestedUrls.push(requestUrl);
     if (requestUrl.includes("/limited-phones/")) {
@@ -550,8 +582,10 @@ test("falls back to OLX limited-phones when the regular endpoint is empty", asyn
 
   const listingUrl = "https://www.olx.ro/d/oferta/espressor-IDkMeZT.html";
   const response = await worker.fetch(
-    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`),
-    {}
+    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`, {
+      headers: { authorization: "Bearer user-token" }
+    }),
+    { SUPABASE_URL: "https://supabase.example", SUPABASE_ANON_KEY: "test-key" }
   );
   const payload = await response.json();
 
@@ -573,6 +607,7 @@ test("keeps OLX listing cookies when requesting the seller phone", async (t) => 
   });
 
   globalThis.fetch = async (url, init = {}) => {
+    if (String(url) === "https://supabase.example/auth/v1/user") return Response.json({ id: "user-1" });
     if (String(url).includes("/api/v1/offers/421340/phones/")) {
       phoneRequest = init;
       return new Response(JSON.stringify({ data: { phones: ["0722 333 444"] } }), { status: 200 });
@@ -585,8 +620,10 @@ test("keeps OLX listing cookies when requesting the seller phone", async (t) => 
 
   const listingUrl = "https://www.olx.ro/d/oferta/espressor-IDcookie.html";
   const response = await worker.fetch(
-    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`),
-    {}
+    new Request(`https://libergent.test/api/marketplace/contact?url=${encodeURIComponent(listingUrl)}`, {
+      headers: { authorization: "Bearer user-token" }
+    }),
+    { SUPABASE_URL: "https://supabase.example", SUPABASE_ANON_KEY: "test-key" }
   );
   const payload = await response.json();
 
@@ -612,4 +649,45 @@ test("does not report bridge application failures as successful delivery", async
   assert.equal(response.status, 502);
   assert.equal((await response.json()).ok, false);
   assert.equal(writes, 0);
+});
+
+test("explicit refresh bypasses and replaces search cache for both tiers without bypassing Premium auth", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalCaches = globalThis.caches;
+  const originalEnv = { ...process.env };
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    globalThis.caches = originalCaches;
+    for (const name of Object.keys(process.env)) if (!(name in originalEnv)) delete process.env[name];
+    Object.assign(process.env, originalEnv);
+  });
+  const entries = new Map();
+  const writes = [];
+  globalThis.caches = { default: {
+    match: async request => entries.get(request.url)?.clone(),
+    put: async (request, response) => { entries.set(request.url, response.clone()); }
+  } };
+  globalThis.fetch = async url => {
+    if (String(url) === "https://supabase.example/auth/v1/user") return Response.json({ id: "premium-buyer", email: "premium@example.test" });
+    if (String(url).startsWith("https://supabase.example/")) return Response.json([]);
+    throw new Error(`Unexpected network request: ${url}`);
+  };
+  const env = { LIBERGENT_MOCK_SEARCH: "1", SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "secret", LIBERGENT_PREMIUM_EMAILS: "premium@example.test", BROWSER: {} };
+  const run = async (tier, refresh = false, authorized = true) => {
+    const response = await worker.fetch(new Request(`https://libergent.test/api/search/${tier}?q=iphone&site=all&limit=5${refresh ? "&refresh=1" : ""}`, { headers: authorized ? { authorization: "Bearer token" } : {} }), env, { waitUntil: promise => writes.push(promise) });
+    await Promise.all(writes);
+    return { status: response.status, payload: await response.json() };
+  };
+  for (const tier of ["free", "premium"]) {
+    assert.equal((await run(tier)).payload.summary.cacheHit, false);
+    assert.equal((await run(tier)).payload.summary.cacheHit, true);
+    const refreshed = await run(tier, true);
+    assert.equal(refreshed.status, 200);
+    assert.equal(refreshed.payload.summary.cacheHit, false);
+    const reused = await run(tier);
+    assert.equal(reused.payload.summary.cacheHit, true);
+    assert.equal(reused.payload.summary.searchedAt, refreshed.payload.summary.searchedAt);
+    assert.deepEqual(reused.payload.results, refreshed.payload.results);
+  }
+  assert.equal((await run("premium", true, false)).status, 401);
 });

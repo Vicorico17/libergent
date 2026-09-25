@@ -1,6 +1,6 @@
 # Premium, Product, and Launch TODO
 
-Last prioritized: 2026-09-15
+Last prioritized: 2026-09-25 (owner Notes list merged)
 Implementation and production status audit: 2026-09-13 (unless noted below)
 
 See [the September launch audit](launch-audit-2026-09-13.md) for the comparison
@@ -58,6 +58,11 @@ and post-deployment visual acceptance remain open.
 
 ## Recently completed product work
 
+- [x] **P0** — Step 3 accuracy batch: tolerate malformed/empty retail offers, keep product prices/photos within their own cards, prefer structured/current prices over delivery/installment/old amounts, exclude structured unavailable offers, distinguish new/used/unknown condition, and require matching phone model/storage for new-price savings (local September 25). Live source validation, pagination improvements and broader configuration comparisons remain open.
+- [x] **P0** — Step 2: fix ambiguous vehicle makes and substring routing; preserve complete phones with dual SIM, USA origin or replaced components and consoles with included controllers; use same-model description evidence for unspecified phone variants while ignoring comparisons (local September 25; regression fixtures added, production search acceptance remains open).
+- [x] Automatically use Premium search for Premium accounts, including old Free search links; hide the Free selector, wait for account resolution, and record the actual tier in history (local implementation 2026-09-25; authenticated browser acceptance and deployment remain open).
+- [x] Return a recoverable error when entitlement lookup fails instead of classifying the account as Free (local implementation 2026-09-25).
+- [ ] **P0** — Verify automatic Premium search in an authenticated browser: homepage search, old `tier=free` links, subsequent searches, sign-out, and entitlement outages.
 - [x] Show a clear Premium or Free marker on the account page.
 - [x] Require a valid Premium entitlement for Premium search.
 - [x] Make the Premium loading screen expandable so users can inspect searched sources.
@@ -72,6 +77,19 @@ and post-deployment visual acceptance remain open.
 - [x] Normalize `chrome hearths` to `chrome hearts` with query/classification regression coverage (2026-09-15).
 
 ## Product and customer-acquisition backlog
+
+### Owner priorities — 2026-09-25
+
+Full Notes mapping and refresh investigation: [September 25 improvement plan](improvement-plan-2026-09-25.md).
+
+- [ ] **P0 acceptance** — Verify snapshot restore and new-scan behavior in a deployed browser with Free/Premium accounts, rejected matches, changed filters, a failed scan and disabled/full browser storage. Cross-device snapshots and shared concurrent-scan coalescing remain separate follow-ups.
+
+- [x] **P0** — Preserve results, recommendation, mapped ordering and rejected matches on ordinary reloads using account/tier/query/location-scoped tab snapshots (September 25, local). Retain up to five searches for 24 hours; handle unavailable browser storage explicitly. Storage/API regression tests pass; deployed browser acceptance remains open.
+- [x] **P0** — Separate reload from “Verifică oferte noi”: explicit scans bypass the Free/Premium search response cache, summarize inventory/price/recommendation changes and failed sources, and retain prior displayed results on failed updates (September 25, local).
+- [ ] **P0** — Improve scraping of existing tech marketplaces before broad expansion: stable search routes, representative captured fixtures, correct final prices/configuration/condition, pagination and useful-result monitoring.
+- [ ] **P0** — Strengthen existing retail results and the new-price comparison: exact comparable model/storage/variant, valid payable price, image and source link; clearly explain missing retail evidence.
+- [ ] **P0** — Finish the existing seller communication panel: account-owned conversations per listing, confirmed recipient and send action, incoming replies, delivery/error states and history persistence; production acceptance before claiming delivery.
+- [ ] **P0** — Verify pictures on special recommendation cards on mobile and desktop, including failed/missing image fallback. Rendering exists; acceptance remains open.
 
 ### Login, signup, and purchase flow
 
@@ -193,3 +211,17 @@ and post-deployment visual acceptance remain open.
 - [ ] **P1** — Add webhook replay, duplicate-event, failed-payment, cancellation, and authorization tests.
 - [ ] **P1** — Add operational logging and a reconciliation job for Stripe/Supabase entitlement drift.
 - [ ] **P1** — Document production secrets, webhook rotation, support procedures, and rollback steps.
+
+## Later LLM evaluation
+
+- [ ] **P3 — Deferred by owner** — Evaluate JEV, the LLM identified by the owner, for possible Libergent integration. Keep this among the last implementation items, after core search, scraping, retail comparisons, communication and paid-account flows. Do not research or integrate it in the current workstream; assess capability, quality, latency, cost and integration requirements when this item is resumed.
+
+### September 25 continuation — ready for user testing
+
+- [x] Respect terminal first-page pagination and forward/disabled controls in existing classifieds adapters; associate Autovit prices by identity rather than card position.
+- [x] Save bounded local source evidence; correct evoMAG route/result scope and eMAG `Telefon mobil` intent handling.
+- [x] Require authentication before seller phone lookup/cache/browser recovery and pass the session from the UI.
+- [x] Preserve the last meaningful seller conversation state across courtesy replies.
+- [ ] Validate the final batch in backend/UI checks and authenticated browser flows before merge; prior 203-test result predates the final contact/retail changes.
+- [ ] Add per-account contact lookup quotas and finish controlled-recipient messaging acceptance.
+- [ ] Resolve evoMAG empty search coverage and OLX direct HTTP 403; verify deployed source prices and useful results.

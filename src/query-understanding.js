@@ -90,6 +90,11 @@ const PRODUCT_ENTITIES = [
 const PRODUCT_FAMILIES = [
   { category: "collectible", patterns: ["macheta", "machete", "model auto"], label: "Machete și obiecte de colecție", confidence: 0.94, refinements: ["Scară", "Stare"] },
   { category: "apparel", patterns: ["haine", "tricou", "hanorac", "geaca", "adidasi", "pantofi"], label: "Îmbrăcăminte și încălțăminte", confidence: 0.94, refinements: ["Mărime", "Stare"] },
+  { category: "tablet", patterns: ["ipad", "tableta"], label: "Tabletă", confidence: 0.95, refinements: ["Model", "Stocare"] },
+  { category: "computer", patterns: ["mac mini", "macbook", "laptop"], label: "Calculator", confidence: 0.95, refinements: ["Model", "Memorie"] },
+  { category: "tv", patterns: ["smart tv", "televizor"], label: "Televizor", confidence: 0.95, refinements: ["Model", "Diagonală"] },
+  { category: "phone", patterns: ["samsung galaxy", "telefon", "smartphone"], modelPattern: /\bsamsung [sa]\d{2}\b/, label: "Telefon", confidence: 0.95, refinements: ["Model", "Stocare", "Stare"] },
+  { category: "console", patterns: ["nintendo", "xbox"], label: "Consolă", confidence: 0.95, refinements: ["Model", "Stare"] },
   { category: "phone", patterns: ["iphone"], label: "Apple iPhone", confidence: 0.96, refinements: ["Model", "Stocare", "Stare"] },
   { category: "console", patterns: ["playstation", "ps5", "ps4"], label: "PlayStation", confidence: 0.95, refinements: ["Model", "Stare"] },
   { category: "washing_machine", patterns: ["masina de spalat", "washing machine", "washer"], label: "Mașină de spălat", confidence: 0.96, refinements: ["Capacitate", "Stare"] },
@@ -104,11 +109,14 @@ function findEntity(normalizedQuery) {
     .sort((a, b) => b.alias.length - a.alias.length)[0]?.entity || null;
 }
 
+const AMBIGUOUS_MAKES = new Set(["mini", "smart", "ds", "mg", "seat"]);
+const AMBIGUOUS_MAKE_MODELS = /\b(?:mini (?:cooper|countryman|clubman|one)|smart (?:fortwo|forfour)|ds [3-9]|mg (?:[3-7]|zs|hs)|seat (?:ibiza|leon|arona|ateca|alhambra|toledo))\b/;
 function findVehicleMake(normalizedQuery) {
   return VEHICLE_MAKES
     .slice()
     .sort((a, b) => b.length - a.length)
-    .find((make) => hasPhrase(normalizedQuery, make)) || null;
+    .find((make) => hasPhrase(normalizedQuery, make) && (!AMBIGUOUS_MAKES.has(make) ||
+      AMBIGUOUS_MAKE_MODELS.test(normalizedQuery) || /\b(?:autoturism|masina|benzina|diesel|inmatriculat|km|19[89]\d|20[0-3]\d)\b/.test(normalizedQuery))) || null;
 }
 
 function buildFamilyUnderstanding(family, query, normalized) {
@@ -131,7 +139,7 @@ function buildFamilyUnderstanding(family, query, normalized) {
 export function understandMarketplaceQuery(query = "") {
   const normalized = normalize(query);
   const family = PRODUCT_FAMILIES.find((candidate) =>
-    candidate.patterns.some((pattern) => hasPhrase(normalized, pattern))
+    candidate.patterns.some((pattern) => hasPhrase(normalized, pattern)) || candidate.modelPattern?.test(normalized)
   );
   const entityCandidate = findEntity(normalized);
   const entity = entityCandidate?.category === "vehicle" && ["apparel", "collectible"].includes(family?.category)
@@ -155,7 +163,7 @@ export function understandMarketplaceQuery(query = "") {
     };
   }
 
-  if (family && ["apparel", "collectible"].includes(family.category)) {
+  if (family) {
     return buildFamilyUnderstanding(family, query, normalized);
   }
 
@@ -175,10 +183,6 @@ export function understandMarketplaceQuery(query = "") {
       alternatives: [],
       refinements: ["Model", "An", "Buget", "Motor"]
     };
-  }
-
-  if (family) {
-    return buildFamilyUnderstanding(family, query, normalized);
   }
 
   return {

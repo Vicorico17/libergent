@@ -15,7 +15,9 @@ import {
   writeSavedListingIds,
 } from "@/lib/account-data"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { SNAPSHOT_MAX_AGE_MS, searchSnapshotKey, readSearchSnapshot, writeSearchSnapshot, describeSnapshotChange } from "@/lib/search-snapshot.mjs"
 import { useAccountSession } from "@/lib/use-account-session"
+import { rememberRecentSearch } from "@/lib/recent-searches"
 import { mapOffer, mapSearchResults, type ListingDetails, type SearchPayload, type SearchResultItem } from "./search-data"
 
 // — Constants —
@@ -136,6 +138,8 @@ type FeedbackExclusion = {
   listingType: string
   signatureTokens: string[]
 }
+type SearchSnapshot = { id: string; savedAt: number; payload: SearchPayload; mapped: SearchResultItem[]; exclusions: FeedbackExclusion[] }
+
 type OfferFeedbackHandler = (item: SearchResultItem, feedback: "like" | "dislike", reason: FeedbackReason, correctionText?: string) => Promise<{ hiddenCount: number }>
 type MarketplaceCoverage = {
   site: string
@@ -877,7 +881,7 @@ function LoadingOverlay({ progress, done, query, tier, isPremiumAccount }: { pro
           className="flex justify-between items-center p-3 text-[13px] font-bold uppercase"
           style={{ borderBottom: `1px solid ${INK}`, background: MODAL_BG }}
         >
-          <span>Live Search</span>
+          <span>Căutare marketplace</span>
           <span className="tracking-widest text-[18px] leading-none">...</span>
         </div>
 
@@ -1119,7 +1123,7 @@ function LoadingOverlay({ progress, done, query, tier, isPremiumAccount }: { pro
             )}
             <p className="mt-3 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}88` }}>
               {tier === "premium" || isPremiumAccount
-                ? "Planul tău Premium este activ. Ai acces la comparația extinsă atunci când alegi căutarea Premium."
+                ? "Planul tău Premium este activ. Căutările tale folosesc automat comparația extinsă Premium."
                 : "Premium verifică mai multe oferte, compară prețurile mai profund și te ajută să nu ratezi alegerea potrivită."}
             </p>
             {tier === "free" && !isPremiumAccount && (
@@ -1523,7 +1527,9 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
       let phone = ""
       if (item.url) {
         try {
-          const response = await fetch(`/api/marketplace/contact?url=${encodeURIComponent(item.url)}`)
+          const response = await fetch(`/api/marketplace/contact?url=${encodeURIComponent(item.url)}`, {
+            headers: { authorization: `Bearer ${session.access_token}` },
+          })
           const payload = await response.json().catch(() => ({}))
           phone = Array.isArray(payload.phones) ? String(payload.phones[0] || "") : ""
         } catch {
@@ -2649,8 +2655,16 @@ function SearchResultsContent() {
         ? resolvedAccountPlan.status
         : "checking"
   const query = String(searchParams.get("q") || "").trim()
+  useEffect(() => {
+    rememberRecentSearch(query)
+  }, [query])
   const searchTier: SearchTier = searchParams.get("tier") === "premium" ? "premium" : "free"
   const near = String(searchParams.get("near") || "").trim()
+  const [refreshRequest, setRefreshRequest] = useState(0)
+  const consumedRefresh = useRef(0)
+  const activeSnapshot = useRef<{ key: string; value: SearchSnapshot } | null>(null)
+  const [snapshotNotice, setSnapshotNotice] = useState("")
+  const [snapshotStorageWarning, setSnapshotStorageWarning] = useState("")
 
   const [sort, setSort]             = useState(() => readSearchFiltersStorage().sort)
   const [sources, setSources]       = useState<Set<string>>(() => readSearchFiltersStorage().sources)
@@ -2700,13 +2714,13 @@ function SearchResultsContent() {
     async function loadAccountPlan() {
       if (account.status !== "signed_in") return
       const userId = account.userId
-      const supabase = getSupabaseBrowserClient()
-      const session = supabase ? (await supabase.auth.getSession()).data.session : null
-      if (!session?.access_token) {
-        if (active) setResolvedAccountPlan({ userId, status: "unknown" })
-        return
-      }
       try {
+        const supabase = getSupabaseBrowserClient()
+        const session = supabase ? (await supabase.auth.getSession()).data.session : null
+        if (!session?.access_token) {
+          if (active) setResolvedAccountPlan({ userId, status: "unknown" })
+          return
+        }
         const response = await fetch("/api/alerts", { headers: { authorization: `Bearer ${session.access_token}` } })
         const payload = await response.json().catch(() => ({}))
         if (!active) return
@@ -2722,8 +2736,9 @@ function SearchResultsContent() {
   }, [account.status, account.userId])
 
   const isPremiumAccount = accountPlan === "premium"
-  const effectiveSearchTier: SearchTier = searchTier === "premium" && isPremiumAccount ? "premium" : "free"
-  const premiumLocked = searchTier === "premium" && accountPlan !== "checking" && !isPremiumAccount
+  const effectiveSearchTier: SearchTier = isPremiumAccount ? "premium" : "free"
+  const snapshotKey = searchSnapshotKey({ userId: account.userId, tier: effectiveSearchTier, query, near, limit: SEARCH_RESULT_LIMIT, pages: SEARCH_PAGE_LIMIT })
+  const premiumLocked = searchTier === "premium" && accountPlan === "free"
 
   function selectSearchTier(nextTier: SearchTier) {
     const params = new URLSearchParams(searchParams.toString())
@@ -2842,16 +2857,16 @@ function SearchResultsContent() {
     if (!account.userId || !query || isLoading || !searchedAt || !results.length) return
     const offer = bestUsedOffer || results[0]
     recordAccountActivity(account.userId, {
-      id: `${searchTier}:${query.toLowerCase()}:${searchedAt}`,
+      id: `${effectiveSearchTier}:${query.toLowerCase()}:${searchedAt}`,
       query,
-      tier: searchTier,
+      tier: effectiveSearchTier,
       searchedAt,
       resultCount: results.length,
       bestOfferTitle: offer?.title || "",
       bestOfferPrice: offer?.priceLabel || "",
       bestOfferUrl: offer?.url || "",
     })
-  }, [account.userId, bestUsedOffer, isLoading, query, results, searchTier, searchedAt])
+  }, [account.userId, bestUsedOffer, effectiveSearchTier, isLoading, query, results, searchedAt])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -2866,13 +2881,29 @@ function SearchResultsContent() {
   }, [conditions, priceMax, priceMin, sort, sourceTypes, sources])
 
   useEffect(() => {
-    if (searchTier === "premium" && accountPlan === "checking") return
+    const snapshot = activeSnapshot.current
+    if (!snapshot || snapshot.key !== snapshotKey || isLoading) return
+    snapshot.value.exclusions = feedbackExclusions
+    try { writeSearchSnapshot(window.sessionStorage, snapshot.key, snapshot.value) } catch { /* Storage may be disabled. */ }
+  }, [feedbackExclusions, isLoading, snapshotKey])
+
+  useEffect(() => {
+    if (accountPlan === "checking") return
 
     const controller = new AbortController()
+    const forceRefresh = consumedRefresh.current !== refreshRequest
+    let previousSnapshot: SearchSnapshot | null = null
+    let restored = false
+    let finishTimer: ReturnType<typeof setTimeout> | undefined
+    let hideTimer: ReturnType<typeof setTimeout> | undefined
 
     const searchId = setTimeout(() => {
+      consumedRefresh.current = refreshRequest
       setFiltersOpen(shouldOpenFiltersByDefault())
+      setSnapshotNotice("")
+      setSnapshotStorageWarning("")
       if (!query) {
+        activeSnapshot.current = null
         setResults([])
         setBestUsedOffer(null)
         setClosestUsedOffer(null)
@@ -2905,7 +2936,7 @@ function SearchResultsContent() {
       setLoaderProgress(8)
       setLoaderDone(false)
       setError("")
-      setQueryUnderstanding(null)
+      // Keep the previous snapshot intact until a successful replacement arrives.
 
       let prog = 0
       const TICK = 250
@@ -2926,9 +2957,19 @@ function SearchResultsContent() {
         pages: String(SEARCH_PAGE_LIMIT),
       })
       if (near) params.set("near", near)
+      if (forceRefresh) params.set("refresh", "1")
 
       const searchEndpoint = effectiveSearchTier === "premium" ? "/api/search/premium" : "/api/search/free"
       const runSearch = async () => {
+        if (accountPlan === "unknown") {
+          throw new Error("Nu am putut verifica planul contului. Reîncarcă pagina pentru a încerca din nou.")
+        }
+        try { previousSnapshot = readSearchSnapshot(window.sessionStorage, snapshotKey) as SearchSnapshot | null } catch { /* Storage may be disabled. */ }
+        if (!previousSnapshot && activeSnapshot.current?.key === snapshotKey && Date.now() - activeSnapshot.current.value.savedAt < SNAPSHOT_MAX_AGE_MS) previousSnapshot = activeSnapshot.current.value
+        if (previousSnapshot && !forceRefresh) {
+          restored = true
+          return { payload: previousSnapshot.payload, snapshot: previousSnapshot }
+        }
         const headers: HeadersInit = {}
         if (effectiveSearchTier === "premium") {
           const supabase = getSupabaseBrowserClient()
@@ -2939,26 +2980,38 @@ function SearchResultsContent() {
           }
           headers.authorization = `Bearer ${session.access_token}`
         }
-        return fetch(`${searchEndpoint}?${params.toString()}`, { signal: controller.signal, headers })
+        const response = await fetch(`${searchEndpoint}?${params.toString()}`, { signal: controller.signal, headers })
+        const payload = await readJsonResponse(response)
+        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError")
+        if (!response.ok || payload.error) {
+          if (response.status === 401 || (response.status === 403 && payload.code === "premium_required")) {
+            setResolvedAccountPlan({ userId: account.userId, status: response.status === 403 ? "free" : "unknown" })
+          }
+          throw new Error(payload.error || "Căutarea nu a putut fi finalizată.")
+        }
+
+        if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError")
+        // A complete transport outage must not replace a usable earlier snapshot.
+        if (!payload.results?.some(result => result.ok)) throw new Error("Sursele nu au răspuns. Încearcă din nou.")
+        return { payload, snapshot: null }
       }
 
       runSearch()
-        .then(async (response) => {
-          const payload = await readJsonResponse(response)
-          if (!response.ok || payload.error) {
-            if (response.status === 401 || (response.status === 403 && payload.code === "premium_required")) {
-              setResolvedAccountPlan({ userId: account.userId, status: response.status === 403 ? "free" : "unknown" })
-            }
-            throw new Error(payload.error || "Căutarea nu a putut fi finalizată.")
-          }
-
-          const mapped = mapSearchResults(payload).slice(0, SEARCH_RESULT_LIMIT)
-          setFeedbackExclusions([])
+        .then(({ payload, snapshot }) => {
+          if (controller.signal.aborted) return
+          const mapped = snapshot?.mapped || mapSearchResults(payload).slice(0, SEARCH_RESULT_LIMIT)
+          const nextSnapshot: SearchSnapshot = snapshot || { id: crypto.randomUUID(), savedAt: Date.now(), payload, mapped, exclusions: previousSnapshot?.exclusions || [] }
+          activeSnapshot.current = { key: snapshotKey, value: nextSnapshot }
+          let stored = false
+          try { stored = writeSearchSnapshot(window.sessionStorage, snapshotKey, nextSnapshot) } catch { /* Storage may be disabled. */ }
+          if (!stored) setSnapshotStorageWarning("Browserul nu poate păstra rezultatele. Reîncărcarea paginii poate porni o căutare nouă.")
+          setSnapshotNotice(restored ? "Rezultatele salvate au fost restaurate. Pentru date actualizate, verifică ofertele noi." : describeSnapshotChange(previousSnapshot, nextSnapshot))
+          setFeedbackExclusions(nextSnapshot.exclusions)
           setFeedbackNotice(null)
           setResults(mapped)
           setBestUsedOffer(mapOffer(payload.summary?.bestUsedOffer, mapped) || mapped.find((item) => item.sourceKind === "used") || null)
           setClosestUsedOffer(mapOffer(payload.summary?.closestUsedOffer, mapped))
-          setBestNewBenchmark(mapOffer(payload.summary?.bestNewBenchmark, mapped) || mapped.find((item) => item.sourceKind === "new") || null)
+          setBestNewBenchmark(mapOffer(payload.summary?.bestNewBenchmark, mapped) || mapped.find((item) => item.sourceKind === "new" && item.isComparableNewBenchmark !== false) || null)
           setViewerLocation(payload.summary?.viewerLocation?.city
             ? { city: payload.summary.viewerLocation.city, source: payload.summary.viewerLocation.source || "edge" }
             : null)
@@ -2989,6 +3042,13 @@ function SearchResultsContent() {
         })
         .catch((searchError) => {
           if (controller.signal.aborted) return
+          if (previousSnapshot && activeSnapshot.current?.key === snapshotKey) {
+            setError(searchError instanceof Error ? searchError.message : String(searchError))
+            setSnapshotNotice("Actualizarea nu a reușit. Afișăm în continuare rezultatele anterioare.")
+            return
+          }
+          activeSnapshot.current = null
+          setFeedbackExclusions([])
           setResults([])
           setBestUsedOffer(null)
           setClosestUsedOffer(null)
@@ -3011,10 +3071,12 @@ function SearchResultsContent() {
             loaderTimerRef.current = null
           }
           setLoaderProgress(100)
-          setTimeout(() => {
+          finishTimer = setTimeout(() => {
+            if (controller.signal.aborted) return
             setLoaderDone(true)
             setSearchReportOpen(false)
-            setTimeout(() => {
+            hideTimer = setTimeout(() => {
+              if (controller.signal.aborted) return
               setShowLoader(false)
               setIsLoading(false)
             }, 600)
@@ -3024,10 +3086,12 @@ function SearchResultsContent() {
 
     return () => {
       clearTimeout(searchId)
+      clearTimeout(finishTimer)
+      clearTimeout(hideTimer)
       controller.abort()
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
     }
-  }, [account.userId, accountPlan, effectiveSearchTier, near, query, searchTier])
+  }, [account.userId, accountPlan, effectiveSearchTier, near, query, refreshRequest, snapshotKey])
 
   useEffect(() => {
     const id = setInterval(() => setTime(formatSearchTime()), 30_000)
@@ -3121,7 +3185,7 @@ function SearchResultsContent() {
     // A retail reference remains useful when shopping only for used products or
     // within a used-product budget. Honor explicit source exclusions and feedback.
     const candidates = [...results, ...(bestNewBenchmark ? [bestNewBenchmark] : [])].filter((item) =>
-      item.sourceKind === "new" && item.price !== null && item.price > 0 &&
+      item.sourceKind === "new" && item.isComparableNewBenchmark !== false && item.price !== null && item.price > 0 &&
       !feedbackExclusions.some((exclusion) => isExcludedByFeedback(item, exclusion)) &&
       !(sources.size > 0 && SOURCES_LIST.includes(item.source) && !sources.has(item.source))
     )
@@ -3185,7 +3249,7 @@ function SearchResultsContent() {
     { text: "focus: second-hand + benchmark de preț nou", pulse: false },
     { text: shownBestOffer ? `${shownBestOffer.recommendation.strong ? "Best used deal" : "Top used match"} on ${shownBestOffer.source}` : "Top used match în așteptare", pulse: false },
     { text: shownNewBenchmark ? `New benchmark on ${shownNewBenchmark.source}` : "New benchmark în așteptare", pulse: false },
-    { text: isLoading ? "Recommendation updating live" : "Recommendation updated live", pulse: isLoading },
+    { text: isLoading ? "Actualizăm recomandarea" : "Recomandare din rezultatele colectate", pulse: isLoading },
   ]
 
   return (
@@ -3193,7 +3257,7 @@ function SearchResultsContent() {
 
       {/* Loading overlay — rendered above everything */}
       {showLoader && <LoadingOverlay progress={loaderProgress} done={loaderDone} query={query} tier={effectiveSearchTier} isPremiumAccount={isPremiumAccount} />}
-      <ListingDetailDrawer key={selectedListing?.url || "closed"} item={selectedListing} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} onFeedback={handleOfferFeedback} />
+      <ListingDetailDrawer key={selectedListing?.url || "closed"} item={selectedListing} query={query} searchTier={effectiveSearchTier} isLoggedIn={isLoggedIn} conversationStatus={selectedListing?.url ? conversationStatuses[selectedListing.url] : undefined} onClose={() => setSelectedListing(null)} onFeedback={handleOfferFeedback} />
       <ConversationCenter key={account.userId || "signed-out"} enabled={isLoggedIn} onStatusesChange={(statuses) => setConversationState((current) => ({ ownerId: account.userId, statuses: current.ownerId === account.userId ? { ...current.statuses, ...statuses } : statuses }))} />
       <EmailCapturePopup
         enabled={isLoggedIn && Boolean(query) && !isLoading && !showLoader && !error && results.length > 0}
@@ -3220,7 +3284,7 @@ function SearchResultsContent() {
               <MapPin size={11} /> Aproape de {viewerLocation.city}
             </div>
           )}
-          <div className="flex" style={{ border: `1px solid ${INK}` }}>
+          {accountPlan === "free" && <div className="flex" style={{ border: `1px solid ${INK}` }}>
             {(["free", "premium"] as SearchTier[]).map((tier) => (
               <button
                 key={tier}
@@ -3238,7 +3302,8 @@ function SearchResultsContent() {
                 {tier === "premium" ? <span className="flex items-center gap-1.5">{isPremiumAccount ? <Crown size={11} /> : <Lock size={11} />} Premium</span> : "Free"}
               </button>
             ))}
-          </div>
+          </div>}
+          {accountPlan === "checking" && <span role="status" className="text-[10px]">Verificăm planul contului…</span>}
           {isPremiumAccount && (
             <Link href="/account" className="flex items-center gap-1.5 px-3 py-2 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: PINK, color: INK }}>
               <Crown size={12} fill={INK} /> Premium activ
@@ -3246,10 +3311,16 @@ function SearchResultsContent() {
           )}
           <div className="flex items-center gap-3 text-[11px] uppercase font-bold px-3 py-1.5" style={{ background: "white", border: `1px solid ${INK}` }}>
             <div className="w-2 h-2 animate-pulse" style={{ background: "#22C55E" }} />
-            <span title="Aceeași căutare poate reutiliza rezultatele timp de 5 minute. Ofertele și disponibilitatea surselor se pot schimba la actualizare.">Rezultate din <span className="mx-2">|</span> {updatedLabel === "în timp real" ? time : updatedLabel}</span>
+            <span title="Momentul colectării ofertelor. Folosește Verifică oferte noi pentru o nouă căutare.">Rezultate din <span className="mx-2">|</span> {updatedLabel === "în timp real" ? time : updatedLabel}</span>
           </div>
         </div>
       </header>
+      {query && <section className="mx-6 mt-4 flex flex-wrap items-center gap-3 text-[11px]" aria-label="Actualizarea rezultatelor">
+        <button type="button" disabled={isLoading || accountPlan === "checking" || accountPlan === "unknown"} onClick={() => setRefreshRequest(value => value + 1)} className="min-h-11 border border-black px-4 py-2 font-bold disabled:opacity-50">Verifică oferte noi</button>
+        <p>Reîncărcarea păstrează rezultatele în această filă până la 24 de ore. Prețurile și disponibilitatea se pot schimba.</p>
+        {snapshotNotice && <p role="status" className="basis-full">{snapshotNotice}</p>}
+        {snapshotStorageWarning && <p role="alert" className="basis-full">{snapshotStorageWarning}</p>}
+      </section>}
 
       {queryUnderstanding && (queryUnderstanding.category || queryUnderstanding.alternatives?.length) && query && !isLoading && !showLoader && (
         <section className="mx-6 mt-5 flex flex-wrap items-center gap-2 p-3 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: "white" }}>
@@ -3417,7 +3488,7 @@ function SearchResultsContent() {
               <div className="p-4 flex flex-col items-center justify-center gap-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 animate-pulse" style={{ background: GREEN }} />
-                  <span className="text-[10px] uppercase font-bold">Updated Live</span>
+                  <span className="text-[10px] uppercase font-bold">Rezultate colectate</span>
                 </div>
                 <span className="text-[11px] uppercase font-bold">{time || "00:20"}</span>
               </div>
@@ -3499,7 +3570,7 @@ function SearchResultsContent() {
             </section>
           )}
 
-          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} searchTier={searchTier} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} onFeedback={handleOfferFeedback} />}
+          {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} searchTier={effectiveSearchTier} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} onFeedback={handleOfferFeedback} />}
           {shownBestOffer && !shownNewBenchmark && (
             <p className="p-4 text-[11px] leading-relaxed" style={{ border: `1px solid ${INK}33`, background: "white" }}>
               Nu am găsit un preț nou pentru comparație în sursele selectate. Nu putem confirma economia față de retail pentru această ofertă second-hand.
@@ -3547,7 +3618,7 @@ function SearchResultsContent() {
                         key={item.id}
                         item={item}
                         query={query}
-                        searchTier={searchTier}
+                        searchTier={effectiveSearchTier}
                         isLoggedIn={isLoggedIn}
                         conversationStatus={item.url ? conversationStatuses[item.url] : undefined}
                         onInspect={setSelectedListing}
@@ -3580,7 +3651,7 @@ function SearchResultsContent() {
                         key={item.id}
                         item={item}
                         query={query}
-                        searchTier={searchTier}
+                        searchTier={effectiveSearchTier}
                         isLoggedIn={isLoggedIn}
                         conversationStatus={item.url ? conversationStatuses[item.url] : undefined}
                         onInspect={setSelectedListing}

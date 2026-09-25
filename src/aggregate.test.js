@@ -714,3 +714,43 @@ test("keeps the best overall offer separate from the closest strong match", () =
   assert.ok(aggregated.summary.closestUsedOffer.proximity.distanceKm < 20);
   assert.ok(aggregated.summary.bestUsedOffer);
 });
+
+test("used filtering retains grades, ungraded classifieds and new retail reference", () => {
+  const result = aggregateMarketplaceResults([
+    makeResult('olx.ro', 'iphone 15', ['', 'Ca nou', 'Foarte bun', 'Excelent', 'Recondiționat'].map((condition, index) => ({ title: 'iPhone 15 128GB', condition, price: `${2000 + index * 100} lei`, sourceType: 'classifieds', url: `https://olx.ro/${index}` }))),
+    makeResult('retail.ro', 'iphone 15', [{ title: 'iPhone 15 128GB', condition: 'Nou', price: '4000 lei', sourceType: 'retailer', url: 'https://retail.ro/new' }])
+  ], { condition: 'used' });
+  assert.equal(result.results[0].items.length, 5);
+  assert.equal(result.summary.bestNewBenchmark.priceRon, 4000);
+  assert.notEqual(result.summary.bestUsedOffer.url, 'https://retail.ro/new');
+});
+
+test("new filter excludes like-new, refurbished and unspecified conditions", () => {
+  const result = aggregateMarketplaceResults([makeResult('olx.ro', 'iphone 15', ['', 'Ca nou', 'Refurbished', 'Nou'].map((condition, index) => ({ title: 'iPhone 15 128GB', condition, price: '2000 lei', url: `https://olx.ro/${index}` })))], { condition: 'new' });
+  assert.deepEqual(result.results[0].items.map(item => item.condition), ['Nou']);
+});
+
+test("refurbished retailer inventory cannot become the new benchmark", () => {
+  const result = aggregateMarketplaceResults([
+    makeResult('retail.ro', 'iphone 15', [
+      { title: 'iPhone 15 128GB', condition: 'Ca nou', price: '2000 lei', sourceType: 'retailer', url: 'https://retail.ro/used' },
+      { title: 'iPhone 15 128GB', condition: 'Nou', price: '4000 lei', sourceType: 'retailer', url: 'https://retail.ro/new' }
+    ])
+  ]);
+  assert.equal(result.summary.bestUsedOffer.url, 'https://retail.ro/used');
+  assert.equal(result.summary.bestNewBenchmark.url, 'https://retail.ro/new');
+  assert.equal(result.summary.priceIntelligence.savingsVsNewPct, 50);
+});
+
+test("phone savings require matching model and known capacity in retail and used offers", () => {
+  for (const retailTitle of ['iPhone 15 128GB', 'iPhone 15']) {
+    const result = aggregateMarketplaceResults([
+      makeResult('olx.ro', 'iphone 15', [{ title: 'iPhone 15 256GB', condition: 'Folosit', price: '2000 lei', sourceType: 'classifieds', url: 'https://olx.ro/used' }]),
+      makeResult('retail.ro', 'iphone 15', [{ title: retailTitle, condition: 'Nou', price: '3000 lei', sourceType: 'retailer', url: 'https://retail.ro/new' }])
+    ]);
+    assert.equal(result.summary.bestNewBenchmark, null, retailTitle);
+    assert.equal(result.summary.priceIntelligence.savingsVsNewPct, null);
+    assert.equal(result.results[1].items.length, 1, 'Other retail configurations remain browsable');
+    assert.equal(result.results[1].items[0].isComparableNewBenchmark, false);
+  }
+});

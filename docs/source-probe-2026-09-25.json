@@ -1,0 +1,414 @@
+{
+  "checkedAt": "2026-09-25T08:07:20.663Z",
+  "provider": "direct",
+  "summary": {
+    "total": 6,
+    "candidateKeep": 3,
+    "needsQueryOrParser": 2,
+    "fixOrDemote": 1
+  },
+  "niches": {
+    "marketplaces": [
+      {
+        "site": "olx.ro",
+        "niche": "marketplaces",
+        "integrationStatus": "active",
+        "verdict": "fix_or_demote",
+        "repeatedNoUsefulResults": true,
+        "checks": [
+          {
+            "site": "olx.ro",
+            "niche": "marketplaces",
+            "query": "iphone 15 pro",
+            "durationMs": 353,
+            "integrationStatus": "active",
+            "verdict": "fix_or_demote",
+            "ok": false,
+            "rawItemCount": 0,
+            "includedItemCount": 0,
+            "error": "Direct fetch failed (403) for https://www.olx.ro/oferte/q-iphone-15-pro/?search%5Border%5D=created_at%3Adesc"
+          },
+          {
+            "site": "olx.ro",
+            "niche": "marketplaces",
+            "query": "samsung galaxy s24",
+            "durationMs": 87,
+            "integrationStatus": "active",
+            "verdict": "fix_or_demote",
+            "ok": false,
+            "rawItemCount": 0,
+            "includedItemCount": 0,
+            "error": "Direct fetch failed (403) for https://www.olx.ro/oferte/q-samsung-galaxy-s24/?search%5Border%5D=created_at%3Adesc"
+          }
+        ]
+      },
+      {
+        "site": "vinted.ro",
+        "niche": "marketplaces",
+        "integrationStatus": "active",
+        "verdict": "candidate_keep",
+        "repeatedNoUsefulResults": false,
+        "checks": [
+          {
+            "site": "vinted.ro",
+            "niche": "marketplaces",
+            "query": "iphone 15 pro",
+            "durationMs": 1226,
+            "integrationStatus": "active",
+            "verdict": "candidate_keep",
+            "ok": true,
+            "rawItemCount": 96,
+            "includedItemCount": 1,
+            "error": ""
+          },
+          {
+            "site": "vinted.ro",
+            "niche": "marketplaces",
+            "query": "samsung galaxy s24",
+            "durationMs": 1814,
+            "integrationStatus": "active",
+            "verdict": "candidate_keep",
+            "ok": true,
+            "rawItemCount": 96,
+            "includedItemCount": 9,
+            "error": ""
+          }
+        ]
+      }
+    ],
+    "tech": [
+      {
+        "site": "flip.ro",
+        "niche": "tech",
+        "integrationStatus": "active",
+        "verdict": "candidate_keep",
+        "repeatedNoUsefulResults": false,
+        "checks": [
+          {
+            "site": "flip.ro",
+            "niche": "tech",
+            "query": "iphone 15 pro",
+            "durationMs": 614,
+            "integrationStatus": "active",
+            "verdict": "candidate_keep",
+            "ok": true,
+            "rawItemCount": 32,
+            "includedItemCount": 1,
+            "error": ""
+          },
+          {
+            "site": "flip.ro",
+            "niche": "tech",
+            "query": "samsung galaxy s24",
+            "durationMs": 607,
+            "integrationStatus": "active",
+            "verdict": "needs_query_or_parser",
+            "ok": true,
+            "rawItemCount": 32,
+            "includedItemCount": 0,
+            "error": ""
+          }
+        ]
+      },
+      {
+        "site": "klap.ro",
+        "niche": "tech",
+        "integrationStatus": "active",
+        "verdict": "candidate_keep",
+        "repeatedNoUsefulResults": false,
+        "checks": [
+          {
+            "site": "klap.ro",
+            "niche": "tech",
+            "query": "iphone 15 pro",
+            "durationMs": 1461,
+            "integrationStatus": "active",
+            "verdict": "candidate_keep",
+            "ok": true,
+            "rawItemCount": 15,
+            "includedItemCount": 2,
+            "error": ""
+          },
+          {
+            "site": "klap.ro",
+            "niche": "tech",
+            "query": "samsung galaxy s24",
+            "durationMs": 1430,
+            "integrationStatus": "active",
+            "verdict": "candidate_keep",
+            "ok": true,
+            "rawItemCount": 8,
+            "includedItemCount": 1,
+            "error": ""
+          }
+        ]
+      },
+      {
+        "site": "emag.ro",
+        "niche": "tech",
+        "integrationStatus": "experimental",
+        "verdict": "needs_query_or_parser",
+        "repeatedNoUsefulResults": true,
+        "checks": [
+          {
+            "site": "emag.ro",
+            "niche": "tech",
+            "query": "iphone 15 pro",
+            "durationMs": 1542,
+            "integrationStatus": "experimental",
+            "verdict": "needs_query_or_parser",
+            "ok": true,
+            "rawItemCount": 20,
+            "includedItemCount": 0,
+            "error": ""
+          },
+          {
+            "site": "emag.ro",
+            "niche": "tech",
+            "query": "samsung galaxy s24",
+            "durationMs": 2259,
+            "integrationStatus": "experimental",
+            "verdict": "needs_query_or_parser",
+            "ok": true,
+            "rawItemCount": 20,
+            "includedItemCount": 0,
+            "error": ""
+          }
+        ]
+      },
+      {
+        "site": "evomag.ro",
+        "niche": "tech",
+        "integrationStatus": "experimental",
+        "verdict": "needs_query_or_parser",
+        "repeatedNoUsefulResults": true,
+        "checks": [
+          {
+            "site": "evomag.ro",
+            "niche": "tech",
+            "query": "iphone 15 pro",
+            "durationMs": 309,
+            "integrationStatus": "experimental",
+            "verdict": "needs_query_or_parser",
+            "ok": true,
+            "rawItemCount": 20,
+            "includedItemCount": 0,
+            "error": ""
+          },
+          {
+            "site": "evomag.ro",
+            "niche": "tech",
+            "query": "samsung galaxy s24",
+            "durationMs": 112,
+            "integrationStatus": "experimental",
+            "verdict": "needs_query_or_parser",
+            "ok": true,
+            "rawItemCount": 20,
+            "includedItemCount": 0,
+            "error": ""
+          }
+        ]
+      }
+    ]
+  },
+  "sources": [
+    {
+      "site": "olx.ro",
+      "niche": "marketplaces",
+      "integrationStatus": "active",
+      "verdict": "fix_or_demote",
+      "repeatedNoUsefulResults": true,
+      "checks": [
+        {
+          "site": "olx.ro",
+          "niche": "marketplaces",
+          "query": "iphone 15 pro",
+          "durationMs": 353,
+          "integrationStatus": "active",
+          "verdict": "fix_or_demote",
+          "ok": false,
+          "rawItemCount": 0,
+          "includedItemCount": 0,
+          "error": "Direct fetch failed (403) for https://www.olx.ro/oferte/q-iphone-15-pro/?search%5Border%5D=created_at%3Adesc"
+        },
+        {
+          "site": "olx.ro",
+          "niche": "marketplaces",
+          "query": "samsung galaxy s24",
+          "durationMs": 87,
+          "integrationStatus": "active",
+          "verdict": "fix_or_demote",
+          "ok": false,
+          "rawItemCount": 0,
+          "includedItemCount": 0,
+          "error": "Direct fetch failed (403) for https://www.olx.ro/oferte/q-samsung-galaxy-s24/?search%5Border%5D=created_at%3Adesc"
+        }
+      ]
+    },
+    {
+      "site": "vinted.ro",
+      "niche": "marketplaces",
+      "integrationStatus": "active",
+      "verdict": "candidate_keep",
+      "repeatedNoUsefulResults": false,
+      "checks": [
+        {
+          "site": "vinted.ro",
+          "niche": "marketplaces",
+          "query": "iphone 15 pro",
+          "durationMs": 1226,
+          "integrationStatus": "active",
+          "verdict": "candidate_keep",
+          "ok": true,
+          "rawItemCount": 96,
+          "includedItemCount": 1,
+          "error": ""
+        },
+        {
+          "site": "vinted.ro",
+          "niche": "marketplaces",
+          "query": "samsung galaxy s24",
+          "durationMs": 1814,
+          "integrationStatus": "active",
+          "verdict": "candidate_keep",
+          "ok": true,
+          "rawItemCount": 96,
+          "includedItemCount": 9,
+          "error": ""
+        }
+      ]
+    },
+    {
+      "site": "flip.ro",
+      "niche": "tech",
+      "integrationStatus": "active",
+      "verdict": "candidate_keep",
+      "repeatedNoUsefulResults": false,
+      "checks": [
+        {
+          "site": "flip.ro",
+          "niche": "tech",
+          "query": "iphone 15 pro",
+          "durationMs": 614,
+          "integrationStatus": "active",
+          "verdict": "candidate_keep",
+          "ok": true,
+          "rawItemCount": 32,
+          "includedItemCount": 1,
+          "error": ""
+        },
+        {
+          "site": "flip.ro",
+          "niche": "tech",
+          "query": "samsung galaxy s24",
+          "durationMs": 607,
+          "integrationStatus": "active",
+          "verdict": "needs_query_or_parser",
+          "ok": true,
+          "rawItemCount": 32,
+          "includedItemCount": 0,
+          "error": ""
+        }
+      ]
+    },
+    {
+      "site": "klap.ro",
+      "niche": "tech",
+      "integrationStatus": "active",
+      "verdict": "candidate_keep",
+      "repeatedNoUsefulResults": false,
+      "checks": [
+        {
+          "site": "klap.ro",
+          "niche": "tech",
+          "query": "iphone 15 pro",
+          "durationMs": 1461,
+          "integrationStatus": "active",
+          "verdict": "candidate_keep",
+          "ok": true,
+          "rawItemCount": 15,
+          "includedItemCount": 2,
+          "error": ""
+        },
+        {
+          "site": "klap.ro",
+          "niche": "tech",
+          "query": "samsung galaxy s24",
+          "durationMs": 1430,
+          "integrationStatus": "active",
+          "verdict": "candidate_keep",
+          "ok": true,
+          "rawItemCount": 8,
+          "includedItemCount": 1,
+          "error": ""
+        }
+      ]
+    },
+    {
+      "site": "emag.ro",
+      "niche": "tech",
+      "integrationStatus": "experimental",
+      "verdict": "needs_query_or_parser",
+      "repeatedNoUsefulResults": true,
+      "checks": [
+        {
+          "site": "emag.ro",
+          "niche": "tech",
+          "query": "iphone 15 pro",
+          "durationMs": 1542,
+          "integrationStatus": "experimental",
+          "verdict": "needs_query_or_parser",
+          "ok": true,
+          "rawItemCount": 20,
+          "includedItemCount": 0,
+          "error": ""
+        },
+        {
+          "site": "emag.ro",
+          "niche": "tech",
+          "query": "samsung galaxy s24",
+          "durationMs": 2259,
+          "integrationStatus": "experimental",
+          "verdict": "needs_query_or_parser",
+          "ok": true,
+          "rawItemCount": 20,
+          "includedItemCount": 0,
+          "error": ""
+        }
+      ]
+    },
+    {
+      "site": "evomag.ro",
+      "niche": "tech",
+      "integrationStatus": "experimental",
+      "verdict": "needs_query_or_parser",
+      "repeatedNoUsefulResults": true,
+      "checks": [
+        {
+          "site": "evomag.ro",
+          "niche": "tech",
+          "query": "iphone 15 pro",
+          "durationMs": 309,
+          "integrationStatus": "experimental",
+          "verdict": "needs_query_or_parser",
+          "ok": true,
+          "rawItemCount": 20,
+          "includedItemCount": 0,
+          "error": ""
+        },
+        {
+          "site": "evomag.ro",
+          "niche": "tech",
+          "query": "samsung galaxy s24",
+          "durationMs": 112,
+          "integrationStatus": "experimental",
+          "verdict": "needs_query_or_parser",
+          "ok": true,
+          "rawItemCount": 20,
+          "includedItemCount": 0,
+          "error": ""
+        }
+      ]
+    }
+  ]
+}

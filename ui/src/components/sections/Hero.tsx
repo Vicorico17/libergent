@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { RecentSearches } from "@/components/RecentSearches";
 
 const MONO  = "var(--font-mono-var), monospace";
 const PINK  = "#FF4F8B";
@@ -152,6 +153,8 @@ export function Hero() {
               </button>
             </form>
           </div>
+
+          <RecentSearches />
 
           {/* Status line */}
           <div className="flex items-center gap-2 text-sm mt-2" style={{ color: `${INK}CC` }}>

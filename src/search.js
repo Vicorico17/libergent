@@ -433,7 +433,8 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
   let exhaustedReason = firstPage.rawItemCount === 0 ? "empty-first-page" : "limit";
   let pageError = null;
   const estimatedTotalPages = estimateTotalPages(firstPage, pageSize, effectiveLimit);
-  const targetPages = Math.max(1, Math.min(cappedMaxPages, estimatedTotalPages));
+  const targetPages = firstPage.hasNextPage === false ? 1 : Math.max(1, Math.min(cappedMaxPages, estimatedTotalPages));
+  if (firstPage.hasNextPage === false) exhaustedReason = "no-next-page";
 
   for (let page = 2; page <= targetPages; page += 1) {
     if (items.length >= effectiveLimit) {

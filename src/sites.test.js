@@ -128,3 +128,11 @@ test("does not classify non-car terms as car searches", () => {
     "shopmania.ro"
   ]);
 });
+
+test("routing requires complete car words and supporting automotive context", () => {
+  for (const query of ["iphone 13 mini", "ipad mini", "mac mini m2", "smart tv samsung", "nintendo ds", "chitara electrica", "combina frigorifica", "aspirator automat", "parfum diesel", "samsung galaxy s24 2024"]) {
+    assert.equal(isCarQuery(query), false, query);
+    assert.ok(!getSiteKeysForAllSearch(query).includes("autovit.ro"), query);
+  }
+  for (const query of ["mini cooper", "smart fortwo", "ds 7", "mg zs", "seat leon", "masina electrica", "BMW X5 2024", "A4 2019 diesel"]) assert.equal(isCarQuery(query), true, query);
+});
