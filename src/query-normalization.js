@@ -19,7 +19,12 @@ export function normalizeModelTerms(value = "") {
 
 // Match storage/RAM formatting consistently without changing the displayed title.
 export function normalizeCapacityTerms(value = "") {
-  return String(value).replace(/\b(\d+)\s*(gb|tb)\b/gi, (_, amount, unit) => `${amount}${unit.toLowerCase()}`);
+  return String(value)
+    // Common computer-memory shorthand omits GB, but still explicitly says RAM.
+    // Do not infer capacity from a bare number or rewrite VRAM/MB/TB values.
+    .replace(/\b(4|8|12|16|24|32|48|64|96|128|192|256|512)\s*(?:gb\s*)?ram\b/gi, "$1gb ram")
+    .replace(/\bram\s*(4|8|12|16|24|32|48|64|96|128|192|256|512)(?:\s*gb)?\b(?!\s*(?:mb|tb)\b)/gi, "$1gb ram")
+    .replace(/\b(\d+)\s*(gb|tb)\b/gi, (_, amount, unit) => `${amount}${unit.toLowerCase()}`);
 }
 
 export function normalizeMarketplaceQuery(query = "") {
