@@ -17,6 +17,7 @@ import {
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { SNAPSHOT_MAX_AGE_MS, searchSnapshotKey, readSearchSnapshot, writeSearchSnapshot, describeSnapshotChange } from "@/lib/search-snapshot.mjs"
 import { useAccountSession } from "@/lib/use-account-session"
+import { rememberRecentSearch } from "@/lib/recent-searches"
 import { mapOffer, mapSearchResults, type ListingDetails, type SearchPayload, type SearchResultItem } from "./search-data"
 
 // — Constants —
@@ -2654,6 +2655,9 @@ function SearchResultsContent() {
         ? resolvedAccountPlan.status
         : "checking"
   const query = String(searchParams.get("q") || "").trim()
+  useEffect(() => {
+    rememberRecentSearch(query)
+  }, [query])
   const searchTier: SearchTier = searchParams.get("tier") === "premium" ? "premium" : "free"
   const near = String(searchParams.get("near") || "").trim()
   const [refreshRequest, setRefreshRequest] = useState(0)
