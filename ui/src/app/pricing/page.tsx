@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { LogoIcon } from "@/components/LogoIcon";
+import { AccountNavLink } from "@/components/AccountNavLink";
 import { SourceCatalog } from "@/components/SourceCatalog";
 import { PREMIUM_MONTHLY_PRICE_RON } from "@/lib/pricing";
 
@@ -11,11 +12,9 @@ const PINK = "#FF4B8B";
 const MONO = "var(--font-mono-var), monospace";
 
 const NAV_LINKS = [
-  { label: "Cum funcționează", href: "/#cum-functioneaza" },
   { label: "Căutare",          href: "/#cautare" },
-  { label: "Întrebări",        href: "/#intrebari" },
-  { label: "Trenduri",         href: "/trenduri" },
   { label: "Discovery",        href: "/discovery" },
+  { label: "Premium",          href: "/pricing" },
 ];
 
 const BETA_FEATURES = [
@@ -149,7 +148,7 @@ export default function PricingPage() {
 
         {/* Nav */}
         <header
-          className="flex flex-nowrap justify-between items-center px-4 py-4 md:px-8 md:py-5 z-20 relative"
+          className="flex flex-wrap justify-between items-center gap-y-4 px-4 py-4 md:px-8 md:py-5 z-20 relative"
           style={{ borderBottom: `2px solid ${INK}`, background: BG }}
         >
           <Link href="/" className="flex items-center gap-3">
@@ -159,7 +158,7 @@ export default function PricingPage() {
             </span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-5 text-[11px] uppercase tracking-widest">
+          <nav className="order-3 flex w-full items-center justify-center gap-5 text-[11px] uppercase tracking-widest lg:order-none lg:w-auto">
             {NAV_LINKS.map((l, i) => (
               <div key={l.label} className="flex items-center gap-5">
                 {i > 0 && <div style={{ width: 6, height: 6, background: PINK }} />}
@@ -170,7 +169,7 @@ export default function PricingPage() {
             ))}
           </nav>
 
-          <Link href="/search" className="flex min-h-10 items-center justify-center px-3 text-[9px] font-bold uppercase sm:px-4" style={{ border: `2px solid ${INK}`, color: INK }}>Înapoi la căutare</Link>
+          <AccountNavLink next="/pricing" />
         </header>
 
         {/* Main */}

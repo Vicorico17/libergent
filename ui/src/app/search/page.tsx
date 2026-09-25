@@ -1244,8 +1244,9 @@ function SearchNav({ query, tier, isLoggedIn }: { query: string; tier: SearchTie
         </button>
       </form>
 
-      <div className="flex items-center gap-5 text-[12px] uppercase font-bold flex-none ml-auto">
-        <Link href="/trenduri" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Trenduri</Link>
+      <div className="flex flex-wrap items-center gap-3 text-[10px] sm:text-[12px] uppercase font-bold flex-none ml-auto">
+        <Link href="/discovery" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Discovery</Link>
+        <Link href="/pricing" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Premium</Link>
         {isLoggedIn ? (
           <Link href={`/account?next=${encodeURIComponent(`/search?q=${query}&tier=${tier}`)}`} className="inline-flex items-center gap-1.5 px-3 py-2" style={{ color: GREEN, border: `1px solid ${GREEN}` }}><span className="h-2 w-2 rounded-full" style={{ background: GREEN }} /> Contul meu</Link>
         ) : (
