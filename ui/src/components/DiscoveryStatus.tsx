@@ -38,7 +38,6 @@ export function DiscoveryStatus() {
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState("");
-  const [tier, setTier] = useState("all");
   const [status, setStatus] = useState("all");
   useEffect(() => {
     let active = true;
@@ -57,7 +56,7 @@ export function DiscoveryStatus() {
   }, [attempt]);
   const rows = sources.map(source => ({ source, check: evidence(source) }));
   const filtered = rows.filter(({ source, check }) =>
-    (tier === "all" || source.tier === tier) && (status === "all" || check.state === status) &&
+    (status === "all" || check.state === status) &&
     `${source.domain} ${(source.categories || []).join(" ")}`.toLowerCase().includes(query.trim().toLowerCase()));
   const counts = { available: rows.filter(row => row.check.state === "available").length, empty: rows.filter(row => row.check.state === "empty").length, unknown: rows.filter(row => row.check.state === "unknown").length };
   const latest = rows.map(row => row.check.date).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
@@ -74,18 +73,39 @@ export function DiscoveryStatus() {
       <label className="flex-1 text-[10px] font-bold uppercase tracking-widest">Caută o sursă
         <span className="mt-2 flex min-h-12 items-center gap-3 border border-[#111111] bg-white/60 px-3"><Search size={16} aria-hidden="true" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="OLX, eMAG, fashion…" className="min-w-0 flex-1 bg-transparent py-3 text-sm font-normal normal-case tracking-normal outline-none" /></span>
       </label>
-      <label className="text-[10px] font-bold uppercase tracking-widest">Acces<select value={tier} onChange={event => setTier(event.target.value)} className="mt-2 block min-h-12 w-full border border-[#111111] bg-white/60 px-3 text-sm normal-case tracking-normal lg:w-40"><option value="all">Free + Premium</option><option value="free">Free</option><option value="premium">Premium</option></select></label>
       <label className="text-[10px] font-bold uppercase tracking-widest">Ultima verificare<select value={status} onChange={event => setStatus(event.target.value)} className="mt-2 block min-h-12 w-full border border-[#111111] bg-white/60 px-3 text-sm normal-case tracking-normal lg:w-48"><option value="all">Toate statusurile</option>{Object.entries(LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     </div>
     {loading ? <p role="status" className="py-12 text-sm">Se încarcă sursele și verificările…</p> : error ? <div role="status" className="my-8 border border-[#c02662] bg-[#ffe4ef] p-6"><p>Nu am putut încărca statusul surselor.</p><button onClick={() => { setError(false); setLoading(true); setAttempt(value => value + 1); }} className="mt-4 min-h-11 border border-[#111] bg-white px-4 text-sm font-bold">Încearcă din nou</button></div> : <>
       <p role="status" className="my-5 text-xs text-[#555]">{filtered.length} din {sources.length} surse</p>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filtered.map(({ source, check }) => <article key={source.domain} className="flex flex-col border border-[#111111]/30 bg-white/50 p-5 transition-colors hover:border-[#111111]">
-          <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-widest">{source.tier === "premium" ? "Premium" : "Free"}</span><StatusBadge state={check.state} /></div>
-          <a href={`https://${source.domain}`} target="_blank" rel="noopener noreferrer" className="mt-5 flex min-h-11 items-center justify-between gap-3 text-xl font-bold hover:underline"><span className="break-all">{source.domain}</span><ArrowUpRight size={18} className="shrink-0" aria-hidden="true" /><span className="sr-only"> (se deschide într-o filă nouă)</span></a>
-          <p className="mt-1 text-xs text-[#555]">{source.selection === "vehicles" ? "Autoturisme" : source.selection === "refurbished-tech" ? "Tehnologie recondiționată" : "Selectată în funcție de căutare"}{source.status === "experimental" ? " · Experimental" : ""}</p>
-          <div className="mt-5 border-t border-[#111111]/15 pt-4 text-[11px] leading-relaxed text-[#555]"><p>{check.detail}</p><p className="mt-1">{check.date ? `Verificat: ${check.date.slice(0, 10)}` : "Verificare în așteptare"}</p></div>
-        </article>)}
+      <div className="grid items-start gap-6 md:grid-cols-2">
+        {(["free", "premium"] as const).map(tier => {
+          const tierRows = rows.filter(row => row.source.tier === tier);
+          const visibleRows = filtered.filter(row => row.source.tier === tier);
+          const withOffers = tierRows.filter(row => row.check.state === "available").length;
+          return <section key={tier} aria-labelledby={`discovery-${tier}`} className="min-w-0 border-2 border-[#111111] bg-white/40">
+            <header className={`border-b-2 border-[#111111] p-5 sm:p-6 ${tier === "free" ? "bg-[#dcfce7]" : "bg-[#ffe4ef]"}`}>
+              <div className="flex items-center justify-between gap-3">
+                <h2 id={`discovery-${tier}`} className="text-2xl font-bold">{tier === "free" ? "Free" : "Premium"}</h2>
+                <span className="border border-[#111111]/30 bg-white/60 px-2 py-1 text-xs font-bold tabular-nums">{tierRows.length} surse</span>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed">{withOffers} din {tierRows.length} surse au returnat oferte la ultima verificare publicată.</p>
+            </header>
+            <ul className="divide-y divide-[#111111]/15">
+              {visibleRows.map(({ source, check }) => <li key={source.domain} className="p-4 transition-colors hover:bg-white/70 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                  <a href={`https://${source.domain}`} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 items-center gap-2 text-base font-bold hover:underline sm:text-lg">
+                    <span className="break-all">{source.domain}</span><ArrowUpRight size={15} className="shrink-0" aria-hidden="true" /><span className="sr-only"> (se deschide într-o filă nouă)</span>
+                  </a>
+                  <StatusBadge state={check.state} />
+                </div>
+                <p className="mt-1 text-xs text-[#555]">{source.selection === "vehicles" ? "Autoturisme" : source.selection === "refurbished-tech" ? "Tehnologie recondiționată" : "Selectată în funcție de căutare"}{source.status === "experimental" ? " · Experimental" : ""}</p>
+                <p className="mt-3 text-[11px] leading-relaxed text-[#555]">{check.detail}</p>
+                <p className="mt-1 text-[11px] text-[#555]">{check.date ? `Verificat: ${check.date.slice(0, 10)}` : "Verificare în așteptare"}</p>
+              </li>)}
+            </ul>
+            {!visibleRows.length && <p className="p-5 text-sm text-[#555]">Nicio sursă {tier === "free" ? "Free" : "Premium"} pentru filtrele alese.</p>}
+          </section>;
+        })}
       </div>
       {!filtered.length && <p className="py-10 text-sm">Nicio sursă pentru filtrele alese. Încearcă alt nume sau selectează toate statusurile.</p>}
     </>}
