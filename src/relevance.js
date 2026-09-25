@@ -1,5 +1,5 @@
 import { understandMarketplaceQuery } from "./query-understanding.js";
-import { normalizeCapacityTerms } from "./query-normalization.js";
+import { normalizeCapacityTerms, normalizeModelTerms } from "./query-normalization.js";
 
 const STOP_WORDS = new Set([
   "a",
@@ -725,7 +725,7 @@ const SIZE_PHRASE_ANCHORS = new Set([
 ]);
 
 export function normalizeText(value = "") {
-  return normalizeCapacityTerms(value)
+  return normalizeCapacityTerms(normalizeModelTerms(value))
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")

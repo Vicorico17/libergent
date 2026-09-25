@@ -1,5 +1,7 @@
+import { normalizeModelTerms } from "./query-normalization.js";
+
 function normalize(value = "") {
-  return String(value)
+  return normalizeModelTerms(value)
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")

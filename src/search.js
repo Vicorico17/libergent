@@ -6,7 +6,7 @@ import { parseVintedMarkdown } from "./parsers/vinted.js";
 import { parseSiteHtml } from "./site-html-parser.js";
 import { getQueryBrandTerms } from "./relevance.js";
 import { buildAbortSignal } from "./abort.js";
-import { normalizeCapacityTerms, normalizeMarketplaceQuery } from "./query-normalization.js";
+import { normalizeCapacityTerms, normalizeMarketplaceQuery, normalizeModelTerms } from "./query-normalization.js";
 import { normalizeSearchProvider } from "./provider-options.js";
 
 const DESKTOP_BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
@@ -14,7 +14,7 @@ const MOBILE_BROWSER_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like 
 const VINTED_DIRECT_HTML_CACHE_SECONDS = 300;
 
 function tokenize(value = "") {
-  return normalizeCapacityTerms(value)
+  return normalizeCapacityTerms(normalizeModelTerms(value))
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
