@@ -56,14 +56,18 @@ function readRecords<T>(key: string): T[] {
     const parsed = JSON.parse(window.localStorage.getItem(key) || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch {
-    window.localStorage.removeItem(key);
+    try { window.localStorage.removeItem(key); } catch { /* Storage can be blocked. */ }
     return [];
   }
 }
 
 function writeRecords<T>(key: string, records: T[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(records));
+  try {
+    window.localStorage.setItem(key, JSON.stringify(records));
+  } catch {
+    // Optional local history must not crash search when storage is unavailable.
+  }
 }
 
 export function readSavedListingIds(userId: string) {

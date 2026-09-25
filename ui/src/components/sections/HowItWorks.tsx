@@ -16,10 +16,11 @@ function formatLiveTime() {
 }
 
 function useLiveTime() {
-  const [t, setT] = useState(() => formatLiveTime());
+  const [t, setT] = useState("--:--:--");
   useEffect(() => {
+    const initial = setTimeout(() => setT(formatLiveTime()), 0);
     const id = setInterval(() => setT(formatLiveTime()), 1000);
-    return () => clearInterval(id);
+    return () => { clearTimeout(initial); clearInterval(id); };
   }, []);
   return t;
 }

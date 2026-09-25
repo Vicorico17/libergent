@@ -503,7 +503,7 @@ function readSearchFiltersStorage(): {
       priceMax: typeof parsed.priceMax === "string" ? parsed.priceMax : fallback.priceMax,
     }
   } catch {
-    window.localStorage.removeItem(SEARCH_FILTERS_STORAGE_KEY)
+    try { window.localStorage.removeItem(SEARCH_FILTERS_STORAGE_KEY) } catch { /* Storage can be blocked. */ }
     return fallback
   }
 }
@@ -2658,7 +2658,7 @@ function SearchResultsContent() {
   const [conditions, setConditions] = useState<Set<string>>(() => readSearchFiltersStorage().conditions)
   const [priceMin, setPriceMin]     = useState(() => readSearchFiltersStorage().priceMin)
   const [priceMax, setPriceMax]     = useState(() => readSearchFiltersStorage().priceMax)
-  const [time, setTime]             = useState(() => formatSearchTime())
+  const [time, setTime]             = useState("--:--")
   const [results, setResults]       = useState<SearchResultItem[]>([])
   const [bestUsedOffer, setBestUsedOffer] = useState<SearchResultItem | null>(null)
   const [closestUsedOffer, setClosestUsedOffer] = useState<SearchResultItem | null>(null)
@@ -2855,14 +2855,14 @@ function SearchResultsContent() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    window.localStorage.setItem(SEARCH_FILTERS_STORAGE_KEY, JSON.stringify({
+    try { window.localStorage.setItem(SEARCH_FILTERS_STORAGE_KEY, JSON.stringify({
       sort,
       sources: [...sources],
       sourceTypes: [...sourceTypes],
       conditions: [...conditions],
       priceMin,
       priceMax,
-    }))
+    })) } catch { /* Keep searching when storage is full or unavailable. */ }
   }, [conditions, priceMax, priceMin, sort, sourceTypes, sources])
 
   useEffect(() => {
@@ -3030,8 +3030,9 @@ function SearchResultsContent() {
   }, [account.userId, accountPlan, effectiveSearchTier, near, query, searchTier])
 
   useEffect(() => {
+    const initial = setTimeout(() => setTime(formatSearchTime()), 0)
     const id = setInterval(() => setTime(formatSearchTime()), 30_000)
-    return () => clearInterval(id)
+    return () => { clearTimeout(initial); clearInterval(id) }
   }, [])
 
   const resetVisibleResults = () => setVisibleCount(INITIAL_VISIBLE_RESULTS)
