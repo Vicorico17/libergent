@@ -1128,8 +1128,10 @@ async function handleApi(request, env, context) {
   if (apiPath === "/api/shop-suggestions") {
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
     const parsedBody = await parseJsonRequest(request);
+    if (parsedBody.error) return json({ ok: false, error: parsedBody.error }, 400);
     try {
-      await insertShopSuggestionToSupabase(normalizeShopSuggestion(parsedBody.data || {}), env);
+      const saved = await insertShopSuggestionToSupabase(normalizeShopSuggestion(parsedBody.data || {}), env);
+      if (!saved) return json({ ok: false, error: "Shop suggestions are temporarily unavailable." }, 503);
       return json({ ok: true, status: "pending" }, 201);
     } catch (error) { return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400); }
   }
