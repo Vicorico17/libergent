@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { label: "Căutare",          href: "/#cautare" },
   { label: "Întrebări",        href: "/#intrebari" },
   { label: "Trenduri",         href: "/trenduri" },
+  { label: "Discovery",        href: "/discovery" },
 ];
 
 const BETA_FEATURES = [
@@ -372,6 +373,11 @@ export default function PricingPage() {
         </main>
 
         <SourceCatalog />
+        <div className="relative z-10 px-6 pb-10 md:px-12">
+          <Link href="/discovery" className="inline-flex min-h-12 items-center gap-3 border-2 border-[#111111] bg-[#dcfce7] px-5 py-3 text-xs font-bold uppercase tracking-wide shadow-[4px_4px_0_#111111] transition-colors hover:bg-[#bbf7d0]">
+            Discovery · vezi statusul tuturor surselor <ArrowRight size={16} />
+          </Link>
+        </div>
 
         {/* Bottom strip */}
         <footer
