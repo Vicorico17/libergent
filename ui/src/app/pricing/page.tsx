@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { LogoIcon } from "@/components/LogoIcon";
 import { AccountNavLink } from "@/components/AccountNavLink";
+import { PremiumNavLink } from "@/components/PremiumNavLink";
 import { PREMIUM_MONTHLY_PRICE_RON } from "@/lib/pricing";
 
 const BG   = "#F3F0E7";
@@ -157,13 +158,13 @@ export default function PricingPage() {
             </span>
           </Link>
 
-          <nav className="order-3 flex w-full items-center justify-center gap-5 text-[11px] uppercase tracking-widest lg:order-none lg:w-auto">
+          <nav className="order-3 flex w-full items-center justify-center gap-3 sm:gap-5 text-[11px] uppercase tracking-widest lg:order-none lg:w-auto">
             {NAV_LINKS.map((l, i) => (
               <div key={l.label} className="flex items-center gap-5">
-                {i > 0 && <div style={{ width: 6, height: 6, background: PINK }} />}
-                <Link href={l.href} className="hover:opacity-60 transition-opacity" style={{ color: INK }}>
+                {i > 0 && <div className="hidden sm:block" style={{ width: 6, height: 6, background: PINK }} />}
+                {l.href === "/pricing" ? <PremiumNavLink /> : <Link href={l.href} className="hover:opacity-60 transition-opacity" style={{ color: INK }}>
                   {l.label}
-                </Link>
+                </Link>}
               </div>
             ))}
           </nav>

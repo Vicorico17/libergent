@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { LogoIcon } from "./LogoIcon";
 import { AccountNavLink } from "./AccountNavLink";
+import { PremiumNavLink } from "./PremiumNavLink";
 
 const TICKER_TEXT =
   "AGENT ACTIV: ROMÂNIA +++ SCANARE MULTI-PLATFORMĂ +++ COMPARARE OFERTE +++ INTELIGENȚĂ ARTIFICIALĂ PENTRU SECOND-HAND";
@@ -88,7 +89,7 @@ export function Navbar() {
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
-          {navLinks.map((link) => (
+          {navLinks.map((link) => link.href === "/pricing" ? <PremiumNavLink key={link.href} /> : (
             <Link
               key={link.label}
               href={link.href}
@@ -135,7 +136,7 @@ export function Navbar() {
         }}
       >
         <div className="px-4 py-4 flex flex-col gap-4">
-          {navLinks.map((link) => (
+          {navLinks.map((link) => link.href === "/pricing" ? <PremiumNavLink key={link.href} onClick={() => setMenuOpen(false)} /> : (
             <Link
               key={link.label}
               href={link.href}
