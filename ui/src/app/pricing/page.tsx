@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { LogoIcon } from "@/components/LogoIcon";
 import { AccountNavLink } from "@/components/AccountNavLink";
-import { SourceCatalog } from "@/components/SourceCatalog";
 import { PREMIUM_MONTHLY_PRICE_RON } from "@/lib/pricing";
 
 const BG   = "#F3F0E7";
@@ -370,13 +369,6 @@ export default function PricingPage() {
 
           </div>
         </main>
-
-        <SourceCatalog />
-        <div className="relative z-10 px-6 pb-10 md:px-12">
-          <Link href="/discovery" className="inline-flex min-h-12 items-center gap-3 border-2 border-[#111111] bg-[#dcfce7] px-5 py-3 text-xs font-bold uppercase tracking-wide shadow-[4px_4px_0_#111111] transition-colors hover:bg-[#bbf7d0]">
-            Discovery · vezi statusul tuturor surselor <ArrowRight size={16} />
-          </Link>
-        </div>
 
         {/* Bottom strip */}
         <footer
