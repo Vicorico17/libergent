@@ -8,18 +8,10 @@ const MONO  = "var(--font-mono-var), monospace";
 
 const NAV_LINKS = {
   Produs: [
-    { label: "Cum funcționează", href: "/#cum-functioneaza" },
     { label: "Căutare", href: "/#cautare" },
-    { label: "Prețuri", href: "/#pricing" },
+    { label: "Discovery", href: "/discovery" },
+    { label: "Premium", href: "/pricing" },
     { label: "Trenduri", href: "/trenduri" },
-    { label: "Discovery · status surse", href: "/discovery" },
-    { label: "Stare servicii", href: "/health" },
-  ],
-  Companie: [
-    { label: "Despre LiberGent", href: "/#cum-functioneaza" },
-    { label: "Întrebări frecvente", href: "/#intrebari" },
-    { label: "Platforme active", href: "/#platforme" },
-    { label: "Trenduri produse", href: "/trenduri" },
   ],
   Legal: [
     { label: "Politică de confidențialitate", href: "/confidentialitate" },
@@ -37,9 +29,9 @@ export function Footer() {
     >
       <div className="max-w-[1280px] mx-auto">
 
-        {/* 4-column grid */}
+        {/* Brand, product links and legal links */}
         <div
-          className="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-0"
+          className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-0"
           style={{ borderBottom: `1px solid ${CREAM}12` }}
         >
           {/* Col 1: Brand */}
@@ -62,7 +54,7 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Cols 2-4: Link groups */}
+          {/* Link groups */}
           {Object.entries(NAV_LINKS).map(([section, items]) => (
             <div
               key={section}
