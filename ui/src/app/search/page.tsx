@@ -312,7 +312,7 @@ function buildSellerMessage(item: SearchResultItem, query: string) {
   const product = item.title || query || "produsul din anunț"
   if (isLikelyVehicleSearch(`${query} ${item.title}`)) {
     return [
-      `Bună! Mă interesează ${product}, văzut pe ${item.source}. Mai este disponibilă?`,
+      `Bună! Sunt asistentul AI LiberGent și contactez în numele unui cumpărător interesat de ${product}, văzut pe ${item.source}. Mai este disponibilă?`,
       `Îmi puteți trimite VIN-ul pentru verificare și să-mi spuneți dacă există istoric service/facturi, daune sau revopsiri?`,
       "Acceptați o verificare într-un service ales de cumpărător înainte de cumpărare? Care este prețul final?",
     ].join(" ")
@@ -1498,6 +1498,7 @@ function useListingImage(item: Pick<SearchResultItem, "id" | "image" | "images">
 
 function SellerMessageActions({ item, query }: { item: SearchResultItem; query: string }) {
   const message = buildSellerMessage(item, query)
+  const dealHref = `/deals?${new URLSearchParams({ url: item.url || "", title: item.title, marketplace: item.source, price: item.priceLabel }).toString()}`
   const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle")
   const [sendError, setSendError] = useState("")
   const [sentTarget, setSentTarget] = useState("")
@@ -1655,6 +1656,7 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
         </p>
       )}
       {item.url && <a href={item.url} target="_blank" rel="noopener noreferrer" onClick={trackOpenContact} className="min-h-10 px-3 py-2 text-[10px] font-bold uppercase underline">Contact pe marketplace</a>}
+      {item.url && <Link href={dealHref} className="min-h-10 px-3 py-2 text-[10px] font-bold uppercase underline">Pregătește negocierea Premium</Link>}
       {sendState === "error" && <p className="basis-full text-[10px] text-[#FF3366]" style={{ fontFamily: MONO }}>{sendError}</p>}
       {sendState === "error" && sendError.includes("Conectează-te") && (
         <Link href={`/auth?next=${encodeURIComponent(`/search?q=${query}`)}`} className="basis-full text-[10px] font-bold uppercase underline" style={{ color: PINK }}>
@@ -2507,6 +2509,8 @@ function ConversationCenter({ enabled, onStatusesChange }: { enabled: boolean; o
   const [conversations, setConversations] = useState<SellerConversation[]>([])
   const [selectedId, setSelectedId] = useState("")
   const [error, setError] = useState("")
+  const [replyText, setReplyText] = useState("")
+  const [replyBusy, setReplyBusy] = useState(false)
   const selected = conversations.find((conversation) => conversation.id === selectedId) || null
 
   async function loadConversations(preferredId = "") {
@@ -2535,6 +2539,36 @@ function ConversationCenter({ enabled, onStatusesChange }: { enabled: boolean; o
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Conversațiile nu au putut fi încărcate.")
     }
+  }
+
+  async function sendReply() {
+    if (!selected || !replyText.trim() || replyBusy) return
+    const message = replyText.trim()
+    if (!window.confirm(`Trimiți acest răspuns către seller?\n\n${message}`)) return
+    setReplyBusy(true)
+    setError("")
+    try {
+      const client = getSupabaseBrowserClient()
+      const session = client ? (await client.auth.getSession()).data.session : null
+      if (!session?.access_token) throw new Error("Sesiunea a expirat. Conectează-te din nou.")
+      const response = await fetch("/api/whatsapp/send", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          conversationId: selected.id,
+          target: selected.sellerPhone,
+          message,
+          listing: { url: selected.listingUrl, title: selected.listingTitle, marketplace: selected.marketplace, price: selected.listingPrice }
+        })
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || "Răspunsul nu a putut fi trimis.")
+      setReplyText("")
+      if (!payload.historySaved) setError("Mesajul a fost preluat, dar istoricul nu a putut fi salvat. Nu îl retrimite automat.")
+      else await loadConversations(selected.id)
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Răspunsul nu a putut fi trimis.")
+    } finally { setReplyBusy(false) }
   }
 
   useEffect(() => {
@@ -2624,6 +2658,11 @@ function ConversationCenter({ enabled, onStatusesChange }: { enabled: boolean; o
                         </div>
                       </div>
                     ))}
+                  </div>
+                  <div className="grid gap-2 border-t border-black p-4">
+                    <label htmlFor="seller-reply" className="text-[10px] font-bold uppercase">Răspunde sellerului</label>
+                    <textarea id="seller-reply" value={replyText} onChange={(event) => setReplyText(event.target.value)} maxLength={2000} rows={3} disabled={replyBusy || selected.status === "unavailable"} className="w-full border border-black bg-white p-3 text-[11px]" placeholder="Scrie răspunsul tău..." />
+                    <button type="button" onClick={sendReply} disabled={replyBusy || !replyText.trim() || selected.status === "unavailable"} className="border border-black bg-black px-4 py-3 text-[10px] font-bold uppercase text-white disabled:opacity-50">{replyBusy ? "Se trimite..." : "Verifică și trimite"}</button>
                   </div>
                   {selected.listingUrl && <a href={selected.listingUrl} target="_blank" rel="noopener noreferrer" className="m-4 flex items-center justify-center gap-2 p-3 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: "white" }}>Deschide listingul <ExternalLink size={12} /></a>}
                 </>

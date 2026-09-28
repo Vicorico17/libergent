@@ -121,3 +121,14 @@ test("findWhatsAppConversationOwner fails closed when a seller number belongs to
 
   assert.equal(owner, null);
 });
+
+test("findWhatsAppConversationOwner leaves replies unassigned when one seller has multiple listings", async (t) => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify([
+    { direction: "outbound", to_number: "+40735577052", raw: { userId: "user-1", listing: { url: "https://example.test/a" } } },
+    { direction: "outbound", to_number: "+40735577052", raw: { userId: "user-1", listing: { url: "https://example.test/b" } } }
+  ]), { status: 200 });
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const owner = await findWhatsAppConversationOwner("+40735577052", { SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "service-role" });
+  assert.equal(owner, null);
+});

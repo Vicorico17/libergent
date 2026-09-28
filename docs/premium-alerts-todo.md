@@ -1,6 +1,6 @@
 # Premium, Product, and Launch TODO
 
-Last prioritized: 2026-09-15
+Last prioritized: 2026-09-28
 Implementation and production status audit: 2026-09-13 (unless noted below)
 
 See [the September launch audit](launch-audit-2026-09-13.md) for the comparison
@@ -12,6 +12,12 @@ paid Premium subscriptions, and tracking the next product work. A checked item
 is implemented or has been explicitly confirmed in the target environment;
 unchecked operational items must be completed before the corresponding test or
 launch.
+
+The Premium seller-conversation goal is an agent that can reach a seller,
+negotiate within a buyer-approved brief, arrange terms, and help the buyer close
+the transaction. The current messaging feature is an initial contact and inbox,
+not that complete service. See the [deal-agent inventory and implementation
+plan](premium-deal-agent.md).
 
 ## Priority and execution order
 
@@ -33,6 +39,7 @@ activating dependent features. Priority does not mean implementation is complete
 | 2 | P0 | Validate advertised sources and search health | Dated source results, useful counts, explicit errors/cache state; fix or demote unreliable sources; details in the marketplace TODO |
 | 3 | P0 | Email/Google login and account ownership | New and returning users pass mobile/desktop acceptance, expiry, resend, callback and ownership checks |
 | 4 | P0 | Existing seller messaging | Controlled-recipient delivery, replies, failures and consent verified; explicit delivery states and supported contact routes |
+| 4a | P1 | Premium deal-agent pilot | Account-owned deal brief and thread, supported channel, buyer-approved follow-ups, explicit offers and terms, pause/stop, buyer-confirmed outcome; see deal-agent plan |
 | 5 | P1 | Source costs and total service economics | Actual usage/rates, cost per useful result and alert scan, margin and fair-use limits for 99 RON/month |
 | 6 | P1 | Billing policy and subscription implementation | Confirm trial/tax/limits, then provider and prices → customer mapping/checkout → signed webhooks/lifecycle → portal/reconciliation and tests |
 | 7 | P1 | Paid onboarding and acquisition measurement | Funnel plan can start now; validate checkout → entitlement → first search/alert after billing works |
@@ -126,6 +133,11 @@ and post-deployment visual acceptance remain open.
 
 - [x] Allow seller messaging actions only for logged-in users.
 - [x] Group message chat and history by listing for the owning account.
+- [x] Implement a local Premium deal brief, explicit stage transitions, price ceiling, pause/resume, buyer acceptance, and buyer-confirmed purchase outcome (September 28; SQL deployment and production acceptance open).
+- [x] Add buyer-approved follow-up replies and durable idempotency for deal-linked WhatsApp sends (September 28; provider receipt and channel-permission acceptance open).
+- [x] Add an optional structured AI reply proposal behind Premium and buyer approval (September 28; requires model configuration and live provider acceptance).
+- [ ] **P1** — Build the Premium deal-agent pilot in [the deal-agent plan](premium-deal-agent.md): buyer brief, verified channel, durable deal and message state, reply and follow-up controls, explicit terms, pause/stop, and buyer-confirmed outcome.
+- [ ] **P1** — Add bounded autonomous negotiation after the pilot proves correct reply attribution, delivery, channel permission, and buyer-controlled limits.
 - [ ] **P0** — Test the full “reach out for me” flow in production: contact discovery, user confirmation, outbound delivery, provider receipt, inbound reply, history, and failure recovery.
 - [x] **P0** — Display provider-evidenced queued, sent, delivered, failed, replied and unavailable states; preserve unknown delivery for historical records (September 15). Real provider receipt callbacks and production delivery acceptance remain open.
 - [ ] **P0** — Confirm each marketplace permits the selected contact mechanism and preserve link-out contact where direct sending is unsupported.

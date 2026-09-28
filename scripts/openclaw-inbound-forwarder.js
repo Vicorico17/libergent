@@ -82,6 +82,15 @@ async function postInbound(message) {
   if (!response.ok) {
     throw new Error(`Webhook failed (${response.status}): ${payload}`);
   }
+  let result;
+  try {
+    result = JSON.parse(payload);
+  } catch {
+    throw new Error("Webhook returned an invalid JSON response.");
+  }
+  if (result?.ok !== true) {
+    throw new Error(`Webhook did not accept the message: ${payload}`);
+  }
   return payload;
 }
 

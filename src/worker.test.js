@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "./worker.js";
+import { buildConversationHistory } from "./conversations.js";
 
 test("Free searches reuse a five-minute snapshot with isolated location and filters", async (t) => {
   const originalCaches = globalThis.caches;
@@ -327,6 +328,112 @@ test("Premium search attempts Kitesurf for every empty selected source before bo
   assert.equal(chromiumDiagnostics.length, 7);
   assert.deepEqual(payload.summary.chromiumFallbackMarketplaces, ["okazii.ro", "compari.ro", "pcgarage.ro", "flanco.ro", "altex.ro", "shopmania.ro", "evomag.ro"]);
   assert.equal(kitesurfDiagnostics.every((entry) => entry.ok === false), true);
+});
+
+test("keeps deal records behind Premium and scopes reads to the authenticated owner", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const seen = [];
+  let premium = false;
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    seen.push(requestUrl);
+    if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
+    if (requestUrl.includes("/user_entitlements")) return new Response(JSON.stringify(premium ? [{ plan: "premium", status: "active" }] : []), { status: 200 });
+    if (requestUrl.includes("/deal_cases")) return new Response(JSON.stringify([]), { status: 200 });
+    throw new Error(`Unexpected fetch: ${requestUrl}`);
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const env = { SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "service-secret" };
+  const request = () => new Request("https://libergent.test/api/deals", { headers: { authorization: "Bearer buyer-token" } });
+  const free = await worker.fetch(request(), env);
+  assert.equal(free.status, 403);
+  assert.equal((await free.json()).code, "premium_required");
+  assert.equal(seen.some((entry) => entry.includes("/deal_cases")), false);
+  premium = true;
+  const paid = await worker.fetch(request(), env);
+  assert.equal(paid.status, 200);
+  assert.equal(new URL(seen.find((entry) => entry.includes("/deal_cases"))).searchParams.get("user_id"), "eq.buyer-1");
+});
+
+test("rejects a deal agreement above the buyer's ceiling before writing", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let patches = 0;
+  globalThis.fetch = async (url, init = {}) => {
+    const requestUrl = String(url);
+    if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
+    if (requestUrl.includes("/user_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
+    if (requestUrl.includes("/deal_cases")) {
+      if (init.method === "PATCH") patches++;
+      return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111", user_id: "buyer-1", stage: "negotiating", paused_at: null, brief: { maxPriceRon: 1800 } }]), { status: 200 });
+    }
+    throw new Error(`Unexpected fetch: ${requestUrl}`);
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const response = await worker.fetch(new Request("https://libergent.test/api/deals/11111111-1111-4111-8111-111111111111", {
+    method: "PATCH", headers: { authorization: "Bearer buyer-token", "content-type": "application/json" },
+    body: JSON.stringify({ action: "terms_agreed", agreedPriceRon: 1900, agreedTerms: "Ridicare" })
+  }), { SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "service-secret" });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /exceeds/);
+  assert.equal(patches, 0);
+});
+
+test("a repeated deal reply returns its saved send attempt without calling the bridge", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const listingUrl = "https://www.olx.ro/d/oferta/test.html";
+  const sellerPhone = "+40722123456";
+  const dealId = "11111111-1111-4111-8111-111111111111";
+  const idempotencyKey = "22222222-2222-4222-8222-222222222222";
+  const row = { message_id: "original", direction: "outbound", to_number: sellerPhone, text: "Salut", received_at: "2026-09-28T10:00:00Z", raw: { userId: "buyer-1", listing: { url: listingUrl, title: "Test OLX" } } };
+  const [conversation] = buildConversationHistory([row], { userId: "buyer-1" });
+  let bridgeCalls = 0;
+  globalThis.fetch = async (url, init = {}) => {
+    const requestUrl = String(url);
+    if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
+    if (requestUrl.includes("/user_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
+    if (requestUrl.includes("/deal_cases")) return new Response(JSON.stringify([{ id: dealId, user_id: "buyer-1", listing_url: listingUrl, stage: "negotiating", brief: { maxPriceRon: 1800 } }]), { status: 200 });
+    if (requestUrl.includes("/whatsapp_messages")) return new Response(JSON.stringify([row]), { status: 200 });
+    if (requestUrl.includes("/deal_send_attempts")) {
+      if (init.method === "POST") return new Response(JSON.stringify([]), { status: 201 });
+      return new Response(JSON.stringify([{ idempotency_key: idempotencyKey, deal_id: dealId, user_id: "buyer-1", seller_phone: sellerPhone, message: "Mulțumesc", status: "accepted", provider_message_id: "provider-1", delivery_status: "sent", history_saved: true }]), { status: 200 });
+    }
+    bridgeCalls++;
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const response = await worker.fetch(new Request("https://libergent.test/api/whatsapp/send", {
+    method: "POST", headers: { authorization: "Bearer buyer-token", "content-type": "application/json" },
+    body: JSON.stringify({ dealId, idempotencyKey, conversationId: conversation.id, target: sellerPhone, message: "Mulțumesc", listing: { url: listingUrl, title: "Test OLX" } })
+  }), { SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "service-secret", OPENCLAW_BRIDGE_URL: "https://bridge.example", OPENCLAW_BRIDGE_TOKEN: "secret" });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).deduplicated, true);
+  assert.equal(bridgeCalls, 0);
+});
+
+test("AI deal proposal requires a configured model and never contacts the seller", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let externalCalls = 0;
+  const dealId = "11111111-1111-4111-8111-111111111111";
+  const listingUrl = "https://www.olx.ro/d/oferta/test.html";
+  globalThis.fetch = async (url) => {
+    const requestUrl = String(url);
+    if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
+    if (requestUrl.includes("/user_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
+    if (requestUrl.includes("/deal_cases")) return new Response(JSON.stringify([{ id: dealId, user_id: "buyer-1", listing_url: listingUrl, listing_title: "Test", stage: "negotiating", brief: { maxPriceRon: 1800, openingOfferRon: 1500, questions: [] } }]), { status: 200 });
+    if (requestUrl.includes("/whatsapp_messages")) return new Response(JSON.stringify([
+      { message_id: "out", direction: "outbound", to_number: "+40722123456", text: "Salut", received_at: "2026-09-28T10:00:00Z", raw: { userId: "buyer-1", listing: { url: listingUrl } } },
+      { message_id: "in", direction: "inbound", from_number: "+40722123456", text: "Ce preț oferiți?", received_at: "2026-09-28T10:01:00Z", raw: { userId: "buyer-1", listing: { url: listingUrl } } }
+    ]), { status: 200 });
+    externalCalls++;
+    throw new Error(`Unexpected external call: ${requestUrl}`);
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const response = await worker.fetch(new Request(`https://libergent.test/api/deals/${dealId}/suggest`, {
+    method: "POST", headers: { authorization: "Bearer buyer-token" }
+  }), { SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "service-secret" });
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /not configured/);
+  assert.equal(externalCalls, 0);
 });
 
 test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {

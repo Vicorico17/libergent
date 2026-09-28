@@ -357,6 +357,9 @@ Counts vary by query and source availability. Failed marketplaces remain represe
 | `POST /api/whatsapp/send` | Authenticated seller outreach through the configured bridge |
 
 The protected `/api/admin/browser-benchmark` endpoint renders one supported marketplace at a time and requires `LIBERGENT_ADMIN_TOKEN` plus the `BROWSER` binding. It accepts `engine=kitesurf` or `engine=chromium`; Kitesurf is the default.
+| `GET/POST /api/deals` | Premium buyer deal briefs and list |
+| `GET/PATCH /api/deals/:id` | Premium deal details, approved stage changes, and seller-conversation context |
+| `POST /api/deals/:id/suggest` | Optional server-side AI reply proposal for buyer review |
 
 To test the complete marketplace registry with category-appropriate queries after deploying the Worker:
 
@@ -460,6 +463,10 @@ Client-side Google Analytics is enabled only when `NEXT_PUBLIC_GA_MEASUREMENT_ID
 Seller conversation APIs validate the Supabase access token and filter history by account ID. Direct client access to WhatsApp message rows is disabled through RLS. Ambiguous inbound ownership is intentionally left unassigned rather than risking cross-account disclosure. Bridge setup is documented in [docs/openclaw-bridge.md](docs/openclaw-bridge.md).
 
 ## Cloudflare deployment
+
+The Premium deal pilot is implemented locally at `/deals`. Before using it against a Supabase project, apply [the deal schema](supabase/deals.sql) and configure the existing Supabase service credentials. The deal API checks Premium entitlement and account ownership. Deal-linked replies reserve an idempotent send attempt before calling the bridge. The initial message is a draft for an allowed seller-contact route; autonomous negotiation, channel-permission review, provider receipts, and production acceptance remain open. See [the deal-agent plan](docs/premium-deal-agent.md).
+
+Set `OPENAI_API_KEY` and `DEAL_AGENT_OPENAI_MODEL` to enable the optional reply proposal button. The server sends the buyer brief and the last six conversation messages to the configured OpenAI model with `store: false`, validates the structured result against the buyer's price ceiling, and returns an editable draft. It never sends the model proposal to the seller without buyer confirmation. The endpoint remains unavailable when either setting is absent.
 
 `wrangler.toml` configures the Worker, static assets from `ui/out`, Node compatibility, and the `BROWSER` binding.
 

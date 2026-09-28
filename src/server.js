@@ -19,6 +19,7 @@ import { buildSourceCatalog } from "./source-catalog.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { resolveViewerLocation } from "./location-intelligence.js";
+import worker from "./worker.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -221,6 +222,19 @@ const server = http.createServer(async (req, res) => {
   const apiPath = normalizeApiPathname(url.pathname);
 
   if (apiPath === "/api/sources" && req.method === "GET") {
+  if (apiPath === "/api/deals" || apiPath.startsWith("/api/deals/")) {
+    const parsed = req.method === "POST" || req.method === "PATCH" ? await readJsonBody(req) : null;
+    if (parsed?.error) { sendJson(res, parsed.error.includes("large") ? 413 : 400, { error: parsed.error }); return; }
+    const response = await worker.fetch(new Request(url, {
+      method: req.method,
+      headers: { authorization: String(req.headers.authorization || ""), "content-type": "application/json" },
+      ...(parsed ? { body: JSON.stringify(parsed.data) } : {})
+    }), process.env, {});
+    res.writeHead(response.status, { "Content-Type": response.headers.get("content-type") || "application/json" });
+    res.end(await response.text());
+    return;
+  }
+
     sendJson(res, 200, { sources: buildSourceCatalog() });
     return;
   }

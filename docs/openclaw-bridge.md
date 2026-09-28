@@ -29,4 +29,6 @@ The POST endpoint expects an `Authorization: Bearer ...` header and:
 }
 ```
 
-The LiberGent backend then uses `OPENCLAW_BRIDGE_URL` and `OPENCLAW_BRIDGE_TOKEN` to call the bridge. Inbound messages still need a separate OpenClaw plugin/forwarder because this deployment does not expose a confirmed generic inbound webhook.
+The LiberGent backend then uses `OPENCLAW_BRIDGE_URL` and `OPENCLAW_BRIDGE_TOKEN` to call the bridge. The repository includes `scripts/openclaw-inbound-forwarder.js`, which polls OpenClaw session files and posts messages to the token-protected `/api/openclaw/inbound` endpoint. Its deployment and reliable receipt behavior still need production acceptance; use a supported provider event or webhook integration when available.
+
+Deal-linked replies pass a stable `idempotencyKey` to the bridge and reserve the attempt in `deal_send_attempts` before delivery. Apply `supabase/deals.sql` before enabling the Premium deal pilot. A timed-out or `unknown` attempt must be reconciled against the provider before starting a new attempt; the same key is never sent again by the API.

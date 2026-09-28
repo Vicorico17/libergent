@@ -14,6 +14,9 @@ const DEFAULT_EMAIL_LEADS_TABLE = "email_leads";
 const DEFAULT_SAVED_SEARCHES_TABLE = "saved_searches";
 const DEFAULT_WHATSAPP_MESSAGES_TABLE = "whatsapp_messages";
 const DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE = "vehicle_price_observations";
+const DEFAULT_DEAL_CASES_TABLE = "deal_cases";
+const DEFAULT_DEAL_SEND_ATTEMPTS_TABLE = "deal_send_attempts";
+const DEFAULT_DEAL_EVENTS_TABLE = "deal_events";
 const DEFAULT_SHOP_SUGGESTIONS_TABLE = "shop_suggestions";
 const DEFAULT_USER_ENTITLEMENTS_TABLE = "user_entitlements";
 const DEFAULT_ALERT_PROFILES_TABLE = "alert_profiles";
@@ -41,6 +44,9 @@ function getSupabaseConfig(env = process.env) {
   const savedSearchesTable = normalizePublicRestTableName(env.SUPABASE_SAVED_SEARCHES_TABLE, DEFAULT_SAVED_SEARCHES_TABLE);
   const whatsappMessagesTable = normalizePublicRestTableName(env.SUPABASE_WHATSAPP_MESSAGES_TABLE, DEFAULT_WHATSAPP_MESSAGES_TABLE);
   const vehiclePriceObservationsTable = normalizePublicRestTableName(env.SUPABASE_VEHICLE_PRICE_OBSERVATIONS_TABLE, DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE);
+  const dealCasesTable = normalizePublicRestTableName(env.SUPABASE_DEAL_CASES_TABLE, DEFAULT_DEAL_CASES_TABLE);
+  const dealSendAttemptsTable = normalizePublicRestTableName(env.SUPABASE_DEAL_SEND_ATTEMPTS_TABLE, DEFAULT_DEAL_SEND_ATTEMPTS_TABLE);
+  const dealEventsTable = normalizePublicRestTableName(env.SUPABASE_DEAL_EVENTS_TABLE, DEFAULT_DEAL_EVENTS_TABLE);
   const shopSuggestionsTable = normalizePublicRestTableName(env.SUPABASE_SHOP_SUGGESTIONS_TABLE, DEFAULT_SHOP_SUGGESTIONS_TABLE);
   const userEntitlementsTable = normalizePublicRestTableName(env.SUPABASE_USER_ENTITLEMENTS_TABLE, DEFAULT_USER_ENTITLEMENTS_TABLE);
   const alertProfilesTable = normalizePublicRestTableName(env.SUPABASE_ALERT_PROFILES_TABLE, DEFAULT_ALERT_PROFILES_TABLE);
@@ -52,7 +58,7 @@ function getSupabaseConfig(env = process.env) {
     return null;
   }
 
-  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable, vehiclePriceObservationsTable, shopSuggestionsTable, userEntitlementsTable, alertProfilesTable, alertListingStateTable, alertEventsTable, notificationDeliveriesTable };
+  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable, dealCasesTable, dealSendAttemptsTable, dealEventsTable, vehiclePriceObservationsTable, shopSuggestionsTable, userEntitlementsTable, alertProfilesTable, alertListingStateTable, alertEventsTable, notificationDeliveriesTable };
 }
 
 function getRequestHeaders(apiKey) {
@@ -603,7 +609,7 @@ export async function readWhatsAppMessagesFromSupabase({ limit = 500, userId = "
   if (!config) return [];
   const query = new URLSearchParams({
     select: "message_id,direction,channel,from_number,to_number,text,received_at,raw,created_at",
-    order: "received_at.asc",
+    order: "received_at.desc",
     limit: String(Math.max(1, Math.min(limit, 1000)))
   });
   if (userId) query.set("raw->>userId", `eq.${userId}`);
@@ -616,13 +622,88 @@ export async function readWhatsAppMessagesFromSupabase({ limit = 500, userId = "
 export async function findWhatsAppConversationOwner(sellerPhone, env = process.env) {
   const rows = await readWhatsAppMessagesFromSupabase({ limit: 1000, sellerPhone, direction: "outbound" }, env);
   const matchingOutbound = rows.filter((row) =>
+  if (rows.length >= 1000) return null;
     row.direction === "outbound" &&
     String(row.to_number || "").trim() === String(sellerPhone || "").trim() &&
     row.raw?.userId
   );
   const ownerIds = new Set(matchingOutbound.map((row) => String(row.raw.userId)));
-  if (ownerIds.size !== 1) return null;
-  return matchingOutbound[matchingOutbound.length - 1]?.raw || null;
+  const listingUrls = new Set(matchingOutbound.map((row) => String(row.raw.listing?.url || "")));
+  if (ownerIds.size !== 1 || listingUrls.size !== 1) return null;
+  return matchingOutbound[0]?.raw || null;
+}
+
+export async function listDealCasesFromSupabase(userId, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ select: "*", user_id: `eq.${userId}`, order: "updated_at.desc", limit: "100" });
+  const rows = await requestSupabase(`${config.dealCasesTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function getDealCaseFromSupabase(id, userId, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ select: "*", id: `eq.${id}`, user_id: `eq.${userId}`, limit: "1" });
+  const rows = await requestSupabase(`${config.dealCasesTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+export async function createDealCaseInSupabase(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const rows = await requestSupabase(config.dealCasesTable, {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(entry)
+  }, env);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+export async function updateDealCaseInSupabase(id, userId, changes, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ id: `eq.${id}`, user_id: `eq.${userId}` });
+  const rows = await requestSupabase(`${config.dealCasesTable}?${query.toString()}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ ...changes, updated_at: new Date().toISOString() })
+  }, env);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+export async function listDealEventsFromSupabase(id, userId, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ select: "id,event_type,stage,details,created_at", deal_id: `eq.${id}`, user_id: `eq.${userId}`, order: "created_at.desc", limit: "100" });
+  const rows = await requestSupabase(`${config.dealEventsTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function reserveDealSendAttempt(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const inserted = await requestSupabase(`${config.dealSendAttemptsTable}?on_conflict=idempotency_key`, {
+    method: "POST",
+    headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
+    body: JSON.stringify(entry)
+  }, env);
+  if (Array.isArray(inserted) && inserted[0]) return { created: true, attempt: inserted[0] };
+  const query = new URLSearchParams({ select: "*", idempotency_key: `eq.${entry.idempotency_key}`, user_id: `eq.${entry.user_id}`, limit: "1" });
+  const existing = await requestSupabase(`${config.dealSendAttemptsTable}?${query.toString()}`, { method: "GET" }, env);
+  return { created: false, attempt: Array.isArray(existing) ? existing[0] || null : null };
+}
+
+export async function updateDealSendAttempt(key, userId, changes, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ idempotency_key: `eq.${key}`, user_id: `eq.${userId}` });
+  const rows = await requestSupabase(`${config.dealSendAttemptsTable}?${query.toString()}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ ...changes, updated_at: new Date().toISOString() })
+  }, env);
+  return Array.isArray(rows) ? rows[0] || null : null;
 }
 
 export async function readSearchEventsFromSupabase({ limit = MAX_HISTORY_ENTRIES } = {}, env = process.env) {

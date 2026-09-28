@@ -41,6 +41,15 @@ test("marks a contacted listing unavailable from the seller reply", () => {
   assert.equal(conversation.status, "unavailable");
 });
 
+test("does not mark a deal agreed from seller wording alone", () => {
+  const [conversation] = buildConversationHistory([
+    { message_id: "out", direction: "outbound", to_number: "+40722000000", text: "Acceptați?", received_at: "2026-07-19T10:00:00Z", raw: { listing: { url: "https://example.test/a" } } },
+    { message_id: "in", direction: "inbound", from_number: "+40722000000", text: "De acord, rămâne stabilit", received_at: "2026-07-19T10:01:00Z", raw: {} }
+  ]);
+
+  assert.equal(conversation.status, "replied");
+});
+
 test("delivery status requires provider evidence and preserves failure and queue states", () => {
   for (const [raw, expected] of [
     [{}, "unknown"], [{ deliveryStatus: "queued" }, "queued"],

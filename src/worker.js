@@ -1,6 +1,8 @@
 import { searchAcrossSites } from "./app.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildConversationHistory, getConversationById, normalizeDeliveryStatus } from "./conversations.js";
+import { buildDealOpeningDraft, buildDealReplyDraft, normalizeDealChange, normalizeDealCreate } from "./deals.js";
+import { generateDealReplyWithModel } from "./deal-ai.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
 import { runMarketplaceHealthChecks } from "./health.js";
 import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
@@ -8,6 +10,7 @@ import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { buildAlertEvents, MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
 import { completeAlertProfileCheck, createAlertProfileInSupabase, deleteAlertProfileInSupabase, findWhatsAppConversationOwner, insertAlertEventsInSupabase, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertListingStatesFromSupabase, listAlertProfilesFromSupabase, listDueAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, readPremiumEntitlement, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, recordNotificationDeliveryInSupabase, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase, upsertAlertListingStatesInSupabase } from "./supabase.js";
+import { createDealCaseInSupabase, getDealCaseFromSupabase, listDealCasesFromSupabase, listDealEventsFromSupabase, reserveDealSendAttempt, updateDealCaseInSupabase, updateDealSendAttempt } from "./supabase.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { normalizeOfferFeedbackPayload } from "./feedback.js";
 import { buildSourceCatalog } from "./source-catalog.js";
@@ -1218,6 +1221,66 @@ async function handleApi(request, env, context) {
     if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
     const auth = await authenticateSupabaseUser(request, env);
     if (!auth.user) return json({ error: auth.error }, auth.status);
+  if (apiPath === "/api/deals" || apiPath.startsWith("/api/deals/")) {
+    if (!isSupabaseConfigured(env)) return json({ error: "Supabase is not configured." }, 503);
+    const premium = await authenticatePremiumUser(request, env, "Asistentul de negociere este disponibil în Premium.");
+    if (premium.response) return premium.response;
+    const userId = premium.user.id;
+    const [dealId = "", subroute = "", extra = ""] = apiPath === "/api/deals" ? [] : apiPath.slice("/api/deals/".length).split("/");
+    if (dealId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dealId)) return json({ error: "Invalid deal ID." }, 400);
+    if (extra || (subroute && subroute !== "suggest")) return json({ error: "Not found" }, 404);
+
+    try {
+      if (request.method === "POST" && dealId && subroute === "suggest") {
+        const deal = await getDealCaseFromSupabase(dealId, userId, env);
+        if (!deal) return json({ error: "Deal not found." }, 404);
+        const rows = await readWhatsAppMessagesFromSupabase({ limit: 1000, userId }, env);
+        const conversation = buildConversationHistory(rows, { userId }).find((item) => item.listingUrl === deal.listing_url && item.messages.at(-1)?.direction === "inbound");
+        if (!conversation || !buildDealReplyDraft(deal, conversation)) return json({ error: "No active seller reply to draft from." }, 409);
+        try {
+          return json({ ok: true, conversationId: conversation.id, proposal: await generateDealReplyWithModel(deal, conversation, env) });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return json({ error: message }, message.includes("not configured") ? 503 : 502);
+        }
+      }
+      if (request.method === "GET" && !subroute) {
+        if (dealId) {
+          const deal = await getDealCaseFromSupabase(dealId, userId, env);
+          if (!deal) return json({ error: "Deal not found." }, 404);
+          const rows = await readWhatsAppMessagesFromSupabase({ limit: 1000, userId }, env);
+          const conversations = buildConversationHistory(rows, { userId }).filter((item) => item.listingUrl === deal.listing_url);
+          const replyConversation = conversations.find((item) => item.messages.at(-1)?.direction === "inbound");
+          const events = await listDealEventsFromSupabase(dealId, userId, env);
+          return json({ ok: true, deal, events, openingDraft: buildDealOpeningDraft(deal), conversations,
+            replyDraft: buildDealReplyDraft(deal, replyConversation), replyConversationId: replyConversation?.id || null });
+        }
+        return json({ ok: true, deals: await listDealCasesFromSupabase(userId, env) });
+      }
+      if (request.method === "POST" && !dealId) {
+        const parsed = await parseJsonRequest(request);
+        if (parsed.error) return json({ error: parsed.error }, parsed.error.includes("large") ? 413 : 400);
+        const entry = normalizeDealCreate(parsed.data || {});
+        entry.listing_url = parseSupportedMarketplaceUrl(entry.listing_url).toString();
+        const deal = await createDealCaseInSupabase({ ...entry, user_id: userId }, env);
+        return json({ ok: true, deal, openingDraft: buildDealOpeningDraft(deal) }, 201);
+      }
+      if (request.method === "PATCH" && dealId && !subroute) {
+        const current = await getDealCaseFromSupabase(dealId, userId, env);
+        if (!current) return json({ error: "Deal not found." }, 404);
+        const parsed = await parseJsonRequest(request);
+        if (parsed.error) return json({ error: parsed.error }, parsed.error.includes("large") ? 413 : 400);
+        const changes = normalizeDealChange(parsed.data || {}, current);
+        const deal = await updateDealCaseInSupabase(dealId, userId, changes, env);
+        return deal ? json({ ok: true, deal, openingDraft: buildDealOpeningDraft(deal) }) : json({ error: "Deal not found." }, 404);
+      }
+      return json({ error: "Method not allowed" }, 405);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return json({ ok: false, error: message }, /Supabase request failed/.test(message) ? 500 : 400);
+    }
+  }
+
     if (!isSupabaseConfigured(env)) return json({ error: "Supabase is not configured." }, 503);
 
     try {
@@ -1266,11 +1329,64 @@ async function handleApi(request, env, context) {
       const bridgeUrl = String(env.OPENCLAW_BRIDGE_URL).replace(/\/+$/, "");
       const response = await fetch(`${bridgeUrl}/whatsapp/send`, {
         method: "POST",
+    let dealAttemptKey = "";
+    if (body.dealId) {
+      if (!body.conversationId) return json({ error: "Deal replies require an existing conversation." }, 400);
+      const entitlement = await readPremiumEntitlement(auth.user.id, auth.user.email || "", env).catch(() => ({ active: false }));
+      if (!entitlement.active) return json({ error: "Premium required for deal-agent messages.", code: "premium_required" }, 403);
+      dealAttemptKey = String(body.idempotencyKey || "");
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(dealAttemptKey)) {
+        return json({ error: "A valid idempotency key is required for deal messages." }, 400);
+      }
+      try {
+        const deal = await getDealCaseFromSupabase(String(body.dealId), auth.user.id, env);
+        if (!deal || deal.listing_url !== listing.url) return json({ error: "Deal not found for this listing." }, 404);
+        if (deal.paused_at || ["draft", "completed", "lost", "cancelled"].includes(deal.stage)) return json({ error: "This deal is not active for replies." }, 409);
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+      }
+    }
+
+    if (body.conversationId) {
+      try {
+        const rows = await readWhatsAppMessagesFromSupabase({ limit: 1000, userId: auth.user.id }, env);
+        const conversation = getConversationById(rows, String(body.conversationId), { userId: auth.user.id });
+        if (!conversation || conversation.sellerPhone !== target || conversation.listingUrl !== listing.url) {
+          return json({ ok: false, error: "Conversation not found for this listing and seller." }, 404);
+        }
+        const lastInbound = [...conversation.messages].reverse().find((item) => item.direction === "inbound");
+        if (conversation.status === "unavailable" || /nu mai (trimite|scrie)|oprește|opreste|\bstop\b/i.test(lastInbound?.text || "")) {
+          return json({ ok: false, error: "Seller contact has stopped for this conversation." }, 409);
+        }
+      } catch (error) {
+        return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 500);
+      }
+    }
+
+    if (dealAttemptKey) {
+      try {
+        const { created, attempt } = await reserveDealSendAttempt({
+          idempotency_key: dealAttemptKey, deal_id: String(body.dealId), user_id: auth.user.id,
+          seller_phone: target, message
+        }, env);
+        if (!created) {
+          if (!attempt || attempt.deal_id !== String(body.dealId) || attempt.seller_phone !== target || attempt.message !== message) {
+            return json({ error: "Idempotency key belongs to another request." }, 409);
+          }
+          if (attempt.status === "accepted") return json({ ok: true, deduplicated: true, target, messageId: attempt.provider_message_id,
+            deliveryStatus: attempt.delivery_status, historySaved: Boolean(attempt.history_saved) });
+          return json({ ok: false, error: `Send attempt is ${attempt.status}; review its outcome before sending again.`, code: "send_attempt_exists" }, 409);
+        }
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : String(error) }, 503);
+      }
+    }
+
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${env.OPENCLAW_BRIDGE_TOKEN}`
         },
-        body: JSON.stringify({ target, message })
+        body: JSON.stringify({ target, message, ...(dealAttemptKey ? { idempotencyKey: dealAttemptKey } : {}) })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || normalizeDeliveryStatus(payload) === "failed") {
@@ -1278,6 +1394,9 @@ async function handleApi(request, env, context) {
       }
       const deliveryStatus = normalizeDeliveryStatus(payload, "queued");
       const messageId = String(payload.messageId || payload.result?.messageId || `outbound:${target}:${Date.now()}`);
+        if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
+          status: payload.ok === false ? "failed" : "unknown", error: String(payload.error || `Bridge returned ${response.status}`).slice(0, 500)
+        }, env).catch(() => null);
       const timestamp = new Date().toISOString();
       let historySaved = false;
       let historyError = "";
@@ -1296,6 +1415,10 @@ async function handleApi(request, env, context) {
         message_id: messageId,
         direction: "outbound",
         from_number: "libergent-agent",
+      if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
+        status: "accepted", provider_message_id: messageId, delivery_status: deliveryStatus, history_saved: historySaved,
+        error: historyError.slice(0, 500)
+      }, env);
         to_number: target,
         text: message,
         received_at: timestamp,
@@ -1315,6 +1438,9 @@ async function handleApi(request, env, context) {
     }
   }
 
+      if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
+        status: "unknown", error: (error instanceof Error ? error.message : String(error)).slice(0, 500)
+      }, env).catch(() => null);
   if (apiPath === "/api/vehicle/price-history") {
     if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
     try {

@@ -38,12 +38,12 @@ function readJson(req) {
   });
 }
 
-function runOpenClawMessage({ target, message, media, replyTo }) {
+function runOpenClawMessage({ target, message, media, replyTo, idempotencyKey }) {
   const args = CONTAINER
     ? ["exec", CONTAINER, "openclaw", "gateway", "call", "send"]
     : ["gateway", "call", "send"];
   const params = {
-    idempotencyKey: "bridge-" + Date.now() + "-" + randomUUID(),
+    idempotencyKey: idempotencyKey || "bridge-" + Date.now() + "-" + randomUUID(),
     channel: "whatsapp",
     to: target,
     message
@@ -100,13 +100,18 @@ const server = http.createServer(async (req, res) => {
   const message = String(body.message || "").trim();
   const media = String(body.media || "").trim();
   const replyTo = String(body.replyTo || "").trim();
+  const idempotencyKey = String(body.idempotencyKey || "").trim();
+  if (idempotencyKey && !/^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(idempotencyKey)) {
+    json(res, 400, { error: "Invalid idempotency key." });
+    return;
+  }
   if (!/^\+\d{8,15}$/.test(target) || !message || message.length > 8_000) {
     json(res, 400, { error: "Expected an E.164 target and a non-empty message." });
     return;
   }
 
   try {
-    json(res, 200, { ok: true, result: await runOpenClawMessage({ target, message, media, replyTo }) });
+    json(res, 200, { ok: true, result: await runOpenClawMessage({ target, message, media, replyTo, idempotencyKey }) });
   } catch (error) {
     json(res, 502, { ok: false, error: error instanceof Error ? error.message : String(error) });
   }
