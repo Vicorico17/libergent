@@ -10,7 +10,7 @@ All 117 registered sources received two category-appropriate direct search check
 | No accepted offers, requests failed | 61 |
 | Total | 117 |
 
-After this direct audit, local Cloudflare Browser Run checks recovered JYSK, IKEA, F64, and Bookzone. Their search-card prices were checked against representative product pages after the three incorrect parsers were repaired. Discovery now shows 41 green and 76 red sources, with these four labeled as browser evidence. The table above remains the direct/production baseline.
+After this direct audit, local Cloudflare Browser Run checks recovered JYSK, IKEA, F64, and Bookzone. Their search-card prices were checked against representative product pages after the three incorrect parsers were repaired. Seven further direct search recoveries bring Discovery to 48 green and 69 red sources. The four browser recoveries remain labeled as browser evidence. The table above remains the original direct/production baseline.
 
 The 62 sources without useful direct responses split into 24 with a 404 search URL, 20 with a 403/429 or challenge, nine with a soft error page or lost search redirect, eight with a network or other HTTP failure, and one that timed out after 15 seconds. OLX is in the local 403 group but returned offers through the production Worker, so Discovery shows 61 red failures. The source checks now recognize maintenance pages, parked domains, explicit error pages, search redirects to home pages, and redirects to another retailer instead of treating their HTTP 200 responses as empty searches. The longer validation timeout avoids classifying a merely slow response as a failure at eight seconds.
 
@@ -42,6 +42,10 @@ This audit repaired and rechecked:
 
 The corrected search forms for Bookzone, AutoHut, and Mezoni respond but did not yield accepted offers in the representative direct queries. Other red sources remain red until a relevant product with a trustworthy price is extracted. The direct audit did not use an authenticated scraping provider; a later local Cloudflare Browser Run check used the Worker's `BROWSER` binding.
 
+## Further direct search recoveries
+
+Seven sources now return accepted product cards through corrected search routes. Fashion Days returned 19 and 19 fashion offers; Footshop 20 and 18; Mobexpert 20 and four furniture offers; MAKEUP one perfume offer; PlayBike seven bicycles; Kondela 20 and 20 furniture offers; and ITGalaxy two and two matching laptop/phone offers. These checks use the same direct provider and relevance filter as the original audit. Footshop, Mobexpert, MAKEUP, Fashion Days, and PlayBike have source-specific parsers for their current listing formats. The PlayBike price and a Mobexpert price were also matched against their product pages; Kondela search and product JSON-LD agree for a sampled sofa. The remaining source statuses are point-in-time observations.
+
 ## Browser recovery check
 
 The Premium Worker tries Kitesurf after a failed or empty direct search. A bounded Chromium pass handles selected remaining sources. Local Browser Run worked without a Cloudflare account login via `wrangler dev --local`. The protected benchmark endpoint and `scripts/benchmark-kitesurf.js --state=red` were used to inspect failed Discovery sources. The current account has no configured Cloudflare API credentials, so these browser findings are local and are not a production Worker smoke test.
@@ -55,8 +59,8 @@ In the 19-source batch of direct 403/challenge failures, Kitesurf still encounte
 | Cause | Sources |
 | --- | --- |
 | 403/429 or challenge (19) | okazii.ro, price.ro, compari.ro, pcgarage.ro, flanco.ro, vexio.ro, avstore.ro, xxxlutz.ro, mathaus.ro, arabesque.ro, decathlon.ro, sportisimo.ro, thomann.de, carturesti.ro, noriel.ro, notino.ro, drmax.ro, helpnet.ro, elefant.ro |
-| Completed without accepted offers (15) | shopmania.ro, evomag.ro, altex.ro, aboutyou.ro, mobexpert.ro, mezoni.ro, leroymerlin.ro, hornbach.ro, ambient.ro, scule.ro, intersport.ro, 4fstore.ro, sportano.ro, autohut.ro, automag.ro |
-| 404 search URL (24) | itgalaxy.ro, mediagalaxy.ro, fashiondays.ro, deichmann.com, jdsports.ro, footshop.ro, fashionhouse.ro, bonami.ro, kondela.ro, bricodepot.ro, ferex.ro, miculmester.ro, bike24.ro, playbike.ro, zeedo.ro, pravaliacucarti.ro, autokarma.ro, unixauto.ro, nichiduta.ro, douglas.ro, sephora.ro, esteto.ro, makeup.ro, farmec.ro |
+| Completed without accepted offers (14) | shopmania.ro, evomag.ro, altex.ro, aboutyou.ro, mezoni.ro, leroymerlin.ro, hornbach.ro, ambient.ro, scule.ro, intersport.ro, 4fstore.ro, sportano.ro, autohut.ro, automag.ro |
+| 404 search URL (18) | mediagalaxy.ro, deichmann.com, jdsports.ro, fashionhouse.ro, bonami.ro, bricodepot.ro, ferex.ro, miculmester.ro, bike24.ro, zeedo.ro, pravaliacucarti.ro, autokarma.ro, unixauto.ro, nichiduta.ro, douglas.ro, sephora.ro, esteto.ro, farmec.ro |
 | Soft error page or redirect (9) | a2t.ro, answear.ro, ccc.eu, hervis.ro, musicshop.ro, librarie.net, autodoc.ro, pieseauto.ro, bebetei.ro |
 | Network or other HTTP failure (8) | badabum.ro, sizeer.ro, dormeo.ro, egradini.ro, tenis-shop.ro, okian.ro, roata.ro, bricksdepot.ro |
 | Timeout (1) | somproduct.ro |
@@ -72,4 +76,4 @@ LIBERGENT_MOCK_SEARCH=0 LIBERGENT_MOCK_PROVIDER=0 node src/cli.js validate-shops
 node scripts/refresh-source-validation-snapshot.js /tmp/libergent-source-validation.json
 ```
 
-The refresh script requires a complete 117-source report. Production Free response JSON files can be passed as additional arguments. To publish a browser recovery, pass `--browser-report=/path/to/benchmark.json --browser-verified=site.example` after checking product relevance and prices against the source pages. This keeps the direct result intact and labels the browser evidence separately. Review relevance and prices before promoting an experimental source to normal search routing.
+The refresh script requires a complete 117-source report. Production Free response JSON files can be passed as additional arguments. Pass `--update-report=/path/to/partial-validation.json` for each later direct recheck. To publish a browser recovery, pass `--browser-report=/path/to/benchmark.json --browser-verified=site.example` after checking product relevance and prices against the source pages. This keeps the direct result intact and labels the browser evidence separately. Review relevance and prices before promoting an experimental source to normal search routing.

@@ -4,9 +4,11 @@ import { SOURCE_VALIDATION_SNAPSHOT } from "../src/source-validation-snapshot.js
 
 const [reportPath, ...evidenceArgs] = process.argv.slice(2);
 if (!reportPath) {
-  throw new Error("Usage: node scripts/refresh-source-validation-snapshot.js <validate-shops.json> [production-free-response.json ...] [--browser-report=path --browser-verified=site,...]");
+  throw new Error("Usage: node scripts/refresh-source-validation-snapshot.js <validate-shops.json> [production-free-response.json ...] [--update-report=partial-validation.json] [--browser-report=path --browser-verified=site,...]");
 }
 const productionPaths = evidenceArgs.filter((arg) => !arg.startsWith("--"));
+const updatePaths = evidenceArgs.filter((arg) => arg.startsWith("--update-report="))
+  .map((arg) => arg.slice("--update-report=".length));
 const browserReportPaths = evidenceArgs.filter((arg) => arg.startsWith("--browser-report="))
   .map((arg) => arg.slice("--browser-report=".length));
 const verifiedBrowserSites = new Set((evidenceArgs.find((arg) => arg.startsWith("--browser-verified="))?.slice("--browser-verified=".length) || "")
@@ -16,6 +18,18 @@ if (verifiedBrowserSites.size && !browserReportPaths.length) throw new Error("--
 const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
 const expectedSites = Object.keys(SITES);
 const reportedSites = new Map((report.sources || []).map((source) => [source.site, source]));
+for (const updatePath of updatePaths) {
+  const update = JSON.parse(fs.readFileSync(updatePath, "utf8"));
+  if (!Number.isFinite(Date.parse(update.checkedAt)) || !Array.isArray(update.sources)) {
+    throw new Error(`Invalid partial validation report: ${updatePath}`);
+  }
+  for (const source of update.sources) {
+    if (!expectedSites.includes(source.site) || !Array.isArray(source.checks) || !source.checks.length) {
+      throw new Error(`Invalid source in partial validation report: ${source.site}`);
+    }
+    reportedSites.set(source.site, { ...source, checkedAt: update.checkedAt });
+  }
+}
 if (reportedSites.size !== expectedSites.length || expectedSites.some((site) => !reportedSites.has(site))) {
   throw new Error(`Expected one validation result for all ${expectedSites.length} registered sources.`);
 }

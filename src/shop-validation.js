@@ -34,6 +34,8 @@ const SITE_VALIDATION_QUERIES = {
   "epiesa.ro": ["filtru ulei", "placute frana"],
   "photosetup.ro": ["sony a7", "canon eos"],
   "modlet.ro": ["pantofi sport dama", "sandale dama"],
+  "playbike.ro": ["bicicleta mtb", "bicicleta cross"],
+  "itgalaxy.ro": ["lenovo v15", "iphone 15 512gb"],
   "cel.ro": ["ssd samsung 1tb", "laptop lenovo"]
 };
 const VALIDATION_TIMEOUT_MS = 15_000;

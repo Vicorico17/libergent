@@ -24,6 +24,14 @@ const VERIFIED_RETAIL_SEARCH_URLS = {
   "photosetup.ro": (query) => `https://www.photosetup.ro/search?q=${encodeSearchText(query)}`
 };
 
+const RECOVERED_EXPERIMENTAL_SEARCH_URLS = {
+  "footshop.ro": (query) => `https://www.footshop.ro/ro/index.php?controller=search&search_query=${encodeSearchText(query)}`,
+  "makeup.ro": (query) => `https://makeup.ro/search/?q=${encodeSearchText(query)}`,
+  "playbike.ro": (query) => `https://www.playbike.ro/cautare?cautare=${encodeSearchText(query)}`,
+  "itgalaxy.ro": (query) => `https://www.itgalaxy.ro/cauta/?search=${encodeSearchText(query)}`,
+  "kondela.ro": (query) => `https://www.kondela.ro/rezultatele-cautarii/?term=${encodeSearchText(query)}`
+};
+
 function slugifyRetailSearchPath(value) {
   return value
     .trim()
@@ -985,7 +993,7 @@ export const SITES = {
     defaultLimit: 36,
     defaultMaxPages: 1,
     searchUrl(query) {
-      return `https://www.fashiondays.ro/g/search/?q=${encodeSearchText(query)}`;
+      return `https://www.fashiondays.ro/search/?q=${encodeSearchText(query)}`;
     },
     pagedSearchUrl(query) { return this.searchUrl(query); },
     prompt(query, limit) {
@@ -1104,7 +1112,7 @@ export const SITES = {
     }),
     createCategoryRetailer({
       key: "mobexpert.ro", label: "Mobexpert", priority: 25, focus: "furniture and home",
-      searchUrl: (query) => `https://mobexpert.ro/search?query=${encodeSearchText(query)}`
+      searchUrl: (query) => `https://mobexpert.ro/search?q=${encodeSearchText(query)}&type=product`
     }),
     createCategoryRetailer({
       key: "dedeman.ro", label: "Dedeman", priority: 26, focus: "DIY, tools, and home improvement",
@@ -1196,7 +1204,8 @@ export const SITES = {
       label: key.replace(/^www\./, "").replace(/\.(ro|com|eu|de)$/, ""),
       priority: 60 + index,
       focus: "experimental niche retail",
-      searchUrl: VERIFIED_RETAIL_SEARCH_URLS[key] || ((query) => `https://www.${key}/catalogsearch/result/?q=${encodeSearchText(query)}`)
+      searchUrl: RECOVERED_EXPERIMENTAL_SEARCH_URLS[key] || VERIFIED_RETAIL_SEARCH_URLS[key] ||
+        ((query) => `https://www.${key}/catalogsearch/result/?q=${encodeSearchText(query)}`)
     }))
   ].map((site) => [site.key, site]))
 

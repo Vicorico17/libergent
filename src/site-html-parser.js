@@ -8,6 +8,11 @@ import { parseAnuntulHtml } from "./parsers/anuntul.js";
 import { parseEmagHtml, parseEvomagHtml, parseF64Html, parseRetailHtml } from "./parsers/retail.js";
 import { parseIkeaHtml } from "./parsers/ikea.js";
 import { parseBookzoneHtml } from "./parsers/bookzone.js";
+import { parseFootshopHtml } from "./parsers/footshop.js";
+import { parseMobexpertHtml } from "./parsers/mobexpert.js";
+import { parseMakeupHtml } from "./parsers/makeup.js";
+import { parseFashionDaysHtml } from "./parsers/fashiondays.js";
+import { parsePlaybikeHtml } from "./parsers/playbike.js";
 import { parseFlipHtml, parseKlapHtml } from "./parsers/refurbished.js";
 import { parseForitHtml } from "./parsers/forit.js";
 import { parseZooplusHtml } from "./parsers/zooplus.js";
@@ -70,6 +75,16 @@ export function parseSiteHtml({ site, html, url, limit, query = "" }) {
     parsed = parseF64Html(html, limit, { origin: new URL(url).origin });
   } else if (site.key === "bookzone.ro") {
     parsed = parseBookzoneHtml(html, limit, { origin: new URL(url).origin });
+  } else if (site.key === "footshop.ro") {
+    parsed = parseFootshopHtml(html, limit);
+  } else if (site.key === "mobexpert.ro") {
+    parsed = parseMobexpertHtml(html, limit);
+  } else if (site.key === "makeup.ro") {
+    parsed = parseMakeupHtml(html, limit);
+  } else if (site.key === "fashiondays.ro") {
+    parsed = parseFashionDaysHtml(html, limit);
+  } else if (site.key === "playbike.ro") {
+    parsed = parsePlaybikeHtml(html, limit);
   } else if (site.strategy === "direct-html-retail") {
     parsed = parseRetailHtml(html, limit, { origin: new URL(url).origin });
   } else {
