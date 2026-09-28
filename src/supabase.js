@@ -13,10 +13,10 @@ const DEFAULT_FEEDBACK_TABLE = "offer_feedback";
 const DEFAULT_EMAIL_LEADS_TABLE = "email_leads";
 const DEFAULT_SAVED_SEARCHES_TABLE = "saved_searches";
 const DEFAULT_WHATSAPP_MESSAGES_TABLE = "whatsapp_messages";
-const DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE = "vehicle_price_observations";
 const DEFAULT_DEAL_CASES_TABLE = "deal_cases";
 const DEFAULT_DEAL_SEND_ATTEMPTS_TABLE = "deal_send_attempts";
 const DEFAULT_DEAL_EVENTS_TABLE = "deal_events";
+const DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE = "vehicle_price_observations";
 const DEFAULT_SHOP_SUGGESTIONS_TABLE = "shop_suggestions";
 const DEFAULT_USER_ENTITLEMENTS_TABLE = "user_entitlements";
 const DEFAULT_ALERT_PROFILES_TABLE = "alert_profiles";
@@ -43,10 +43,10 @@ function getSupabaseConfig(env = process.env) {
   const emailLeadsTable = normalizePublicRestTableName(env.SUPABASE_EMAIL_LEADS_TABLE, DEFAULT_EMAIL_LEADS_TABLE);
   const savedSearchesTable = normalizePublicRestTableName(env.SUPABASE_SAVED_SEARCHES_TABLE, DEFAULT_SAVED_SEARCHES_TABLE);
   const whatsappMessagesTable = normalizePublicRestTableName(env.SUPABASE_WHATSAPP_MESSAGES_TABLE, DEFAULT_WHATSAPP_MESSAGES_TABLE);
-  const vehiclePriceObservationsTable = normalizePublicRestTableName(env.SUPABASE_VEHICLE_PRICE_OBSERVATIONS_TABLE, DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE);
   const dealCasesTable = normalizePublicRestTableName(env.SUPABASE_DEAL_CASES_TABLE, DEFAULT_DEAL_CASES_TABLE);
   const dealSendAttemptsTable = normalizePublicRestTableName(env.SUPABASE_DEAL_SEND_ATTEMPTS_TABLE, DEFAULT_DEAL_SEND_ATTEMPTS_TABLE);
   const dealEventsTable = normalizePublicRestTableName(env.SUPABASE_DEAL_EVENTS_TABLE, DEFAULT_DEAL_EVENTS_TABLE);
+  const vehiclePriceObservationsTable = normalizePublicRestTableName(env.SUPABASE_VEHICLE_PRICE_OBSERVATIONS_TABLE, DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE);
   const shopSuggestionsTable = normalizePublicRestTableName(env.SUPABASE_SHOP_SUGGESTIONS_TABLE, DEFAULT_SHOP_SUGGESTIONS_TABLE);
   const userEntitlementsTable = normalizePublicRestTableName(env.SUPABASE_USER_ENTITLEMENTS_TABLE, DEFAULT_USER_ENTITLEMENTS_TABLE);
   const alertProfilesTable = normalizePublicRestTableName(env.SUPABASE_ALERT_PROFILES_TABLE, DEFAULT_ALERT_PROFILES_TABLE);
@@ -621,8 +621,8 @@ export async function readWhatsAppMessagesFromSupabase({ limit = 500, userId = "
 
 export async function findWhatsAppConversationOwner(sellerPhone, env = process.env) {
   const rows = await readWhatsAppMessagesFromSupabase({ limit: 1000, sellerPhone, direction: "outbound" }, env);
-  const matchingOutbound = rows.filter((row) =>
   if (rows.length >= 1000) return null;
+  const matchingOutbound = rows.filter((row) =>
     row.direction === "outbound" &&
     String(row.to_number || "").trim() === String(sellerPhone || "").trim() &&
     row.raw?.userId

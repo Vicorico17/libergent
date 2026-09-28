@@ -221,7 +221,6 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
   const apiPath = normalizeApiPathname(url.pathname);
 
-  if (apiPath === "/api/sources" && req.method === "GET") {
   if (apiPath === "/api/deals" || apiPath.startsWith("/api/deals/")) {
     const parsed = req.method === "POST" || req.method === "PATCH" ? await readJsonBody(req) : null;
     if (parsed?.error) { sendJson(res, parsed.error.includes("large") ? 413 : 400, { error: parsed.error }); return; }
@@ -235,6 +234,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (apiPath === "/api/sources" && req.method === "GET") {
     sendJson(res, 200, { sources: buildSourceCatalog() });
     return;
   }

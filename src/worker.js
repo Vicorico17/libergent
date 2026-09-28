@@ -1217,10 +1217,6 @@ async function handleApi(request, env, context) {
     }
   }
 
-  if (apiPath === "/api/conversations" || apiPath.startsWith("/api/conversations/")) {
-    if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
-    const auth = await authenticateSupabaseUser(request, env);
-    if (!auth.user) return json({ error: auth.error }, auth.status);
   if (apiPath === "/api/deals" || apiPath.startsWith("/api/deals/")) {
     if (!isSupabaseConfigured(env)) return json({ error: "Supabase is not configured." }, 503);
     const premium = await authenticatePremiumUser(request, env, "Asistentul de negociere este disponibil în Premium.");
@@ -1281,6 +1277,10 @@ async function handleApi(request, env, context) {
     }
   }
 
+  if (apiPath === "/api/conversations" || apiPath.startsWith("/api/conversations/")) {
+    if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+    const auth = await authenticateSupabaseUser(request, env);
+    if (!auth.user) return json({ error: auth.error }, auth.status);
     if (!isSupabaseConfigured(env)) return json({ error: "Supabase is not configured." }, 503);
 
     try {
@@ -1325,10 +1325,6 @@ async function handleApi(request, env, context) {
       return json({ ok: false, error: "Message cannot be empty." }, 400);
     }
 
-    try {
-      const bridgeUrl = String(env.OPENCLAW_BRIDGE_URL).replace(/\/+$/, "");
-      const response = await fetch(`${bridgeUrl}/whatsapp/send`, {
-        method: "POST",
     let dealAttemptKey = "";
     if (body.dealId) {
       if (!body.conversationId) return json({ error: "Deal replies require an existing conversation." }, 400);
@@ -1382,6 +1378,10 @@ async function handleApi(request, env, context) {
       }
     }
 
+    try {
+      const bridgeUrl = String(env.OPENCLAW_BRIDGE_URL).replace(/\/+$/, "");
+      const response = await fetch(`${bridgeUrl}/whatsapp/send`, {
+        method: "POST",
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${env.OPENCLAW_BRIDGE_TOKEN}`
@@ -1390,13 +1390,13 @@ async function handleApi(request, env, context) {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || normalizeDeliveryStatus(payload) === "failed") {
+        if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
+          status: payload.ok === false ? "failed" : "unknown", error: String(payload.error || `Bridge returned ${response.status}`).slice(0, 500)
+        }, env).catch(() => null);
         return json({ ok: false, error: payload.error || `WhatsApp bridge failed (${response.status}).` }, 502);
       }
       const deliveryStatus = normalizeDeliveryStatus(payload, "queued");
       const messageId = String(payload.messageId || payload.result?.messageId || `outbound:${target}:${Date.now()}`);
-        if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
-          status: payload.ok === false ? "failed" : "unknown", error: String(payload.error || `Bridge returned ${response.status}`).slice(0, 500)
-        }, env).catch(() => null);
       const timestamp = new Date().toISOString();
       let historySaved = false;
       let historyError = "";
@@ -1411,14 +1411,14 @@ async function handleApi(request, env, context) {
       } catch (error) {
         historyError = error instanceof Error ? error.message : String(error);
       }
-      const [conversation] = buildConversationHistory([{
-        message_id: messageId,
-        direction: "outbound",
-        from_number: "libergent-agent",
       if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
         status: "accepted", provider_message_id: messageId, delivery_status: deliveryStatus, history_saved: historySaved,
         error: historyError.slice(0, 500)
       }, env);
+      const [conversation] = buildConversationHistory([{
+        message_id: messageId,
+        direction: "outbound",
+        from_number: "libergent-agent",
         to_number: target,
         text: message,
         received_at: timestamp,
@@ -1434,13 +1434,13 @@ async function handleApi(request, env, context) {
         historyError: historyError || null
       }, 200);
     } catch (error) {
+      if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
+        status: "unknown", error: (error instanceof Error ? error.message : String(error)).slice(0, 500)
+      }, env).catch(() => null);
       return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 502);
     }
   }
 
-      if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
-        status: "unknown", error: (error instanceof Error ? error.message : String(error)).slice(0, 500)
-      }, env).catch(() => null);
   if (apiPath === "/api/vehicle/price-history") {
     if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
     try {
