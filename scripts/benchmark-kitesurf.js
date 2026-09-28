@@ -1,4 +1,5 @@
 import { SITES } from "../src/sites.js";
+import { SOURCE_VALIDATION_SNAPSHOT } from "../src/source-validation-snapshot.js";
 
 const REPRESENTATIVE_QUERIES = {
   marketplaces: "iphone 15",
@@ -32,8 +33,23 @@ function boundedInteger(value, fallback, min, max) {
 
 function representativeQuery(site, override) {
   if (override) return override;
+  if (SOURCE_VALIDATION_SNAPSHOT[site.key]?.queries?.[0]?.query) {
+    return SOURCE_VALIDATION_SNAPSHOT[site.key].queries[0].query;
+  }
   const niche = (site.niches || []).find((entry) => REPRESENTATIVE_QUERIES[entry]);
   return REPRESENTATIVE_QUERIES[niche] || "iphone 15";
+}
+
+function isRedSource(site) {
+  const validation = SOURCE_VALIDATION_SNAPSHOT[site.key];
+  if (!validation) return false;
+  const sameDayProduction = (validation.productionChecks || [])
+    .filter((check) => check.checkedAt?.slice(0, 10) >= validation.checkedAt?.slice(0, 10));
+  if (sameDayProduction.length) return !sameDayProduction.some((check) => check.accepted > 0);
+  const sameDayBrowser = (validation.browserChecks || [])
+    .filter((check) => check.checkedAt?.slice(0, 10) >= validation.checkedAt?.slice(0, 10));
+  if (sameDayBrowser.some((check) => check.accepted > 0 && check.priceVerified)) return false;
+  return !validation.queries?.some((check) => check.accepted > 0);
 }
 
 const baseUrl = argumentValue("base-url", process.env.LIBERGENT_BENCHMARK_URL || "https://libergent.com").replace(/\/+$/, "");
@@ -42,19 +58,18 @@ const engine = argumentValue("engine", "kitesurf").trim().toLowerCase();
 const queryOverride = argumentValue("query").trim();
 const state = argumentValue("state", "all").trim().toLowerCase();
 const concurrency = boundedInteger(argumentValue("concurrency", "2"), 2, 1, 4);
+const maxSites = boundedInteger(argumentValue("max-sites", "117"), 117, 1, 117);
+const dryRun = process.argv.includes("--dry-run");
 const selectedKeys = argumentValue("sites")
   .split(",")
   .map((entry) => entry.trim())
   .filter(Boolean);
 
-if (!adminToken) {
-  throw new Error("Set LIBERGENT_ADMIN_TOKEN or pass --token. The token is sent only in the x-libergent-admin-token header.");
-}
 if (!new Set(["kitesurf", "chromium"]).has(engine)) {
   throw new Error("--engine must be kitesurf or chromium.");
 }
-if (!new Set(["all", "active", "experimental"]).has(state)) {
-  throw new Error("--state must be all, active, or experimental.");
+if (!new Set(["all", "active", "experimental", "red"]).has(state)) {
+  throw new Error("--state must be all, active, experimental, or red.");
 }
 
 const unknownKeys = selectedKeys.filter((siteKey) => !SITES[siteKey]);
@@ -62,7 +77,19 @@ if (unknownKeys.length) throw new Error(`Unknown sites: ${unknownKeys.join(", ")
 
 const sites = (selectedKeys.length ? selectedKeys : Object.keys(SITES))
   .map((siteKey) => SITES[siteKey])
-  .filter((site) => state === "all" || site.integrationStatus === state);
+  .filter((site) => state === "all" || (state === "red" ? isRedSource(site) : site.integrationStatus === state))
+  .slice(0, maxSites);
+if (dryRun) {
+  console.log(JSON.stringify({ state, engine, selected: sites.length, sites: sites.map((site) => ({
+    site: site.key,
+    query: representativeQuery(site, queryOverride),
+    directErrors: SOURCE_VALIDATION_SNAPSHOT[site.key]?.queries?.map((check) => check.error).filter(Boolean) || []
+  })) }, null, 2));
+  process.exit(0);
+}
+if (!adminToken) {
+  throw new Error("Set LIBERGENT_ADMIN_TOKEN or pass --token. The token is sent only in the x-libergent-admin-token header.");
+}
 const results = new Array(sites.length);
 let nextIndex = 0;
 

@@ -17,5 +17,5 @@ test("source validation counts final accepted offers instead of preliminary acce
 test("source validation chooses vehicles for car marketplaces and parts for automotive retailers", async () => {
   const report = await runShopValidation({ siteKeys: ["autovit.ro", "epiesa.ro"], search: async () => ({ items: [] }) });
   assert.equal(report.sources.find(s => s.site === "autovit.ro").checks[0].query, "bmw x5");
-  assert.equal(report.sources.find(s => s.site === "epiesa.ro").checks[0].query, "anvelope 205 55 r16");
+  assert.equal(report.sources.find(s => s.site === "epiesa.ro").checks[0].query, "filtru ulei");
 });

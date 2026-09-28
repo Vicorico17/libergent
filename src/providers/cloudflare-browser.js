@@ -2,6 +2,7 @@ import puppeteer from "@cloudflare/puppeteer";
 import { extractRomanianMobilePhones } from "../phone-numbers.js";
 import { parseSiteHtml } from "../site-html-parser.js";
 import { filterRelevantItems } from "../search.js";
+import { aggregateMarketplaceResults } from "../aggregate.js";
 
 const OLX_PHONE_RESPONSE_PATTERN = /\/offers\/\d+\/[^?]*phone/i;
 const BROWSER_ENGINES = new Set(["chromium", "kitesurf"]);
@@ -166,6 +167,8 @@ export async function benchmarkMarketplaceWithBrowser(
     { site, query, limit },
     { launch, includeBodyText: true, engine }
   );
+  const accepted = result.challengeDetected ? []
+    : aggregateMarketplaceResults([result]).results.find((entry) => entry.site === site.key)?.items || [];
 
   return {
     site: result.site,
@@ -176,13 +179,13 @@ export async function benchmarkMarketplaceWithBrowser(
     durationMs: result.durationMs,
     htmlBytes: result.htmlBytes,
     rawItemCount: result.rawItemCount,
-    itemCount: result.itemCount,
+    itemCount: accepted.length,
     queryMismatchItemCount: result.queryMismatchItemCount,
     totalResults: result.totalResults,
     hasNextPage: result.hasNextPage,
     challengeDetected: result.challengeDetected,
     browserEngine: result.browserEngine,
-    sample: result.items.slice(0, 5).map((item) => ({
+    sample: accepted.slice(0, 5).map((item) => ({
       title: item.title || "",
       price: item.price || "",
       url: item.url || "",

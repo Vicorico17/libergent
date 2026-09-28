@@ -72,7 +72,7 @@ function normalizeJsonLdProduct(entry, origin) {
   const offer = Array.isArray(product.offers) ? product.offers[0] : product.offers || product;
   const imageValue = Array.isArray(product.image) ? product.image[0] : product.image;
   const title = cleanText(product.name || offer.name || "");
-  const url = toAbsoluteUrl(product.url || offer.url || "", origin);
+  const url = toAbsoluteUrl(product.url || product["@id"] || offer.url || "", origin);
   const priceValue = offer.lowPrice || offer.price || product.lowPrice || product.price || "";
   const currency = cleanText(offer.priceCurrency || product.priceCurrency || "");
 
@@ -365,4 +365,11 @@ export function parseRetailHtml(html, limit, { origin }) {
     rawItemCount: items.length,
     hasNextPage: null
   };
+}
+
+export function parseF64Html(html, limit, { origin }) {
+  const items = dedupeItems(parseJsonLdProducts(html, origin, limit * 2))
+    .filter((item) => new URL(item.url).pathname.endsWith("/p"))
+    .slice(0, limit);
+  return { items, totalResults: null, rawItemCount: items.length, hasNextPage: null };
 }

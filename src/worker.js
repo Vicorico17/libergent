@@ -33,12 +33,22 @@ const MARKETPLACE_CONTACT_CACHE_SECONDS = 900;
 const MARKETPLACE_DETAILS_CACHE_SECONDS = 1800;
 const MAX_MARKETPLACE_DETAILS_HTML_BYTES = 6 * 1024 * 1024;
 const PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS = ["okazii.ro"];
-const DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT = PREMIUM_BROWSER_SITE_KEYS.length + PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS.length;
+const DEFAULT_PREMIUM_BROWSER_FALLBACK_LIMIT = 8;
 const DEFAULT_PREMIUM_BROWSER_CONCURRENCY = 3;
 const DEFAULT_PREMIUM_KITESURF_CONCURRENCY = 4;
 const PREMIUM_BROWSER_FALLBACK_PRIORITY = [
   ...PREMIUM_FREE_BROWSER_FALLBACK_SITE_KEYS,
-  ...PREMIUM_BROWSER_SITE_KEYS
+  ...PREMIUM_BROWSER_SITE_KEYS,
+  "shopmania.ro",
+  "evomag.ro",
+  "aboutyou.ro",
+  "ikea.com",
+  "jysk.ro",
+  "mobexpert.ro",
+  "leroymerlin.ro",
+  "sportano.ro",
+  "f64.ro",
+  "4fstore.ro"
 ];
 
 function normalizeApiPathname(pathname = "") {
@@ -103,6 +113,13 @@ function needsBrowserFallback(result) {
   if (!result?.ok) return true;
   const usableCount = result.itemCount ?? result.includedItemCount ?? result.items?.length ?? result.parsedItemCount ?? result.rawItemCount ?? 0;
   return usableCount === 0;
+}
+
+function canTryChromiumAfterKitesurf(directResult, kitesurfResult) {
+  if (kitesurfResult?.challengeDetected) return false;
+  if (!needsBrowserFallback(preferBrowserFallback(directResult, kitesurfResult))) return false;
+  if (!directResult?.ok && /\b404\b|Search returned an error page|Search redirected/i.test(directResult?.error || "")) return false;
+  return true;
 }
 
 function preferBrowserFallback(directResult, browserResult) {
@@ -906,7 +923,8 @@ async function handleApi(request, env, context) {
 
       const chromiumFallbackLimit = getPremiumBrowserFallbackLimit(env);
       const chromiumSiteKeys = PREMIUM_BROWSER_FALLBACK_PRIORITY
-        .filter((siteKey) => eligibleSiteKeys.includes(siteKey) && needsBrowserFallback(resultAfterKitesurf(siteKey)))
+        .filter((siteKey) => eligibleSiteKeys.includes(siteKey)
+          && canTryChromiumAfterKitesurf(directBySite.get(siteKey), kitesurfBySite.get(siteKey)))
         .slice(0, chromiumFallbackLimit);
       const chromiumResults = await searchPremiumBrowserSites(env, {
         query,

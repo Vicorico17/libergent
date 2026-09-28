@@ -37,6 +37,8 @@ There are 117 registered adapters as of the September 13 code audit: 12 Free and
 
 ### Free
 
+The [September 28 Discovery audit](docs/source-availability-2026-09-28.md) checked every registered source with two live queries, checked the Free tier on the production Worker, and used local Cloudflare Browser Run to retest red sources. Discovery shows dated direct, production, or reviewed browser evidence and highlights sources without accepted offers in red.
+
 | Source | Role | Routing | Default provider |
 | --- | --- | --- | --- |
 | OLX | Classified / second-hand | Every Free search | Direct |
@@ -164,7 +166,7 @@ The default policy is:
 2. parse and score HTML locally
 3. retry a small set of transient transport failures with the alternate direct header profile
 4. for Premium searches, try Kitesurf after a failed or empty direct result for every source selected by the query
-5. if Kitesurf still has no usable data, use Chromium only for the existing conservative fallback list
+5. if Kitesurf still has no usable data, use bounded Chromium recovery for selected JS-rendered sources; skip known 404/error-page redirects and detected challenges
 6. never use either browser engine as a CAPTCHA or anti-bot bypass
 
 Important source-specific behavior:
@@ -282,7 +284,7 @@ Kitesurf is enabled by default for the experiment. It is attempted for every fai
 PREMIUM_KITESURF_ENABLED=1
 PREMIUM_KITESURF_FALLBACK_LIMIT=100
 PREMIUM_KITESURF_CONCURRENCY=4
-PREMIUM_BROWSER_FALLBACK_LIMIT=5
+PREMIUM_BROWSER_FALLBACK_LIMIT=8
 PREMIUM_BROWSER_CONCURRENCY=3
 ```
 
@@ -363,7 +365,7 @@ export LIBERGENT_ADMIN_TOKEN='YOUR_DEPLOYED_ADMIN_TOKEN'
 npm run benchmark:kitesurf -- --base-url=https://libergent.com --state=all --concurrency=2
 ```
 
-Use `--sites=emag.ro,altex.ro,olx.ro` for a small batch, `--state=active` for established sources, or `--engine=chromium` for a comparison run. The command returns JSON with `usableSites`, `challengedSites`, `failedSites`, relevant and rejected item counts, sample products, durations, and per-source errors. A rendered page without a usable title/URL/price sample is kept separate from a browser failure or challenge.
+Use `--state=red --dry-run` to review the Discovery failures without a token or browser charge, then `--state=red --max-sites=10` for a bounded first live batch. Use `--sites=emag.ro,altex.ro` for a focused batch or `--engine=chromium` for a comparison run. The command returns JSON with `usableSites`, `challengedSites`, `failedSites`, relevant and rejected item counts, sample products, durations, and per-source errors. A rendered page without a usable title/URL/price sample is kept separate from a browser failure or challenge.
 
 ## Accounts, analytics, and Supabase
 

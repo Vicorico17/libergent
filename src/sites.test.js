@@ -110,6 +110,24 @@ test("categorizes every registered marketplace into one access tier", () => {
   assert.equal(PREMIUM_BROWSER_SITE_KEYS.includes("cel.ro"), false);
 });
 
+test("uses verified search routes for repaired retail sources", () => {
+  assert.equal(SITES["forit.ro"].searchUrl("ssd samsung 1tb"), "https://www.forit.ro/cauta/?q=ssd%20samsung%201tb");
+  assert.equal(SITES["dedeman.ro"].searchUrl("bormasina bosch"), "https://www.dedeman.ro/ro/catalogsearch/result/v2?q=bormasina%20bosch");
+  assert.equal(SITES["soundcreation.ro"].searchUrl("chitara electrica"), "https://www.soundcreation.ro/search.html?queryString=chitara%20electrica");
+  assert.equal(SITES["zooplus.ro"].searchUrl("royal canin"), "https://www.zooplus.ro/search/results?q=royal%20canin");
+  assert.equal(SITES["petmax.ro"].searchUrl("hrana caine"), "https://www.petmax.ro/produse?c=hrana%20caine");
+  assert.equal(SITES["animax.ro"].searchUrl("hrana caine"), "https://animax.ro/search?q=hrana%20caine");
+  assert.equal(SITES["regatuljocurilor.ro"].searchUrl("lego"), "https://regatuljocurilor.ro/ro/cautare?search_query=lego");
+  assert.equal(SITES["sportvision.ro"].searchUrl("adidas running"), "https://www.sportvision.ro/produse?search=adidas%20running");
+  assert.equal(SITES["thehome.ro"].searchUrl("canapea extensibila"), "https://www.thehome.ro/catalog?q=canapea%20extensibila");
+  assert.equal(SITES["buzzsneakers.ro"].searchUrl("adidas samba"), "https://www.buzzsneakers.ro/produse?search=adidas%20samba");
+  assert.equal(SITES["sneakerindustry.ro"].searchUrl("adidas samba"), "https://sneakerindustry.ro/search?q=adidas%20samba");
+  assert.equal(SITES["epetshop.ro"].searchUrl("hrana pisici"), "https://www.epetshop.ro/produse?c=hrana%20pisici");
+  assert.equal(SITES["photosetup.ro"].searchUrl("canon eos"), "https://www.photosetup.ro/search?q=canon%20eos");
+  assert.equal(SITES["libris.ro"].searchUrl("dune"), "https://www.libris.ro/search?iv.q=dune");
+  assert.equal(SITES["mcmusic.ro"].searchUrl("chitara electrica"), "https://www.mcmusic.ro/cautare?s=chitara%20electrica");
+});
+
 test("does not classify non-car terms as car searches", () => {
   assert.equal(isCarQuery("masina de spalat samsung"), false);
   assert.equal(isCarQuery("spalat rufe slim"), false);

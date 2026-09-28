@@ -168,6 +168,28 @@ function buildDirectFetchError(response, url) {
   return new Error(`Direct fetch failed (${response.status}) for ${url}`);
 }
 
+export function detectSearchResponseFailure(requestedUrl, finalUrl, html) {
+  const requested = new URL(requestedUrl);
+  const final = new URL(finalUrl || requestedUrl);
+  const title = String(html || "").match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
+    .replace(/\s+/g, " ").trim() || "";
+  const requestedHost = requested.hostname.replace(/^www\./, "");
+  const finalHost = final.hostname.replace(/^www\./, "");
+  if (finalHost !== requestedHost && !finalHost.endsWith(`.${requestedHost}`)) {
+    return `Search redirected to another site: ${final.href}`;
+  }
+  if (/\/(?:page-not-found|maintenance)(?:\/|$)/i.test(final.pathname)
+    || final.searchParams.get("action") === "sorry"
+    || /^404\s*[-:]/i.test(title)
+    || /\beste de vânzare\b/i.test(title)) {
+    return `Search returned an error page: ${title || final.pathname}`;
+  }
+  if (requested.pathname !== "/" && final.pathname === "/" && !final.search) {
+    return `Search redirected to the home page: ${final.href}`;
+  }
+  return "";
+}
+
 function buildDirectHtmlCacheRequest(url) {
   const targetUrl = new URL(url);
   if (targetUrl.hostname !== "vinted.ro" && targetUrl.hostname !== "www.vinted.ro") return null;
@@ -221,6 +243,8 @@ async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
 
     if (response.ok) {
       const html = await response.text();
+      const softFailure = detectSearchResponseFailure(url, response.url, html);
+      if (softFailure) throw new Error(softFailure);
       await writeDirectHtmlCache(cacheRequest, html);
       return html;
     }

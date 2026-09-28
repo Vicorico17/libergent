@@ -28,7 +28,15 @@ const SECOND_VALIDATION_QUERIES = {
   books: "dune", music: "pian digital", photo: "canon eos", baby: "scaun auto copii",
   hobby: "lego", marketplaces: "samsung galaxy s24"
 };
-const VALIDATION_TIMEOUT_MS = 8_000;
+const SITE_VALIDATION_QUERIES = {
+  "forit.ro": ["ssd samsung 1tb", "ssd kingston 1tb"],
+  "zooplus.ro": ["royal canin", "purina pro plan"],
+  "epiesa.ro": ["filtru ulei", "placute frana"],
+  "photosetup.ro": ["sony a7", "canon eos"],
+  "modlet.ro": ["pantofi sport dama", "sandale dama"],
+  "cel.ro": ["ssd samsung 1tb", "laptop lenovo"]
+};
+const VALIDATION_TIMEOUT_MS = 15_000;
 const VALIDATION_CONCURRENCY = 4;
 
 function validationNiche(site, siteKey) {
@@ -128,9 +136,9 @@ export async function runShopValidation({ provider = "direct", limit = 20, maxPa
   for (const [niche, siteKeys] of groups) {
     sources.push(...await mapWithConcurrency(siteKeys, async (siteKey) => {
       const checks = [];
-      const queries = siteKey === "avstore.ro" ? ["casti sony", "boxe jbl"]
+      const queries = SITE_VALIDATION_QUERIES[siteKey] || (siteKey === "avstore.ro" ? ["casti sony", "boxe jbl"]
         : siteKey === "a2t.ro" ? ["camera hikvision", "camera dahua"]
-        : [VALIDATION_QUERIES[niche], SECOND_VALIDATION_QUERIES[niche]];
+        : [VALIDATION_QUERIES[niche], SECOND_VALIDATION_QUERIES[niche]]);
       for (const query of queries) {
         checks.push(await validateSource({ siteKey, niche, query, provider, limit, maxPages, search }));
       }

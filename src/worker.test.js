@@ -324,8 +324,8 @@ test("Premium search attempts Kitesurf for every empty selected source before bo
   assert.equal(response.status, 200);
   assert.equal(payload.summary.kitesurfFallbackMarketplaces.length, payload.summary.browserEligibleMarketplaces);
   assert.equal(kitesurfDiagnostics.length, payload.summary.browserEligibleMarketplaces);
-  assert.equal(chromiumDiagnostics.length, 5);
-  assert.deepEqual(payload.summary.chromiumFallbackMarketplaces, ["okazii.ro", "compari.ro", "pcgarage.ro", "flanco.ro", "altex.ro"]);
+  assert.equal(chromiumDiagnostics.length, 7);
+  assert.deepEqual(payload.summary.chromiumFallbackMarketplaces, ["okazii.ro", "compari.ro", "pcgarage.ro", "flanco.ro", "altex.ro", "shopmania.ro", "evomag.ro"]);
   assert.equal(kitesurfDiagnostics.every((entry) => entry.ok === false), true);
 });
 

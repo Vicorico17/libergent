@@ -9,13 +9,20 @@ export function buildSourceCatalog() {
     tier: PREMIUM_SITE_KEYS.includes(domain) ? "premium" : "free",
     status: site.integrationStatus,
     productionValidation: SOURCE_VALIDATION_SNAPSHOT[domain]?.productionChecks?.map((check) => ({
-      checkedAt: check.checkedAt, query: check.query, accepted: check.accepted, cacheHit: check.cacheHit
+      checkedAt: check.checkedAt, query: check.query, ok: check.ok, accepted: check.accepted, error: check.error, cacheHit: check.cacheHit
+    })) || [],
+    browserValidation: SOURCE_VALIDATION_SNAPSHOT[domain]?.browserChecks?.map((check) => ({
+      checkedAt: check.checkedAt, query: check.query, engine: check.engine,
+      accepted: check.accepted, priceVerified: check.priceVerified
     })) || [],
     directValidation: SOURCE_VALIDATION_SNAPSHOT[domain] ? {
       checkedAt: SOURCE_VALIDATION_SNAPSHOT[domain].checkedAt,
       environment: SOURCE_VALIDATION_SNAPSHOT[domain].environment,
       queriesChecked: SOURCE_VALIDATION_SNAPSHOT[domain].queries.length,
-      queriesWithAcceptedOffers: SOURCE_VALIDATION_SNAPSHOT[domain].queries.filter((query) => query.accepted > 0).length
+      queriesWithAcceptedOffers: SOURCE_VALIDATION_SNAPSHOT[domain].queries.filter((query) => query.accepted > 0).length,
+      checks: SOURCE_VALIDATION_SNAPSHOT[domain].queries.map((query) => ({
+        query: query.query, ok: query.ok, accepted: query.accepted, error: query.error
+      }))
     } : null,
     categories: site.niches || [],
     selection: FREE_CAR_SITE_KEYS.includes(domain) ? "vehicles"

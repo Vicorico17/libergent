@@ -10,6 +10,20 @@ function encodeSearchText(value) {
   return encodeURIComponent(value.trim());
 }
 
+const VERIFIED_RETAIL_SEARCH_URLS = {
+  "buzzsneakers.ro": (query) => `https://www.buzzsneakers.ro/produse?search=${encodeSearchText(query)}`,
+  "sneakerindustry.ro": (query) => `https://sneakerindustry.ro/search?q=${encodeSearchText(query)}`,
+  "modlet.ro": (query) => `https://www.modlet.ro/catalog?q=${encodeSearchText(query)}`,
+  "epetshop.ro": (query) => `https://www.epetshop.ro/produse?c=${encodeSearchText(query)}`,
+  "petguru.ro": (query) => `https://petguru.ro/search?q=${encodeSearchText(query)}`,
+  "redgoblin.ro": (query) => `https://redgoblin.ro/search?q=${encodeSearchText(query)}`,
+  "senia.ro": (query) => `https://www.senia.ro/cautare?search_query=${encodeSearchText(query)}`,
+  "bookzone.ro": (query) => `https://bookzone.ro/cautare?term=${encodeSearchText(query)}`,
+  "autohut.ro": (query) => `https://www.autohut.ro/gaseste/?q=${encodeSearchText(query)}`,
+  "mezoni.ro": (query) => `https://www.mezoni.ro/cautare?term=${encodeSearchText(query)}`,
+  "photosetup.ro": (query) => `https://www.photosetup.ro/search?q=${encodeSearchText(query)}`
+};
+
 function slugifyRetailSearchPath(value) {
   return value
     .trim()
@@ -1086,7 +1100,7 @@ export const SITES = {
     }),
     createCategoryRetailer({
       key: "jysk.ro", label: "JYSK", priority: 24, focus: "furniture and home",
-      searchUrl: (query) => `https://jysk.ro/cauta?q=${encodeSearchText(query)}`
+      searchUrl: (query) => `https://jysk.ro/search?query=${encodeSearchText(query)}`
     }),
     createCategoryRetailer({
       key: "mobexpert.ro", label: "Mobexpert", priority: 25, focus: "furniture and home",
@@ -1094,7 +1108,7 @@ export const SITES = {
     }),
     createCategoryRetailer({
       key: "dedeman.ro", label: "Dedeman", priority: 26, focus: "DIY, tools, and home improvement",
-      searchUrl: (query) => `https://www.dedeman.ro/ro/cauta/s/${encodeSearchText(query)}`
+      searchUrl: (query) => `https://www.dedeman.ro/ro/catalogsearch/result/v2?q=${encodeSearchText(query)}`
     }),
     createCategoryRetailer({
       key: "leroymerlin.ro", label: "Leroy Merlin", priority: 27, focus: "DIY, tools, and home improvement",
@@ -1110,7 +1124,7 @@ export const SITES = {
     }),
     createCategoryRetailer({
       key: "sportvision.ro", label: "Sport Vision", priority: 30, focus: "sports and outdoor",
-      searchUrl: (query) => `https://www.sportvision.ro/catalogsearch/result/?q=${encodeSearchText(query)}`
+      searchUrl: (query) => `https://www.sportvision.ro/produse?search=${encodeSearchText(query)}`
     }),
     createCategoryRetailer({
       key: "intersport.ro", label: "INTERSPORT", priority: 31, focus: "sports and outdoor",
@@ -1122,15 +1136,15 @@ export const SITES = {
     }),
     createCategoryRetailer({
       key: "photosetup.ro", label: "Photosetup", priority: 33, focus: "photo and video equipment",
-      searchUrl: (query) => `https://www.photosetup.ro/catalogsearch/result/?q=${encodeSearchText(query)}`
+      searchUrl: VERIFIED_RETAIL_SEARCH_URLS["photosetup.ro"]
     }),
     createCategoryRetailer({
       key: "soundcreation.ro", label: "SoundCreation", priority: 34, focus: "musical instruments and pro audio",
-      searchUrl: (query) => `https://www.soundcreation.ro/catalogsearch/result/?q=${encodeSearchText(query)}`
+      searchUrl: (query) => `https://www.soundcreation.ro/search.html?queryString=${encodeSearchText(query)}`
     }),
     createCategoryRetailer({
       key: "mcmusic.ro", label: "M&C Musical Instruments", priority: 35, focus: "musical instruments and pro audio",
-      searchUrl: (query) => `https://www.mcmusic.ro/catalogsearch/result/?q=${encodeSearchText(query)}`
+      searchUrl: (query) => `https://www.mcmusic.ro/cautare?s=${encodeSearchText(query)}`
     }),
     createCategoryRetailer({
       key: "carturesti.ro", label: "Cărturești", priority: 36, focus: "books, games, and collectibles",
@@ -1138,23 +1152,51 @@ export const SITES = {
     }),
     createCategoryRetailer({
       key: "libris.ro", label: "Libris", priority: 37, focus: "books, games, and collectibles",
-      searchUrl: (query) => `https://www.libris.ro/search?query=${encodeSearchText(query)}`
+      searchUrl: (query) => `https://www.libris.ro/search?iv.q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "forit.ro", label: "ForIT", priority: 38, focus: "technology and electronics",
+      searchUrl: (query) => `https://www.forit.ro/cauta/?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "zooplus.ro", label: "Zooplus", priority: 39, focus: "pet supplies",
+      searchUrl: (query) => `https://www.zooplus.ro/search/results?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "epiesa.ro", label: "ePiesa", priority: 40, focus: "automotive parts",
+      searchUrl: (query) => `https://www.epiesa.ro/cautare-piesa/?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "petmax.ro", label: "Petmax", priority: 41, focus: "pet supplies",
+      searchUrl: (query) => `https://www.petmax.ro/produse?c=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "animax.ro", label: "Animax", priority: 42, focus: "pet supplies",
+      searchUrl: (query) => `https://animax.ro/search?q=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "regatuljocurilor.ro", label: "Regatul Jocurilor", priority: 43, focus: "games and hobby",
+      searchUrl: (query) => `https://regatuljocurilor.ro/ro/cautare?search_query=${encodeSearchText(query)}`
+    }),
+    createCategoryRetailer({
+      key: "thehome.ro", label: "The Home", priority: 44, focus: "furniture and home decor",
+      searchUrl: (query) => `https://www.thehome.ro/catalog?q=${encodeSearchText(query)}`
     }),
     ...[
       ["noriel.ro", "Noriel", "baby and kids"], ["nichiduta.ro", "Nichiduta", "baby and kids"], ["bebetei.ro", "Bebe Tei", "baby and kids"],
       ["notino.ro", "Notino", "beauty and personal care"], ["douglas.ro", "Douglas", "beauty and personal care"], ["sephora.ro", "Sephora", "beauty and personal care"],
       ["zooplus.ro", "Zooplus", "pet supplies"], ["animax.ro", "Animax", "pet supplies"], ["petmart.ro", "PetMart", "pet supplies"],
       ["redgoblin.ro", "Red Goblin", "toys and hobby"], ["regatuljocurilor.ro", "Regatul Jocurilor", "toys and hobby"], ["bricksdepot.ro", "Bricks Depot", "toys and hobby"]
-    ].map(([key, label, focus], index) => createCategoryRetailer({
+    ].filter(([key]) => !["zooplus.ro", "animax.ro", "regatuljocurilor.ro"].includes(key)).map(([key, label, focus], index) => createCategoryRetailer({
       key, label, focus, priority: 38 + index,
-      searchUrl: (query) => `https://www.${key}/catalogsearch/result/?q=${encodeSearchText(query)}`
+      searchUrl: VERIFIED_RETAIL_SEARCH_URLS[key] || ((query) => `https://www.${key}/catalogsearch/result/?q=${encodeSearchText(query)}`)
     })),
-    ...EXPERIMENTAL_EXPANSION_SITE_KEYS.filter((key) => !["altex.ro", "intersport.ro", "evomag.ro", "notino.ro", "animax.ro", "petmart.ro", "zooplus.ro", "mcmusic.ro", "soundcreation.ro"].includes(key)).map((key, index) => createCategoryRetailer({
+    ...EXPERIMENTAL_EXPANSION_SITE_KEYS.filter((key) => !["altex.ro", "intersport.ro", "evomag.ro", "notino.ro", "animax.ro", "petmart.ro", "zooplus.ro", "mcmusic.ro", "soundcreation.ro", "forit.ro", "epiesa.ro", "petmax.ro", "thehome.ro"].includes(key)).map((key, index) => createCategoryRetailer({
       key,
       label: key.replace(/^www\./, "").replace(/\.(ro|com|eu|de)$/, ""),
       priority: 60 + index,
       focus: "experimental niche retail",
-      searchUrl: (query) => `https://www.${key}/catalogsearch/result/?q=${encodeSearchText(query)}`
+      searchUrl: VERIFIED_RETAIL_SEARCH_URLS[key] || ((query) => `https://www.${key}/catalogsearch/result/?q=${encodeSearchText(query)}`)
     }))
   ].map((site) => [site.key, site]))
 
