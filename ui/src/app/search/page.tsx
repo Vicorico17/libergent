@@ -2724,6 +2724,7 @@ function SearchResultsContent() {
   const [bestUsedOffer, setBestUsedOffer] = useState<SearchResultItem | null>(null)
   const [closestUsedOffer, setClosestUsedOffer] = useState<SearchResultItem | null>(null)
   const [bestNewBenchmark, setBestNewBenchmark] = useState<SearchResultItem | null>(null)
+  const [jevDecision, setJevDecision] = useState<NonNullable<NonNullable<SearchPayload["summary"]>["jevDecision"]> | null>(null)
   const [viewerLocation, setViewerLocation] = useState<{ city: string; source: string } | null>(null)
   const [duplicateListings, setDuplicateListings] = useState(0)
   const [priceBenchmark, setPriceBenchmark] = useState<PriceBenchmark | undefined>()
@@ -2938,6 +2939,7 @@ function SearchResultsContent() {
         setBestUsedOffer(null)
         setClosestUsedOffer(null)
         setBestNewBenchmark(null)
+        setJevDecision(null)
         setViewerLocation(null)
         setDuplicateListings(0)
         setPriceBenchmark(undefined)
@@ -2967,6 +2969,7 @@ function SearchResultsContent() {
       setLoaderDone(false)
       setError("")
       setQueryUnderstanding(null)
+      setJevDecision(null)
 
       let prog = 0
       const TICK = 250
@@ -3020,6 +3023,7 @@ function SearchResultsContent() {
           setBestUsedOffer(mapOffer(payload.summary?.bestUsedOffer, mapped) || mapped.find((item) => item.sourceKind === "used") || null)
           setClosestUsedOffer(mapOffer(payload.summary?.closestUsedOffer, mapped))
           setBestNewBenchmark(mapOffer(payload.summary?.bestNewBenchmark, mapped) || mapped.find((item) => item.sourceKind === "new") || null)
+          setJevDecision(effectiveSearchTier === "premium" ? payload.summary?.jevDecision || { status: "missing" } : null)
           setViewerLocation(payload.summary?.viewerLocation?.city
             ? { city: payload.summary.viewerLocation.city, source: payload.summary.viewerLocation.source || "edge" }
             : null)
@@ -3559,6 +3563,13 @@ function SearchResultsContent() {
           {error && (
             <section className="p-4 text-[12px] uppercase font-bold" style={{ border: `1px solid ${INK}`, background: "white", color: PINK }}>
               <span>&gt; {error}</span>
+            </section>
+          )}
+
+          {effectiveSearchTier === "premium" && jevDecision && (
+            <section className="flex flex-wrap items-center justify-between gap-2 p-3 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: jevDecision.status === "selected" ? "#E7F7EC" : "white" }}>
+              <span>JEV · {jevDecision.status === "selected" ? "decizie aplicată" : jevDecision.status === "insufficient_candidates" ? "prea puține oferte eligibile" : jevDecision.status === "low_confidence" ? "încredere redusă; s-a păstrat scorul LiberGent" : jevDecision.status === "unavailable" ? "indisponibil; s-a păstrat scorul LiberGent" : jevDecision.status === "disabled" ? "dezactivat" : jevDecision.status === "missing" ? "status absent din răspunsul API" : jevDecision.status}</span>
+              <span style={{ color: `${INK}77` }}>{jevDecision.model || "jev-latest"}{typeof jevDecision.selections === "number" ? ` · ${jevDecision.selections} selecții` : ""}{typeof jevDecision.inputTokens === "number" ? ` · ${jevDecision.inputTokens} tokeni input` : ""}</span>
             </section>
           )}
 
