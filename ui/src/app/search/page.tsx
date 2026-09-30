@@ -518,9 +518,27 @@ async function readJsonResponse(response: Response): Promise<SearchPayload> {
     return JSON.parse(body) as SearchPayload
   } catch {
     const looksLikeHtml = /^\s*</.test(body)
+    const contentType = response.headers.get("content-type")?.split(";")[0]?.trim()
+    const title = looksLikeHtml
+      ? body.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, " ").trim()
+      : undefined
+    const safeTitle = title?.replace(/<[^>]+>/g, "").slice(0, 100)
+    let responsePath = ""
+    try {
+      const finalUrl = new URL(response.url)
+      responsePath = finalUrl.pathname
+    } catch {
+      // Some mocked or opaque responses do not expose a URL.
+    }
+    const details = [
+      `HTTP ${response.status}`,
+      contentType,
+      safeTitle ? `„${safeTitle}”` : undefined,
+      response.redirected && responsePath ? `redirecționat către ${responsePath}` : undefined
+    ].filter(Boolean).join(" · ")
     throw new Error(
       looksLikeHtml
-        ? "API-ul de căutare a returnat HTML în loc de JSON. Reîncarcă pagina și încearcă din nou."
+        ? `API-ul de căutare a returnat HTML în loc de JSON (${details}). Reîncarcă pagina și încearcă din nou.`
         : "API-ul de căutare a returnat un răspuns JSON invalid."
     )
   }
