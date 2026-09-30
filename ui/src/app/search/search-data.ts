@@ -21,6 +21,7 @@ export type ApiListing = {
   rank?: number;
   offerScore?: number;
   recommendationScore?: number;
+  jevDecision?: { provider?: string; confidence?: number; candidateCount?: number };
   dealQuality?: {
     score?: number;
     label?: string;
@@ -168,6 +169,7 @@ export type SearchPayload = {
     bestUsedOffer?: ApiListing | null;
     closestUsedOffer?: ApiListing | null;
     bestNewBenchmark?: ApiListing | null;
+    jevDecision?: { status?: string; model?: string; selections?: number; inputTokens?: number | null };
   };
   error?: string;
 };
@@ -193,6 +195,7 @@ export type SearchResultItem = {
   url?: string;
   sellerPhone?: string;
   rank?: number;
+  jevDecision?: { provider: string; confidence: number; candidateCount: number };
   score: number;
   dealQuality: {
     score: number;
@@ -378,9 +381,12 @@ export function mapOffer(offer: ApiListing | null | undefined, results: SearchRe
   if (!bestOffer) return null;
 
   const bestOfferUrl = bestOffer.url?.trim();
+  const selection: SearchResultItem["jevDecision"] = bestOffer.jevDecision?.provider === "jev" && Number.isFinite(bestOffer.jevDecision.confidence)
+    ? { provider: "jev", confidence: Number(bestOffer.jevDecision.confidence), candidateCount: Number(bestOffer.jevDecision.candidateCount) || 0 }
+    : undefined;
   if (bestOfferUrl) {
     const existingByUrl = results.find((product) => product.url === bestOfferUrl);
-    if (existingByUrl) return existingByUrl;
+    if (existingByUrl) return selection ? { ...existingByUrl, jevDecision: selection } : existingByUrl;
   }
 
   const source = bestOffer.site || "Marketplace";
@@ -389,7 +395,7 @@ export function mapOffer(offer: ApiListing | null | undefined, results: SearchRe
     const existingByTitleAndSite = results.find(
       (product) => product.title.trim() === bestOfferTitle && product.source === getPlatformLabel(source)
     );
-    if (existingByTitleAndSite) return existingByTitleAndSite;
+    if (existingByTitleAndSite) return selection ? { ...existingByTitleAndSite, jevDecision: selection } : existingByTitleAndSite;
   }
 
   return mapListing(bestOffer, source, 0, "best-offer");
@@ -429,6 +435,9 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
     url: url || undefined,
     sellerPhone: typeof item.phone === "string" ? item.phone.trim() : undefined,
     rank: typeof item.rank === "number" && Number.isFinite(item.rank) ? item.rank : undefined,
+    jevDecision: item.jevDecision?.provider === "jev" && Number.isFinite(item.jevDecision.confidence)
+      ? { provider: "jev", confidence: Number(item.jevDecision.confidence), candidateCount: Number(item.jevDecision.candidateCount) || 0 }
+      : undefined,
     score,
     dealQuality: normalizeDealQuality(item.dealQuality, score),
     evidenceConfidence: normalizeEvidenceConfidence(item.evidenceConfidence),

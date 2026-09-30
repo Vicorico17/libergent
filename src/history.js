@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries, MAX_HISTORY_ENTRIES } from "./history-base.js";
 import { insertSearchEventToSupabase, isSupabaseConfigured, readSupabaseHistoryPayload } from "./supabase.js";
+import { isPublicSearchQuery } from "./search-policy.js";
 
 const DATA_ROOT = process.env.VERCEL ? "/tmp/libergent" : process.cwd();
 const DATA_DIR = path.join(DATA_ROOT, "data");
@@ -32,6 +33,7 @@ function writeHistoryEntries(entries) {
 }
 
 export async function logSearchEvent({ query, condition, provider, siteKeys, payload }) {
+  if (!isPublicSearchQuery(query)) return;
   const entries = readHistoryEntries();
   const entry = buildHistoryEntry({ query, condition, provider, siteKeys, payload });
 

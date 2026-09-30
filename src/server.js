@@ -19,6 +19,7 @@ import { buildSourceCatalog } from "./source-catalog.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { resolveViewerLocation } from "./location-intelligence.js";
+import { getSearchQueryError } from "./search-policy.js";
 import worker from "./worker.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
@@ -261,6 +262,11 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 400, { error: "Missing q parameter" });
       return;
     }
+    const queryError = getSearchQueryError(query);
+    if (queryError) {
+      sendJson(res, 400, { error: queryError });
+      return;
+    }
 
     try {
       const viewerLocation = resolveViewerLocation({
@@ -312,6 +318,11 @@ const server = http.createServer(async (req, res) => {
 
     if (!query) {
       sendJson(res, 400, { error: "Missing q parameter" });
+      return;
+    }
+    const queryError = getSearchQueryError(query);
+    if (queryError) {
+      sendJson(res, 400, { error: queryError });
       return;
     }
 

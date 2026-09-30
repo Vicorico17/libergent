@@ -1992,6 +1992,7 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
               <div className="mb-6 flex flex-wrap gap-2">
                 <MetaChip>{item.source}</MetaChip>
                 <MetaChip icon={<MapPin size={10} strokeWidth={2.2} />}>{item.city}</MetaChip>
+                {item.jevDecision && <MetaChip>Jev a ales · {Math.round(item.jevDecision.confidence * 100)}% · {item.jevDecision.candidateCount} oferte</MetaChip>}
               </div>
               <ConversationStatusBadge status={conversationStatus} />
               <div className="text-[22px] font-bold mb-8" style={{ color: PINK }}>{item.priceLabel}</div>
@@ -2763,7 +2764,7 @@ function SearchResultsContent() {
   }, [account.status, account.userId])
 
   const isPremiumAccount = accountPlan === "premium"
-  const effectiveSearchTier: SearchTier = searchTier === "premium" && isPremiumAccount ? "premium" : "free"
+  const effectiveSearchTier: SearchTier = isPremiumAccount || searchTier === "premium" ? "premium" : "free"
   const premiumLocked = searchTier === "premium" && accountPlan !== "checking" && !isPremiumAccount
 
   function selectSearchTier(nextTier: SearchTier) {
@@ -2883,16 +2884,16 @@ function SearchResultsContent() {
     if (!account.userId || !query || isLoading || !searchedAt || !results.length) return
     const offer = bestUsedOffer || results[0]
     recordAccountActivity(account.userId, {
-      id: `${searchTier}:${query.toLowerCase()}:${searchedAt}`,
+      id: `${effectiveSearchTier}:${query.toLowerCase()}:${searchedAt}`,
       query,
-      tier: searchTier,
+      tier: effectiveSearchTier,
       searchedAt,
       resultCount: results.length,
       bestOfferTitle: offer?.title || "",
       bestOfferPrice: offer?.priceLabel || "",
       bestOfferUrl: offer?.url || "",
     })
-  }, [account.userId, bestUsedOffer, isLoading, query, results, searchTier, searchedAt])
+  }, [account.userId, bestUsedOffer, effectiveSearchTier, isLoading, query, results, searchedAt])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -2907,7 +2908,7 @@ function SearchResultsContent() {
   }, [conditions, priceMax, priceMin, sort, sourceTypes, sources])
 
   useEffect(() => {
-    if (searchTier === "premium" && accountPlan === "checking") return
+    if (accountPlan === "checking") return
 
     const controller = new AbortController()
 
@@ -3068,7 +3069,7 @@ function SearchResultsContent() {
       controller.abort()
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
     }
-  }, [account.userId, accountPlan, effectiveSearchTier, near, query, searchTier])
+  }, [account.status, account.userId, accountPlan, effectiveSearchTier, near, query, searchTier])
 
   useEffect(() => {
     const initial = setTimeout(() => setTime(formatSearchTime()), 0)
@@ -3263,7 +3264,7 @@ function SearchResultsContent() {
             </div>
           )}
           <div className="flex" style={{ border: `1px solid ${INK}` }}>
-            {(["free", "premium"] as SearchTier[]).map((tier) => (
+            {((isPremiumAccount ? ["premium"] : ["free", "premium"]) as SearchTier[]).map((tier) => (
               <button
                 key={tier}
                 type="button"

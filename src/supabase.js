@@ -5,6 +5,7 @@ import {
   HISTORY_TOP_QUERY_LIMIT,
   MAX_HISTORY_ENTRIES
 } from "./history-base.js";
+import { isPublicSearchQuery } from "./search-policy.js";
 
 const DEFAULT_TABLE = "search_events";
 const DEFAULT_QUERY_STATS_TABLE = "search_query_stats";
@@ -780,14 +781,17 @@ export async function readSupabaseHistoryPayload(env = process.env) {
     throw new Error("Supabase is not configured.");
   }
 
-  const [recentSearches, topQueries, topKeywords, totalSearches, uniqueQueries, uniqueKeywords] = await Promise.all([
+  const [allRecentSearches, allTopQueries, allTopKeywords, totalSearches, uniqueQueries, uniqueKeywords] = await Promise.all([
     readSearchEventsFromSupabase({}, env),
-    readTopQueriesFromSupabase({}, env),
-    readTopKeywordsFromSupabase({}, env),
+    readTopQueriesFromSupabase({ limit: MAX_HISTORY_ENTRIES }, env),
+    readTopKeywordsFromSupabase({ limit: MAX_HISTORY_ENTRIES }, env),
     requestSupabaseCount(`${config.table}?select=id`, env),
     requestSupabaseCount(`${config.queryStatsTable}?select=query`, env),
     requestSupabaseCount(`${config.keywordStatsTable}?select=keyword`, env)
   ]);
+  const recentSearches = allRecentSearches.filter((entry) => isPublicSearchQuery(entry.query));
+  const topQueries = allTopQueries.filter((entry) => isPublicSearchQuery(entry.value)).slice(0, HISTORY_TOP_QUERY_LIMIT);
+  const topKeywords = allTopKeywords.filter((entry) => isPublicSearchQuery(entry.value)).slice(0, HISTORY_TOP_KEYWORD_LIMIT);
 
   const dailyCounts = new Map();
 

@@ -15,3 +15,5 @@ crons = ["15 * * * *"]
 
 [vars]
 OPENCLAW_BRIDGE_URL = "https://bridge.srv1648069.hstgr.cloud"
+PREMIUM_JEV_ENABLED = "1"
+PREMIUM_JEV_MODEL = "jev-latest"

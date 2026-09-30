@@ -1,3 +1,5 @@
+import { isPublicSearchQuery } from "./search-policy.js";
+
 export const MAX_HISTORY_ENTRIES = 500;
 export const HISTORY_RECENT_LIMIT = 100;
 export const HISTORY_TOP_QUERY_LIMIT = 30;
@@ -55,11 +57,12 @@ export function buildHistoryEntry({ query, condition, provider, siteKeys, payloa
 }
 
 export function buildHistoryPayloadFromEntries(entries) {
+  const publicEntries = entries.filter((entry) => isPublicSearchQuery(entry?.query));
   const queryCounts = new Map();
   const keywordCounts = new Map();
   const dailyCounts = new Map();
 
-  for (const entry of entries) {
+  for (const entry of publicEntries) {
     const normalizedQuery = entry.query?.trim();
     if (normalizedQuery) {
       queryCounts.set(normalizedQuery, (queryCounts.get(normalizedQuery) || 0) + 1);
@@ -78,7 +81,7 @@ export function buildHistoryPayloadFromEntries(entries) {
   return {
     updatedAt: new Date().toISOString(),
     totals: {
-      searches: entries.length,
+      searches: publicEntries.length,
       uniqueQueries: queryCounts.size,
       uniqueKeywords: keywordCounts.size
     },
@@ -88,6 +91,6 @@ export function buildHistoryPayloadFromEntries(entries) {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .slice(-HISTORY_DAILY_LIMIT)
       .map(([date, count]) => ({ date, count })),
-    recentSearches: entries.slice(0, HISTORY_RECENT_LIMIT)
+    recentSearches: publicEntries.slice(0, HISTORY_RECENT_LIMIT)
   };
 }

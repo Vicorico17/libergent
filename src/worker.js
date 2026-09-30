@@ -21,6 +21,8 @@ import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomania
 import { benchmarkMarketplaceWithBrowser, normalizeBrowserEngine, revealOlxPhonesWithBrowser, searchMarketplacesWithBrowser } from "./providers/cloudflare-browser.js";
 import { parseListingDetailsHtml } from "./listing-details.js";
 import { resolveViewerLocation, viewerLocationCacheKey } from "./location-intelligence.js";
+import { getSearchQueryError, isPublicSearchQuery, SEARCH_QUERY_LENGTH_MESSAGE, SEARCH_QUERY_REJECTION_MESSAGE } from "./search-policy.js";
+import { applyJevProductDecision } from "./jev.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -327,6 +329,8 @@ function getSearchRequestParams(url) {
   if (!query) {
     throw new Error("Missing q parameter");
   }
+  const queryError = getSearchQueryError(query);
+  if (queryError) throw new Error(queryError);
 
   return {
     query,
@@ -443,6 +447,7 @@ function buildEmptyHistoryPayload() {
 }
 
 async function persistSearchEvent(entry, env) {
+  if (!isPublicSearchQuery(entry.query)) return;
   if (!isSupabaseConfigured(env)) {
     return;
   }
@@ -867,7 +872,7 @@ async function handleApi(request, env, context) {
       return json(payload, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const statusCode = message === "Missing q parameter" || message.startsWith("Expected ") ||
+      const statusCode = message === "Missing q parameter" || message === SEARCH_QUERY_REJECTION_MESSAGE || message === SEARCH_QUERY_LENGTH_MESSAGE || message.startsWith("Expected ") ||
         message.startsWith("Unsupported site") ||
         message.startsWith("Unsupported provider")
         ? 400
@@ -948,6 +953,7 @@ async function handleApi(request, env, context) {
           viewerLocation
         }
       );
+      payload.summary.jevDecision = await applyJevProductDecision(payload, { env, query, condition });
       payload.searchTier = "premium";
       payload.summary.premiumMarketplaces = premiumSiteKeys.length;
       payload.summary.browserEligibleMarketplaces = eligibleSiteKeys.length;
@@ -984,7 +990,7 @@ async function handleApi(request, env, context) {
       return json(payload, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const statusCode = message === "Missing q parameter" || message.startsWith("Expected ") ||
+      const statusCode = message === "Missing q parameter" || message === SEARCH_QUERY_REJECTION_MESSAGE || message === SEARCH_QUERY_LENGTH_MESSAGE || message.startsWith("Expected ") ||
         message.startsWith("Unsupported site") ||
         message.startsWith("Unsupported provider")
         ? 400
