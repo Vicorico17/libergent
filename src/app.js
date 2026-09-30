@@ -386,17 +386,22 @@ export async function searchAcrossSites({
   limit,
   maxPages,
   siteKeys = getDefaultSiteKeys(),
-  viewerLocation = null
+  viewerLocation = null,
+  aggregate = true
 }) {
   const requestedProvider = normalizeSearchProvider(provider);
   const orderedSiteKeys = [...new Set(siteKeys)].sort((a, b) => getSite(a).priority - getSite(b).priority);
   const creditBudget = getCreditBudget(orderedSiteKeys, requestedProvider);
 
   if (isMockSearchEnabled()) {
+    const mockResults = orderedSiteKeys.map((siteKey) =>
+      buildMockSearchResult({ siteKey, query, condition, provider: "mock" })
+    );
+    if (!aggregate) {
+      return { results: mockResults, summary: { creditBudget, creditsUsed: 0 } };
+    }
     return aggregateMarketplaceResults(
-      orderedSiteKeys.map((siteKey) =>
-        buildMockSearchResult({ siteKey, query, condition, provider: "mock" })
-      ),
+      mockResults,
       {
         condition,
         creditBudget,
@@ -414,6 +419,16 @@ export async function searchAcrossSites({
     limit,
     maxPages
   });
+
+  if (!aggregate) {
+    return {
+      results: rawResults,
+      summary: {
+        creditBudget,
+        creditsUsed: rawResults.reduce((sum, result) => sum + (result.ok ? result.creditsUsed || 0 : 0), 0)
+      }
+    };
+  }
 
   return aggregateMarketplaceResults(rawResults, {
     condition,

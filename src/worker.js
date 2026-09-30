@@ -909,8 +909,8 @@ async function handleApi(request, env, context) {
       const freeSiteKeys = [...new Set(getFreeSearchSiteKeys(site, query).filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey)))];
       const eligibleSiteKeys = [...new Set([...freeSiteKeys, ...premiumSiteKeys])];
       const [freePayload, directPremiumPayload] = await Promise.all([
-        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages, siteKeys: freeSiteKeys }),
-        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages: 1, siteKeys: premiumSiteKeys })
+        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages, siteKeys: freeSiteKeys, aggregate: false }),
+        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages: 1, siteKeys: premiumSiteKeys, aggregate: false })
       ]);
       const directResults = [...freePayload.results, ...directPremiumPayload.results];
       const directBySite = new Map(directResults.map((result) => [result.site, result]));

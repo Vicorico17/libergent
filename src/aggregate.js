@@ -743,10 +743,10 @@ function enrichItemWithDealIntelligence(item, medianPriceRon, condition) {
   };
 }
 
-function buildRecommendationExplanation(item, comparisonPool) {
-  const pricedPool = comparisonPool.filter((candidate) => Number.isFinite(candidate.priceRon) && candidate.priceRon > 0);
-  const marketplaceCount = new Set(comparisonPool.map((candidate) => candidate.site).filter(Boolean)).size;
-  const segmentRank = comparisonPool.findIndex((candidate) => itemRankKey(candidate) === itemRankKey(item)) + 1;
+function buildRecommendationExplanation(item, comparisonPool, context = null) {
+  const pricedPoolCount = context?.pricedPoolCount ?? comparisonPool.filter((candidate) => Number.isFinite(candidate.priceRon) && candidate.priceRon > 0).length;
+  const marketplaceCount = context?.marketplaceCount ?? new Set(comparisonPool.map((candidate) => candidate.site).filter(Boolean)).size;
+  const segmentRank = context?.segmentRank ?? comparisonPool.findIndex((candidate) => itemRankKey(candidate) === itemRankKey(item)) + 1;
   const confidence = item.evidenceConfidence || buildEvidenceConfidence(item);
   const reasons = [];
   const cautions = [];
@@ -760,7 +760,7 @@ function buildRecommendationExplanation(item, comparisonPool) {
   if (
     Number.isFinite(item.priceRon) &&
     Number.isFinite(item.priceInsight?.marketMedianRon) &&
-    pricedPool.length >= 3
+    pricedPoolCount >= 3
   ) {
     const delta = item.priceInsight.priceDeltaPct;
     const comparison =
@@ -768,7 +768,7 @@ function buildRecommendationExplanation(item, comparisonPool) {
       delta > 0 ? `${delta}% peste` :
       "la nivelul";
     reasons.push(
-      `Prețul de ${Math.round(item.priceRon).toLocaleString("ro-RO")} RON este ${comparison} medianei de ${Math.round(item.priceInsight.marketMedianRon).toLocaleString("ro-RO")} RON, calculată din ${pricedPool.length} oferte comparabile.`
+      `Prețul de ${Math.round(item.priceRon).toLocaleString("ro-RO")} RON este ${comparison} medianei de ${Math.round(item.priceInsight.marketMedianRon).toLocaleString("ro-RO")} RON, calculată din ${pricedPoolCount} oferte comparabile.`
     );
   } else if (Number.isFinite(item.priceRon)) {
     reasons.push(`Are preț verificabil (${Math.round(item.priceRon).toLocaleString("ro-RO")} RON), dar eșantionul de comparație este încă mic.`);
@@ -793,7 +793,7 @@ function buildRecommendationExplanation(item, comparisonPool) {
   if (confidence.missing.length) {
     cautions.push(`Date încă lipsă: ${confidence.missing.slice(0, 4).join(", ")}.`);
   }
-  if (pricedPool.length < 3) {
+  if (pricedPoolCount < 3) {
     cautions.push("Comparația de preț are mai puțin de 3 oferte și trebuie tratată ca orientativă.");
   }
 
@@ -1143,12 +1143,52 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       ...item,
       rank: index + 1
     }));
+  const comparisonPools = new Map();
+  const allPoolsBySegment = new Map();
+  for (const item of rankedBaseCandidates) {
+    if (item.queryCategory === "vehicle") continue;
+    const segment = isNewProductSource(item) ? "new" : "used";
+    const allKey = `${segment}:all`;
+    const allPool = allPoolsBySegment.get(allKey) || [];
+    allPool.push(item);
+    allPoolsBySegment.set(allKey, allPool);
+    if (item.comparableKey) {
+      const key = `${segment}:key:${item.comparableKey}`;
+      const keyPool = comparisonPools.get(key) || [];
+      keyPool.push(item);
+      comparisonPools.set(key, keyPool);
+    }
+  }
+  const comparisonContexts = new Map();
+  const getComparisonContext = (item) => {
+    if (item.queryCategory === "vehicle") return null;
+    const segment = isNewProductSource(item) ? "new" : "used";
+    const key = item.comparableKey ? `${segment}:key:${item.comparableKey}` : `${segment}:all`;
+    if (comparisonContexts.has(key)) return comparisonContexts.get(key);
+    const pool = item.comparableKey ? comparisonPools.get(key) || [] : allPoolsBySegment.get(key) || [];
+    const context = {
+      pricedPoolCount: pool.reduce((count, candidate) => count + (Number.isFinite(candidate.priceRon) && candidate.priceRon > 0 ? 1 : 0), 0),
+      marketplaceCount: new Set(pool.map((candidate) => candidate.site).filter(Boolean)).size,
+      rankByKey: new Map(pool.map((candidate, index) => [itemRankKey(candidate), index + 1]))
+    };
+    comparisonContexts.set(key, context);
+    return context;
+  };
   const rankedCandidates = rankedBaseCandidates.map((item) => {
-    const comparisonPool = rankedBaseCandidates.filter((candidate) => isComparableCandidate(item, candidate));
-    const pricedComparisonCount = comparisonPool.filter(
+    const comparisonContext = getComparisonContext(item);
+    const comparisonPool = comparisonContext
+      ? (item.comparableKey
+        ? comparisonPools.get(`${isNewProductSource(item) ? "new" : "used"}:key:${item.comparableKey}`) || []
+        : allPoolsBySegment.get(`${isNewProductSource(item) ? "new" : "used"}:all`) || [])
+      : rankedBaseCandidates.filter((candidate) => isComparableCandidate(item, candidate));
+    const pricedComparisonCount = comparisonContext?.pricedPoolCount ?? comparisonPool.filter(
       (candidate) => Number.isFinite(candidate.priceRon) && candidate.priceRon > 0
     ).length;
-    const recommendation = buildRecommendationExplanation(item, comparisonPool);
+    const recommendation = buildRecommendationExplanation(item, comparisonPool, comparisonContext ? {
+      pricedPoolCount: comparisonContext.pricedPoolCount,
+      marketplaceCount: comparisonContext.marketplaceCount,
+      segmentRank: comparisonContext.rankByKey.get(itemRankKey(item)) || 0
+    } : null);
     const recommendationScore = comparisonPool.length < 2
       ? Math.min(item.recommendationScore, 79)
       : item.recommendationScore;
