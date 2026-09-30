@@ -962,6 +962,9 @@ function semanticMatchTier(item) {
 
 function buildPriceIntelligence({ usedMedianPriceRon, newMedianPriceRon, globalMedianPriceRon, usedPricedItems, newPricedItems, allPricedItems, bestUsedOffer, bestNewBenchmark }) {
   const benchmarkPriceRon = Number.isFinite(bestNewBenchmark?.priceRon) ? bestNewBenchmark.priceRon : null;
+  const lowestNewPriceRon = newPricedItems.length
+    ? newPricedItems.reduce((lowest, item) => Math.min(lowest, item.priceRon), Number.POSITIVE_INFINITY)
+    : null;
   const usedBestPriceRon = Number.isFinite(bestUsedOffer?.priceRon) ? bestUsedOffer.priceRon : null;
   const savingsVsNewPct = Number.isFinite(usedBestPriceRon) && Number.isFinite(benchmarkPriceRon) && benchmarkPriceRon > 0
     ? Math.round((1 - (usedBestPriceRon / benchmarkPriceRon)) * 100)
@@ -978,7 +981,7 @@ function buildPriceIntelligence({ usedMedianPriceRon, newMedianPriceRon, globalM
     usedFairHighRon: Number.isFinite(usedMedianPriceRon) ? Math.round(usedMedianPriceRon * 1.15) : null,
     usedPricedListingsRon: usedPricedItems.length,
     newMedianRon: Number.isFinite(newMedianPriceRon) ? Math.round(newMedianPriceRon) : null,
-    newLowestRon: Number.isFinite(benchmarkPriceRon) ? Math.round(benchmarkPriceRon) : null,
+    newLowestRon: Number.isFinite(lowestNewPriceRon) ? Math.round(lowestNewPriceRon) : null,
     newPricedListingsRon: newPricedItems.length,
     savingsVsNewPct
   };
@@ -1193,8 +1196,11 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
         })
     };
   });
-  const bestOffer = rankedCandidates[0] || null;
-  const bestUsedOffer = rankedCandidates.find((item) => !isNewProductSource(item)) || null;
+  const saferCandidates = rankedCandidates.filter((item) => !item.riskFlags?.some((flag) => flag.severity === "bad"));
+  const bestOffer = saferCandidates[0] || rankedCandidates[0] || null;
+  const bestUsedOffer = saferCandidates.find((item) => !isNewProductSource(item))
+    || rankedCandidates.find((item) => !isNewProductSource(item))
+    || null;
   const nearbyUsedCandidates = rankedCandidates.filter((item) =>
     !isNewProductSource(item) &&
     item.proximity &&
@@ -1211,7 +1217,14 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     )[0] || null;
   const bestNewBenchmark = rankedCandidates
     .filter((item) => isNewProductSource(item))
-    .sort((a, b) => safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon) || b.recommendationScore - a.recommendationScore)[0] || null;
+    .sort((a, b) => {
+      const aHasSevereRisk = a.riskFlags?.some((flag) => flag.severity === "bad") ? 1 : 0;
+      const bHasSevereRisk = b.riskFlags?.some((flag) => flag.severity === "bad") ? 1 : 0;
+      return aHasSevereRisk - bHasSevereRisk ||
+        semanticMatchTier(b) - semanticMatchTier(a) ||
+        b.recommendationScore - a.recommendationScore ||
+        safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon);
+    })[0] || null;
   const recommendedOffers = pickTopRecommendationsByMarketplace(rankedCandidates);
   const successfulResults = rankedResults.filter((result) => result.ok);
   const failedResults = rankedResults.filter((result) => !result.ok);

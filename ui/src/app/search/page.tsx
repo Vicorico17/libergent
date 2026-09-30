@@ -143,6 +143,7 @@ type MarketplaceCoverage = {
   provider: string
   ok: boolean
   itemCount: number
+  pagesUsed: number
   error: string
 }
 
@@ -3026,6 +3027,7 @@ function SearchResultsContent() {
             provider: String(result.provider || "unknown"),
             ok: Boolean(result.ok),
             itemCount: Number(result.itemCount ?? result.items?.length ?? 0),
+            pagesUsed: Number(result.pagesUsed ?? 1),
             error: String(result.error || ""),
           })))
         })
@@ -3514,7 +3516,7 @@ function SearchResultsContent() {
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                               <div className="truncate">{source.site}</div>
-                              <div className="truncate text-[8px]" style={{ color: `${INK}66` }}>{source.provider}</div>
+                              <div className="truncate text-[8px]" style={{ color: `${INK}66` }}>{source.provider}{source.pagesUsed > 1 ? ` · ${source.pagesUsed} pagini` : ""}</div>
                             </div>
                             <div className="flex flex-none items-center gap-2">
                               <span style={{ color: source.ok ? GREEN : PINK }}>{source.ok ? source.itemCount : marketplaceFailureLabel(source.error)}</span>

@@ -12,6 +12,7 @@ import { normalizeSearchProvider } from "./provider-options.js";
 const DESKTOP_BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 const MOBILE_BROWSER_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const VINTED_DIRECT_HTML_CACHE_SECONDS = 300;
+const MIN_FIRST_PAGE_MATCHES_BEFORE_EXPANSION = 8;
 
 function tokenize(value = "") {
   return normalizeCapacityTerms(normalizeModelTerms(value))
@@ -457,7 +458,17 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
   let exhaustedReason = firstPage.rawItemCount === 0 ? "empty-first-page" : "limit";
   let pageError = null;
   const estimatedTotalPages = estimateTotalPages(firstPage, pageSize, effectiveLimit);
-  const targetPages = Math.max(1, Math.min(cappedMaxPages, estimatedTotalPages));
+  const requestedTargetPages = Math.max(1, Math.min(cappedMaxPages, estimatedTotalPages));
+  const hasMorePages = firstPage.hasNextPage !== false && (
+    firstPage.hasNextPage === true ||
+    (Number.isFinite(firstPage.totalResults) && firstPage.totalResults > 0) ||
+    (firstPage.rawItemCount || firstPage.itemCount) > 0
+  );
+  const firstPageIsUnderfilled = firstPage.itemCount < MIN_FIRST_PAGE_MATCHES_BEFORE_EXPANSION
+    && hasMorePages;
+  const targetPages = requestedTargetPages > 1 && firstPageIsUnderfilled
+    ? requestedTargetPages
+    : 1;
 
   for (let page = 2; page <= targetPages; page += 1) {
     if (items.length >= effectiveLimit) {

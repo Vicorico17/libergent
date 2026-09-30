@@ -112,6 +112,8 @@ export type ApiResult = {
   matchedItemCount?: number;
   includedItemCount?: number;
   excludedItemCount?: number;
+  pagesUsed?: number;
+  pagesTargeted?: number;
   error?: string;
 };
 

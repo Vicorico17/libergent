@@ -13,23 +13,63 @@ function candidatePool(results, segment) {
     .filter((item) => segment === "new"
       ? item.marketType === "retail" || item.sourceType === "retail"
       : item.marketType !== "retail" && item.sourceType !== "retail")
-    .sort((a, b) => (b.recommendationScore || 0) - (a.recommendationScore || 0));
+    .sort(compareCandidates);
   const seen = new Set();
-  return candidates.filter((item) => {
+  const uniqueCandidates = candidates.filter((item) => {
     if (seen.has(item.url)) return false;
     seen.add(item.url);
     return true;
-  }).slice(0, MAX_JEV_CANDIDATES);
+  });
+
+  const selected = [];
+  for (const relevanceTier of [3, 2, 1]) {
+    // Round-robin each relevance tier by marketplace so one high-volume
+    // source cannot occupy Jev's entire candidate set.
+    const byMarketplace = new Map();
+    for (const item of uniqueCandidates.filter((candidate) => getRelevanceTier(candidate) === relevanceTier)) {
+      const marketplace = item.site || "unknown";
+      const marketplaceItems = byMarketplace.get(marketplace) || [];
+      marketplaceItems.push(item);
+      byMarketplace.set(marketplace, marketplaceItems);
+    }
+    const marketplaces = [...byMarketplace.entries()]
+      .sort((a, b) => compareCandidates(a[1][0], b[1][0]))
+      .map(([, items]) => items);
+    while (selected.length < MAX_JEV_CANDIDATES && marketplaces.some((items) => items.length)) {
+      for (const items of marketplaces) {
+        if (items.length && selected.length < MAX_JEV_CANDIDATES) selected.push(items.shift());
+      }
+    }
+    if (selected.length >= MAX_JEV_CANDIDATES) break;
+  }
+  return selected;
+}
+
+function getRelevanceTier(item) {
+  const relevance = Number(item.relevanceScore) || 0;
+  return relevance >= 90 ? 3 : relevance >= 75 ? 2 : 1;
+}
+
+function compareCandidates(a, b) {
+  return getRelevanceTier(b) - getRelevanceTier(a) ||
+    (Number(b.recommendationScore) || 0) - (Number(a.recommendationScore) || 0) ||
+    (Number(b.dealQuality?.score) || 0) - (Number(a.dealQuality?.score) || 0);
 }
 
 function describeCandidate(item) {
+  const priceContext = Number.isFinite(item.priceInsight?.priceDeltaPct)
+    && Number.isFinite(item.priceInsight?.marketMedianRon)
+    ? `${item.priceInsight.priceDeltaPct}% vs ${item.priceInsight.marketMedianRon} RON comparable median`
+    : "market comparison unavailable";
   return [
     `Title: ${String(item.title || "Untitled").slice(0, 180)}`,
     `Price: ${item.priceRon} RON`,
     `Condition: ${String(item.condition || "unspecified").slice(0, 50)}`,
     `Marketplace: ${String(item.site || "unknown").slice(0, 50)}`,
+    `Product match: ${Number(item.relevanceScore) || 0}/100`,
     `Recommendation score: ${Number(item.recommendationScore) || 0}/100`,
     `Quality score: ${Number(item.dealQuality?.score) || 0}/100`,
+    `Price context: ${priceContext}`,
     `Evidence: ${(item.evidenceConfidence?.available || []).slice(0, 5).join(", ") || "limited"}`,
     `Cautions: ${(item.riskFlags || []).map((flag) => String(flag.label || flag.code || "").slice(0, 60)).filter(Boolean).slice(0, 4).join(", ") || "none identified"}`
   ].join("; ");
