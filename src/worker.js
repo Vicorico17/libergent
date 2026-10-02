@@ -9,7 +9,7 @@ import { extractImageSearchIntent, validateImageSearchRequest } from "./image-se
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { buildAlertEvents, MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
-import { completeAlertProfileCheck, createAlertProfileInSupabase, deleteAlertProfileInSupabase, findWhatsAppConversationOwner, insertAlertEventsInSupabase, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertListingStatesFromSupabase, listAlertProfilesFromSupabase, listDueAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, readPremiumEntitlement, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, recordNotificationDeliveryInSupabase, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase, upsertAlertListingStatesInSupabase } from "./supabase.js";
+import { claimDiscoveryProbeLease, completeAlertProfileCheck, createAlertProfileInSupabase, deleteAlertProfileInSupabase, findWhatsAppConversationOwner, insertAlertEventsInSupabase, insertDiscoveryProbeRun, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertListingStatesFromSupabase, listAlertProfilesFromSupabase, listDiscoveryProbeRuns, listDiscoveryProbeTerms, listDueAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, markDiscoveryProbeTermSearched, readPremiumEntitlement, readRecentDiscoverySeedQueries, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, recordDiscoveryProbeFeedback, recordNotificationDeliveryInSupabase, releaseDiscoveryProbeLease, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase, upsertAlertListingStatesInSupabase, upsertDiscoveryProbeTerms } from "./supabase.js";
 import { createDealCaseInSupabase, getDealCaseFromSupabase, listDealCasesFromSupabase, listDealEventsFromSupabase, reserveDealSendAttempt, updateDealCaseInSupabase, updateDealSendAttempt } from "./supabase.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { normalizeOfferFeedbackPayload } from "./feedback.js";
@@ -23,6 +23,7 @@ import { parseListingDetailsHtml } from "./listing-details.js";
 import { resolveViewerLocation, viewerLocationCacheKey } from "./location-intelligence.js";
 import { getSearchQueryError, isPublicSearchQuery, SEARCH_QUERY_LENGTH_MESSAGE, SEARCH_QUERY_REJECTION_MESSAGE } from "./search-policy.js";
 import { applyJevProductDecision } from "./jev.js";
+import { buildProbeSuggestions, chooseProbeTerm, DISCOVERY_PROBE_SITES, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -563,6 +564,94 @@ async function runDuePremiumAlerts(env) {
   return { checked: profiles.length, results };
 }
 
+async function runDiscoveryProbe(env) {
+  if (!isSupabaseConfigured(env)) return { status: "skipped", reason: "Supabase is not configured." };
+  const now = new Date();
+  const leaseToken = crypto.randomUUID();
+  let lease;
+  try {
+    lease = await claimDiscoveryProbeLease({
+      now,
+      leaseUntil: new Date(now.getTime() + 2 * 60 * 1000),
+      token: leaseToken
+    }, env);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/PGRST205|does not exist|42P01/i.test(message)) console.warn("Discovery probe lease failed:", message);
+    return { status: "schema_not_ready" };
+  }
+  if (!lease) return { status: "already_running" };
+
+  let term = null;
+  const sourceCursor = Number(lease.source_cursor) || 0;
+  const site = DISCOVERY_PROBE_SITES[sourceCursor % DISCOVERY_PROBE_SITES.length];
+  try {
+    const seeds = await readRecentDiscoverySeedQueries({ limit: 100, days: 14, minimumSearchCount: 3 }, env);
+    const eligibleSeeds = seeds.filter((seed) => isEligibleProbeQuery(seed.query));
+    await upsertDiscoveryProbeTerms(eligibleSeeds.map((seed) => ({
+      query: seed.query,
+      origin: "search_history",
+      searchCount: seed.searchCount,
+      priority: Math.min(100, 10 + Math.round(Math.log2(Math.max(1, seed.searchCount)) * 5))
+    })), env);
+
+    const queuedTerms = await listDiscoveryProbeTerms({ limit: 100 }, env);
+    term = chooseProbeTerm(queuedTerms);
+    if (!term) return { status: "no_eligible_terms" };
+
+    const startedAt = Date.now();
+    let run;
+    try {
+      const payload = await searchAcrossSites({
+        query: term.query,
+        condition: "any",
+        provider: "direct",
+        limit: 12,
+        maxPages: 1,
+        siteKeys: [site]
+      });
+      const suggestions = buildProbeSuggestions(term.query, payload.results || [], 3);
+      if (suggestions.length) {
+        await upsertDiscoveryProbeTerms(suggestions.map((query) => ({
+          query,
+          origin: "result_expansion",
+          parentQuery: term.query,
+          searchCount: 0,
+          priority: 10
+        })), env);
+      }
+      run = serializeProbeRun({ query: term.query, site, payload, elapsedMs: Date.now() - startedAt, parentQuery: term.parentQuery });
+      run.suggested_queries = suggestions;
+    } catch (error) {
+      run = {
+        query: term.query,
+        source_site: site,
+        parent_query: term.parentQuery || null,
+        outcome: "error",
+        results_count: 0,
+        parsed_count: 0,
+        failed_sources: [],
+        offers: [],
+        suggested_queries: [],
+        elapsed_ms: Date.now() - startedAt,
+        error: (error instanceof Error ? error.message : String(error)).slice(0, 500),
+        searched_at: new Date().toISOString()
+      };
+    }
+    await insertDiscoveryProbeRun(run, env);
+    await markDiscoveryProbeTermSearched(term.query, env);
+    return { status: run.outcome, query: term.query, source: site, results: run.results_count };
+  } catch (error) {
+    console.warn("Discovery probe failed:", error instanceof Error ? error.message : String(error));
+    return { status: "failed" };
+  } finally {
+    await releaseDiscoveryProbeLease({
+      token: leaseToken,
+      nextSourceCursor: (sourceCursor + 1) % DISCOVERY_PROBE_SITES.length
+    }, env).catch((error) => console.warn("Failed to release discovery probe lease:", error instanceof Error ? error.message : String(error)));
+  }
+}
+
 async function authenticatePremiumUser(request, env, premiumMessage = "Premium este disponibil doar pentru conturile Premium.") {
   const auth = await authenticateSupabaseUser(request, env);
   if (!auth.user) return { response: json({ error: auth.error }, auth.status) };
@@ -828,6 +917,36 @@ async function handleApi(request, env, context) {
 
   if (apiPath === "/api/sources" && request.method === "GET") {
     return json({ sources: buildSourceCatalog() }, 200);
+  }
+
+  if (apiPath === "/api/discovery/probes" && request.method === "GET") {
+    try {
+      const [runs, terms] = await Promise.all([
+        listDiscoveryProbeRuns({ limit: 30 }, env),
+        listDiscoveryProbeTerms({ limit: 40 }, env)
+      ]);
+      return json({ runs, terms, updatedAt: new Date().toISOString() }, 200);
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 503);
+    }
+  }
+
+  if (apiPath === "/api/discovery/probes/feedback" && request.method === "POST") {
+    const auth = await authenticateSupabaseUser(request, env);
+    if (auth.error) return json({ error: auth.error }, auth.status);
+    const parsedBody = await parseJsonRequest(request);
+    if (parsedBody.error) return json({ error: parsedBody.error }, parsedBody.error.includes("large") ? 413 : 400);
+    const query = String(parsedBody.data?.query || "").trim();
+    const feedback = String(parsedBody.data?.feedback || "");
+    if (!isEligibleProbeQuery(query) || !["useful", "irrelevant"].includes(feedback)) {
+      return json({ error: "Choose a valid product query and useful/irrelevant feedback." }, 400);
+    }
+    try {
+      await recordDiscoveryProbeFeedback({ query, userId: auth.user.id, feedback }, env);
+      return json({ ok: true }, 200);
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 400);
+    }
   }
 
   if (apiPath === "/api/image") {
@@ -1592,8 +1711,12 @@ export default {
 
     return env.ASSETS.fetch(request);
   },
-  async scheduled(_controller, env, context) {
+  async scheduled(controller, env, context) {
     applyEnv(env);
-    context.waitUntil(runDuePremiumAlerts(env));
+    const scheduledAt = new Date(Number(controller?.scheduledTime) || Date.now());
+    context.waitUntil((async () => {
+      await runDiscoveryProbe(env);
+      if (scheduledAt.getUTCMinutes() === 15) await runDuePremiumAlerts(env);
+    })());
   }
 };

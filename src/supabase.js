@@ -24,6 +24,9 @@ const DEFAULT_ALERT_PROFILES_TABLE = "alert_profiles";
 const DEFAULT_ALERT_LISTING_STATE_TABLE = "alert_listing_state";
 const DEFAULT_ALERT_EVENTS_TABLE = "alert_events";
 const DEFAULT_NOTIFICATION_DELIVERIES_TABLE = "notification_deliveries";
+const DEFAULT_DISCOVERY_PROBE_TERMS_TABLE = "discovery_probe_terms";
+const DEFAULT_DISCOVERY_PROBE_RUNS_TABLE = "discovery_probe_runs";
+const DEFAULT_DISCOVERY_PROBE_STATE_TABLE = "discovery_probe_state";
 
 function trimTrailingSlash(value = "") {
   return value.replace(/\/+$/, "");
@@ -54,12 +57,15 @@ function getSupabaseConfig(env = process.env) {
   const alertListingStateTable = normalizePublicRestTableName(env.SUPABASE_ALERT_LISTING_STATE_TABLE, DEFAULT_ALERT_LISTING_STATE_TABLE);
   const alertEventsTable = normalizePublicRestTableName(env.SUPABASE_ALERT_EVENTS_TABLE, DEFAULT_ALERT_EVENTS_TABLE);
   const notificationDeliveriesTable = normalizePublicRestTableName(env.SUPABASE_NOTIFICATION_DELIVERIES_TABLE, DEFAULT_NOTIFICATION_DELIVERIES_TABLE);
+  const discoveryProbeTermsTable = normalizePublicRestTableName(env.SUPABASE_DISCOVERY_PROBE_TERMS_TABLE, DEFAULT_DISCOVERY_PROBE_TERMS_TABLE);
+  const discoveryProbeRunsTable = normalizePublicRestTableName(env.SUPABASE_DISCOVERY_PROBE_RUNS_TABLE, DEFAULT_DISCOVERY_PROBE_RUNS_TABLE);
+  const discoveryProbeStateTable = normalizePublicRestTableName(env.SUPABASE_DISCOVERY_PROBE_STATE_TABLE, DEFAULT_DISCOVERY_PROBE_STATE_TABLE);
 
   if (!url || !apiKey) {
     return null;
   }
 
-  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable, dealCasesTable, dealSendAttemptsTable, dealEventsTable, vehiclePriceObservationsTable, shopSuggestionsTable, userEntitlementsTable, alertProfilesTable, alertListingStateTable, alertEventsTable, notificationDeliveriesTable };
+  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable, dealCasesTable, dealSendAttemptsTable, dealEventsTable, vehiclePriceObservationsTable, shopSuggestionsTable, userEntitlementsTable, alertProfilesTable, alertListingStateTable, alertEventsTable, notificationDeliveriesTable, discoveryProbeTermsTable, discoveryProbeRunsTable, discoveryProbeStateTable };
 }
 
 function getRequestHeaders(apiKey) {
@@ -773,6 +779,137 @@ export async function readTopKeywordsFromSupabase({ limit = HISTORY_TOP_KEYWORD_
   }, env);
 
   return Array.isArray(rows) ? rows.map((row) => mapCountRow(row, "keyword")) : [];
+}
+
+export async function readRecentDiscoverySeedQueries({ limit = 100, days = 14, minimumSearchCount = 3 } = {}, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return [];
+  const since = new Date(Date.now() - Math.max(1, days) * 24 * 60 * 60 * 1000).toISOString();
+  const query = new URLSearchParams({
+    select: "query,search_count,last_searched_at",
+    last_searched_at: `gte.${since}`,
+    search_count: `gte.${Math.max(1, minimumSearchCount)}`,
+    order: "search_count.desc,last_searched_at.desc",
+    limit: String(Math.max(1, Math.min(500, limit)))
+  });
+  const rows = await requestSupabase(`${config.queryStatsTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows.map((row) => ({
+    query: String(row.query || "").trim(),
+    searchCount: Number(row.search_count) || 0,
+    lastSearchedAt: row.last_searched_at || null
+  })) : [];
+}
+
+export async function upsertDiscoveryProbeTerms(terms = [], env = process.env) {
+  const config = getSupabaseConfig(env);
+  const rows = terms.filter((term) => term?.query).map((term) => ({
+    query: String(term.query).trim().slice(0, 80),
+    origin: term.origin || "search_history",
+    parent_query: term.parentQuery || null,
+    search_count: Math.max(0, Number(term.searchCount) || 0),
+    priority: Math.max(0, Math.min(100, Math.round(Number(term.priority) || 0))),
+    status: "queued",
+    updated_at: new Date().toISOString()
+  }));
+  if (!config || !rows.length) return 0;
+  await requestSupabase(`${config.discoveryProbeTermsTable}?on_conflict=query`, {
+    method: "POST",
+    headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify(rows)
+  }, env);
+  return rows.length;
+}
+
+export async function listDiscoveryProbeTerms({ limit = 100 } = {}, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return [];
+  const query = new URLSearchParams({
+    select: "query,origin,parent_query,search_count,priority,useful_count,irrelevant_count,status,last_probed_at,created_at",
+    status: "eq.queued",
+    order: "priority.desc,last_probed_at.asc.nullsfirst,search_count.desc",
+    limit: String(Math.max(1, Math.min(200, limit)))
+  });
+  const rows = await requestSupabase(`${config.discoveryProbeTermsTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows.map((row) => ({
+    query: row.query,
+    origin: row.origin,
+    parentQuery: row.parent_query || "",
+    searchCount: Number(row.search_count) || 0,
+    priority: Number(row.priority) || 0,
+    usefulCount: Number(row.useful_count) || 0,
+    irrelevantCount: Number(row.irrelevant_count) || 0,
+    lastProbedAt: row.last_probed_at || null,
+    status: row.status
+  })) : [];
+}
+
+export async function claimDiscoveryProbeLease({ now = new Date(), leaseUntil, token } = {}, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return null;
+  const query = new URLSearchParams({ id: "eq.1", lease_until: `lt.${now.toISOString()}` });
+  const rows = await requestSupabase(`${config.discoveryProbeStateTable}?${query.toString()}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ lease_until: leaseUntil.toISOString(), lease_token: token, updated_at: now.toISOString() })
+  }, env);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+export async function releaseDiscoveryProbeLease({ token, nextSourceCursor } = {}, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config || !token) return false;
+  const query = new URLSearchParams({ id: "eq.1", lease_token: `eq.${token}` });
+  await requestSupabase(`${config.discoveryProbeStateTable}?${query.toString()}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ lease_until: new Date(0).toISOString(), lease_token: null, source_cursor: Math.max(0, Number(nextSourceCursor) || 0), updated_at: new Date().toISOString() })
+  }, env);
+  return true;
+}
+
+export async function markDiscoveryProbeTermSearched(queryValue, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config || !queryValue) return false;
+  const query = new URLSearchParams({ query: `eq.${queryValue}` });
+  await requestSupabase(`${config.discoveryProbeTermsTable}?${query.toString()}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ last_probed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+  }, env);
+  return true;
+}
+
+export async function insertDiscoveryProbeRun(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return false;
+  await requestSupabase(config.discoveryProbeRunsTable, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify(entry)
+  }, env);
+  return true;
+}
+
+export async function listDiscoveryProbeRuns({ limit = 30 } = {}, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) return [];
+  const query = new URLSearchParams({
+    select: "id,query,source_site,parent_query,outcome,results_count,parsed_count,failed_sources,offers,suggested_queries,elapsed_ms,error,searched_at",
+    order: "searched_at.desc",
+    limit: String(Math.max(1, Math.min(100, limit)))
+  });
+  const rows = await requestSupabase(`${config.discoveryProbeRunsTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function recordDiscoveryProbeFeedback({ query: queryValue, userId, feedback } = {}, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  await requestSupabase("rpc/record_discovery_probe_feedback", {
+    method: "POST",
+    body: JSON.stringify({ query_value: queryValue, user_value: userId, feedback_value: feedback })
+  }, env);
+  return true;
 }
 
 export async function readSupabaseHistoryPayload(env = process.env) {

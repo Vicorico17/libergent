@@ -11,7 +11,7 @@ binding = "ASSETS"
 binding = "BROWSER"
 
 [triggers]
-crons = ["15 * * * *"]
+crons = ["* * * * *"]
 
 [vars]
 OPENCLAW_BRIDGE_URL = "https://bridge.srv1648069.hstgr.cloud"

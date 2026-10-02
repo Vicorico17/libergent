@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { DiscoveryStatus } from "@/components/DiscoveryStatus";
+import { DiscoveryProbeRadar } from "@/components/DiscoveryProbeRadar";
 import { ShopSubmission } from "@/components/ShopSubmission";
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export default function DiscoveryPage() {
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#a51d50]">LiberGent / Discovery status</p>
       <h1 className="mt-5 max-w-4xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">Toate sursele.<br />Status la vedere<span className="text-[#FF4B8B]">.</span></h1>
       <p className="mt-6 max-w-2xl text-sm leading-relaxed sm:text-base">Descoperă marketplace-urile, magazinele și agregatoarele din căutarea LiberGent. Vezi ce surse au returnat oferte, ce nu a funcționat și ce urmează să verificăm.</p>
+      <DiscoveryProbeRadar />
       <ShopSubmission />
       <DiscoveryStatus />
     </main>
