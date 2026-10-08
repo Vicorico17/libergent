@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
+import { isPublicSearchQuery } from "../../../../src/search-policy.js";
 
 const BG   = "#F3F0E7";
 const INK  = "#101010";
@@ -291,6 +292,7 @@ function buildCountList(values: Map<string, number>, limit: number): CountEntry[
 }
 
 function buildHistoryPayloadFromEntries(entries: RecentSearch[]): HistoryPayload {
+  entries = entries.filter((entry) => isPublicSearchQuery(entry.query));
   const queryCounts = new Map<string, number>();
   const keywordCounts = new Map<string, number>();
   const dailyCounts = new Map<string, number>();
@@ -387,7 +389,7 @@ export default function TrenduriPage() {
 
         if ((serverPayload.totals?.searches || 0) > 0) {
           if (!active) return;
-          setPayload(serverPayload);
+          setPayload({ ...serverPayload, recentSearches: serverPayload.recentSearches?.filter((entry) => isPublicSearchQuery(entry.query)) });
           setSource("server");
           setStatus(buildStatus(serverPayload, "server"));
           return;
@@ -433,7 +435,8 @@ export default function TrenduriPage() {
   const totals = payload.totals || {};
   const topQueries = payload.topQueries?.length ? payload.topQueries.slice(0, TOP_QUERY_LIMIT) : fallbackPayload.topQueries || [];
   const topKeywords = payload.topKeywords?.length ? payload.topKeywords.slice(0, TOP_KEYWORD_LIMIT) : fallbackPayload.topKeywords || [];
-  const recentSearches = payload.recentSearches?.length ? payload.recentSearches.slice(0, RECENT_SEARCH_LIMIT) : fallbackPayload.recentSearches || [];
+  const recentSearches = (payload.recentSearches?.length ? payload.recentSearches : fallbackPayload.recentSearches || [])
+    .filter((entry) => isPublicSearchQuery(entry.query)).slice(0, RECENT_SEARCH_LIMIT);
   const dailyEntries = payload.dailyTrend?.length ? payload.dailyTrend : fallbackPayload.dailyTrend || [];
   const maxDailyCount = Math.max(...dailyEntries.map((entry) => entry.count), 1);
   const dailyVolume = dailyEntries.map((entry) => ({

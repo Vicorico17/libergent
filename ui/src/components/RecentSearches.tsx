@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, History } from "lucide-react";
+import { isPublicSearchQuery } from "../../../src/search-policy.js";
 
 export function RecentSearches() {
   const [searches, setSearches] = useState<string[]>([]);
@@ -21,7 +22,7 @@ export function RecentSearches() {
         const queries: string[] = [];
         // The Trends API returns searches ordered by searched_at descending.
         for (const entry of payload.recentSearches) {
-          if (typeof entry?.query !== "string") continue;
+          if (typeof entry?.query !== "string" || !isPublicSearchQuery(entry.query)) continue;
           const query = entry.query.trim().replace(/\s+/g, " ").slice(0, 120);
           const key = query.toLocaleLowerCase("ro");
           if (!query || seen.has(key)) continue;

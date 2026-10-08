@@ -6,7 +6,7 @@ import worker from "./worker.js";
 import { readSupabaseHistoryPayload } from "./supabase.js";
 
 test("rejects offensive words, obfuscated words, and personal data", () => {
-  for (const query of ["iphone muie", "m.u.i.e", "F U C K", "c căcat", "ion@example.com", "+40 712 345 678"]) {
+  for (const query of ["iphone muie", "m.u.i.e", "F U C K", "c căcat", "târfă", "pizdă", "futut", "coaie", "ion@example.com", "+40 712 345 678"]) {
     assert.ok(getSearchQueryError(query), query);
     assert.equal(isPublicSearchQuery(query), false);
   }
@@ -26,6 +26,7 @@ test("bounds public search text with a useful error", () => {
 test("old unsuitable entries are removed from every public history list", () => {
   const payload = buildHistoryPayloadFromEntries([
     { query: "iphone muie", searchedAt: "2026-09-28T12:00:00Z" },
+    { query: "târfă", searchedAt: "2026-09-28T11:30:00Z" },
     { query: "ion@example.com", searchedAt: "2026-09-28T11:00:00Z" },
     { query: "iphone 15", searchedAt: "2026-09-28T10:00:00Z" }
   ]);

@@ -1,6 +1,12 @@
 // Match whole words so product names containing the same letters remain searchable.
 const OFFENSIVE_WORDS = new Set([
-  "muie", "pula", "pizda", "cacat", "curva",
+  // Common Romanian profanity and derogatory terms. Match complete words after
+  // folding diacritics, so "târfă" and "tarfa" receive the same treatment.
+  "muie", "pula", "pulii", "pule", "pizda", "pizdo", "pizde", "pizdulica",
+  "cacat", "caca", "rahat", "curva", "curve", "curvo", "curvelor",
+  "tarfa", "tarfo", "curve", "futu", "fut", "futut", "fututa", "fututi",
+  "coaie", "coaiele", "labagiu", "labagioaica", "sloboz", "buleandra",
+  "boule", "bou", "idiotule", "handicapat", "handicapata",
   "fuck", "fucking", "fucker", "shit", "bitch", "cunt",
   "nigger", "nigga", "faggot", "jidan"
 ]);

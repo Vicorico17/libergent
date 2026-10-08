@@ -6,6 +6,7 @@ import Link from "next/link";
 import { BarChart3, Clock3, Hash, Search, TrendingUp } from "lucide-react";
 import { MascotSVG } from "@/components/MascotSVG";
 import { SearchBar } from "@/components/SearchBar";
+import { isPublicSearchQuery } from "../../../../src/search-policy.js";
 
 const HISTORY_STORAGE_KEY = "libergent-search-history-v1";
 const TOP_QUERY_LIMIT = 30;
@@ -115,7 +116,7 @@ export function TrendsClient() {
   const topQueries = payload?.topQueries || [];
   const topKeywords = payload?.topKeywords || [];
   const dailyTrend = useMemo(() => payload?.dailyTrend || [], [payload?.dailyTrend]);
-  const recentSearches = payload?.recentSearches || [];
+  const recentSearches = (payload?.recentSearches || []).filter((entry) => isPublicSearchQuery(entry.query));
   const maxDailyCount = useMemo(() => Math.max(...dailyTrend.map((entry) => entry.count), 1), [dailyTrend]);
 
   return (
@@ -331,6 +332,7 @@ function buildCountList(values: Map<string, number>, limit: number): CountEntry[
 }
 
 function buildHistoryPayloadFromEntries(entries: RecentSearch[]): HistoryPayload {
+  entries = entries.filter((entry) => isPublicSearchQuery(entry.query));
   const queryCounts = new Map<string, number>();
   const keywordCounts = new Map<string, number>();
   const dailyCounts = new Map<string, number>();
