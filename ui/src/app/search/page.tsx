@@ -1970,14 +1970,11 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
     >
       <div style={{ background: CREAM }}>
         <PanelHeader title={item.recommendation.strong ? "Best Used Deal" : "Top Match · Verifică"} />
-        <div className="flex flex-col md:flex-row">
-          <div className="w-full md:w-2/5 relative overflow-hidden" style={{ minHeight: 256, background: "#DDD9CE", borderRight: `1px solid ${INK}` }}>
+        <div className="flex flex-col md:flex-row bg-white">
+          <div className="w-full md:w-1/2 md:shrink-0 aspect-square relative self-start overflow-hidden border-b md:border-b-0 md:border-r" style={{ background: "#F8F7F3", borderColor: INK }}>
             {image ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={image} alt={item.title} className="absolute inset-0 h-full w-full object-cover" onError={handleImageError} />
-                <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.08)" }} />
-              </>
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={image} alt={item.title} className="absolute inset-0 h-full w-full object-contain px-4 pb-4 pt-16" onError={handleImageError} />
             ) : (
               <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 256" preserveAspectRatio="xMidYMid slice" fill="none">
                 <defs>
@@ -2002,7 +1999,7 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
               <AgentScoreBadge item={item} />
             </div>
           </div>
-          <div className="flex-1 p-6 md:p-8 flex flex-col justify-between" style={{ background: "white" }}>
+          <div className="min-w-0 flex-1 p-6 md:p-8 flex flex-col justify-between" style={{ background: "white" }}>
             <div>
               <div className="flex flex-col gap-3 mb-2">
                 <AgentScoreBadge item={item} />
