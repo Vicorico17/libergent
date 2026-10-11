@@ -95,7 +95,7 @@ export function Hero() {
             className="font-semibold leading-[1.1]"
             style={{ fontFamily: MONO, fontSize: "clamp(40px, 5.5vw, 72px)", color: INK }}
           >
-            Caută cel mai bun deal<br />în România<span style={{ color: PINK }}>.</span>
+            Găsește cel mai bun deal<br />din România<span style={{ color: PINK }}>.</span>
           </h1>
 
           {/* Body copy */}
