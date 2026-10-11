@@ -33,13 +33,13 @@ export function DiscoveryProbeRadar() {
     try {
       const response = await fetch("/api/discovery/probes", { signal, cache: "no-store" });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Nu am putut încărca probele.");
+      if (!response.ok) throw new Error("Probe radar unavailable");
       setRuns(Array.isArray(payload.runs) ? payload.runs : []);
       setTerms(Array.isArray(payload.terms) ? payload.terms : []);
       setError("");
     } catch (cause) {
       if (cause instanceof Error && cause.name === "AbortError") return;
-      setError(cause instanceof Error ? cause.message : "Nu am putut încărca probele.");
+      setError("Radarul de căutări este temporar indisponibil. Lista surselor și statusul lor sunt disponibile mai jos.");
     } finally {
       setLoading(false);
     }
@@ -67,7 +67,7 @@ export function DiscoveryProbeRadar() {
         body: JSON.stringify({ query, feedback: value })
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Feedbackul nu a putut fi salvat.");
+      if (!response.ok || !payload.ok) throw new Error("Feedbackul nu a putut fi salvat. Încearcă din nou mai târziu.");
       setFeedback((current) => ({ ...current, [query]: "Feedback salvat." }));
       await refresh();
     } catch (cause) {
@@ -82,10 +82,15 @@ export function DiscoveryProbeRadar() {
         <h2 id="probe-radar-heading" className="mt-2 text-2xl font-bold uppercase">Radar de căutări</h2>
         <p className="mt-2 max-w-2xl text-xs leading-relaxed text-[#555]">O căutare de produs la fiecare minut, rotită între marketplace-uri. Termenii populari pornesc din căutări agregate recente; ofertele relevante pot propune variante noi.</p>
       </div>
-      <span className="shrink-0 border border-[#111]/30 bg-white/70 px-3 py-2 text-[10px] font-bold uppercase">{loading ? "Se încarcă…" : `${runs.length} verificări recente`}</span>
+      <span className="shrink-0 border border-[#111]/30 bg-white/70 px-3 py-2 text-[10px] font-bold uppercase">{loading ? "Se încarcă…" : error ? "Indisponibil temporar" : `${runs.length} verificări recente`}</span>
     </header>
 
-    {error ? <p role="status" className="border-b border-[#111]/15 bg-[#fee2e2] p-4 text-xs text-[#991b1b]">{error} · Verifică dacă a fost aplicată migrarea `discovery-probes.sql` în Supabase.</p> : null}
+    {error ? <div role="status" className="border-b border-[#111]/15 bg-[#fee2e2] p-4 text-xs text-[#991b1b]">
+      <p>{error}</p>
+      <button type="button" disabled={loading} onClick={() => { setLoading(true); void refresh(); }} className="mt-3 min-h-11 border border-[#111]/30 bg-white px-4 font-bold text-[#111] disabled:opacity-50">
+        {loading ? "Se încarcă…" : "Încearcă din nou"}
+      </button>
+    </div> : null}
 
     <div className="grid gap-6 p-4 md:grid-cols-[0.8fr_1.2fr] md:p-6">
       <div>
@@ -105,7 +110,7 @@ export function DiscoveryProbeRadar() {
               {feedback[term.query] ? <span role="status" className="text-[9px] text-[#555]">{feedback[term.query]}</span> : null}
             </div>
           </li>)}
-          {!loading && !terms.length ? <li className="p-4 text-xs text-[#666]">Așteptăm căutări de produse repetate pentru a forma prima coadă.</li> : null}
+          {!loading && !error && !terms.length ? <li className="p-4 text-xs text-[#666]">Așteptăm căutări de produse repetate pentru a forma prima coadă.</li> : null}
         </ul>
       </div>
 
@@ -130,7 +135,7 @@ export function DiscoveryProbeRadar() {
             </ul> : null}
             {run.suggested_queries?.length ? <p className="mt-2 text-[9px] text-[#555]">Sugestii noi: {run.suggested_queries.join(" · ")}</p> : null}
           </li>)}
-          {!loading && !runs.length ? <li className="border border-[#111]/15 bg-white p-4 text-xs text-[#666]">Prima probă automată va apărea aici după activarea cozii.</li> : null}
+          {!loading && !error && !runs.length ? <li className="border border-[#111]/15 bg-white p-4 text-xs text-[#666]">Prima probă automată va apărea aici după activarea cozii.</li> : null}
         </ul>
       </div>
     </div>

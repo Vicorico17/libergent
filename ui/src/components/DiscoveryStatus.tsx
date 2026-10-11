@@ -11,6 +11,7 @@ type Source = {
     checks?: { query: string; ok: boolean; accepted: number; error: string }[] } | null;
 };
 type Availability = "available" | "empty" | "failed" | "unknown";
+const AVAILABILITY_ORDER: Record<Availability, number> = { available: 0, empty: 1, failed: 1, unknown: 2 };
 
 function evidence(source: Source) {
   const checks = (source.productionValidation || []).filter(check => Number.isFinite(Date.parse(check.checkedAt)));
@@ -68,7 +69,9 @@ export function DiscoveryStatus() {
       .finally(() => { clearTimeout(timeout); if (active) setLoading(false); });
     return () => { active = false; clearTimeout(timeout); controller.abort(); };
   }, [attempt]);
-  const rows = sources.map(source => ({ source, check: evidence(source) }));
+  const rows = sources.map(source => ({ source, check: evidence(source) }))
+    .sort((a, b) => AVAILABILITY_ORDER[a.check.state] - AVAILABILITY_ORDER[b.check.state]
+      || a.source.domain.localeCompare(b.source.domain, "ro"));
   const availableCount = rows.filter(row => row.check.state === "available").length;
   const unavailableCount = rows.filter(row => row.check.state === "empty" || row.check.state === "failed").length;
   const filtered = rows.filter(({ source }) =>
