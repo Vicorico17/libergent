@@ -11,6 +11,8 @@ import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { buildAlertEvents, MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
 import { claimDiscoveryProbeLease, completeAlertProfileCheck, createAlertProfileInSupabase, deleteAlertProfileInSupabase, findWhatsAppConversationOwner, insertAlertEventsInSupabase, insertDiscoveryProbeRun, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertListingStatesFromSupabase, listAlertProfilesFromSupabase, listDiscoveryProbeRuns, listDiscoveryProbeTerms, listDueAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, markDiscoveryProbeTermSearched, readPremiumEntitlement, readRecentDiscoverySeedQueries, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, recordDiscoveryProbeFeedback, recordNotificationDeliveryInSupabase, releaseDiscoveryProbeLease, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase, upsertAlertListingStatesInSupabase, upsertDiscoveryProbeTerms } from "./supabase.js";
 import { createDealCaseInSupabase, getDealCaseFromSupabase, listDealCasesFromSupabase, listDealEventsFromSupabase, reserveDealSendAttempt, updateDealCaseInSupabase, updateDealSendAttempt } from "./supabase.js";
+import { applyBillingSubscription, readBillingCustomer, readBillingCustomerByStripeId } from "./supabase.js";
+import { assertConfiguredPrice, configuredPriceIds, createCheckoutSession, createPortalSession, entitlementFromSubscription, isBillingConfigured, isCheckoutConfigured, stripeGet, verifyStripeEvent } from "./billing.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { normalizeOfferFeedbackPayload } from "./feedback.js";
 import { buildSourceCatalog } from "./source-catalog.js";
@@ -872,6 +874,93 @@ async function handleApi(request, env, context) {
 
   const url = new URL(request.url);
   const apiPath = normalizeApiPathname(url.pathname);
+
+  if (apiPath === "/api/billing/config") {
+    if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+    return json({ available: isCheckoutConfigured(env) });
+  }
+
+  if (apiPath === "/api/billing/status") {
+    if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+    const auth = await authenticateSupabaseUser(request, env);
+    if (!auth.user) return json({ error: auth.error }, auth.status);
+    if (!isBillingConfigured(env)) return json({ available: false, hasCustomer: false });
+    try {
+      const mapped = await readBillingCustomer(auth.user.id, env);
+      return json({ available: true, hasCustomer: Boolean(mapped?.stripe_customer_id) });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
+
+  if (apiPath === "/api/billing/webhook") {
+    if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    if (!isBillingConfigured(env)) return json({ error: "Billing is not configured." }, 503);
+    const rawBody = await request.text();
+    if (rawBody.length > 65536) return json({ error: "Webhook too large." }, 413);
+    const event = await verifyStripeEvent(rawBody, request.headers.get("stripe-signature"), env.STRIPE_WEBHOOK_SECRET);
+    if (!event?.id || !event?.type || !Number.isSafeInteger(event.created)) return json({ error: "Invalid Stripe signature or event." }, 400);
+    const relevant = new Set(["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted", "invoice.paid", "invoice.payment_failed"]);
+    if (!relevant.has(event.type)) return json({ ok: true, ignored: true });
+    try {
+      const object = event.data?.object || {};
+      const subscriptionId = event.type === "checkout.session.completed" ? object.subscription
+        : event.type.startsWith("invoice.") ? (object.parent?.subscription_details?.subscription || object.subscription)
+        : object.id;
+      if (typeof subscriptionId !== "string" || !/^sub_[a-zA-Z0-9]+$/.test(subscriptionId)) return json({ ok: true, ignored: true });
+      const subscription = await stripeGet(`/subscriptions/${subscriptionId}`, env);
+      const allowedPriceIds = configuredPriceIds(env);
+      if (!subscription.items?.data?.some((item) => allowedPriceIds.includes(item.price?.id))) return json({ ok: true, ignored: true });
+      const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
+      const mapped = customerId ? await readBillingCustomerByStripeId(customerId, env) : null;
+      if (mapped?.stripe_subscription_id && mapped.stripe_subscription_id !== subscriptionId) {
+        const current = await stripeGet(`/subscriptions/${mapped.stripe_subscription_id}`, env);
+        if (["active", "trialing", "past_due"].includes(current.status)) return json({ ok: true, ignored: true });
+      }
+      const userId = subscription.metadata?.user_id || mapped?.user_id || (event.type === "checkout.session.completed" ? object.client_reference_id : "");
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId || "") || !/^cus_[a-zA-Z0-9]+$/.test(customerId || "")) {
+        return json({ error: "Billing owner could not be resolved." }, 500);
+      }
+      const entitlement = entitlementFromSubscription(subscription);
+      await applyBillingSubscription({ userId, customerId, subscriptionId, status: entitlement.status,
+        expiresAt: entitlement.expires_at, eventCreated: event.created }, env);
+      return json({ ok: true });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
+
+  if (apiPath === "/api/billing/checkout" || apiPath === "/api/billing/portal") {
+    if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    if (!isBillingConfigured(env)) return json({ error: "Billing is not configured." }, 503);
+    if (apiPath.endsWith("/checkout") && !isCheckoutConfigured(env)) return json({ error: "Checkout plans are not configured." }, 503);
+    const auth = await authenticateSupabaseUser(request, env);
+    if (!auth.user) return json({ error: auth.error }, auth.status);
+    try {
+      const mapped = await readBillingCustomer(auth.user.id, env);
+      if (apiPath.endsWith("/portal")) {
+        if (!mapped?.stripe_customer_id) return json({ error: "No billing account found." }, 404);
+        const session = await createPortalSession({ customerId: mapped.stripe_customer_id, requestUrl: request.url, env });
+        return json({ url: session.url });
+      }
+      if (mapped?.stripe_subscription_id) {
+        const subscription = await stripeGet(`/subscriptions/${mapped.stripe_subscription_id}`, env);
+        if (["active", "trialing", "past_due", "unpaid"].includes(subscription.status)) {
+          return json({ error: "A subscription already exists. Manage it in the billing portal.", code: "subscription_exists" }, 409);
+        }
+      }
+      const parsedBody = await parseJsonRequest(request);
+      if (parsedBody.error) return json({ error: parsedBody.error }, parsedBody.error.includes("large") ? 413 : 400);
+      const plan = parsedBody.data?.plan;
+      if (plan !== "weekly" && plan !== "annual") return json({ error: "Choose a valid billing plan." }, 400);
+      const priceId = await assertConfiguredPrice(plan, env);
+      const session = await createCheckoutSession({ user: auth.user, customerId: mapped?.stripe_customer_id,
+        requestUrl: request.url, priceId, trialEligible: !mapped?.stripe_subscription_id, env });
+      return json({ url: session.url });
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
 
   if (apiPath === "/api/openclaw/inbound") {
     if (request.method !== "POST") {

@@ -1,3 +1,5 @@
-// Owner-confirmed monthly price. Checkout must use a server-configured Stripe
-// Price; never trust a browser-supplied amount when billing is connected.
-export const PREMIUM_MONTHLY_PRICE_RON = 99;
+// Checkout uses server-configured Stripe Prices. These display values must match
+// the amounts validated by src/billing.js before a Checkout Session is created.
+export const PREMIUM_WEEKLY_PRICE_RON = 49;
+export const PREMIUM_ANNUAL_PRICE_RON = 499;
+export const PREMIUM_TRIAL_DAYS = 3;

@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Prețuri",
+  title: "LiberGent Premium | Agentul tău personal",
   description:
-    "LiberGent Beta este gratuit pentru căutări de produse pe mai multe platforme. Vezi ce include planul gratuit și ce funcții Premium urmează pentru monitorizare.",
+    "Cunoaște agentul tău personal LiberGent. Începe cu 3 zile gratuite la primul abonament, apoi alege plata săptămânală sau anuală. Apelurile sunt disponibile în pilot, cu aprobarea ta.",
   alternates: {
     canonical: "/pricing",
   },
   openGraph: {
-    title: "Prețuri LiberGent",
+    title: "Get your personal LIBERGENT AGENT",
     description:
-      "Căutare de produse gratuită în beta, cu funcții Premium planificate pentru monitorizare.",
+      "Agentul tău personal caută, compară și urmărește ofertele. Contactul cu vânzătorii se face cu aprobarea ta.",
     url: "/pricing",
   },
 };

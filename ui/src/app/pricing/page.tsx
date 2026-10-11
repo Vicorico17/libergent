@@ -4,7 +4,8 @@ import Link from "next/link";
 import { LogoIcon } from "@/components/LogoIcon";
 import { AccountNavLink } from "@/components/AccountNavLink";
 import { PremiumNavLink } from "@/components/PremiumNavLink";
-import { PREMIUM_MONTHLY_PRICE_RON } from "@/lib/pricing";
+import { PREMIUM_TRIAL_DAYS } from "@/lib/pricing";
+import { BillingPlanPicker, BillingReturnNotice } from "@/components/BillingAction";
 
 const BG   = "#F3F0E7";
 const INK  = "#111111";
@@ -27,15 +28,12 @@ const BETA_FEATURES = [
 ];
 
 const PREMIUM_FEATURES = [
-  "Mai multe magazine și marketplace-uri verificate",
-  "Retail fashion: Sizeer, ePantofi, Fashion Days, Zalando, ABOUT YOU, Answear și MODIVO",
-  "Niche retail: casă și mobilier, DIY și scule, sport și outdoor",
-  "Echipamente foto, instrumente muzicale, cărți și jocuri",
-  "Comparație extinsă de preț",
-  "Recomandare mai sigură pentru bugetul tău",
-  "Monitorizare și alerte automate",
-  "Contact și follow-up cu sellerii",
-  "Istoric privat al conversațiilor",
+  "Caută pentru tine în magazine și marketplace-uri verificate",
+  "Compară prețurile, verifică ofertele și îți arată riscurile",
+  "Urmărește anunțurile și te anunță când apare o ofertă bună",
+  "Pregătește mesaje și urmărește discuțiile cu vânzătorii",
+  "Poate suna vânzătorii pentru tine, cu aprobarea ta (funcție pilot)",
+  "Păstrează istoricul privat al conversațiilor și negocierilor",
 ];
 
 function CheckIcon() {
@@ -94,14 +92,6 @@ function StarIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={INK} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  );
-}
-
-function CrownIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 20h20M5 20L3 8l4.5 4.5L12 4l4.5 8.5L21 8l-2 12" />
     </svg>
   );
 }
@@ -174,25 +164,28 @@ export default function PricingPage() {
 
         {/* Main */}
         <main className="flex-grow flex flex-col items-center px-3 pb-12 pt-9 sm:px-4 md:pb-24 md:pt-20 z-10 relative">
+          <BillingReturnNotice />
 
-          {/* Section label */}
-          <div className="mb-5 flex items-center gap-2 text-[10px] tracking-widest uppercase md:mb-10 md:text-[11px]" style={{ color: PINK }}>
-            <div style={{ width: 5, height: 5, background: PINK }} />
-            Prețuri
-            <div style={{ width: 5, height: 5, background: PINK }} />
-          </div>
-
-          {/* Headline */}
-          <div className="mb-8 max-w-2xl text-center md:mb-16">
+          {/* Premium identity */}
+          <div className="mb-8 flex flex-col items-center text-center md:mb-14">
+            <div className="mb-6 flex h-24 w-24 items-center justify-center border-2 border-[#111111] bg-white shadow-[6px_6px_0_#FF4B8B] md:h-28 md:w-28">
+              <LogoIcon size={78} className="md:!h-24 md:!w-24" />
+            </div>
+            <div className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] md:text-xs" style={{ color: PINK }}>
+              <span className="h-1.5 w-1.5 bg-[#FF4B8B]" />
+              LiberGent Premium
+              <span className="h-1.5 w-1.5 bg-[#FF4B8B]" />
+            </div>
             <h1
-              className="mb-4 text-[32px] font-bold tracking-tight leading-[1.05] sm:text-[40px] md:mb-6 md:text-[64px] lg:text-[80px]"
+              className="mb-5 max-w-4xl text-[34px] font-bold tracking-tight leading-[1.04] sm:text-[46px] md:mb-6 md:text-[64px] lg:text-[76px]"
               style={{ color: INK, fontFamily: MONO }}
             >
-              Mai multe surse.<br />
-              O alegere mai bună<span style={{ color: PINK }}>.</span>
+              Get your personal<br />
+              <span style={{ color: PINK }}>LIBERGENT AGENT.</span>
             </h1>
-            <p className="mx-auto max-w-xl text-[12px] leading-relaxed md:text-sm" style={{ color: `${INK}99` }}>
-              Începe gratuit sau testează Deep Search pentru acoperire extinsă și mai multe șanse să găsești oferta potrivită.
+            <p className="max-w-2xl text-sm leading-relaxed md:text-base" style={{ color: `${INK}B3` }}>
+              Spune-i ce cauți și cât vrei să plătești. Agentul tău caută ofertele, le compară,
+              urmărește schimbările și te ajută să vorbești cu vânzătorii.
             </p>
           </div>
 
@@ -284,7 +277,7 @@ export default function PricingPage() {
               </div>
             </div>
 
-            {/* PREMIUM card (locked) */}
+            {/* PREMIUM agent card */}
             <div
               className="order-1 relative flex flex-col md:order-2"
               style={{
@@ -296,38 +289,25 @@ export default function PricingPage() {
               <div className="flex h-full flex-col p-5 sm:p-7 md:p-8">
               <div className="flex justify-between items-start mb-6">
                 <div
-                  className="w-12 h-12 flex items-center justify-center"
-                  style={{ border: `2px solid ${INK}`, color: PINK }}
+                  className="flex h-14 w-14 items-center justify-center bg-white"
+                  style={{ border: `2px solid ${INK}`, boxShadow: `3px 3px 0 ${PINK}` }}
                 >
-                  <CrownIcon />
+                  <LogoIcon size={44} />
                 </div>
                 <div
                   className="px-3 py-1 text-[11px] font-bold uppercase tracking-widest"
                   style={{ background: PINK, border: `2px solid ${INK}`, color: "white" }}
                 >
-                  În curând
+                  {PREMIUM_TRIAL_DAYS} zile gratuit
                 </div>
               </div>
 
               <h2 className="mb-2 text-[27px] font-bold tracking-tight md:text-3xl" style={{ color: INK, fontFamily: MONO }}>
-                LiberGent Premium
+                Agentul tău LiberGent
               </h2>
 
-              <div className="mb-4">
-                <div
-                  className="mb-2 inline-flex px-2 py-1 text-[10px] font-bold uppercase tracking-widest"
-                  style={{ background: "#FCE7F3", border: `1px solid ${PINK}`, color: PINK }}
-                >
-                  Abonament lunar
-                </div>
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <span className="text-[40px] font-bold tracking-tight md:text-[44px]" style={{ color: INK, fontFamily: MONO }}>{PREMIUM_MONTHLY_PRICE_RON}</span>
-                  <span className="text-base uppercase md:text-lg" style={{ color: INK }}>RON / lună</span>
-                </div>
-              </div>
-
               <p className="mb-4 text-[12px] leading-relaxed md:text-sm" style={{ color: `${INK}B3`, minHeight: 48 }}>
-                Compară ofertele second-hand de tehnologie cu prețurile produselor noi din magazine și urmărește ofertele relevante.
+                Caută, compară și urmărește ofertele pentru tine. Pentru contactul cu vânzătorii, agentul îți cere aprobarea înainte să acționeze.
               </p>
 
               {/* Locked notice */}
@@ -342,12 +322,11 @@ export default function PricingPage() {
                   <LockIcon size={12} />
                 </div>
                 <p className="text-xs leading-snug" style={{ color: INK }}>
-                  Testează căutarea Premium acum. Abonamentul se lansează în curând.
+                  Abonamentul devine disponibil când plata este configurată.
                 </p>
               </div>
 
-              <Link href="/search?tier=premium" className="mt-3 flex min-h-12 items-center justify-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest" style={{ border: `2px solid ${INK}`, background: PINK, color: INK, boxShadow: `4px 4px 0 ${INK}`, fontFamily: MONO }}>Încearcă Premium <ArrowRight size={16} /></Link>
-              <p className="mt-3 text-center text-[9px] uppercase" style={{ color: `${INK}77` }}>Fără card în perioada de test</p>
+              <BillingPlanPicker />
 
               <div style={{ borderTop: `1px dashed ${INK}`, margin: "1.25rem 0" }} />
 

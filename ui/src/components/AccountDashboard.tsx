@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, Bookmark, Clock3, Crown, ExternalLink, LayoutDashboard, LogOut, MessageSquare, Plus, Search, Trash2, UserRound } from "lucide-react";
 import { LogoIcon } from "@/components/LogoIcon";
+import { BillingAction } from "@/components/BillingAction";
 import {
   readAccountActivity,
   readAccountAlerts,
@@ -311,7 +312,7 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
         <aside className="flex flex-col border-b border-black bg-white lg:border-b-0 lg:border-r">
           <div className="flex items-center gap-3 p-5" style={{ borderBottom: `1px solid ${INK}` }}>
             <div className="flex h-11 w-11 items-center justify-center text-[16px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: PINK }}>{(account.displayName || account.email || "L").slice(0, 1)}</div>
-            <div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase">{account.displayName || "Cont LiberGent"}</div><div className="truncate text-[9px]" style={{ color: `${INK}88` }}>{account.email}</div><div className="mt-2"><PlanBadge status={alertAccess} /></div></div>
+            <div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase">{account.displayName || "Cont LiberGent"}</div><div className="truncate text-[9px]" style={{ color: `${INK}88` }}>{account.email}</div><div className="mt-2"><PlanBadge status={alertAccess} /></div><BillingAction kind="portal" /></div>
           </div>
           <nav className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-1" aria-label="Meniu cont">
             {navItems.map((item) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { PREMIUM_MONTHLY_PRICE_RON } from "@/lib/pricing";
+import { PREMIUM_ANNUAL_PRICE_RON, PREMIUM_TRIAL_DAYS, PREMIUM_WEEKLY_PRICE_RON } from "@/lib/pricing";
 
 const BG   = "#F3F0E7";
 const INK  = "#111111";
@@ -193,7 +193,7 @@ export function Pricing() {
                 className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest"
                 style={{ background: "#D1D5DB", border: "2px solid #9CA3AF", color: "#6B7280" }}
               >
-                Blocat
+                Premium
               </div>
             </div>
 
@@ -204,12 +204,13 @@ export function Pricing() {
                 className="mb-2 inline-flex px-2 py-1 text-[10px] font-bold uppercase tracking-widest"
                 style={{ background: "#FCE7F3", border: "1px solid #9CA3AF", color: PINK }}
               >
-                În pregătire
+                {PREMIUM_TRIAL_DAYS} zile gratuite la primul abonament
               </div>
               <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="font-bold uppercase" style={{ fontSize: 32, color: "#6B7280" }}>{PREMIUM_MONTHLY_PRICE_RON}</span>
-                <span className="text-lg uppercase" style={{ color: "#6B7280" }}>RON / lună</span>
+                <span className="font-bold uppercase" style={{ fontSize: 32, color: "#6B7280" }}>{PREMIUM_WEEKLY_PRICE_RON}</span>
+                <span className="text-lg uppercase" style={{ color: "#6B7280" }}>RON / săptămână</span>
               </div>
+              <p className="mt-1 text-[11px]" style={{ color: "#6B7280" }}>sau {PREMIUM_ANNUAL_PRICE_RON} RON / an</p>
             </div>
 
             <p className="text-[13px] leading-relaxed mb-4" style={{ color: "#9CA3AF", minHeight: 44 }}>
@@ -227,7 +228,7 @@ export function Pricing() {
                 <LockIcon />
               </div>
               <p className="text-[11px] leading-snug" style={{ color: "#6B7280" }}>
-                Premium nu este disponibil încă.<br />Nu există plată sau abonament activ.
+                Abonamentul devine disponibil când plata este configurată.
               </p>
             </div>
 
@@ -242,12 +243,7 @@ export function Pricing() {
               ))}
             </ul>
 
-            <div
-              className="flex justify-center items-center gap-3 py-4 font-bold text-[11px] uppercase tracking-widest cursor-not-allowed"
-              style={{ border: "2px solid #9CA3AF", background: "#E5E7EB", color: "#9CA3AF", fontFamily: MONO }}
-            >
-              Indisponibil momentan
-            </div>
+            <Link href="/pricing" className="mt-3 flex min-h-12 items-center justify-center border-2 border-[#111] bg-[#FF4B8B] px-4 py-3 text-[11px] font-bold uppercase tracking-widest text-[#111] shadow-[4px_4px_0_#111]">Vezi planurile Premium</Link>
           </div>
 
         </div>

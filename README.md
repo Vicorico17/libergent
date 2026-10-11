@@ -424,6 +424,14 @@ set plan = 'premium', status = 'active', expires_at = excluded.expires_at, updat
 
 To revoke access, change the row to `plan = 'free'` or `status = 'cancelled'`. Premium alerts run from the hourly Cloudflare cron. A new alert's first scan creates its baseline without notifying for old inventory; later scans can produce `new_strong_match`, `price_drop`, and `better_than_shortlist` events. Events always appear in the account inbox. Email is additionally delivered when `ALERT_EMAIL_WEBHOOK_URL` is configured.
 
+### Stripe subscription test flow
+
+The billing UI stays unavailable until all billing variables are set. This integration accepts **Stripe test keys only** while tax and refund policies are unresolved. Apply `supabase/billing.sql` after `supabase/search_tracking.sql`. In Stripe test mode, create recurring Prices for **49 RON weekly** and **499 RON yearly** (about 80% less than 52 weekly payments), then configure the Customer Portal. Set `STRIPE_SECRET_KEY`, `STRIPE_WEEKLY_PRICE_ID`, `STRIPE_ANNUAL_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, and `LIBERGENT_PUBLIC_URL` as Worker secrets or local environment variables. `STRIPE_PRICE_ID` is optional for reconciling an older 99 RON monthly subscription. `LIBERGENT_PUBLIC_URL` must be the site origin; with `npm run dev`, use `http://localhost:3000` for the UI while webhooks forward to port 8787. Never put Stripe secrets in `NEXT_PUBLIC_*` variables.
+
+Register `/api/billing/webhook` for `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, and `invoice.payment_failed`. For local testing, forward the Stripe CLI webhook to `http://127.0.0.1:8787/api/billing/webhook`, then use a signed-in account on `/pricing/`. The first completed subscription receives a **3-day trial**; a returning subscriber is charged without another trial. Stripe's test card `4242 4242 4242 4242` with any future expiry and CVC completes a test Checkout. Confirm that `/api/alerts` changes from 403 to 200 after the webhook and that the account page opens the Customer Portal. Cancel in the Portal and confirm access ends at the configured period end. A `past_due` subscription blocks Premium access immediately. Checkout return URLs only report navigation; the signed webhook changes entitlement.
+
+`node --test src/billing.test.js` exercises authentication, server-owned plan prices, trial eligibility, signature rejection, and active/past-due/cancelled reconciliation without contacting Stripe. A live end-to-end payment test needs Stripe test keys, both recurring test Prices, the webhook secret, and a configured Supabase project.
+
 Run the relevant SQL files in `supabase/` before enabling these features. Use the unqualified table name `email_leads`, not `public.email_leads`, in `SUPABASE_EMAIL_LEADS_TABLE`.
 
 ### Search-quality database migration

@@ -430,6 +430,26 @@ export async function readPremiumEntitlement(userId, email = "", env = process.e
   return { active: row?.plan === "premium" && row?.status === "active" && unexpired, plan: row?.plan || "free", source: "database", expiresAt: row?.expires_at || null };
 }
 
+export async function readBillingCustomer(userId, env = process.env) {
+  const query = new URLSearchParams({ select: "user_id,stripe_customer_id,stripe_subscription_id", user_id: `eq.${userId}`, limit: "1" });
+  const rows = await requestSupabase(`billing_customers?${query}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+export async function readBillingCustomerByStripeId(customerId, env = process.env) {
+  const query = new URLSearchParams({ select: "user_id,stripe_customer_id,stripe_subscription_id", stripe_customer_id: `eq.${customerId}`, limit: "1" });
+  const rows = await requestSupabase(`billing_customers?${query}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+export async function applyBillingSubscription({ userId, customerId, subscriptionId, status, expiresAt, eventCreated }, env = process.env) {
+  return requestSupabase("rpc/apply_billing_subscription", {
+    method: "POST",
+    body: JSON.stringify({ p_user_id: userId, p_customer_id: customerId, p_subscription_id: subscriptionId,
+      p_status: status, p_expires_at: expiresAt, p_event_created: eventCreated })
+  }, env);
+}
+
 export async function listAlertProfilesFromSupabase(userId, env = process.env) {
   const config = getSupabaseConfig(env);
   if (!config) return [];
