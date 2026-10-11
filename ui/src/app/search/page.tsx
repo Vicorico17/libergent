@@ -2102,25 +2102,51 @@ function SpecialResultImage({ item }: { item: SearchResultItem }) {
 }
 
 function ClosestDealCard({ item, viewerCity, isBestOverall, onInspect }: { item: SearchResultItem; viewerCity: string; isBestOverall: boolean; onInspect: (item: SearchResultItem) => void }) {
+  const listingCity = item.proximity?.listingCity || item.city
+  const distanceKm = item.proximity?.distanceKm
+  const hasDistance = typeof distanceKm === "number" && Number.isFinite(distanceKm) && distanceKm >= 0
+
   return (
     <article data-testid="closest-deal" className="flex h-full flex-col overflow-hidden" style={{ border: `2px solid ${INK}`, background: "white", boxShadow: `5px 5px 0 ${INK}`, fontFamily: MONO }}>
-      <PanelHeader title={isBestOverall ? "Best Deal · Și cel mai aproape" : "Cel mai apropiat match bun"} />
+      <header className="flex items-start gap-3 border-b p-5" style={{ borderColor: INK, background: "#EAF4EC" }}>
+        <span className="flex size-10 shrink-0 items-center justify-center border" style={{ borderColor: INK, background: "white" }}>
+          <MapPin size={22} aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-bold uppercase">Cel mai aproape de tine</h2>
+          <p className="mt-1 text-[11px] leading-relaxed">Cea mai apropiată ofertă dintre cele potrivite căutării tale.</p>
+          {isBestOverall && <span className="mt-2 inline-block bg-white px-2 py-1 text-[9px] font-bold uppercase">Și recomandarea #1</span>}
+        </div>
+      </header>
       <SpecialResultImage item={item} />
       <div className="flex flex-1 flex-col p-5 sm:p-6" style={{ background: CREAM }}>
         <div className="min-w-0 flex-1">
-          <div className="mb-3 flex flex-wrap gap-2">
-            <MetaChip tone="dark"><MapPin size={10} /> {item.proximity?.label || "distanță aproximativă"}</MetaChip>
-            <MetaChip>{item.proximity?.listingCity || item.city}</MetaChip>
-            <MetaChip tone="muted">din zona {viewerCity}</MetaChip>
+          <div className="mb-5 border p-4" style={{ borderColor: `${INK}25`, background: "white" }}>
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#376344" }}>Distanță față de orașul de referință</p>
+            <p className="mt-1 text-[28px] font-bold leading-tight">
+              {hasDistance ? distanceKm < 1 ? "Sub 1 km · estimat" : `≈ ${distanceKm.toLocaleString("ro-RO", { maximumFractionDigits: 0 })} km` : "Distanță indisponibilă"}
+            </p>
+            <div className="mt-4 flex gap-3">
+              <div className="flex w-5 shrink-0 flex-col items-center py-1" aria-hidden="true">
+                <span className="size-2.5 rounded-full border-2" style={{ borderColor: INK }} />
+                <span className="my-1 min-h-5 flex-1 border-l border-dashed" style={{ borderColor: `${INK}55` }} />
+                <MapPin size={18} style={{ color: "#376344" }} />
+              </div>
+              <div className="min-w-0 space-y-3">
+                <div><p className="text-[9px] uppercase" style={{ color: `${INK}99` }}>Oraș de referință</p><p className="break-words text-[13px] font-bold">{viewerCity}</p></div>
+                <div><p className="text-[9px] uppercase" style={{ color: `${INK}99` }}>Locația anunțului</p><p className="break-words text-[15px] font-bold">{listingCity || "Locație nespecificată"}</p></div>
+              </div>
+            </div>
+            {listingCity && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${listingCity}, România`)}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-2 text-[10px] font-bold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4">
+              Vezi orașul pe hartă <ExternalLink size={12} aria-hidden="true" />
+            </a>}
+            <p className="mt-2 text-[10px] leading-relaxed" style={{ color: `${INK}99` }}>Estimare între orașe, nu distanță rutieră. Confirmă locul de întâlnire cu vânzătorul.</p>
           </div>
           <h3 className="text-[17px] font-bold uppercase leading-snug sm:text-[20px]">{item.title}</h3>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <span className="text-[24px] font-bold" style={{ color: PINK }}>{item.priceLabel}</span>
             <span className="text-[10px] font-bold uppercase">{item.source} · scor {item.score}%</span>
           </div>
-          <p className="mt-4 text-[9px] leading-relaxed" style={{ color: `${INK}77` }}>
-            Distanță estimată la nivel de oraș. Locația exactă și disponibilitatea trebuie confirmate cu vânzătorul.
-          </p>
         </div>
         <button type="button" onClick={() => onInspect(item)} className="mt-5 min-h-12 w-full px-5 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>
           Analizează oferta
