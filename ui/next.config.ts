@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
   },
   turbopack: {
-    root: uiRoot,
+    root: dirname(uiRoot),
   },
   ...(isDev
     ? {
