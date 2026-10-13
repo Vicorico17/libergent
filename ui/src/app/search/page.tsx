@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ChevronDown as ChevronDownIcon, ClipboardCheck, Crown, ExternalLink, Lock, MapPin, MessageSquare, RotateCcw, ShieldCheck, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
 import { LogoIcon } from "@/components/LogoIcon"
+import { PremiumSearchAnimation } from "@/components/search/PremiumSearchAnimation"
 import { PremiumNavLink } from "@/components/PremiumNavLink"
 import { EmailCapturePopup } from "@/components/EmailCapturePopup"
 import {
@@ -910,6 +911,8 @@ function LoadingOverlay({ progress, done, query, tier, isPremiumAccount }: { pro
           </p>
 
           {/* Current phase */}
+          {tier === "premium" && <PremiumSearchAnimation />}
+
           <div
             className="p-4"
             style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}
@@ -2087,13 +2090,13 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
   )
 }
 
-function SpecialResultImage({ item }: { item: SearchResultItem }) {
+function SpecialResultImage({ item, className = "h-48 shrink-0" }: { item: SearchResultItem; className?: string }) {
   const { image, handleImageError } = useListingImage(item)
   return (
-    <div className="flex h-48 shrink-0 items-center justify-center overflow-hidden" style={{ borderBottom: `1px solid ${INK}`, background: CREAM }}>
+    <div className={`relative flex items-center justify-center overflow-hidden ${className}`} style={{ borderBottom: `1px solid ${INK}`, background: CREAM }}>
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image} alt={item.title} loading="lazy" className="h-full w-full object-contain" onError={handleImageError} />
+        <img src={image} alt={item.title} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-3" onError={handleImageError} />
       ) : (
         <span className="text-[10px] uppercase" style={{ color: `${INK}77` }}>Fotografie indisponibilă</span>
       )}
@@ -2108,7 +2111,7 @@ function ClosestDealCard({ item, viewerCity, isBestOverall, onInspect }: { item:
 
   return (
     <article data-testid="closest-deal" className="flex h-full flex-col overflow-hidden" style={{ border: `2px solid ${INK}`, background: "white", boxShadow: `5px 5px 0 ${INK}`, fontFamily: MONO }}>
-      <header className="flex items-start gap-3 border-b p-5" style={{ borderColor: INK, background: "#EAF4EC" }}>
+      <header className="flex items-start gap-3 border-b p-4" style={{ borderColor: INK, background: "#EAF4EC" }}>
         <span className="flex size-10 shrink-0 items-center justify-center border" style={{ borderColor: INK, background: "white" }}>
           <MapPin size={22} aria-hidden="true" />
         </span>
@@ -2118,37 +2121,32 @@ function ClosestDealCard({ item, viewerCity, isBestOverall, onInspect }: { item:
           {isBestOverall && <span className="mt-2 inline-block bg-white px-2 py-1 text-[9px] font-bold uppercase">Și recomandarea #1</span>}
         </div>
       </header>
-      <SpecialResultImage item={item} />
-      <div className="flex flex-1 flex-col p-5 sm:p-6" style={{ background: CREAM }}>
-        <div className="min-w-0 flex-1">
-          <div className="mb-5 border p-4" style={{ borderColor: `${INK}25`, background: "white" }}>
-            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#376344" }}>Distanță față de orașul de referință</p>
-            <p className="mt-1 text-[28px] font-bold leading-tight">
-              {hasDistance ? distanceKm < 1 ? "Sub 1 km · estimat" : `≈ ${distanceKm.toLocaleString("ro-RO", { maximumFractionDigits: 0 })} km` : "Distanță indisponibilă"}
-            </p>
-            <div className="mt-4 flex gap-3">
-              <div className="flex w-5 shrink-0 flex-col items-center py-1" aria-hidden="true">
-                <span className="size-2.5 rounded-full border-2" style={{ borderColor: INK }} />
-                <span className="my-1 min-h-5 flex-1 border-l border-dashed" style={{ borderColor: `${INK}55` }} />
-                <MapPin size={18} style={{ color: "#376344" }} />
-              </div>
-              <div className="min-w-0 space-y-3">
-                <div><p className="text-[9px] uppercase" style={{ color: `${INK}99` }}>Oraș de referință</p><p className="break-words text-[13px] font-bold">{viewerCity}</p></div>
-                <div><p className="text-[9px] uppercase" style={{ color: `${INK}99` }}>Locația anunțului</p><p className="break-words text-[15px] font-bold">{listingCity || "Locație nespecificată"}</p></div>
-              </div>
-            </div>
-            {listingCity && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${listingCity}, România`)}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center gap-2 text-[10px] font-bold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4">
-              Vezi orașul pe hartă <ExternalLink size={12} aria-hidden="true" />
-            </a>}
-            <p className="mt-2 text-[10px] leading-relaxed" style={{ color: `${INK}99` }}>Estimare între orașe, nu distanță rutieră. Confirmă locul de întâlnire cu vânzătorul.</p>
-          </div>
-          <h3 className="text-[17px] font-bold uppercase leading-snug sm:text-[20px]">{item.title}</h3>
+      <SpecialResultImage item={item} className="min-h-56 flex-1 sm:min-h-64" />
+      <div className="flex flex-col p-4 sm:p-5" style={{ background: CREAM }}>
+        <div className="min-w-0">
+          <h3 className="break-words text-[17px] font-bold uppercase leading-snug sm:text-[20px]">{item.title}</h3>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <span className="text-[24px] font-bold" style={{ color: PINK }}>{item.priceLabel}</span>
             <span className="text-[10px] font-bold uppercase">{item.source} · scor {item.score}%</span>
           </div>
+          <div className="mt-4 border p-3" style={{ borderColor: `${INK}25`, background: "white" }}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                <MapPin size={18} className="mt-0.5 shrink-0" style={{ color: "#376344" }} aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-[9px] uppercase" style={{ color: `${INK}99` }}>Locația anunțului</p>
+                  <p className="break-words text-[14px] font-bold">{listingCity || "Locație nespecificată"}</p>
+                </div>
+              </div>
+              <p className="text-[22px] font-bold leading-tight" style={{ color: "#376344" }}>
+                {hasDistance ? distanceKm < 1 ? "< 1 km" : `≈ ${distanceKm.toLocaleString("ro-RO", { maximumFractionDigits: 0 })} km` : "Distanță indisponibilă"}
+              </p>
+            </div>
+            <p className="mt-2 break-words text-[11px]">Oraș de referință: <span className="font-bold">{viewerCity}</span></p>
+            <p className="mt-2 border-t pt-2 text-[10px] leading-relaxed" style={{ borderColor: `${INK}15`, color: `${INK}99` }}>Estimare între orașe, nu distanță rutieră. Confirmă locul de întâlnire cu vânzătorul.</p>
+          </div>
         </div>
-        <button type="button" onClick={() => onInspect(item)} className="mt-5 min-h-12 w-full px-5 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>
+        <button type="button" onClick={() => onInspect(item)} className="mt-4 min-h-12 w-full px-5 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>
           Analizează oferta
         </button>
       </div>
