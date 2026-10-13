@@ -2,6 +2,16 @@ import { understandMarketplaceQuery } from "./query-understanding.js";
 import { getSearchQueryError } from "./search-policy.js";
 
 export const DISCOVERY_PROBE_SITES = ["olx.ro", "vinted.ro", "emag.ro"];
+
+export function discoveryProbeFailure(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  const missingSchema = /discovery_probe|record_discovery_probe_feedback/i.test(message)
+    && /PGRST20[25]|42P01|does not exist|could not find (?:the )?(?:table|function)/i.test(message);
+  return {
+    code: missingSchema ? "discovery_schema_not_ready" : "discovery_unavailable",
+    error: "Radarul de căutări este temporar indisponibil. Încearcă din nou mai târziu."
+  };
+}
 const QUERY_STOP_WORDS = new Set([
   "vand", "vanzare", "cumpar", "cumparare", "nou", "noua", "noi", "folosit", "folosita",
   "stare", "superba", "superb", "oferta", "reducere", "pret", "lei", "ron", "livrare",
@@ -67,14 +77,19 @@ export function serializeProbeRun({ query, site, payload, elapsedMs, parentQuery
       relevanceScore: Number.isFinite(item.relevanceScore) ? item.relevanceScore : null
     }));
   const summary = payload?.summary || {};
+  const failedSources = Array.isArray(summary.failedMarketplaces) ? summary.failedMarketplaces
+    : (payload?.results || []).filter((result) => result?.ok === false)
+      .map((result) => ({ site: result.site, error: result.error || "Source request failed." }));
+  const failed = !items.length && failedSources.length > 0 && !(payload?.results || []).some((result) => result?.ok);
   return {
     query,
     source_site: site,
     parent_query: parentQuery || null,
-    outcome: items.length ? "results" : "empty",
+    outcome: items.length ? "results" : failed ? "error" : "empty",
     results_count: Number(summary.includedListings ?? items.length) || 0,
     parsed_count: Number(summary.parsedListings) || 0,
-    failed_sources: Array.isArray(summary.failedMarketplaces) ? summary.failedMarketplaces : [],
+    failed_sources: failedSources,
+    error: failed ? String(failedSources[0]?.error || "Source request failed.").slice(0, 500) : "",
     offers: items,
     elapsed_ms: Math.max(0, Math.round(Number(elapsedMs) || 0)),
     searched_at: summary.searchedAt || new Date().toISOString()

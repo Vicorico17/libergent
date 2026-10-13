@@ -43,3 +43,18 @@ test("probe run storage keeps a small public offer summary", () => {
   assert.equal(run.results_count, 1);
   assert.equal(run.offers[0].description, undefined);
 });
+
+test("failed source requests are recorded as errors, not empty inventory", () => {
+  const run = serializeProbeRun({ query: "iphone 15", site: "olx.ro", elapsedMs: 10,
+    payload: { results: [{ ok: false, site: "olx.ro", error: "Direct fetch failed (403)" }],
+      summary: { includedListings: 0, failedMarketplaces: [{ site: "olx.ro", error: "Direct fetch failed (403)" }] } }
+  });
+  assert.equal(run.outcome, "error");
+  assert.equal(run.results_count, 0);
+  assert.match(run.error, /403/);
+  const empty = serializeProbeRun({ query: "iphone 15", site: "olx.ro", elapsedMs: 10,
+    payload: { results: [{ ok: true, items: [] }], summary: { includedListings: 0, failedMarketplaces: [] } }
+  });
+  assert.equal(empty.outcome, "empty");
+  assert.equal(empty.error, "");
+});

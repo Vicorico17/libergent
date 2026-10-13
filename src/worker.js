@@ -25,7 +25,7 @@ import { parseListingDetailsHtml } from "./listing-details.js";
 import { resolveViewerLocation, viewerLocationCacheKey } from "./location-intelligence.js";
 import { getSearchQueryError, isPublicSearchQuery, SEARCH_QUERY_LENGTH_MESSAGE, SEARCH_QUERY_REJECTION_MESSAGE } from "./search-policy.js";
 import { applyJevProductDecision } from "./jev.js";
-import { buildProbeSuggestions, chooseProbeTerm, DISCOVERY_PROBE_SITES, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
+import { buildProbeSuggestions, chooseProbeTerm, discoveryProbeFailure, DISCOVERY_PROBE_SITES, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -579,8 +579,9 @@ async function runDiscoveryProbe(env) {
     }, env);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (!/PGRST205|does not exist|42P01/i.test(message)) console.warn("Discovery probe lease failed:", message);
-    return { status: "schema_not_ready" };
+    const failure = discoveryProbeFailure(error);
+    if (failure.code !== "discovery_schema_not_ready") console.warn("Discovery probe lease failed:", message);
+    return { status: failure.code === "discovery_schema_not_ready" ? "schema_not_ready" : "failed" };
   }
   if (!lease) return { status: "already_running" };
 
@@ -1009,6 +1010,7 @@ async function handleApi(request, env, context) {
   }
 
   if (apiPath === "/api/discovery/probes" && request.method === "GET") {
+    if (!isSupabaseConfigured(env)) return json(discoveryProbeFailure("Supabase is not configured."), 503);
     try {
       const [runs, terms] = await Promise.all([
         listDiscoveryProbeRuns({ limit: 30 }, env),
@@ -1016,7 +1018,8 @@ async function handleApi(request, env, context) {
       ]);
       return json({ runs, terms, updatedAt: new Date().toISOString() }, 200);
     } catch (error) {
-      return json({ error: error instanceof Error ? error.message : String(error) }, 503);
+      console.warn("Discovery radar unavailable:", error instanceof Error ? error.message : String(error));
+      return json(discoveryProbeFailure(error), 503);
     }
   }
 
