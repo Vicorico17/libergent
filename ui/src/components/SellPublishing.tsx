@@ -15,7 +15,7 @@ const storageKey = 'libergent:sell-publishing:v1';
 
 export type SellingActions = { start: () => void };
 
-export function SellPublishing({ connectionsOpen, onOpenConnections, actionRef, onAutomaticHandled, listing, photos, selected, prepared, onBusyChange, onPhotosUploaded, onNewListing, onRestore }: { connectionsOpen: boolean; onOpenConnections: () => void; actionRef: Ref<SellingActions>; onAutomaticHandled: (names: string[]) => void; onBusyChange: (busy: boolean) => void; prepared: boolean; listing: SellProduct; photos: SellPhoto[]; selected: string[]; onPhotosUploaded: (photos: SellPhoto[]) => void; onNewListing: () => void; onRestore: (listing: SellProduct, photos: SellPhoto[]) => void }) {
+export function SellPublishing({ onReadiness, connectionsOpen, onOpenConnections, actionRef, onAutomaticHandled, listing, photos, selected, prepared, onBusyChange, onPhotosUploaded, onNewListing, onRestore }: { onReadiness: (message: string) => void; connectionsOpen: boolean; onOpenConnections: () => void; actionRef: Ref<SellingActions>; onAutomaticHandled: (names: string[]) => void; onBusyChange: (busy: boolean) => void; prepared: boolean; listing: SellProduct; photos: SellPhoto[]; selected: string[]; onPhotosUploaded: (photos: SellPhoto[]) => void; onNewListing: () => void; onRestore: (listing: SellProduct, photos: SellPhoto[]) => void }) {
   const [config, setConfig] = useState<{ available: boolean; olx: boolean; okazii: boolean } | null>(null);
   const [feedUrl, setFeedUrl] = useState('');
   const [connected, setConnected] = useState(false);
@@ -33,6 +33,11 @@ export function SellPublishing({ connectionsOpen, onOpenConnections, actionRef, 
   const [submitOkazii, setSubmitOkazii] = useState(true);
   const olxSent = results.some((result) => result.platform === 'olx' && !['failed', 'error'].includes(result.status));
   const targets = [...(submitOlx && selected.includes('OLX') && connected && signedIn && contactName.trim() && olx.categoryId && olx.cityId && config?.olx && !olxSent ? ['olx'] : []), ...(submitOkazii && selected.includes('Okazii') && signedIn && config?.okazii ? ['okazii'] : [])];
+
+  const targetCount = targets.length;
+  useEffect(() => {
+    onReadiness(!config ? 'Verificăm conexiunile…' : !config.available ? 'Publicarea automată nu este activată încă. Poți pregăti anunțul și continua manual.' : !signedIn ? 'Autentifică-te pentru a trimite din conturile tale.' : targetCount ? `${targetCount} integrări pregătite pentru trimitere. Restul platformelor necesită finalizare manuală.` : 'Nicio integrare pregătită. Conectează conturile și completează detaliile platformei.');
+  }, [config, signedIn, targetCount, onReadiness]);
 
   useEffect(() => {
     let active = true;
@@ -140,7 +145,7 @@ export function SellPublishing({ connectionsOpen, onOpenConnections, actionRef, 
     <p className="mt-3 text-xs text-[#555]">Aceste platforme nu sunt conectate pentru publicare automată. Îți pregătim anunțul și te ghidăm la publicare.</p>
     </div>
     {!connectionsOpen && <div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-semibold">Rezultatul trimiterii</h2><button type="button" onClick={onOpenConnections} className="text-sm underline">Conectează platformele</button></div>}
-    <div hidden={connectionsOpen && !prepared}><p className="mb-3 mt-5 text-xs text-[#555]">{!prepared && "Completează formularul și apasă Publică peste tot. "}Prin trimitere, fotografiile devin accesibile prin link pentru platformele selectate. Butonul nu cumpără promovări sau pachete.</p>
+    <div hidden={connectionsOpen && !prepared}><p className="mb-3 mt-5 text-xs text-[#555]">{!prepared && "Completează formularul și apasă Trimite anunțul. "}Prin trimitere, fotografiile devin accesibile prin link pentru platformele selectate. Butonul nu cumpără promovări sau pachete.</p>
     {olxSent && <p className="my-3 text-sm">Acest anunț a fost deja trimis către OLX. Starea de mai jos se referă la versiunea salvată la trimitere. Modificările din formular nu actualizează anunțul OLX.</p>}
     <div className="flex flex-wrap gap-3"><button hidden={!prepared || !targets.length} type="button" disabled={busy || !loaded || !targets.length || !prepared} className={`${button} bg-[#FF4F8B]`} onClick={() => run(publish)}><Send size={16} />{busy ? 'Se procesează…' : `Trimite din nou doar către integrările pregătite (${targets.length})`}</button><button type="button" disabled={busy || !config?.available} className={button} onClick={() => run(async () => { const response = await sellingRequest('/refresh', 'POST', { id }); setResults(response.publications); const connections = await sellingRequest('/connections'); setConnected(connections.connections.some((connection: { platform: string }) => connection.platform === 'olx')); })}><RefreshCw size={16} />Verifică starea</button><button type="button" disabled={busy} className={button} onClick={() => { setId(crypto.randomUUID()); setOlx({ ...initialOlx, cityId: olx.cityId, districtId: olx.districtId, advertiserType: olx.advertiserType }); setResults([]); setNotice('Anunț nou. Publicările precedente rămân în conturile platformelor.'); onNewListing(); }}>Alt produs / anunț nou</button></div>
 

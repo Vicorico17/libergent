@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { SellPostingQueue } from "./SellPostingQueue";
 import { recommendedMarketplaces, sellingMarketplaces } from "@/lib/selling-marketplaces";
 import { SellPublishing, type SellingActions } from "./SellPublishing";
+import { announcementDetails } from "@/lib/selling-announcement";
 import type { SellPhoto } from "@/lib/selling";
 import { readPhotoCache, savePhotoCache } from "@/lib/selling-photo-cache";
 import { ArrowRight, ImagePlus, X } from "lucide-react";
@@ -22,6 +23,7 @@ export function SellListing() {
   const [selected, setSelected] = useState<string[]>(recommendedMarketplaces(categories[0]));
   const [photos, setPhotos] = useState<Photo[]>([]);
   const photoUrls = useRef(new Set<string>());
+  const [connectionHint, setConnectionHint] = useState("Verificăm conexiunile…");
   const [publishing, setPublishing] = useState(false);
   const [view, setView] = useState<"listing" | "connections">("listing");
   const [prepared, setPrepared] = useState(false);
@@ -95,16 +97,20 @@ export function SellListing() {
       <header className="mb-8">
         <p className="mb-2 font-mono text-xs font-bold tracking-widest text-[#C51D55]">VINDE</p>
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Un anunț. Mai multe locuri.</h1>
-        <p className="mt-3 text-sm text-[#555]">Adaugi produsul aici. Noi te ajutăm să îl postezi pe platformele alese.</p>
+        <p className="mt-3 text-sm text-[#555]">Scrii anunțul o singură dată. Îl trimitem prin conturile conectate și îți arătăm rezultatul pentru fiecare platformă.</p>
       </header>
       <nav aria-label="Vinde" className="mb-6 flex gap-2 rounded-xl bg-black/5 p-1.5">
         {([["listing", "Anunțul tău"], ["connections", "Conectează platformele"]] as const).map(([value, label]) => <button key={value} type="button" disabled={publishing} aria-pressed={view === value} onClick={() => setView(value)} className={`flex-1 rounded-lg px-3 py-3 text-sm font-semibold transition-colors ${view === value ? "bg-white shadow-sm" : "hover:bg-white/50"}`}>{label}</button>)}
       </nav>
       <div hidden={view !== "listing"}>
-      <form onSubmit={(event) => { event.preventDefault(); if (!listing.title.trim() || !listing.location.trim() || listing.description.trim().length < 20) { setNotice("Completează titlul, localitatea și o descriere de minimum 20 de caractere."); return; } if (!selected.length) { setNotice("Selectează cel puțin un marketplace."); return; } setPrepared(true); setNotice("Am pornit publicarea. Vezi integrările și pașii rămași mai jos."); actions.current?.start(); }}>
+      <form onSubmit={(event) => { event.preventDefault(); if (listing.title.trim().length < 3 || !listing.location.trim() || listing.description.trim().length < 20) { setNotice("Completează titlul (minimum 3 caractere), localitatea și o descriere de minimum 20 de caractere."); return; } if (!selected.length) { setNotice("Selectează cel puțin un marketplace."); return; } setPrepared(true); setNotice("Verificăm trimiterea. Vezi rezultatul și pașii rămași mai jos."); actions.current?.start(); }}>
         <fieldset disabled={publishing} className="grid gap-8 lg:grid-cols-[1fr_280px]">
           <section className="min-w-0 rounded-2xl border border-black/10 bg-white p-5 sm:p-7" aria-labelledby="product-heading">
             <h2 id="product-heading" className="mb-6 font-mono text-lg font-bold">Ce vinzi?</h2>
+            <label className="mb-6 block text-sm font-semibold">Scrie anunțul aici<textarea aria-label="Scrie anunțul aici" required minLength={20} maxLength={5000} rows={6} value={listing.description} onChange={(event) => update("description", event.target.value)} onBlur={() => {
+              const details = announcementDetails(listing.description);
+              setListing((current) => ({ ...current, title: current.title || details.title, price: current.price || details.price, location: current.location || details.location }));
+            }} placeholder={"iPhone 14, 128 GB\nFuncționează perfect, mici urme pe carcasă. Cutie și cablu incluse.\nPreț: 1500 lei\nLocalitate: București"} className={control} /><span className="mt-2 block text-xs font-normal text-[#555]">Prima linie devine titlul. Preluăm prețul în lei și „Localitate:” din text. Verifică detaliile de mai jos înainte de trimitere.</span></label>
             <div className="mb-6"><label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-black/30 bg-[#F3F0E7]/40 p-5 focus-within:ring-2 focus-within:ring-[#C51D55] text-center text-sm"><ImagePlus aria-hidden="true" /><span className="font-semibold">Adaugă fotografiile produsului</span><span className="text-xs">Maximum 8 imagini · JPG, PNG sau WebP · 10 MB fiecare</span><input type="file" className="sr-only" disabled={!ready} accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => {
               const files = Array.from(event.target.files || []);
               const valid = files.filter((file) => ["image/jpeg", "image/png", "image/webp"].includes(file.type) && file.size <= 10 * 1024 * 1024);
@@ -119,13 +125,14 @@ export function SellListing() {
                 <img src={photo.url} alt={photo.name} className="h-full w-full object-cover" /><button type="button" aria-label={`Elimină ${photo.name}`} className="absolute right-0 top-0 bg-white p-1" onClick={() => { URL.revokeObjectURL(photo.url); photoUrls.current.delete(photo.url); setPhotos((current) => current.filter((item) => item.url !== photo.url)); }}><X size={16} /></button>
               </div>)}</div>
             </div>
+            <h3 className="mb-4 text-sm font-semibold">Verifică detaliile</h3>
             <div className="grid gap-5 sm:grid-cols-2">
-              <label className="text-sm font-semibold sm:col-span-2">Titlul anunțului<input required maxLength={120} value={listing.title} onChange={(event) => update("title", event.target.value)} placeholder="Ex. iPhone 14, 128 GB, stare foarte bună" className={control} /></label>
+              <label className="text-sm font-semibold sm:col-span-2">Titlul anunțului<input required minLength={3} maxLength={120} value={listing.title} onChange={(event) => update("title", event.target.value)} placeholder="Ex. iPhone 14, 128 GB, stare foarte bună" className={control} /></label>
               <label className="text-sm font-semibold">Categorie<select value={listing.category} onChange={(event) => update("category", event.target.value)} className={control}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
               <label className="text-sm font-semibold">Stare<select value={listing.condition} onChange={(event) => update("condition", event.target.value)} className={control}>{["Nou", "Folosit — ca nou", "Folosit — stare bună", "Folosit — stare acceptabilă"].map((condition) => <option key={condition}>{condition}</option>)}</select></label>
               <label className="text-sm font-semibold">Preț (RON)<input type="number" required min="1" max="999999999" step="0.01" value={listing.price} onChange={(event) => update("price", event.target.value)} placeholder="450" className={control} /></label>
               <label className="text-sm font-semibold">Localitate<input required maxLength={100} value={listing.location} onChange={(event) => update("location", event.target.value)} placeholder="Ex. București" className={control} /></label>
-              <label className="text-sm font-semibold sm:col-span-2">Descriere<textarea required minLength={20} maxLength={5000} rows={5} value={listing.description} onChange={(event) => update("description", event.target.value)} placeholder="Descrie produsul, starea lui, eventualele defecte și cum îl poți livra." className={control} /><span className="mt-1 block text-xs font-normal">Stare, accesorii incluse și eventuale defecte. Minimum 20 de caractere.</span></label>
+
             </div>
 
           </section>
@@ -136,14 +143,14 @@ export function SellListing() {
             <button type="button" className="mb-4 text-sm font-bold underline underline-offset-4" onClick={() => { setSelected(selected.length === marketplaces.length ? [] : marketplaces.map((market) => market.name)); setPrepared(false); }}>{selected.length === marketplaces.length ? "Deselectează toate" : "Selectează toate"}</button>
             <div className="space-y-2">{marketplaces.map((market) => <label key={market.name} className={`flex cursor-pointer items-center gap-3 border p-3 ${selected.includes(market.name) ? "border-[#101010] bg-[#F3F0E7]" : "border-[#101010]/20"}`}><input type="checkbox" className="h-4 w-4 accent-[#C51D55]" checked={selected.includes(market.name)} onChange={(event) => { setSelected((current) => event.target.checked ? [...current, market.name] : current.filter((name) => name !== market.name)); setPrepared(false); }} /><span className="text-sm font-semibold">{market.name}{market.name === "Autovit" && <span className="block text-xs font-normal text-[#555]">Pentru vehicule</span>}{market.name === "Vinted" && <span className="block text-xs font-normal text-[#555]">Verifică dacă produsul este acceptat în catalog</span>}</span></label>)}</div>
             </details>
-            <div className="mt-6 border-t border-[#101010] pt-5"><p className="mb-4 font-mono text-sm"><strong>{selected.length}</strong> platforme selectate</p><button disabled={!ready || !selected.length} type="submit" className={`${button} w-full bg-[#FF4F8B]`}>Publică peste tot <ArrowRight size={18} /></button><p className="mt-3 text-xs leading-relaxed text-[#555]">Trimitem prin integrările pregătite. Platformele fără integrare necesită finalizare manuală; îți arătăm un singur pas odată.</p></div>
+            <div className="my-4 rounded-lg bg-[#F3F0E7] p-3 text-xs leading-relaxed"><p role="status">{connectionHint}</p><button type="button" onClick={() => setView("connections")} className="mt-2 font-semibold underline">Verifică conexiunile</button></div><div className="mt-6 border-t border-[#101010] pt-5"><p className="mb-4 font-mono text-sm"><strong>{selected.length}</strong> platforme selectate</p><button disabled={!ready || !selected.length} type="submit" className={`${button} w-full bg-[#FF4F8B]`}>{publishing ? "Se trimite…" : "Trimite anunțul"} <ArrowRight size={18} /></button><p className="mt-3 text-xs leading-relaxed text-[#555]">Trimitem prin integrările pregătite. Platformele fără integrare necesită finalizare manuală; îți arătăm un singur pas odată.</p></div>
           </section>
         </fieldset>
       </form>
       <p role="status" className="my-5 text-sm">{notice}</p>
       </div>
       <div hidden={view === "listing" && !prepared} ref={resultRef} tabIndex={-1} className="scroll-mt-28 outline-none">
-        <SellPublishing connectionsOpen={view === "connections"} onOpenConnections={() => setView("connections")} actionRef={actions} onAutomaticHandled={setAutomaticHandled} onBusyChange={setPublishing} prepared={prepared} listing={listing} photos={photos} selected={selected} onRestore={(saved, savedPhotos) => { setListing(saved); setPhotos(savedPhotos); setView("listing"); setPrepared(true); }} onPhotosUploaded={(uploaded) => {
+        <SellPublishing onReadiness={setConnectionHint} connectionsOpen={view === "connections"} onOpenConnections={() => setView("connections")} actionRef={actions} onAutomaticHandled={setAutomaticHandled} onBusyChange={setPublishing} prepared={prepared} listing={listing} photos={photos} selected={selected} onRestore={(saved, savedPhotos) => { setListing(saved); setPhotos(savedPhotos); setView("listing"); setPrepared(true); }} onPhotosUploaded={(uploaded) => {
           setPhotos(uploaded);
         }} onNewListing={() => {
           setListing(emptyListing); setView("listing"); setPrepared(false); setPhotos([]);
