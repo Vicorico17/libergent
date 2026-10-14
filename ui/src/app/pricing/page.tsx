@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useRef } from "react";
 import styles from "./pricing.module.css";
 import { LogoIcon } from "@/components/LogoIcon";
 import { AccountNavLink } from "@/components/AccountNavLink";
@@ -48,31 +47,9 @@ function LockIcon({ size = 14 }: { size?: number }) {
 }
 
 export default function PricingPage() {
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    const viewport = viewportRef.current;
-    const canvas = canvasRef.current;
-    if (!viewport || !canvas) return;
-
-    // Layout dimensions remain unscaled, so resizing cannot compound the scale.
-    const fit = () => {
-      const scale = Math.min(1, viewport.clientHeight / Math.max(1, canvas.offsetHeight));
-      viewport.style.setProperty("--pricing-scale", String(scale));
-    };
-    const observer = new ResizeObserver(fit);
-    observer.observe(viewport);
-    observer.observe(canvas);
-    fit();
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <div ref={viewportRef} className={styles.viewport}>
     <div
-      ref={canvasRef}
-      className={`${styles.canvas} min-h-screen flex flex-col p-0 sm:p-2 md:p-4`}
+      className={`${styles.page} min-h-screen flex flex-col p-0 sm:p-2 md:p-4`}
       style={{ background: BG, fontFamily: MONO }}
     >
       {/* Outer frame */}
@@ -140,7 +117,7 @@ export default function PricingPage() {
           <BillingReturnNotice />
 
           {/* Premium identity */}
-          <div className="mb-8 flex flex-col items-center text-center md:mb-14">
+          <div className={`${styles.intro} mb-8 flex flex-col items-center text-center md:mb-14`}>
             <div className="mb-6 flex h-24 w-24 items-center justify-center border-2 border-[#111111] bg-white shadow-[6px_6px_0_#FF4B8B] md:h-28 md:w-28">
               <LogoIcon size={78} className="md:!h-24 md:!w-24" />
             </div>
@@ -222,7 +199,6 @@ export default function PricingPage() {
           to { stroke-dashoffset: 100; }
         }
       `}</style>
-    </div>
     </div>
   );
 }
