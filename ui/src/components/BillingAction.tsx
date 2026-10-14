@@ -68,7 +68,7 @@ export function BillingAction({ kind = "checkout", plan = "annual" }: { kind?: "
 }
 
 export function BillingPlanPicker() {
-  const [plan, setPlan] = useState<BillingPlan>("annual");
+  const [plan, setPlan] = useState<BillingPlan>("weekly");
   const plans = [
     { id: "weekly" as const, title: "Săptămânal", price: PREMIUM_WEEKLY_PRICE_RON, period: "săptămână", note: "Flexibil, cu plată săptămânală" },
     { id: "annual" as const, title: "Anual", price: PREMIUM_ANNUAL_PRICE_RON, period: "an", note: `Economisești ~80% față de 52 de plăți săptămânale · ~${Math.round(PREMIUM_ANNUAL_PRICE_RON / 12)} RON/lună` }

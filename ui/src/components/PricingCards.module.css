@@ -66,14 +66,9 @@
   text-transform: uppercase;
   box-shadow: 2px 2px #111;
 }
-.savingsLine { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 6px; font-size: 10px; }
-.savingsBadge { display: inline-block; padding: 4px 6px; background: #111; color: #fff; font-size: 12px; white-space: nowrap; }
-.priceAlternative { display: block; font-size: 11px; line-height: 1.5; color: #111; }
 .trialNote { display: block; margin-top: 4px; font-size: 10px; }
 @media (max-height: 740px) { .features { display: none; } }
 @media (max-height: 500px) {
   .trialBadge { padding: 3px 6px; }
-  .savingsLine { margin-bottom: 2px; }
-  .savingsBadge { padding-block: 2px; }
   .trialNote { margin-top: 0; }
 }

@@ -14,7 +14,7 @@ const plans = [
     features: ["Căutare pe mai multe marketplace-uri", "Rezultate normalizate și comparabile", "Filtre și sortare rapidă", "Scor agent și recomandări de bază"],
   },
   {
-    id: "premium", name: "Premium", label: "Pachet de căutări", price: PREMIUM_ANNUAL_PRICE_RON, period: "/ an",
+    id: "premium", name: "Premium", label: "Pachet de căutări", price: PREMIUM_WEEKLY_PRICE_RON, period: "/ săptămână",
     description: "Mai multe surse, comparații extinse și alerte pentru produsele pe care le cauți.",
     features: ["Tot ce include Free", "Căutări în magazine și marketplace-uri verificate", "Comparație între produse noi și second-hand", "Monitorizare de preț și alerte de oferte", "Recomandări în funcție de bugetul tău"],
   },
@@ -54,8 +54,7 @@ export function PricingCards({ checkout = false, fit = false }: { checkout?: boo
           </div>
           <p className="mb-6 min-h-8 text-xs text-[#111]/65">
             {plan.id === "premium" ? <>
-              <span className={styles.savingsLine}><strong className={styles.savingsBadge}>≈80% economie</strong><span>față de 52 de plăți săptămânale</span></span>
-              <span className={styles.priceAlternative}>≈{Math.round(PREMIUM_ANNUAL_PRICE_RON / 12)} RON/lună, facturat anual · sau {PREMIUM_WEEKLY_PRICE_RON} RON/săptămână</span>
+              <span className="block font-bold text-[#111]">sau {PREMIUM_ANNUAL_PRICE_RON} RON / an</span>
               <span className={styles.trialNote}>Primele {PREMIUM_TRIAL_DAYS} zile gratuite la primul abonament.</span>
             </> : plan.id === "agent" ? "Serviciu de negociere · în curând" : "Acces gratuit în beta"}
           </p>
