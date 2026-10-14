@@ -1,0 +1,35 @@
+.viewport {
+  background: #f3f0e7;
+}
+
+/* Keep the complete composition in view without changing its proportions.
+   Narrow screens retain the readable, stacked layout and normal scrolling. */
+@media (min-width: 1024px) {
+  .viewport {
+    position: relative;
+    height: 100dvh;
+    flex: none;
+    overflow: clip;
+  }
+
+  .canvas {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    transform: translateY(-50%) scale(var(--pricing-scale, 1));
+    transform-origin: center center;
+  }
+}
+
+@media print {
+  .viewport {
+    height: auto;
+    overflow: visible;
+  }
+
+  .canvas {
+    position: static;
+    transform: none;
+  }
+}
