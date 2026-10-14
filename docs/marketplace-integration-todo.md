@@ -1,5 +1,8 @@
 # Marketplace Integration TODO
 
+Current owner priorities: see the [October 14 launch checklist](premium-alerts-todo.md#current-launch-checklist--2026-10-14), including Discovery improvements, source expansion, and ChatGPT/Claude connectors. The inventory below remains a technical reference; historical status does not imply current live acceptance.
+
+
 This file tracks marketplaces we still need to add or harden before advertising them as active Libergent sources.
 
 September 13 code audit: the registry now contains **117 adapters: 12 Free and

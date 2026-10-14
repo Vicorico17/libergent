@@ -1,6 +1,6 @@
 # Premium, Product, and Launch TODO
 
-Last prioritized: 2026-09-28
+Last prioritized: 2026-10-14
 Implementation and production status audit: 2026-09-13 (unless noted below)
 
 See [the September launch audit](launch-audit-2026-09-13.md) for the comparison
@@ -13,45 +13,105 @@ is implemented or has been explicitly confirmed in the target environment;
 unchecked operational items must be completed before the corresponding test or
 launch.
 
-The Premium seller-conversation goal is an agent that can reach a seller,
-negotiate within a buyer-approved brief, arrange terms, and help the buyer close
-the transaction. The current messaging feature is an initial contact and inbox,
-not that complete service. See the [deal-agent inventory and implementation
-plan](premium-deal-agent.md).
+## Current launch checklist — 2026-10-14
 
-## Priority and execution order
+This is the active owner-requested to-do list. It supersedes the older execution
+order and product packaging below. Detailed historical checklists remain useful
+implementation references; a checked implementation is not proof of production
+acceptance. This update reviewed repository code and documentation, not live
+payments, seller conversations, or marketplace publication.
 
-Priorities reflect the owner-confirmed focus on second-hand technology in Romania.
-Within each priority, follow the order below and complete prerequisites before
-activating dependent features. Priority does not mean implementation is complete.
+### Priority and execution order
 
-- **P0 — Now:** search relevance, trustworthy source results, basic authentication,
-  and acceptance of currently exposed messaging. These protect the core experience.
-- **P1 — Before paid launch:** unit economics, billing, onboarding, Premium alert
-  acceptance, and operational recovery. Required before selling the relevant service.
-- **P2 — After the core and paid flow work:** picture search, passkeys, new tech
-  sources, deeper feedback tooling, and acquisition optimization.
-- **P3 — Later:** calls and expansion beyond the initial technology niche.
+1. [ ] **Define Premium vs. Libergent Agent.** Premium is the search pack:
+   **49 RON/week or 499 RON/year, with 3 days free on the first subscription**.
+   Agent is the separate **999 RON** seller-contact and negotiation service.
+   Finalize included sources, search/alert limits, whether Agent includes Premium,
+   number of products/sellers, service duration, fee basis, completion criteria,
+   cancellation and refund rules. Implement separate entitlements: the existing
+   deal pilot is still Premium-gated and must match the new packaging.
+2. [ ] **Implement production payments.** Build on the existing Stripe test flow.
+   Add explicit live-mode configuration (the current billing guard accepts only
+   `sk_test_`), configure weekly/annual products and webhooks, and verify the
+   first-subscription trial, successful/failed payments, renewals, cancellation,
+   duplicate events, account ownership and access activation/expiry. Add a
+   separate Agent checkout after its fee basis is decided. Remove test-payment
+   copy only when the live flow is ready.
+3. [ ] **Make the Agent work end to end.** Connect buyer request and budget →
+   suitable offers → seller contact → replies and negotiation → agreed terms →
+   buyer-approved next step and buyer-confirmed purchase. Build on the existing
+   deal brief, stages, proposal generation and pause/resume controls. Verify
+   persistent state, recovery, notifications and budget limits with a controlled
+   pilot before enabling autonomous follow-ups. See [the deal-agent plan](premium-deal-agent.md).
+4. [ ] **Implement reliable Agent outreach.** Choose the best supported route for
+   each source; provide a manual handoff where direct contact is unavailable.
+   Verify delivery receipts, inbound reply attribution, durable duplicate-send
+   prevention, retries, follow-up limits, stop controls and buyer approval.
+   Keep seller acceptance separate from confirmed purchase. Add calls only after
+   messaging works reliably; validate the calling pilot before advertising it.
+5. [ ] **Make the Vinde button work end to end in production.** The route, listing
+   form, photos, saved announcements, OLX integration, Okazii feed and assisted
+   posting already have implementations. Finish database/storage configuration,
+   provider access and seller connections; verify draft → upload → submit →
+   actual publication/status recovery. Test expired authorization, duplicates,
+   provider failures and reloads. Keep manual posting and feed submission distinct
+   from confirmed publication. Define edit, sold and withdrawal behavior.
+   See [VINDE setup and remaining limits](selling-publishing-setup.md).
+6. [ ] **Improve Discovery.** Build on the existing source directory, status,
+   probe results and shop submission. Improve browsing, filtering, categories,
+   clear Free/Premium coverage, last-checked dates and useful search entry points.
+   Decide whether product recommendations also belong here. Validate mobile,
+   loading, empty, stale and error states; make the next action obvious.
+7. [ ] **Add and improve sources.** Prioritize useful coverage, repair unreliable
+   advertised sources, and add new adapters only after representative queries
+   verify relevance, prices, availability, images, links and duplicates. Record
+   freshness, latency, cost and failure behavior; keep experimental sources
+   clearly labeled. See [the marketplace inventory](marketplace-integration-todo.md).
+8. [ ] **Build ChatGPT and Claude connectors.** Define the shared authenticated
+   API/MCP capabilities and each client's supported connection method. Start with
+   search and offer comparison; expose account-scoped alerts, deal status and
+   selling only with the appropriate entitlement and explicit approval for sends,
+   publishing or purchases. Implement connection, revocation, scopes, ownership,
+   errors and setup instructions. Verify a complete real-client flow separately
+   in ChatGPT and Claude. The existing selling CLI is not a shipped connector;
+   local MCP work is not completion until committed, deployed and tested in both.
 
-| Order | Priority | Workstream | Completion evidence / dependency |
-| --- | --- | --- | --- |
-| 1 | P0 | Tech query matching, model/variant/condition accuracy, used versus new comparisons | Dated representative queries and regression fixtures; wrong products and accessories excluded; usable prices and photo fallbacks verified |
-| 2 | P0 | Validate advertised sources and search health | Dated source results, useful counts, explicit errors/cache state; fix or demote unreliable sources; details in the marketplace TODO |
-| 3 | P0 | Email/Google login and account ownership | New and returning users pass mobile/desktop acceptance, expiry, resend, callback and ownership checks |
-| 4 | P0 | Existing seller messaging | Controlled-recipient delivery, replies, failures and consent verified; explicit delivery states and supported contact routes |
-| 4a | P1 | Premium deal-agent pilot | Account-owned deal brief and thread, supported channel, buyer-approved follow-ups, explicit offers and terms, pause/stop, buyer-confirmed outcome; see deal-agent plan |
-| 5 | P1 | Source costs and total service economics | Actual usage/rates, cost per useful result and alert scan, margin and fair-use limits for 99 RON/month |
-| 6 | P1 | Billing policy and subscription implementation | Confirm trial/tax/limits, then provider and prices → customer mapping/checkout → signed webhooks/lifecycle → portal/reconciliation and tests |
-| 7 | P1 | Paid onboarding and acquisition measurement | Funnel plan can start now; validate checkout → entitlement → first search/alert after billing works |
-| 8 | P1 | Deployed Premium alert acceptance | Choose inbox/email mode, configure it, then complete every acceptance item below; verify expiry and cron before advertising alerts |
-| 9 | P1 | Feedback protection and ranking evaluation | Validate existing reports and ownership, retention/deduplication; reviewed fixtures and measured quality before scoring releases |
-| 10 | P2 | Image search, passkeys, feedback review tooling, checkout recovery optimization | Core acceptance first; provider/device tests and bounded costs before activation |
-| 11 | P2 | Additional tech sources and Facebook feasibility | Existing-source quality first; useful coverage and supported access/runtime demonstrated before production exposure |
-| 12 | P3 | Calls and other product niches | Reliable messaging first for calls; strong tech search first for niche expansion |
+### Completed foundations from the recent work
 
-Unchecked tasks below carry a priority. Checked items retain their historical
-status; this prioritization does not reverify production configuration. The
-marketplace TODO uses the same priorities. The launch audit remains historical.
+- [x] Three pricing offers: Free, Premium search pack and Libergent Agent at 999 RON.
+- [x] Premium leads with 49 RON/week and a 3-day trial; 499 RON/year remains available.
+- [x] Fixed pricing frame, compact cards, mobile plan selector and details/checkout dialog.
+- [x] Animated Agent mascot with reduced-motion support.
+- [x] Stripe test checkout/portal helpers, price validation, trial handling and
+  billing UI exist (`src/billing.js`, `src/billing.test.js`,
+  `ui/src/components/BillingAction.tsx`, `supabase/billing.sql`). Live acceptance remains open.
+- [x] Deal workflow and proposal groundwork exist (`src/deals.js`, `src/deal-ai.js`,
+  `supabase/deals.sql`). A completed autonomous negotiation service remains open.
+- [x] VINDE route, publishing groundwork and authenticated selling CLI exist
+  (`ui/src/app/vinde/page.tsx`, `src/selling.js`, `src/selling-agent.js`).
+- [x] Discovery source directory, status/probe components and shop submission exist
+  (`ui/src/app/discovery/page.tsx`). Quality improvements and live source acceptance remain open.
+
+### Other existing lists and launch checks
+
+- This file retains the detailed product, billing and alert checklist below.
+- [Marketplace integration TODO](marketplace-integration-todo.md) tracks source coverage.
+- [Deal-agent plan](premium-deal-agent.md) tracks the negotiation workflow.
+- [VINDE publishing setup](selling-publishing-setup.md) tracks configuration and limitations.
+- [September TODO reconciliation](audit-2026-09-16/todo-reconciliation.md) is a historical
+  audit, not a current completion report.
+
+Keep production Google/email sign-in, account isolation, scheduled-alert delivery,
+source reliability, service costs and failure recovery in the release checks.
+The repository shows substantial progress; do not mark the remaining launch work
+complete merely because a UI, endpoint or mocked test exists.
+
+## Detailed backlog and historical evidence
+
+Priorities and checkmarks below retain their historical meaning unless explicitly
+updated. Use the current launch checklist above for execution order and packaging.
+Older references to a “Premium deal agent” describe the implementation being
+split into the separate Libergent Agent offer.
 
 ## P0 progress — 2026-09-15
 
@@ -190,17 +250,17 @@ and post-deployment visual acceptance remain open.
 
 ## Premium billing backlog
 
-- [x] Owner confirmed LiberGent Premium at **99 RON/month**. Future Stripe Price: currency `ron`, unit amount `9900`, recurring interval `month`; server-owned price ID.
-- [ ] **P1** — Confirm trial policy, tax treatment and alert limits before checkout activation.
-- [ ] **P1** — Select and configure the billing provider; Stripe is the current expected integration.
+- [x] Current Premium pricing is **49 RON/week or 499 RON/year**, with a **3-day first-subscription trial**. Server-validated Stripe amounts are `4900`/week and `49900`/year in `ron`. This supersedes the historical 99 RON/month proposal.
+- [ ] **P1** — Finalize tax treatment and alert limits; verify enforcement of the confirmed 3-day first-subscription trial before live checkout activation.
+- [ ] **P1** — Configure Stripe for production; test-mode integration exists, but live billing is not yet enabled.
 - [ ] **P1** — Create production and test-mode Stripe Product and Price records.
-- [ ] **P1** — Add authenticated Checkout Session creation and success/cancel return flows.
+- [x] Authenticated Checkout Session creation and success/cancel return flows implemented for test billing; production acceptance remains open.
 - [ ] **P1** — Store a durable mapping between the Supabase user, Stripe customer, and subscription.
 - [ ] **P1** — Add a signed, idempotent Stripe webhook endpoint.
 - [ ] **P1** — Translate subscription lifecycle events into `user_entitlements` updates.
 - [ ] **P1** — Handle `active`, trial, `past_due`, cancelled, expired, refunded, and grace-period behavior.
-- [ ] **P1** — Add a customer billing portal for payment-method changes, invoices, and cancellation.
-- [ ] **P1** — Connect pricing and account UI to real checkout and subscription status.
+- [x] Billing portal session creation and account UI implemented; production portal configuration and acceptance remain open.
+- [x] Pricing and account UI connected to billing endpoints; test-mode only, with live checkout acceptance still open.
 - [ ] **P1** — Define cancellation, refund, entitlement-expiry, and reactivation rules.
 - [ ] **P1** — Add webhook replay, duplicate-event, failed-payment, cancellation, and authorization tests.
 - [ ] **P1** — Add operational logging and a reconciliation job for Stripe/Supabase entitlement drift.
