@@ -13,6 +13,7 @@ const navLinks = [
   { label: "CAUTĂ", href: "/#cautare" },
   { label: "VINDE", href: "/vinde" },
   { label: "DISCOVERY", href: "/discovery" },
+  { label: "STATS", href: "/stats" },
   { label: "PREMIUM", href: "/pricing" },
 ];
 

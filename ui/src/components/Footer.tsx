@@ -13,6 +13,7 @@ const NAV_LINKS = {
     { label: "Discovery", href: "/discovery" },
     { label: "Premium", href: "/pricing" },
     { label: "Trenduri", href: "/trenduri" },
+    { label: "Statistici live", href: "/stats" },
   ],
   Legal: [
     { label: "Politică de confidențialitate", href: "/confidentialitate" },
