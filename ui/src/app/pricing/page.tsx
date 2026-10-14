@@ -14,7 +14,8 @@ const PINK = "#FF4B8B";
 const MONO = "var(--font-mono-var), monospace";
 
 const NAV_LINKS = [
-  { label: "Căutare",          href: "/#cautare" },
+  { label: "Caută",            href: "/#cautare" },
+  { label: "Vinde",            href: "/vinde" },
   { label: "Discovery",        href: "/discovery" },
   { label: "Premium",          href: "/pricing" },
 ];
