@@ -36,8 +36,17 @@ export function chooseScheduledProbeTerm(terms, site, runs = []) {
   if (!group) return null;
   const lastRun = (query) => Math.max(0, ...runs.filter((run) => run.source_site === site && run.query === query)
     .map((run) => Date.parse(run.searched_at) || 0));
-  return terms.filter((term) => isEligibleProbeTerm(term) && group.queries.includes(normalizeProbeQuery(term.query)))
-    .sort((a, b) => lastRun(a.query) - lastRun(b.query)
+  const eligible = terms.filter((term) => isEligibleProbeTerm(term) && group.queries.includes(normalizeProbeQuery(term.query)));
+  const recent = runs.filter((run) => run.source_site === site)
+    .sort((a, b) => Date.parse(b.searched_at) - Date.parse(a.searched_at));
+  const latest = recent[0];
+  // One targeted retry after the source cooldown, then resume varied coverage.
+  if (latest?.outcome === "error" && diagnoseProbeRun(latest).automatic
+    && !(recent[1]?.outcome === "error" && recent[1]?.query === latest.query)) {
+    const retry = eligible.find((term) => term.query === latest.query);
+    if (retry) return retry;
+  }
+  return eligible.sort((a, b) => lastRun(a.query) - lastRun(b.query)
       || group.queries.indexOf(normalizeProbeQuery(a.query)) - group.queries.indexOf(normalizeProbeQuery(b.query)))[0] || null;
 }
 
@@ -71,6 +80,52 @@ export function describeProbeError(error = "") {
     message: "Sursa a refuzat accesul automat. Verificările fac o pauză de cel puțin 30 de minute; accesul nu este încă restabilit." };
   return { code: "error", cooldownMs: 5 * 60_000,
     message: "Verificarea sursei a eșuat. Următoarea încercare automată va fi după o pauză de cel puțin 5 minute." };
+}
+
+export function diagnoseProbeRun(run) {
+  if (run.outcome === "results") return { code: "offers_found", automatic: false, priority: 9,
+    reason: "Au fost găsite oferte pentru această căutare.", action: "Continuăm verificările periodice." };
+  if (run.outcome === "empty") return Number(run.parsed_count) > 0
+    ? { code: "filtered_results", automatic: true, priority: 2,
+      reason: `${run.parsed_count} produse au fost extrase, dar niciunul nu a trecut filtrele pentru această căutare.`,
+      action: "Încercăm alt termen din aceeași nișă. Dacă situația se repetă, trebuie analizate potrivirea produselor și filtrele." }
+    : { code: "no_extracted_products", automatic: true, priority: 1,
+      reason: "Pagina a răspuns, dar nu am extras produse. Poate lipsi stocul sau conținutul poate necesita altă metodă de citire.",
+      action: "Încercăm alt termen din aceeași nișă. Repetarea problemei necesită analiza paginii și a extracției." };
+  const message = String(run.error || "");
+  if (/\b404\b|redirected to the home page/i.test(message)) return { code: "search_route", automatic: false, priority: 0,
+    reason: "Adresa de căutare nu a fost găsită sau a redirecționat către pagina principală.",
+    action: "Trebuie verificată și corectată adresa de căutare a magazinului." };
+  const failure = describeProbeError(message);
+  if (failure.code === "blocked") return { code: "access_blocked", automatic: false, priority: 4,
+    reason: "Magazinul refuză accesul automat.", action: "Pauză de 30 de minute. Dacă refuzul continuă, este necesară o altă integrare; reluarea nu garantează accesul." };
+  if (failure.code === "rate_limited") return { code: "rate_limited", automatic: true, priority: 3,
+    reason: "Magazinul limitează numărul de cereri.", action: "Pauză de 15 minute, apoi o nouă încercare când sursa ajunge la rând." };
+  if (/non-JSON|Unexpected token|prices are unavailable|without usable prices/i.test(message)) return { code: "response_format", automatic: false, priority: 1,
+    reason: "Răspunsul primit nu conține datele sau prețurile în formatul așteptat.", action: "Trebuie analizat răspunsul și actualizată extracția înainte de a declara sursa reparată." };
+  return { code: "request_failed", automatic: true, priority: 3,
+    reason: "Cererea a eșuat; cauza exactă nu poate fi stabilită doar din acest răspuns.", action: "Pauză de 5 minute, apoi o nouă încercare. Dacă se repetă, investigăm conexiunea și răspunsul sursei." };
+}
+
+// Keep failures per source AND query: success on a different term does not close them.
+export function discoveryRepairQueue(runs = []) {
+  const groups = new Map();
+  for (const run of [...runs].sort((a, b) => Date.parse(b.searched_at) - Date.parse(a.searched_at))) {
+    const key = JSON.stringify([run.source_site, run.query]);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(run);
+  }
+  return [...groups.values()].flatMap((history) => {
+    const latest = history[0];
+    const failures = history.filter((run) => run.outcome !== "results");
+    if (!failures.length) return [];
+    const diagnostic = diagnoseProbeRun(latest);
+    return [{ site: latest.source_site, query: latest.query,
+      state: latest.outcome === "results" ? "recovered" : "open",
+      observedFailures: failures.length, lastCheckedAt: latest.searched_at,
+      ...diagnostic }];
+  }).sort((a, b) => Number(a.state === "recovered") - Number(b.state === "recovered")
+    || a.priority - b.priority || b.observedFailures - a.observedFailures);
 }
 
 export function discoverySourceStates(runs = [], now = Date.now()) {

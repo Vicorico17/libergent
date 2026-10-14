@@ -5,11 +5,13 @@ import { useCallback, useEffect, useState } from "react";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 
+type ProbeDiagnostic = { code: string; automatic: boolean; reason: string; action: string };
+type RepairItem = ProbeDiagnostic & { site: string; query: string; state: "open" | "recovered"; observedFailures: number; lastCheckedAt: string };
 type ProbeOffer = { title: string; url: string; site: string; priceRon: number | null; relevanceScore: number | null };
 type ProbeRun = {
   id: string; query: string; source_site: string; parent_query: string | null; outcome: "results" | "empty" | "error";
   results_count: number; parsed_count: number; offers: ProbeOffer[]; suggested_queries: string[]; elapsed_ms: number;
-  error: string; searched_at: string;
+  error: string; searched_at: string; diagnostic?: ProbeDiagnostic;
 };
 type ProbeSource = { site: string; status: string; coolingDown: boolean; retryAt: string | null; message: string };
 type ProbeTerm = {
@@ -27,6 +29,7 @@ export function DiscoveryProbeRadar() {
   const [runs, setRuns] = useState<ProbeRun[]>([]);
   const [terms, setTerms] = useState<ProbeTerm[]>([]);
   const [sources, setSources] = useState<ProbeSource[]>([]);
+  const [repairQueue, setRepairQueue] = useState<RepairItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<Record<string, string>>({});
@@ -39,6 +42,7 @@ export function DiscoveryProbeRadar() {
       setRuns(Array.isArray(payload.runs) ? payload.runs : []);
       setTerms(Array.isArray(payload.terms) ? payload.terms : []);
       setSources(Array.isArray(payload.sources) ? payload.sources : []);
+      setRepairQueue(Array.isArray(payload.repairQueue) ? payload.repairQueue : []);
       setError("");
     } catch (cause) {
       if (cause instanceof Error && cause.name === "AbortError") return;
@@ -105,6 +109,20 @@ export function DiscoveryProbeRadar() {
       </ul>
     </div> : null}
 
+    {!error ? <details className="border-b border-[#111]/15 p-4">
+      <summary className="cursor-pointer text-xs font-bold">Diagnostic și reverificare · {repairQueue.filter((item) => item.state === "open").length} de urmărit · {repairQueue.filter((item) => item.state === "recovered").length} cu oferte la reverificare</summary>
+      <p className="mt-2 text-[10px] leading-relaxed text-[#555]">Căutare → diagnostic → acțiune → reverificare. Problemele sunt urmărite separat pentru fiecare magazin și termen, în ultimele 100 de verificări. O nouă încercare cu oferte confirmă revenirea acelei căutări. Corectarea adreselor sau a extracției necesită modificări de cod.</p>
+      <ul className="mt-3 max-h-[32rem] space-y-3 overflow-y-auto">
+        {repairQueue.map((item) => <li key={`${item.site}:${item.query}`} className="border border-[#111]/15 bg-white p-3 text-[10px]">
+          <p className="font-bold">{item.site} · {item.query} · {item.state === "recovered" ? "Oferte găsite la reverificare" : item.automatic ? "Reverificare automată" : "Necesită investigare"}</p>
+          <p className="mt-1">{item.reason}</p>
+          <p className="mt-1 text-[#555]">{item.action}</p>
+          <p className="mt-1 text-[#666]">{item.observedFailures} verificări fără oferte în istoricul recent · {formatDate(item.lastCheckedAt)}</p>
+        </li>)}
+        {!repairQueue.length ? <li className="text-[10px] text-[#555]">Nu există probleme de urmărit în verificările disponibile.</li> : null}
+      </ul>
+    </details> : null}
+
     <div className="grid gap-6 p-4 md:grid-cols-[0.8fr_1.2fr] md:p-6">
       <div>
         <h3 className="text-sm font-bold uppercase">Căutări de verificare</h3>
@@ -139,7 +157,10 @@ export function DiscoveryProbeRadar() {
               <span className="text-[9px] uppercase text-[#666]">{run.source_site} · {formatDate(run.searched_at)}</span>
             </div>
             {run.parent_query ? <p className="mt-1 text-[9px] text-[#666]">Generată din „{run.parent_query}”</p> : null}
-            {run.error ? <p className="mt-2 text-[10px] text-[#991b1b]">{run.error}</p> : null}
+            {run.diagnostic && run.outcome !== "results" ? <div className="mt-2 text-[10px] text-[#7c2d12]">
+              <p>{run.diagnostic.reason}</p>
+              <p className="mt-1 text-[#555]">{run.diagnostic.action}</p>
+            </div> : run.error ? <p className="mt-2 text-[10px] text-[#991b1b]">{run.error}</p> : null}
             {run.offers?.length ? <ul className="mt-2 divide-y divide-[#111]/10">
               {run.offers.slice(0, 3).map((offer) => <li key={offer.url} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[10px]">
                 <a href={offer.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 hover:underline">{offer.title}</a>

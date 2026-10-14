@@ -26,7 +26,7 @@ import { parseListingDetailsHtml } from "./listing-details.js";
 import { resolveViewerLocation, viewerLocationCacheKey } from "./location-intelligence.js";
 import { getSearchQueryError, isPublicSearchQuery, SEARCH_QUERY_LENGTH_MESSAGE, SEARCH_QUERY_REJECTION_MESSAGE } from "./search-policy.js";
 import { applyJevProductDecision } from "./jev.js";
-import { buildProbeSuggestions, chooseProbeSource, chooseScheduledProbeTerm, discoveryProbeSeeds, probeQueryNiche, describeProbeError, discoverySourceStates, isEligibleProbeTerm, discoveryProbeFailure, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
+import { buildProbeSuggestions, chooseProbeSource, chooseScheduledProbeTerm, discoveryProbeSeeds, probeQueryNiche, diagnoseProbeRun, discoveryRepairQueue, describeProbeError, discoverySourceStates, isEligibleProbeTerm, discoveryProbeFailure, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -1026,10 +1026,12 @@ async function handleApi(request, env, context) {
         listDiscoveryProbeTerms({ limit: 200 }, env)
       ]);
       return json({
-        runs: runs.slice(0, 30).map((run) => run.outcome === "error" ? {
-          ...run, error: describeProbeError(run.error).message,
+        runs: runs.slice(0, 30).map((run) => ({
+          ...run, diagnostic: diagnoseProbeRun(run),
+          error: run.outcome === "error" ? describeProbeError(run.error).message : run.error,
           failed_sources: (run.failed_sources || []).map((source) => ({ ...source, error: describeProbeError(source.error).message }))
-        } : run),
+        })),
+        repairQueue: discoveryRepairQueue(runs),
         terms: terms.filter(isEligibleProbeTerm).map((term) => ({ ...term, niche: probeQueryNiche(term.query) })),
         sources: discoverySourceStates(runs),
         updatedAt: new Date().toISOString()
