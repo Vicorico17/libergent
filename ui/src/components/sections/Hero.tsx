@@ -100,9 +100,11 @@ export function Hero() {
 
           {/* Body copy */}
           <p className="text-base lg:text-lg leading-relaxed max-w-lg" style={{ color: `${INK}E6` }}>
-            LiberGent caută anunțuri second-hand pe OLX, Vinted, LaJumate, Okazii, Publi24 și Autovit,
-            apoi le compară cu prețuri noi din Price.ro și ShopMania ca să vezi rapid
-            dacă o ofertă folosită chiar merită.
+            LiberGent te ajută să cumperi și să vinzi în România. Caută produse noi,
+            second-hand și recondiționate pe marketplace-uri și în magazine, compară ofertele
+            și îți explică avantajele, prețurile și riscurile. În Premium, pregătești discuția
+            cu vânzătorul și urmărești negocierea. Iar când vinzi, creezi anunțul o singură
+            dată și îl refolosești pe mai multe platforme.
           </p>
 
           {/* Search form with gradient hover border */}
