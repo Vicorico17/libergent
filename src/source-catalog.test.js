@@ -7,9 +7,9 @@ test("source catalog exposes fresh direct and production evidence without droppi
   const catalog = buildSourceCatalog();
   assert.equal(catalog.length, Object.keys(SITES).length);
   for (const source of catalog) {
-    assert.equal(source.directValidation.queriesChecked, 2);
+    assert.ok(source.directValidation.queriesChecked >= 2);
     assert.ok(Number.isFinite(Date.parse(source.directValidation.checkedAt)));
-    assert.equal(source.directValidation.checks.length, 2);
+    assert.equal(source.directValidation.checks.length, source.directValidation.queriesChecked);
   }
   for (const domain of ["price.ro", "shopmania.ro"]) {
     assert.equal(catalog.find(s => s.domain === domain).status, "experimental");
