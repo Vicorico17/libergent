@@ -336,6 +336,43 @@ export function parseEvomagHtml(html, limit, { origin }) {
   };
 }
 
+export function parseAltexSearchJson(raw, limit, { origin = "https://altex.ro", query = "" } = {}) {
+  const products = Array.isArray(raw?.products) ? raw.products : [];
+  const items = products.flatMap((product) => {
+    const title = cleanText(product?.name || "");
+    const sku = cleanText(product?.sku || "");
+    const slug = cleanText(product?.url_key || "");
+    const numericPrice = Number(product?.price);
+    if (!title || !sku || !slug || !Number.isFinite(numericPrice) || numericPrice <= 0) return [];
+
+    return [{
+      title,
+      price: `${numericPrice} RON`,
+      currency: "RON",
+      location: "",
+      postedAt: "",
+      condition: "Nou",
+      sellerType: cleanText(product.price_seller_name || "Altex"),
+      url: toAbsoluteUrl(`/${slug}/cpd/${encodeURIComponent(sku)}/`, origin),
+      imageUrl: toAbsoluteUrl(product.thumbnail || product.small_image || product.image || "", origin)
+    }];
+  });
+
+  const dedupedItems = dedupeItems(items);
+  const modelVariants = new Set(["pro", "max", "ultra", "plus", "mini", "fe", "lite", "fold", "flip"]);
+  const requiredVariants = String(query).toLowerCase().split(/[^a-z0-9]+/).filter((token) => modelVariants.has(token));
+  const relevantItems = dedupedItems.filter((item) => {
+    const titleTokens = new Set(item.title.toLowerCase().split(/[^a-z0-9]+/));
+    return requiredVariants.every((token) => titleTokens.has(token));
+  }).slice(0, limit);
+  return {
+    items: relevantItems,
+    totalResults: Number.isFinite(Number(raw?.meta?.items)) ? Number(raw.meta.items) : null,
+    rawItemCount: dedupedItems.length,
+    hasNextPage: Number(raw?.meta?.page || 1) < Number(raw?.meta?.total_pages || 1)
+  };
+}
+
 function dedupeItems(items) {
   const seen = new Set();
   const output = [];

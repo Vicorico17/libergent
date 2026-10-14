@@ -86,7 +86,7 @@ function getCreditsPerPage(site, provider) {
 }
 
 function supportsDirectProvider(site) {
-  return ["direct-html-local", "direct-html-retail"].includes(site.strategy);
+  return ["direct-html-local", "direct-html-retail", "direct-json-retail"].includes(site.strategy);
 }
 
 function getProviderCandidates(site, requestedProvider) {

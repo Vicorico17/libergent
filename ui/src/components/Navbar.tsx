@@ -11,6 +11,7 @@ const TICKER_TEXT =
 
 const navLinks = [
   { label: "CĂUTARE", href: "/#cautare" },
+  { label: "VINDE", href: "/vinde" },
   { label: "DISCOVERY", href: "/discovery" },
   { label: "PREMIUM", href: "/pricing" },
 ];

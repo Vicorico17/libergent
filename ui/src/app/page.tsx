@@ -7,6 +7,7 @@ import { HowItWorks } from "@/components/sections/HowItWorks";
 import { FeaturesGrid } from "@/components/sections/FeaturesGrid";
 import { Pricing } from "@/components/sections/Pricing";
 import { FinalCTA } from "@/components/sections/FinalCTA";
+import { SellCTA } from "@/components/sections/SellCTA";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://libergent.com";
 
@@ -59,6 +60,7 @@ export default function Home() {
       />
       <main>
         <Hero />
+        <SellCTA />
         <FeatureCards />
         <HowItWorks />
         <FeaturesGrid />

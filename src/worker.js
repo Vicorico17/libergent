@@ -1,4 +1,5 @@
 import { searchAcrossSites } from "./app.js";
+import { handleSelling } from "./selling.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildConversationHistory, getConversationById, normalizeDeliveryStatus } from "./conversations.js";
 import { buildDealOpeningDraft, buildDealReplyDraft, normalizeDealChange, normalizeDealCreate } from "./deals.js";
@@ -880,6 +881,8 @@ async function handleApi(request, env, context) {
 
   const url = new URL(request.url);
   const apiPath = normalizeApiPathname(url.pathname);
+
+  if (apiPath.startsWith("/api/selling/")) return handleSelling(request, env, authenticateSupabaseUser);
 
   if (apiPath === "/api/billing/config") {
     if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);

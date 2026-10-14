@@ -9,6 +9,7 @@ const MONO  = "var(--font-mono-var), monospace";
 const NAV_LINKS = {
   Produs: [
     { label: "Căutare", href: "/#cautare" },
+    { label: "Vinde", href: "/vinde" },
     { label: "Discovery", href: "/discovery" },
     { label: "Premium", href: "/pricing" },
     { label: "Trenduri", href: "/trenduri" },

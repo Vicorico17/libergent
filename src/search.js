@@ -3,6 +3,8 @@ import { crawlWithCloudflare, scrapeWithCloudflare } from "./providers/cloudflar
 import { scrapeMarkdownWithFirecrawl, scrapeWithFirecrawl } from "./providers/firecrawl.js";
 import { parseOlxMarkdown } from "./parsers/olx.js";
 import { parseVintedMarkdown } from "./parsers/vinted.js";
+import { extractNichidutaCards, parseNichidutaPrices } from "./parsers/nichiduta.js";
+import { parseAltexSearchJson } from "./parsers/retail.js";
 import { parseSiteHtml } from "./site-html-parser.js";
 import { getQueryBrandTerms } from "./relevance.js";
 import { buildAbortSignal } from "./abort.js";
@@ -262,6 +264,46 @@ async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
   throw lastError || new Error(`Direct fetch failed for ${url}`);
 }
 
+async function fetchJsonDirect({ url, refererUrl, timeoutMs = 15000, signal, body, allowLegacyJson = false }) {
+  const referer = refererUrl || url;
+  const origin = new URL(referer).origin;
+  const response = await fetch(url, {
+    signal: buildAbortSignal({ timeoutMs, signal }),
+    redirect: "follow",
+    method: body ? "POST" : "GET",
+    body,
+    headers: {
+      ...(body ? { "content-type": "application/x-www-form-urlencoded; charset=UTF-8", "x-requested-with": "XMLHttpRequest" } : {}),
+      accept: "application/json, text/plain, */*",
+      "accept-language": "ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7",
+      "user-agent": DESKTOP_BROWSER_USER_AGENT,
+      origin,
+      referer,
+      "sec-fetch-dest": "empty",
+      "sec-fetch-mode": "cors",
+      "sec-fetch-site": new URL(url).origin === origin ? "same-origin" : "same-site"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Direct JSON fetch failed (${response.status}) for ${url}`);
+  }
+  if (!allowLegacyJson && !/application\/json/i.test(response.headers.get("content-type") || "")) {
+    throw new Error(`Direct JSON fetch returned a non-JSON response for ${url}`);
+  }
+  return response.json();
+}
+
+async function fetchNichidutaSearch({ url, limit, timeoutMs, signal }) {
+  const html = await fetchHtmlDirect({ url, timeoutMs, signal });
+  const cards = extractNichidutaCards(html).slice(0, 60);
+  if (!cards.length) return { items: [], rawItemCount: 0, totalResults: null, hasNextPage: false };
+  const body = new URLSearchParams(cards.map((card) => ["pid[]", card.id])).toString();
+  const prices = await fetchJsonDirect({ url: "https://www.nichiduta.ro/ajax/load_prices",
+    refererUrl: url, body, timeoutMs, signal, allowLegacyJson: true });
+  return parseNichidutaPrices(cards, prices, limit);
+}
+
 function dedupeItems(items) {
   const seen = new Set();
   const output = [];
@@ -316,10 +358,12 @@ function extractCloudflareCrawlItems(raw) {
 }
 
 async function runSinglePageSearch({ provider, site, query, limit, page, signal }) {
-  const url = typeof site.pagedSearchUrl === "function" ? site.pagedSearchUrl(query, page) : site.searchUrl(query);
+  const resolvedProvider = resolveProvider(provider, site);
+  const url = resolvedProvider !== "direct" && typeof site.searchPageUrl === "function"
+    ? site.searchPageUrl(query, page)
+    : typeof site.pagedSearchUrl === "function" ? site.pagedSearchUrl(query, page) : site.searchUrl(query);
   const schema = buildListingSchema(limit);
   const prompt = site.prompt(query, limit);
-  const resolvedProvider = resolveProvider(provider, site);
 
   let raw;
   let items;
@@ -328,13 +372,29 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
   let hasNextPage = null;
 
   if (resolvedProvider === "direct") {
-    if (!["direct-html-local", "direct-html-retail"].includes(site.strategy)) {
+    if (!["direct-html-local", "direct-html-retail", "direct-json-retail"].includes(site.strategy)) {
       throw new Error(`Direct provider is not configured for ${site.key}`);
     }
 
-    raw = await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs, signal });
-
-    const parsed = parseSiteHtml({ site, html: raw, url, limit, query });
+    const parsed = site.key === "nichiduta.ro"
+      ? await fetchNichidutaSearch({ url, limit, timeoutMs: site.timeoutMs, signal })
+      : site.strategy === "direct-json-retail"
+      ? parseAltexSearchJson(await fetchJsonDirect({
+        url,
+        refererUrl: typeof site.searchPageUrl === "function" ? site.searchPageUrl(query, page) : undefined,
+        timeoutMs: site.timeoutMs,
+        signal
+      }), limit, {
+        origin: new URL(typeof site.searchPageUrl === "function" ? site.searchPageUrl(query, page) : url).origin,
+        query
+      })
+      : parseSiteHtml({
+        site,
+        html: await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs, signal }),
+        url,
+        limit,
+        query
+      });
     items = parsed.items;
     totalResults = parsed.totalResults;
     rawItemCount = getRawItemCount(parsed, items);

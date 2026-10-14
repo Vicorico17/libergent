@@ -11,6 +11,7 @@ function encodeSearchText(value) {
 }
 
 const VERIFIED_RETAIL_SEARCH_URLS = {
+  "nichiduta.ro": (query) => `https://www.nichiduta.ro/cauta?q=${encodeSearchText(query)}`,
   "buzzsneakers.ro": (query) => `https://www.buzzsneakers.ro/produse?search=${encodeSearchText(query)}`,
   "sneakerindustry.ro": (query) => `https://sneakerindustry.ro/search?q=${encodeSearchText(query)}`,
   "modlet.ro": (query) => `https://www.modlet.ro/catalog?q=${encodeSearchText(query)}`,
@@ -845,7 +846,7 @@ export const SITES = {
     priority: 15,
     defaultEnabled: false,
     provider: "direct",
-    strategy: "direct-html-retail",
+    strategy: "direct-json-retail",
     sourceType: "retailer",
     defaultCondition: "Nou",
     defaultSellerType: "Retailer",
@@ -859,6 +860,9 @@ export const SITES = {
     defaultLimit: 24,
     defaultMaxPages: 1,
     searchUrl(query) {
+      return `https://fenrir.altex.ro/v2/catalog/search/${encodeSearchText(query)}?size=48`;
+    },
+    searchPageUrl(query) {
       return `https://altex.ro/cauta/?q=${encodeSearchText(query)}`;
     },
     pagedSearchUrl(query) {

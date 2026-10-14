@@ -1,0 +1,237 @@
+{
+  "checkedAt": "2026-10-14T14:41:58.980Z",
+  "environment": "local-node-isolated-release",
+  "sources": [
+    {
+      "site": "altex.ro",
+      "checks": [
+        {
+          "query": "iphone 15",
+          "ok": true,
+          "raw": 13,
+          "accepted": 4,
+          "error": "",
+          "offers": [
+            {
+              "title": "Telefon APPLE iPhone 15 5G, 128GB, Black",
+              "priceRon": 3499,
+              "url": "https://altex.ro/telefon-apple-iphone-15-5g-128gb-black/cpd/SMTIP151BK/"
+            },
+            {
+              "title": "Telefon APPLE iPhone 15 5G, 128GB, Blue",
+              "priceRon": 3499.99,
+              "url": "https://altex.ro/telefon-apple-iphone-15-5g-128gb-blue/cpd/SMTIP151BL/"
+            },
+            {
+              "title": "Telefon APPLE iPhone 15 5G, 128GB, Pink",
+              "priceRon": 3499.99,
+              "url": "https://altex.ro/telefon-apple-iphone-15-5g-128gb-pink/cpd/SMTIP151PK/"
+            },
+            {
+              "title": "Telefon APPLE iPhone 15 5G, 256GB, Black",
+              "priceRon": 4299.99,
+              "url": "https://altex.ro/telefon-apple-iphone-15-5g-256gb-black/cpd/SMTIP152BK/"
+            }
+          ]
+        },
+        {
+          "query": "iphone 16",
+          "ok": true,
+          "raw": 40,
+          "accepted": 4,
+          "error": "",
+          "offers": [
+            {
+              "title": "Telefon APPLE iPhone 16 5G, 128GB, Pink",
+              "priceRon": 4499.99,
+              "url": "https://altex.ro/telefon-apple-iphone-16-5g-128gb-pink/cpd/SMTIP161PK/"
+            },
+            {
+              "title": "Telefon APPLE iPhone 16 5G, 128GB, Teal",
+              "priceRon": 4499.99,
+              "url": "https://altex.ro/telefon-apple-iphone-16-5g-128gb-teal/cpd/SMTIP161TL/"
+            },
+            {
+              "title": "Telefon APPLE iPhone 16 5G, 128GB, Ultramarine",
+              "priceRon": 4499.99,
+              "url": "https://altex.ro/telefon-apple-iphone-16-5g-128gb-ultramarine/cpd/SMTIP161UM/"
+            },
+            {
+              "title": "Telefon APPLE iPhone 16 5G, 128GB, White",
+              "priceRon": 4499.99,
+              "url": "https://altex.ro/telefon-apple-iphone-16-5g-128gb-white/cpd/SMTIP161WH/"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "nichiduta.ro",
+      "checks": [
+        {
+          "query": "carucior sport",
+          "ok": true,
+          "raw": 60,
+          "accepted": 14,
+          "error": "",
+          "offers": [
+            {
+              "title": "Carucior Sport Nania Disney Eazy Minnie",
+              "priceRon": 395,
+              "url": "https://www.nichiduta.ro/carucior-sport-nania-disney-eazy-minnie-383300"
+            },
+            {
+              "title": "Carucior sport Chipolino Miley obsidian",
+              "priceRon": 503,
+              "url": "https://www.nichiduta.ro/carucior-sport-chipolino-miley-obsidian-390872"
+            },
+            {
+              "title": "Carucior sport Estelle Momi Pink",
+              "priceRon": 537,
+              "url": "https://www.nichiduta.ro/carucior-sport-estelle-momi-pink-301054"
+            },
+            {
+              "title": "Carucior sport Cosimo grey Coletto",
+              "priceRon": 693,
+              "url": "https://www.nichiduta.ro/carucior-sport-cosimo-grey-coletto-46584"
+            },
+            {
+              "title": "Carucior sport Kinderkraft Trig 3 onyx black",
+              "priceRon": 694,
+              "url": "https://www.nichiduta.ro/carucior-sport-kinderkraft-trig-3-onyx-black-392821"
+            },
+            {
+              "title": "Carucior sport Kinderkraft Trig 3 stone beige",
+              "priceRon": 694,
+              "url": "https://www.nichiduta.ro/carucior-sport-kinderkraft-trig-3-stone-beige-392818"
+            },
+            {
+              "title": "Carucior sport Kinderkraft Apino 0-22 kg raven black",
+              "priceRon": 710,
+              "url": "https://www.nichiduta.ro/carucior-sport-kinderkraft-apino-0-22-kg-raven-black-392187"
+            },
+            {
+              "title": "Carucior sport Kidwell Colmer Royal Green",
+              "priceRon": 732,
+              "url": "https://www.nichiduta.ro/carucior-sport-kidwell-colmer-royal-green-391981"
+            },
+            {
+              "title": "Carucior sport Coccolle Micio cu 3 roti Albastru",
+              "priceRon": 780,
+              "url": "https://www.nichiduta.ro/carucior-sport-coccolle-micio-cu-3-roti-albastru-73919"
+            },
+            {
+              "title": "Carucior sport Lionelo Annet Tour Gri",
+              "priceRon": 1013,
+              "url": "https://www.nichiduta.ro/carucior-sport-lionelo-annet-tour-gri-340868"
+            },
+            {
+              "title": "Carucior sport Avus Ink ABC Design",
+              "priceRon": 1302,
+              "url": "https://www.nichiduta.ro/carucior-sport-avus-ink-abc-design-388939"
+            },
+            {
+              "title": "Carucior sport pentru copii Chipolino Point Tiramisu, pliere tip umbrela, spatar reglabil in 2 pozitii",
+              "priceRon": 275,
+              "url": "https://www.nichiduta.ro/carucior-sport-pentru-copii-chipolino-point-tiramisu-pliere-tip-umbrela-spatar-reglabil-in-2-pozitii-445066"
+            },
+            {
+              "title": "Carucior 3 in 1 pentru papusi Malplay Unicorn, cu gondola, carucior sport si landou portabil",
+              "priceRon": 209,
+              "url": "https://www.nichiduta.ro/carucior-3-in-1-pentru-papusi-malplay-unicorn-cu-gondola-carucior-sport-si-landou-portabil-449098"
+            },
+            {
+              "title": "Carucior sport Chipolino Amaya tiramisu, pliere tip umbrela, greutate admisa 15 kg",
+              "priceRon": 227,
+              "url": "https://www.nichiduta.ro/carucior-sport-chipolino-amaya-tiramisu-pliere-tip-umbrela-greutate-admisa-15-kg-410575"
+            }
+          ]
+        },
+        {
+          "query": "scaun auto",
+          "ok": true,
+          "raw": 60,
+          "accepted": 15,
+          "error": "",
+          "offers": [
+            {
+              "title": "Scaun auto Kinderkraft I-Spark I-Size 100-150 cm pink",
+              "priceRon": 452,
+              "url": "https://www.nichiduta.ro/scaun-auto-kinderkraft-i-spark-i-size-100-150-cm-pink-392814"
+            },
+            {
+              "title": "Scaun auto Buf Boof P100 LightPurple, i-size R129, rotativ 360, isofix, 40-150 cm, 0-36 kg",
+              "priceRon": 588,
+              "url": "https://www.nichiduta.ro/scaun-auto-buf-boof-p100-lightpurple-i-size-r129-rotativ-360-isofix-40-150-cm-0-36-kg-379681"
+            },
+            {
+              "title": "Scaun auto Buf Boof P100 LightRed, i-size R129, rotativ 360, isofix, 40-150 cm, 0-36 kg",
+              "priceRon": 588,
+              "url": "https://www.nichiduta.ro/scaun-auto-buf-boof-p100-lightred-i-size-r129-rotativ-360-isofix-40-150-cm-0-36-kg-379682"
+            },
+            {
+              "title": "Scaun auto Buf Boof P100 UrsBlack, i-size R129, rotativ 360, isofix, 40-150 cm, 0-36 kg",
+              "priceRon": 588,
+              "url": "https://www.nichiduta.ro/scaun-auto-buf-boof-p100-ursblack-i-size-r129-rotativ-360-isofix-40-150-cm-0-36-kg-381153"
+            },
+            {
+              "title": "Scaun auto Buf Boof P100 BlackJeans, i-size R129, rotativ 360, isofix, 40-150 cm, 0-36 kg",
+              "priceRon": 596,
+              "url": "https://www.nichiduta.ro/scaun-auto-buf-boof-p100-blackjeans-i-size-r129-rotativ-360-isofix-40-150-cm-0-36-kg-378520"
+            },
+            {
+              "title": "Scaun auto Buf Boof P100 UrsCoffee, i-size R129, rotativ 360, isofix, 40-150 cm, 0-36 kg",
+              "priceRon": 596,
+              "url": "https://www.nichiduta.ro/scaun-auto-buf-boof-p100-urscoffee-i-size-r129-rotativ-360-isofix-40-150-cm-0-36-kg-381155"
+            },
+            {
+              "title": "Scaun auto iSize 40-150 cm Coccolle Vigo Emerald green+Coccolle Parasolar auto cu ventuze",
+              "priceRon": 1199,
+              "url": "https://www.nichiduta.ro/scaun-auto-isize-40-150-cm-coccolle-vigo-emerald-greencoccolle-parasolar-auto-cu-ventuze-411228"
+            },
+            {
+              "title": "Scaun auto cu isofix Avionaut Stardust Airflow Black, rotatie 360 grade, picior de sustinere, spatar reglabil",
+              "priceRon": 2503,
+              "url": "https://www.nichiduta.ro/scaun-auto-cu-isofix-avionaut-stardust-airflow-black-rotatie-360-grade-picior-de-sustinere-spatar-reglabil-430046"
+            },
+            {
+              "title": "Scaun auto cu isofix Avionaut Stardust Airflow Grey, rotatie 360 grade, picior de sustinere, spatar reglabil",
+              "priceRon": 2503,
+              "url": "https://www.nichiduta.ro/scaun-auto-cu-isofix-avionaut-stardust-airflow-grey-rotatie-360-grade-picior-de-sustinere-spatar-reglabil-430045"
+            },
+            {
+              "title": "Scaun auto rotativ iZi Turn i-Size Gri Metallic Melange",
+              "priceRon": 2840,
+              "url": "https://www.nichiduta.ro/scaun-auto-rotativ-izi-turn-i-size-gri-metallic-melange-327982"
+            },
+            {
+              "title": "Cutiuta pentru suzete Akuku Maimutica cu agatatoare,materiale sigura fara bpa, codita tip maner special ce permite agatarea la carucior/patut/scaun auto, dimensiune 13x8,5x5,5 cm",
+              "priceRon": 13,
+              "url": "https://www.nichiduta.ro/cutiuta-pentru-suzete-akuku-maimutica-cu-agatatoaremateriale-sigura-fara-bpa-codita-tip-maner-special-ce-permite-agatarea-la-caruciorpatutscaun-auto-dimensiune-13x85x55-cm-426337"
+            },
+            {
+              "title": "Cutiuta pentru suzete Akuku Lemur cu agatatoare,materiale sigura fara bpa, codita tip maner special ce permite agatarea la carucior/patut/scaun auto, dimensiune 13x6,5x6,5 cm",
+              "priceRon": 14,
+              "url": "https://www.nichiduta.ro/cutiuta-pentru-suzete-akuku-lemur-cu-agatatoaremateriale-sigura-fara-bpa-codita-tip-maner-special-ce-permite-agatarea-la-caruciorpatutscaun-auto-dimensiune-13x65x65-cm-454624"
+            },
+            {
+              "title": "Carte senzoriala pentru bebelusi Akuku Marine Animals 12x12 cm,contine elemente fosnaitoare si zornaitoare, stimuleaza coordonarea vizuala, auditiva si motorie fina,clema pentru atasare la carucior/scaun auto/patut",
+              "priceRon": 40,
+              "url": "https://www.nichiduta.ro/carte-senzoriala-pentru-bebelusi-akuku-marine-animals-12x12-cmcontine-elemente-fosnaitoare-si-zornaitoare-stimuleaza-coordonarea-vizuala-auditiva-si-motorie-finaclema-pentru-atasare-la-caruciorscaun-autopatut-423830"
+            },
+            {
+              "title": "Protectie bancheta pentru scaun auto Akuku Protection Short Mat Negru,marime universala,ofera protectie impotriva murdariei,dimensiune 47,5x86,5 cm",
+              "priceRon": 45,
+              "url": "https://www.nichiduta.ro/protectie-bancheta-pentru-scaun-auto-akuku-protection-short-mat-negrumarime-universalaofera-protectie-impotriva-murdarieidimensiune-475x865-cm-407499"
+            },
+            {
+              "title": "Protectie bancheta pentru scaun auto Akuku Protection Long Mat Negru,marime universala,ofera protectie impotriva murdariei,dimensiune 47x128 cm",
+              "priceRon": 57,
+              "url": "https://www.nichiduta.ro/protectie-bancheta-pentru-scaun-auto-akuku-protection-long-mat-negrumarime-universalaofera-protectie-impotriva-murdarieidimensiune-47x128-cm-407500"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -202,7 +202,7 @@ export async function searchMarketplaceWithBrowser(
   if (!browserBinding) throw new Error("Cloudflare Browser Run is not configured.");
 
   const browserEngine = normalizeBrowserEngine(engine);
-  const url = site.searchUrl(query);
+  const url = typeof site.searchPageUrl === "function" ? site.searchPageUrl(query) : site.searchUrl(query);
   const startedAt = Date.now();
   const browser = sharedBrowser || await launchBrowser(launch, browserBinding, browserEngine);
   const ownsBrowser = !sharedBrowser;

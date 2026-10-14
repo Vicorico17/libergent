@@ -222,6 +222,28 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
   const apiPath = normalizeApiPathname(url.pathname);
 
+  if (apiPath.startsWith("/api/selling/")) {
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of req) {
+      size += chunk.length;
+      if (size > 10 * 1024 * 1024) { sendJson(res, 413, { error: "Request too large." }); return; }
+      chunks.push(chunk);
+    }
+    const response = await worker.fetch(new Request(url, {
+      method: req.method,
+      headers: {
+        authorization: String(req.headers.authorization || ""),
+        cookie: String(req.headers.cookie || ""),
+        "content-type": String(req.headers["content-type"] || "application/json")
+      },
+      ...(["GET", "HEAD"].includes(req.method) ? {} : { body: Buffer.concat(chunks) })
+    }), process.env, {});
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(await response.text());
+    return;
+  }
+
   if (apiPath === "/api/deals" || apiPath.startsWith("/api/deals/")) {
     const parsed = req.method === "POST" || req.method === "PATCH" ? await readJsonBody(req) : null;
     if (parsed?.error) { sendJson(res, parsed.error.includes("large") ? 413 : 400, { error: parsed.error }); return; }
