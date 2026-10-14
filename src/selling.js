@@ -93,6 +93,13 @@ async function route(request, env, authenticate) {
   const auth = await authenticate(request, env);
   if (!auth.user) return json({ error: auth.error }, auth.status);
   const userId = auth.user.id;
+  if (path === '/api/selling/okazii/connect' && method === 'POST') {
+    if (!sellingConfigured(env) || !env.SELLING_PUBLIC_URL) fail('Conectarea Okazii nu este disponibilă încă.', 503);
+    const origin = publicOrigin(env);
+    await store(env, 'selling_feeds', 'on_conflict=user_id', 'POST', { user_id: userId }, 'resolution=ignore-duplicates');
+    const [feed] = await store(env, 'selling_feeds', ownerQuery(userId));
+    return json({ url: `${origin}/api/selling/feeds/${feed.token}.xml`, status: 'setup_required' });
+  }
   if (path === '/api/selling/connections' && method === 'GET') {
     const connections = await store(env, 'selling_connections', `${ownerQuery(userId)}&select=platform`);
     return json({ connections });

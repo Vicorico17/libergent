@@ -4,18 +4,20 @@ import Link from 'next/link';
 import { useEffect, useImperativeHandle, useState, type Ref } from 'react';
 import { Send, RefreshCw, Link2 } from 'lucide-react';
 import { OlxPublishingSettings } from './OlxPublishingSettings';
+import { sellingMarketplaces } from "@/lib/selling-marketplaces";
 import { savePhotoCache } from '@/lib/selling-photo-cache';
 import { sellingRequest, publicationLabels, type SellProduct, type SellPhoto, type OlxSettings, type Publication } from '@/lib/selling';
 
 const control = 'mt-1 w-full border border-[#101010]/40 bg-white px-3 py-2 text-sm';
-const button = 'inline-flex items-center justify-center gap-2 border border-[#101010] px-4 py-3 text-sm font-bold hover:bg-[#FF4F8B] disabled:opacity-40 disabled:cursor-not-allowed';
+const button = 'inline-flex items-center justify-center gap-2 rounded-lg border border-black/20 px-4 py-3 text-sm font-bold hover:bg-[#FF4F8B] disabled:opacity-40 disabled:cursor-not-allowed';
 const initialOlx: OlxSettings = { categoryId: 0, cityId: 0, advertiserType: 'private', attributes: [] };
 const storageKey = 'libergent:sell-publishing:v1';
 
 export type SellingActions = { start: () => void };
 
-export function SellPublishing({ actionRef, onAutomaticHandled, listing, photos, selected, prepared, onBusyChange, onPhotosUploaded, onNewListing, onRestore }: { actionRef: Ref<SellingActions>; onAutomaticHandled: (names: string[]) => void; onBusyChange: (busy: boolean) => void; prepared: boolean; listing: SellProduct; photos: SellPhoto[]; selected: string[]; onPhotosUploaded: (photos: SellPhoto[]) => void; onNewListing: () => void; onRestore: (listing: SellProduct, photos: SellPhoto[]) => void }) {
+export function SellPublishing({ connectionsOpen, onOpenConnections, actionRef, onAutomaticHandled, listing, photos, selected, prepared, onBusyChange, onPhotosUploaded, onNewListing, onRestore }: { connectionsOpen: boolean; onOpenConnections: () => void; actionRef: Ref<SellingActions>; onAutomaticHandled: (names: string[]) => void; onBusyChange: (busy: boolean) => void; prepared: boolean; listing: SellProduct; photos: SellPhoto[]; selected: string[]; onPhotosUploaded: (photos: SellPhoto[]) => void; onNewListing: () => void; onRestore: (listing: SellProduct, photos: SellPhoto[]) => void }) {
   const [config, setConfig] = useState<{ available: boolean; olx: boolean; okazii: boolean } | null>(null);
+  const [feedUrl, setFeedUrl] = useState('');
   const [connected, setConnected] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [id, setId] = useState('');
@@ -101,8 +103,8 @@ export function SellPublishing({ actionRef, onAutomaticHandled, listing, photos,
     setNotice('Am procesat cererea. Verifică rezultatul separat pentru fiecare platformă.');
     const inventory = await sellingRequest('/drafts'); setHistory(inventory.drafts);
   }
-  return <section className="mb-8 border-2 border-[#101010] bg-[#F3F0E7] p-5 sm:p-7" aria-labelledby="publish-heading">
-    <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="mb-2 font-mono text-xs font-bold tracking-widest text-[#C51D55]">PUBLICARE DIN LIBERGENT</p><h2 id="publish-heading" className="text-2xl font-bold">Conturile tale de vânzător</h2></div><Link href="/auth/?next=%2Fvinde%2F" className="text-sm underline underline-offset-4">Conectează-te la LiberGent</Link></div>
+  return <section className="mb-6 rounded-2xl border border-black/10 bg-white p-5 sm:p-7" aria-labelledby="publish-heading">
+    <div hidden={!connectionsOpen}><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="mb-2 font-mono text-xs font-bold tracking-widest text-[#C51D55]">PUBLICARE DIN LIBERGENT</p><h2 id="publish-heading" className="text-2xl font-bold">Conturile tale de vânzător</h2></div><Link href="/auth/?next=%2Fvinde%2F" className="text-sm underline underline-offset-4">{signedIn ? "Cont LiberGent" : "Autentifică-te"}</Link></div>
     <p className="my-4 max-w-3xl text-sm leading-relaxed">Conectează conturile o singură dată. La următorul anunț, folosim automat integrările pregătite.</p>
     {config && !config.available && <p className="mb-5 border border-[#101010]/30 bg-white p-4 text-sm">Publicarea directă nu este activată încă pe acest server. Anunțul rămâne disponibil pentru publicare manuală.</p>}
     {history.length > 0 && <label className="mb-5 block max-w-xl text-sm font-semibold">Anunțurile tale salvate (ultimele 100)<select disabled={busy} className={control} value={history.some((draft) => draft.id === id) ? id : ''} onChange={(event) => {
@@ -114,11 +116,11 @@ export function SellPublishing({ actionRef, onAutomaticHandled, listing, photos,
         onRestore({ title: product.title, description: product.description, price: String(product.price), location: product.location, category: product.category, condition: product.condition }, product.images.map((url: string, index: number) => ({ url, uploadedUrl: url, name: `Fotografie ${index + 1}` })));
       });
     }}><option value="">Anunț nou</option>{history.map((draft) => <option key={draft.id} value={draft.id}>{draft.listing.title}</option>)}</select></label>}
-    <details className="mb-4"><summary className="cursor-pointer py-3 text-sm font-bold">Setări de publicare · {connected ? "OLX conectat" : "conectează conturile"}</summary><fieldset disabled={busy} className="grid gap-5 lg:grid-cols-2">
-      <div className="border border-[#101010] bg-white/50 p-4">
-        <div className="flex items-center justify-between gap-3"><h3 className="font-bold">OLX</h3><span className="font-mono text-xs">{connected ? 'CONECTAT' : 'CONECTARE NECESARĂ'}</span></div>
+    <fieldset disabled={busy} className="grid gap-5 lg:grid-cols-2">
+      <div className="rounded-xl border border-black/15 bg-[#F3F0E7]/30 p-4">
+        <div className="flex items-center justify-between gap-3"><h3 className="font-bold">OLX</h3><span className="font-mono text-xs">{connected ? 'Conectat' : config?.olx ? 'Disponibil' : 'Indisponibil momentan'}</span></div>
         <p className="my-3 text-sm">Publicare directă din contul tău. OLX poate cere confirmare, moderare sau plata unei taxe în cont.</p>
-        {!config?.olx && <p className="mb-3 text-xs text-[#555]">Integrarea necesită activarea accesului de partener OLX.</p>}
+        {!config?.olx && <p className="mb-3 text-xs text-[#555]">Conectarea va fi disponibilă după activarea integrării OLX de către LiberGent.</p>}
         <button type="button" disabled={!config?.olx || busy} className={button} onClick={() => run(async () => {
           if (connected) { await sellingRequest('/olx/disconnect', 'POST'); setConnected(false); }
           else { await savePhotoCache(photos); const result = await sellingRequest('/olx/connect', 'POST'); window.location.assign(result.url); }
@@ -130,12 +132,20 @@ export function SellPublishing({ actionRef, onAutomaticHandled, listing, photos,
           <OlxPublishingSettings value={olx} onChange={setOlx} />
         </>}
       </div>
-      <div className="border border-[#101010] bg-white/50 p-4"><div className="flex items-center justify-between"><h3 className="font-bold">Okazii</h3><span className="font-mono text-xs">IMPORT AUTOMAT</span></div><p className="my-3 text-sm">Configurezi o singură dată adresa feed-ului în magazinul tău Okazii. Următoarele anunțuri se adaugă în același feed.</p><ol className="ml-5 list-decimal space-y-2 text-sm"><li>Include anunțul în feed folosind butonul de mai jos.</li><li>În Okazii, alege Import produse → Import automat și adaugă adresa feed-ului.</li><li>Asociază categoriile și configurează livrarea, plata și actualizarea.</li></ol><a className="mt-4 inline-block text-xs underline" href="https://ajutor.okazii.ro/magazine-okazii-ro/import-produse.html" target="_blank" rel="noopener noreferrer">Instrucțiuni Okazii ↗</a><label className="mt-5 flex items-center gap-2 text-sm"><input type="checkbox" checked={submitOkazii} disabled={!selected.includes('Okazii') || !config?.okazii} onChange={(event) => setSubmitOkazii(event.target.checked)} />Include în feed-ul Okazii{!selected.includes('Okazii') && ' — selectează Okazii mai sus'}</label><p className="mt-3 text-xs text-[#555]">Titlul din feed este limitat la 80 de caractere. Importul și publicarea sunt gestionate de Okazii.</p></div>
-    </fieldset></details>
-    <p className="mb-3 mt-5 text-xs text-[#555]">{!prepared && "Completează formularul și apasă Publică peste tot. "}Prin trimitere, fotografiile devin accesibile prin link pentru platformele selectate. Butonul nu cumpără promovări sau pachete.</p>
+      <div className="rounded-xl border border-black/15 bg-[#F3F0E7]/30 p-4"><div className="flex items-center justify-between"><h3 className="font-bold">Okazii</h3><span className="font-mono text-xs">Prin import</span></div><p className="my-3 text-sm">Configurezi o singură dată adresa feed-ului în magazinul tău Okazii. Următoarele anunțuri se adaugă în același feed.</p><button type="button" className={button} disabled={!config?.okazii || busy} onClick={() => run(async () => { const data = await sellingRequest('/okazii/connect', 'POST'); setFeedUrl(data.url); })}>Obține linkul de conectare</button>{feedUrl && <div className="my-3"><label className="text-xs">Linkul magazinului tău<input readOnly value={feedUrl} className={control} onFocus={(event) => event.target.select()} /></label><button type="button" className={`${button} mt-2`} onClick={() => run(async () => { await navigator.clipboard.writeText(feedUrl); setNotice('Link copiat. Adaugă-l la Import automat în Okazii.'); })}>Copiază linkul</button><p className="mt-2 text-xs">Link pregătit. Conectarea se finalizează în contul Okazii.</p></div>}<ol className="ml-5 mt-4 list-decimal space-y-2 text-sm"><li>Obține și copiază linkul de conectare.</li><li>În Okazii, alege Import produse → Import automat și adaugă adresa feed-ului.</li><li>Asociază categoriile și configurează livrarea, plata și actualizarea.</li></ol><a className="mt-4 inline-block text-xs underline" href="https://ajutor.okazii.ro/magazine-okazii-ro/import-produse.html" target="_blank" rel="noopener noreferrer">Instrucțiuni Okazii ↗</a><label className="mt-5 flex items-center gap-2 text-sm"><input type="checkbox" checked={submitOkazii} disabled={!selected.includes('Okazii') || !config?.okazii} onChange={(event) => setSubmitOkazii(event.target.checked)} />Include în feed-ul Okazii{!selected.includes('Okazii') && ' — selectează Okazii mai sus'}</label><p className="mt-3 text-xs text-[#555]">Titlul din feed este limitat la 80 de caractere. Importul și publicarea sunt gestionate de Okazii.</p></div>
+    </fieldset>
+    <div className="mt-5 divide-y divide-black/10 rounded-xl border border-black/10">
+      {sellingMarketplaces.filter((market) => !["OLX", "Okazii"].includes(market.name)).map((market) => <div key={market.name} className="flex items-center justify-between gap-3 px-4 py-3"><span className="text-sm font-semibold">{market.name}</span><span className="rounded-full bg-black/5 px-3 py-1 text-xs">Finalizare manuală</span></div>)}
+    </div>
+    <p className="mt-3 text-xs text-[#555]">Aceste platforme nu sunt conectate pentru publicare automată. Îți pregătim anunțul și te ghidăm la publicare.</p>
+    </div>
+    {!connectionsOpen && <div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-semibold">Rezultatul trimiterii</h2><button type="button" onClick={onOpenConnections} className="text-sm underline">Conectează platformele</button></div>}
+    <div hidden={connectionsOpen && !prepared}><p className="mb-3 mt-5 text-xs text-[#555]">{!prepared && "Completează formularul și apasă Publică peste tot. "}Prin trimitere, fotografiile devin accesibile prin link pentru platformele selectate. Butonul nu cumpără promovări sau pachete.</p>
     {olxSent && <p className="my-3 text-sm">Acest anunț a fost deja trimis către OLX. Starea de mai jos se referă la versiunea salvată la trimitere. Modificările din formular nu actualizează anunțul OLX.</p>}
     <div className="flex flex-wrap gap-3"><button hidden={!prepared || !targets.length} type="button" disabled={busy || !loaded || !targets.length || !prepared} className={`${button} bg-[#FF4F8B]`} onClick={() => run(publish)}><Send size={16} />{busy ? 'Se procesează…' : `Trimite din nou doar către integrările pregătite (${targets.length})`}</button><button type="button" disabled={busy || !config?.available} className={button} onClick={() => run(async () => { const response = await sellingRequest('/refresh', 'POST', { id }); setResults(response.publications); const connections = await sellingRequest('/connections'); setConnected(connections.connections.some((connection: { platform: string }) => connection.platform === 'olx')); })}><RefreshCw size={16} />Verifică starea</button><button type="button" disabled={busy} className={button} onClick={() => { setId(crypto.randomUUID()); setOlx({ ...initialOlx, cityId: olx.cityId, districtId: olx.districtId, advertiserType: olx.advertiserType }); setResults([]); setNotice('Anunț nou. Publicările precedente rămân în conturile platformelor.'); onNewListing(); }}>Alt produs / anunț nou</button></div>
-    <p role="status" className="mt-4 text-sm">{notice}</p>
+
     <div className="mt-4 space-y-3">{results.map((result) => <div key={result.platform} className="border border-[#101010]/30 bg-white p-4"><p className="font-bold">{result.platform === 'olx' ? 'OLX' : 'Okazii'} · {publicationLabels[result.status] || result.status}</p><p className="mt-1 text-sm">{result.message}</p>{result.url && (result.platform === 'okazii' ? <><label className="mt-3 block text-xs">Adresa feed-ului pentru import<input readOnly className={control} value={result.url} onFocus={(event) => event.target.select()} /></label><button type="button" className={`${button} mt-2`} onClick={() => run(async () => { await navigator.clipboard.writeText(result.url!); setNotice('Adresa feed-ului a fost copiată.'); })}>Copiază adresa</button><button type="button" disabled={busy} className={`${button} ml-2 mt-2`} onClick={() => run(async () => { await sellingRequest('/okazii/remove', 'POST', { id }); setResults((current) => current.filter((item) => item.platform !== 'okazii')); setNotice('Scos din feed. Dacă a fost importat deja, verifică și retrage anunțul din Okazii.'); })}>Scoate din feed</button></> : <a className="mt-2 inline-block text-sm underline" href={result.url} target="_blank" rel="noopener noreferrer">Vezi anunțul OLX ↗</a>)}</div>)}</div>
+    </div>
+    <p role="status" className="mt-4 text-sm">{notice}</p>
   </section>;
 }

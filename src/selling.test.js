@@ -197,3 +197,28 @@ test('Worker dispatch exposes configuration and rejects unauthenticated publicat
   assert.equal(config.status, 200); assert.deepEqual(await config.json(), { available: false, olx: false, okazii: false });
   assert.equal((await worker.fetch(request('/publish', { id, platforms: ['olx'] }), {}, {})).status, 401);
 });
+
+test('Okazii setup requires authentication and configured storage', async () => {
+  assert.equal((await handleSelling(request('/okazii/connect', {}), env, async () => ({ error: 'Sign in', status: 401 }))).status, 401);
+  assert.equal((await handleSelling(request('/okazii/connect', {}), {}, auth)).status, 503);
+});
+
+test('Okazii connection link is stable and does not publish any announcement', async (t) => {
+  const real = globalThis.fetch; t.after(() => { globalThis.fetch = real; });
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(input);
+    assert.ok(url.pathname.endsWith('/selling_feeds'), 'setup must not touch drafts or publications');
+    if (init.method === 'POST') {
+      assert.equal(JSON.parse(init.body).user_id, userId);
+      assert.match(init.headers.prefer, /ignore-duplicates/);
+    } else assert.equal(url.searchParams.get('user_id'), `eq.${userId}`);
+    return reply([{ user_id: userId, token: id }]);
+  };
+  const first = await handleSelling(request('/okazii/connect', {}), env, auth);
+  const second = await handleSelling(request('/okazii/connect', {}), env, auth);
+  assert.equal(first.status, 200);
+  const payload = await first.json();
+  assert.equal(payload.status, 'setup_required');
+  assert.equal(payload.url, `https://libergent.test/api/selling/feeds/${id}.xml`);
+  assert.deepEqual(await second.json(), payload);
+});
