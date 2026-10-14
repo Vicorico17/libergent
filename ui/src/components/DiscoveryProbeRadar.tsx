@@ -12,6 +12,7 @@ type ProbeRun = {
   id: string; query: string; source_site: string; parent_query: string | null; outcome: "results" | "empty" | "error";
   results_count: number; parsed_count: number; offers: ProbeOffer[]; suggested_queries: string[]; elapsed_ms: number;
   error: string; searched_at: string; diagnostic?: ProbeDiagnostic;
+  recovery?: { provider: string; outcome: string; resultsCount: number; attemptedAt: string } | null;
 };
 type ProbeSource = { site: string; status: string; coolingDown: boolean; retryAt: string | null; message: string };
 type ProbeTerm = {
@@ -156,6 +157,9 @@ export function DiscoveryProbeRadar() {
               </div>
               <span className="text-[9px] uppercase text-[#666]">{run.source_site} · {formatDate(run.searched_at)}</span>
             </div>
+            {run.recovery ? <p className={`mt-2 text-[10px] ${run.recovery.outcome === "results" ? "text-[#14532d]" : "text-[#7c2d12]"}`}>
+              Încercare suplimentară în browser: {run.recovery.outcome === "results" ? `${run.recovery.resultsCount} oferte găsite` : run.recovery.outcome === "error" ? "a eșuat; sursa rămâne nerezolvată" : "fără oferte; sursa rămâne nerezolvată"}.
+            </p> : null}
             {run.parent_query ? <p className="mt-1 text-[9px] text-[#666]">Generată din „{run.parent_query}”</p> : null}
             {run.diagnostic && run.outcome !== "results" ? <div className="mt-2 text-[10px] text-[#7c2d12]">
               <p>{run.diagnostic.reason}</p>

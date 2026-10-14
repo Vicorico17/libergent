@@ -50,6 +50,39 @@ export function chooseScheduledProbeTerm(terms, site, runs = []) {
       || group.queries.indexOf(normalizeProbeQuery(a.query)) - group.queries.indexOf(normalizeProbeQuery(b.query)))[0] || null;
 }
 
+export function probeRecoveryAttempt(run) {
+  return (run?.failed_sources || []).find((failure) => failure?.recovery)?.recovery || null;
+}
+
+export function shouldTryProbeBrowser(run, recentRuns = [], now = Date.now()) {
+  if (run.outcome === "results") return false;
+  const error = String(run.error || "");
+  // Respect explicit rate limits; a browser is not a second immediate request.
+  if (/\b(?:429|401|407|404)\b/.test(error)) return false;
+  const refused = /\b(?:403|406|511)\b|challenge|access denied/i.test(error);
+  const unrendered = run.outcome === "empty" && Number(run.parsed_count) === 0;
+  if (!refused && !unrendered) return false;
+  const attempts = recentRuns.map((previous) => ({ site: previous.source_site, attempt: probeRecoveryAttempt(previous) }))
+    .filter(({ attempt }) => attempt && Number.isFinite(Date.parse(attempt.attemptedAt)));
+  // At most one browser fallback per 15 minutes, and one per source per hour.
+  return !attempts.some(({ site, attempt }) => now - Date.parse(attempt.attemptedAt)
+    < (site === run.source_site ? 60 : 15) * 60_000);
+}
+
+export function mergeProbeRecovery(directRun, browserRun, attemptedAt) {
+  const recovered = browserRun.outcome === "results" && browserRun.results_count > 0;
+  const chosen = recovered ? browserRun : directRun;
+  const directFailure = directRun.failed_sources?.[0] || {
+    site: directRun.source_site, provider: "direct", error: "Direct page contained no extractable products."
+  };
+  return { ...chosen,
+    failed_sources: [{ ...directFailure, recovery: {
+      attemptedAt, provider: "cloudflare-browser", outcome: browserRun.outcome,
+      resultsCount: browserRun.results_count
+    } }, ...(browserRun.failed_sources || [])]
+  };
+}
+
 export function discoveryProbeFailure(error) {
   const message = error instanceof Error ? error.message : String(error || "");
   const missingSchema = /discovery_probe|record_discovery_probe_feedback/i.test(message)

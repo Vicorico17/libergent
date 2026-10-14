@@ -26,7 +26,7 @@ import { parseListingDetailsHtml } from "./listing-details.js";
 import { resolveViewerLocation, viewerLocationCacheKey } from "./location-intelligence.js";
 import { getSearchQueryError, isPublicSearchQuery, SEARCH_QUERY_LENGTH_MESSAGE, SEARCH_QUERY_REJECTION_MESSAGE } from "./search-policy.js";
 import { applyJevProductDecision } from "./jev.js";
-import { buildProbeSuggestions, chooseProbeSource, chooseScheduledProbeTerm, discoveryProbeSeeds, probeQueryNiche, diagnoseProbeRun, discoveryRepairQueue, describeProbeError, discoverySourceStates, isEligibleProbeTerm, discoveryProbeFailure, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
+import { buildProbeSuggestions, chooseProbeSource, chooseScheduledProbeTerm, discoveryProbeSeeds, probeQueryNiche, probeRecoveryAttempt, shouldTryProbeBrowser, mergeProbeRecovery, diagnoseProbeRun, discoveryRepairQueue, describeProbeError, discoverySourceStates, isEligibleProbeTerm, discoveryProbeFailure, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -620,7 +620,25 @@ async function runDiscoveryProbe(env) {
         maxPages: 1,
         siteKeys: [site]
       });
-      const suggestions = buildProbeSuggestions(term.query, payload.results || [], 3);
+      run = serializeProbeRun({ query: term.query, site, payload, elapsedMs: Date.now() - startedAt, parentQuery: term.parentQuery });
+      let suggestionResults = payload.results || [];
+      if (env.BROWSER && env.DISCOVERY_BROWSER_RECOVERY_ENABLED !== "0" && shouldTryProbeBrowser(run, recentRuns)) {
+        const attemptedAt = new Date().toISOString();
+        try {
+          const browserResults = await searchPremiumBrowserSites(env, { query: term.query, limit: 12, siteKeys: [site] });
+          const browserPayload = aggregateMarketplaceResults(browserResults, { condition: "any" });
+          const browserRun = serializeProbeRun({ query: term.query, site, payload: browserPayload,
+            elapsedMs: Date.now() - startedAt, parentQuery: term.parentQuery });
+          run = mergeProbeRecovery(run, browserRun, attemptedAt);
+          if (browserRun.outcome === "results") suggestionResults = browserPayload.results || [];
+        } catch (error) {
+          run = mergeProbeRecovery(run, { outcome: "error", results_count: 0, failed_sources: [{
+            site, provider: "cloudflare-browser", error: error instanceof Error ? error.message : String(error)
+          }] }, attemptedAt);
+        }
+        run.elapsed_ms = Date.now() - startedAt;
+      }
+      const suggestions = buildProbeSuggestions(term.query, suggestionResults, 3);
       if (suggestions.length) {
         await upsertDiscoveryProbeTerms(suggestions.map((query) => ({
           query,
@@ -630,7 +648,6 @@ async function runDiscoveryProbe(env) {
           priority: 10
         })), env);
       }
-      run = serializeProbeRun({ query: term.query, site, payload, elapsedMs: Date.now() - startedAt, parentQuery: term.parentQuery });
       run.suggested_queries = suggestions;
     } catch (error) {
       run = {
@@ -640,7 +657,7 @@ async function runDiscoveryProbe(env) {
         outcome: "error",
         results_count: 0,
         parsed_count: 0,
-        failed_sources: [],
+        failed_sources: run?.failed_sources || [],
         offers: [],
         suggested_queries: [],
         elapsed_ms: Date.now() - startedAt,
@@ -1027,7 +1044,7 @@ async function handleApi(request, env, context) {
       ]);
       return json({
         runs: runs.slice(0, 30).map((run) => ({
-          ...run, diagnostic: diagnoseProbeRun(run),
+          ...run, diagnostic: diagnoseProbeRun(run), recovery: probeRecoveryAttempt(run),
           error: run.outcome === "error" ? describeProbeError(run.error).message : run.error,
           failed_sources: (run.failed_sources || []).map((source) => ({ ...source, error: describeProbeError(source.error).message }))
         })),
