@@ -1,7 +1,45 @@
 import { understandMarketplaceQuery } from "./query-understanding.js";
 import { getSearchQueryError } from "./search-policy.js";
 
-export const DISCOVERY_PROBE_SITES = ["olx.ro", "vinted.ro", "emag.ro"];
+export const DISCOVERY_PROBE_GROUPS = [
+  { niche: "Casă și mobilier", sites: ["mobexpert.ro", "thehome.ro"], queries: ["canapea extensibila", "masa dining", "scaun birou"] },
+  { niche: "Copii", sites: ["nichiduta.ro", "noriel.ro"], queries: ["carucior sport", "scaun auto copii", "jucarii bebelusi"] },
+  { niche: "Modă", sites: ["vinted.ro", "epantofi.ro"], queries: ["adidas samba", "nike air force", "sandale dama"] },
+  { niche: "Bricolaj", sites: ["dedeman.ro", "scule.ro"], queries: ["bormasina bosch", "surubelnita electrica", "polizor unghiular"] },
+  { niche: "Animale", sites: ["zooplus.ro", "petmart.ro"], queries: ["royal canin", "purina pro plan", "hrana pisici"] },
+  { niche: "Cărți", sites: ["libris.ro", "nemira.ro"], queries: ["dune", "harry potter", "carti copii"] },
+  { niche: "Muzică", sites: ["soundcreation.ro", "mcmusic.ro"], queries: ["chitara electrica", "pian digital", "microfon shure"] },
+  { niche: "Ciclism", sites: ["playbike.ro"], queries: ["bicicleta mtb", "casca bicicleta", "bicicleta copii"] },
+  { niche: "Sport", sites: ["sportvision.ro"], queries: ["adidas running", "nike running", "minge fotbal"] },
+  { niche: "Foto", sites: ["photosetup.ro", "f64.ro"], queries: ["sony a7", "canon eos", "trepied foto"] },
+  { niche: "Jocuri și hobby", sites: ["redgoblin.ro", "regatuljocurilor.ro"], queries: ["lego", "catan", "joc de societate"] },
+  { niche: "Îngrijire", sites: ["makeup.ro", "springfarma.com"], queries: ["crema cerave", "sampon vichy", "crema la roche posay"] },
+  { niche: "Piese auto", sites: ["epiesa.ro"], queries: ["filtru ulei", "placute frana", "stergatoare bosch"] },
+  { niche: "Auto", sites: ["autovit.ro", "bestauto.ro"], queries: ["dacia duster", "bmw x5", "volkswagen golf"] },
+  { niche: "Tehnologie", sites: ["altex.ro", "emag.ro", "olx.ro"], queries: ["iphone 16", "laptop lenovo", "samsung galaxy s24"] }
+];
+export const DISCOVERY_PROBE_SITES = DISCOVERY_PROBE_GROUPS.flatMap((group) => group.sites);
+const CURATED_QUERIES = new Set(DISCOVERY_PROBE_GROUPS.flatMap((group) => group.queries));
+
+export function discoveryProbeSeeds() {
+  return [...CURATED_QUERIES].map((query) => ({ query, origin: "manual", searchCount: 0, priority: 20 }));
+}
+
+export function probeQueryNiche(query) {
+  return DISCOVERY_PROBE_GROUPS.find((group) => group.queries.includes(normalizeProbeQuery(query)))?.niche || "";
+}
+
+// Use the least recently checked query for this source, so popularity cannot
+// monopolize the scheduled coverage. Each source stays within its product niche.
+export function chooseScheduledProbeTerm(terms, site, runs = []) {
+  const group = DISCOVERY_PROBE_GROUPS.find((entry) => entry.sites.includes(site));
+  if (!group) return null;
+  const lastRun = (query) => Math.max(0, ...runs.filter((run) => run.source_site === site && run.query === query)
+    .map((run) => Date.parse(run.searched_at) || 0));
+  return terms.filter((term) => isEligibleProbeTerm(term) && group.queries.includes(normalizeProbeQuery(term.query)))
+    .sort((a, b) => lastRun(a.query) - lastRun(b.query)
+      || group.queries.indexOf(normalizeProbeQuery(a.query)) - group.queries.indexOf(normalizeProbeQuery(b.query)))[0] || null;
+}
 
 export function discoveryProbeFailure(error) {
   const message = error instanceof Error ? error.message : String(error || "");
@@ -42,7 +80,7 @@ export function discoverySourceStates(runs = [], now = Date.now()) {
     const failure = latest?.outcome === "error" ? describeProbeError(latest.error) : null;
     const lastAt = Date.parse(latest?.searched_at);
     const retryAt = Number.isFinite(lastAt) ? lastAt + (failure?.cooldownMs || 3 * 60_000) : 0;
-    return { site, status: failure?.code || latest?.outcome || "unknown",
+    return { site, niche: DISCOVERY_PROBE_GROUPS.find((group) => group.sites.includes(site))?.niche, status: failure?.code || latest?.outcome || "unknown",
       coolingDown: retryAt > now, retryAt: retryAt ? new Date(retryAt).toISOString() : null,
       message: failure?.message || "" };
   });
@@ -65,7 +103,7 @@ export function normalizeProbeQuery(value = "") {
 export function isEligibleProbeQuery(value = "") {
   const query = String(value || "").trim();
   return query.length >= 3 && query.length <= 80 && !getSearchQueryError(query)
-    && Boolean(understandMarketplaceQuery(query).category);
+    && (CURATED_QUERIES.has(normalizeProbeQuery(query)) || Boolean(understandMarketplaceQuery(query).category));
 }
 
 export function chooseProbeTerm(terms = [], random = Math.random) {

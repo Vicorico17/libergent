@@ -26,7 +26,7 @@ import { parseListingDetailsHtml } from "./listing-details.js";
 import { resolveViewerLocation, viewerLocationCacheKey } from "./location-intelligence.js";
 import { getSearchQueryError, isPublicSearchQuery, SEARCH_QUERY_LENGTH_MESSAGE, SEARCH_QUERY_REJECTION_MESSAGE } from "./search-policy.js";
 import { applyJevProductDecision } from "./jev.js";
-import { buildProbeSuggestions, chooseProbeSource, chooseProbeTerm, describeProbeError, discoverySourceStates, isEligibleProbeTerm, discoveryProbeFailure, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
+import { buildProbeSuggestions, chooseProbeSource, chooseScheduledProbeTerm, discoveryProbeSeeds, probeQueryNiche, describeProbeError, discoverySourceStates, isEligibleProbeTerm, discoveryProbeFailure, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -595,6 +595,7 @@ async function runDiscoveryProbe(env) {
     if (!source) return { status: "cooling_down" };
     const { site } = source;
     nextSourceCursor = source.nextCursor;
+    await upsertDiscoveryProbeTerms(discoveryProbeSeeds(), env);
     const seeds = await readRecentDiscoverySeedQueries({ limit: 100, days: 14, minimumSearchCount: 3 }, env);
     const eligibleSeeds = seeds.filter((seed) => isEligibleProbeQuery(seed.query));
     await upsertDiscoveryProbeTerms(eligibleSeeds.map((seed) => ({
@@ -604,8 +605,8 @@ async function runDiscoveryProbe(env) {
       priority: Math.min(100, 10 + Math.round(Math.log2(Math.max(1, seed.searchCount)) * 5))
     })), env);
 
-    const queuedTerms = await listDiscoveryProbeTerms({ limit: 100 }, env);
-    term = chooseProbeTerm(queuedTerms);
+    const queuedTerms = await listDiscoveryProbeTerms({ limit: 200 }, env);
+    term = chooseScheduledProbeTerm(queuedTerms, site, recentRuns);
     if (!term) return { status: "no_eligible_terms" };
 
     const startedAt = Date.now();
@@ -1022,14 +1023,14 @@ async function handleApi(request, env, context) {
     try {
       const [runs, terms] = await Promise.all([
         listDiscoveryProbeRuns({ limit: 100 }, env),
-        listDiscoveryProbeTerms({ limit: 40 }, env)
+        listDiscoveryProbeTerms({ limit: 200 }, env)
       ]);
       return json({
         runs: runs.slice(0, 30).map((run) => run.outcome === "error" ? {
           ...run, error: describeProbeError(run.error).message,
           failed_sources: (run.failed_sources || []).map((source) => ({ ...source, error: describeProbeError(source.error).message }))
         } : run),
-        terms: terms.filter(isEligibleProbeTerm),
+        terms: terms.filter(isEligibleProbeTerm).map((term) => ({ ...term, niche: probeQueryNiche(term.query) })),
         sources: discoverySourceStates(runs),
         updatedAt: new Date().toISOString()
       }, 200);

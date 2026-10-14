@@ -13,7 +13,7 @@ type ProbeRun = {
 };
 type ProbeSource = { site: string; status: string; coolingDown: boolean; retryAt: string | null; message: string };
 type ProbeTerm = {
-  query: string; origin: string; parentQuery: string; searchCount: number; priority: number;
+  query: string; origin: string; niche?: string; parentQuery: string; searchCount: number; priority: number;
   usefulCount: number; irrelevantCount: number; lastProbedAt: string | null;
 };
 
@@ -42,7 +42,7 @@ export function DiscoveryProbeRadar() {
       setError("");
     } catch (cause) {
       if (cause instanceof Error && cause.name === "AbortError") return;
-      setError("Verificările automate sunt temporar indisponibile. Lista surselor și statusul lor sunt disponibile mai jos.");
+      setError("Verificările automate sunt temporar indisponibile. Lista surselor și statusul lor sunt disponibile mai sus.");
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ export function DiscoveryProbeRadar() {
       <div>
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a51d50]">Probe automate · România</p>
         <h2 id="probe-radar-heading" className="mt-2 text-2xl font-bold uppercase">Verificări automate ale surselor</h2>
-        <p className="mt-2 max-w-2xl text-xs leading-relaxed text-[#555]">Verificăm periodic sursele folosind căutări de produse recurente. Aici vezi istoricul verificărilor automate. Căutarea ta cea mai recentă nu apare imediat. Sursele care refuză cererile sunt reîncercate după o pauză.</p>
+        <p className="mt-2 max-w-2xl text-xs leading-relaxed text-[#555]">Rotim verificările între 15 nișe: casă, copii, modă, bricolaj, animale, cărți, muzică, ciclism, sport, foto, hobby, îngrijire, piese auto, auto și tehnologie. Aici vezi istoricul verificărilor automate. Căutarea ta cea mai recentă nu apare imediat. Sursele care refuză cererile sunt reîncercate după o pauză.</p>
       </div>
       <span className="shrink-0 border border-[#111]/30 bg-white/70 px-3 py-2 text-[10px] font-bold uppercase">{loading ? "Se încarcă…" : error ? "Indisponibil temporar" : `${runs.length} verificări recente`}</span>
     </header>
@@ -107,15 +107,15 @@ export function DiscoveryProbeRadar() {
 
     <div className="grid gap-6 p-4 md:grid-cols-[0.8fr_1.2fr] md:p-6">
       <div>
-        <h3 className="text-sm font-bold uppercase">Următoarele căutări</h3>
-        <p className="mt-1 text-[10px] leading-relaxed text-[#666]">Interesul recent și feedbackul influențează ordinea. Variantele noi vin din titlurile ofertelor potrivite.</p>
-        <ul className="mt-3 divide-y divide-[#111]/10 border border-[#111]/15 bg-white">
-          {terms.slice(0, 15).map((term) => <li key={term.query} className="p-3">
+        <h3 className="text-sm font-bold uppercase">Căutări de verificare</h3>
+        <p className="mt-1 text-[10px] leading-relaxed text-[#666]">Căutările de verificare sunt rotite între nișe și magazine potrivite. Verificăm mai întâi termenii care nu au fost folosiți recent pe sursa respectivă.</p>
+        <ul className="mt-3 max-h-[42rem] overflow-y-auto divide-y divide-[#111]/10 border border-[#111]/15 bg-white">
+          {terms.filter((term) => term.niche).map((term) => <li key={term.query} className="p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Link href={`/search?q=${encodeURIComponent(term.query)}`} className="text-xs font-bold hover:underline">{term.query}</Link>
               <span className="text-[9px] uppercase text-[#666]">prioritate {term.priority}</span>
             </div>
-            <p className="mt-1 text-[9px] text-[#666]">{term.origin === "result_expansion" ? `Sugestie din „${term.parentQuery}”` : `${term.searchCount} căutări recente`} · {formatDate(term.lastProbedAt)}</p>
+            <p className="mt-1 text-[9px] text-[#666]">{term.origin === "result_expansion" ? `Sugestie din „${term.parentQuery}”` : term.niche ? term.niche : `${term.searchCount} căutări recente`} · {formatDate(term.lastProbedAt)}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <button type="button" onClick={() => void sendFeedback(term.query, "useful")} className="flex min-h-8 items-center gap-1 border border-[#111]/20 px-2 text-[9px] font-bold uppercase hover:bg-[#dcfce7]"><ThumbsUp size={11} />Util</button>
               <button type="button" onClick={() => void sendFeedback(term.query, "irrelevant")} className="flex min-h-8 items-center gap-1 border border-[#111]/20 px-2 text-[9px] font-bold uppercase hover:bg-[#fee2e2]"><ThumbsDown size={11} />Irelevant</button>
@@ -152,6 +152,6 @@ export function DiscoveryProbeRadar() {
         </ul>
       </div>
     </div>
-    <p className="border-t border-[#111]/15 p-4 text-[10px] leading-relaxed text-[#666]">Probeaza doar căutări de produse valide, recurente și filtrate pentru date personale ori termeni ofensatori. JEV nu este apelat de această funcție.</p>
+    <p className="border-t border-[#111]/15 p-4 text-[10px] leading-relaxed text-[#666]">Folosim căutări de produse selectate pentru fiecare nișă și filtrate pentru date personale ori termeni ofensatori. JEV nu este apelat de această funcție.</p>
   </section>;
 }
