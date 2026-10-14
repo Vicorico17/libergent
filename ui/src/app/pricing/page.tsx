@@ -139,7 +139,7 @@ export default function PricingPage() {
             </p>
           </div>
 
-          <PricingCards checkout />
+          <PricingCards checkout fit />
         </main>
 
         {/* Bottom strip */}
