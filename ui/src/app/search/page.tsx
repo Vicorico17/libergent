@@ -888,7 +888,7 @@ function LoadingOverlay({ progress, done, query, tier, isPremiumAccount }: { pro
           boxShadow: `4px 4px 0 0 ${INK}`,
           fontFamily: MONO,
           width: "100%",
-          maxWidth: 560,
+          maxWidth: tier === "premium" ? 680 : 560,
           maxHeight: "calc(100vh - 32px)",
           overflowY: "auto",
         }}
@@ -911,7 +911,7 @@ function LoadingOverlay({ progress, done, query, tier, isPremiumAccount }: { pro
           </p>
 
           {/* Current phase */}
-          {tier === "premium" && <PremiumSearchAnimation />}
+          {tier === "premium" && <PremiumSearchAnimation finished={done} />}
 
           <div
             className="p-4"

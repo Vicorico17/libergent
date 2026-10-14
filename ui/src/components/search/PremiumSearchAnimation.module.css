@@ -67,3 +67,41 @@
 .feedback { display: flex; align-items: center; gap: 10px; background: #ffe2eb; border-top: 1px solid #111; }
 .feedback > img { flex-shrink: 0; }
 .feedback p { margin: 0; }
+
+/* Give the arcade its own cabinet and make each game a visible destination. */
+.scene { border: 3px solid #111; box-shadow: 5px 5px 0 #111; }
+.heading { padding: 16px; gap: 12px; }
+.title { font-size: clamp(14px, 3vw, 20px); gap: 12px; }
+.title small { font-size: 10px; letter-spacing: .18em; }
+.score { padding: 9px 10px; font-size: 12px; }
+.tabs { padding: 16px 12px 0; gap: 10px; }
+.tabs button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; min-height: 102px; padding: 8px 3px; font-size: 13px; box-shadow: 3px 3px 0 #111; }
+.tabs button small { font-size: 7px; letter-spacing: .04em; }
+.tabs button[aria-pressed="true"] { background: #ff3366; box-shadow: 3px 3px 0 #111; }
+.memory { max-width: 440px; }
+.memory button { height: 108px; }
+.offers button { min-height: 170px; }
+.welcome { min-height: 200px; }
+.snakeStats { display: flex; justify-content: space-between; gap: 8px; max-width: 360px; margin: 0 auto; padding: 8px 10px; background: #111; color: #fffdf7; font-size: 9px; font-weight: 700; }
+.snakeFrame { position: relative; max-width: 360px; margin: 0 auto; }
+.snakeBoard { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); aspect-ratio: 1; border: 3px solid #111; background: #fffdf7; }
+.snakeBoard:focus-visible { outline: 3px solid #ff3366; outline-offset: 3px; }
+.snakeCell { display: grid; place-items: center; min-width: 0; min-height: 0; border: 1px solid #1111110a; }
+.snakeCell:nth-child(20n + 2), .snakeCell:nth-child(20n + 4), .snakeCell:nth-child(20n + 6), .snakeCell:nth-child(20n + 8), .snakeCell:nth-child(20n + 10), .snakeCell:nth-child(20n + 11), .snakeCell:nth-child(20n + 13), .snakeCell:nth-child(20n + 15), .snakeCell:nth-child(20n + 17), .snakeCell:nth-child(20n + 19) { background: #eee8dc; }
+.snakeHead { width: 100%; height: 100%; max-width: 34px; max-height: 34px; }
+.snakeBody { width: 85%; height: 85%; border: 2px solid #111; background: #ff3366; box-shadow: inset 2px 2px 0 #ffffff66; }
+.snakeFood { width: 80%; height: 80%; max-width: 26px; fill: #ffdc69; color: #111; }
+.snakeOverlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 10px; background: #f5f3eef2; text-align: center; }
+.snakeOverlay strong { font-size: clamp(13px, 3vw, 19px); }
+.snakeOverlay > span { font-size: 10px; line-height: 1.6; max-width: 250px; }
+.snakeOverlay .next { max-width: 230px; margin-top: 4px; font-size: 12px; }
+.controls { flex-wrap: wrap; }
+.controls .pauseButton { width: auto; min-width: 60px; padding: 0 8px; font-size: 10px; font-weight: bold; }
+.controls button:disabled { opacity: .45; cursor: default; }
+@media (max-width: 380px) {
+  .controls { gap: 6px; }
+  .controls button { width: 38px; }
+  .guideCharacter { display: none; }
+  .snakeOverlay { gap: 6px; padding: 10px; }
+  .snakeOverlay > img { width: 36px; height: 36px; }
+}
