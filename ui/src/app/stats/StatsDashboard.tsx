@@ -6,8 +6,8 @@ import { ArrowUpRight, RefreshCw } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { LogoIcon } from "@/components/LogoIcon";
-import { MascotNewspaper, MascotTallHat } from "@/components/MascotSVG";
-import { count, latestTimestamp, recentProbes, sampleStats, validCount, type History, type Source, type Radar } from "./stats-data";
+import { MascotNewspaper } from "@/components/MascotSVG";
+import { agentStats, count, latestTimestamp, recentProbes, sampleStats, validCount, type History, type Source, type Radar } from "./stats-data";
 import styles from "./stats.module.css";
 
 type Snapshot = { history: History | null; sources: Source[] | null; radar: Radar | null; checkedAt: number; errors: string[] };
@@ -72,6 +72,7 @@ export function StatsDashboard() {
   const radar = snapshot?.radar || null;
   const sources = snapshot?.sources || null;
   const sample = sampleStats(history);
+  const agents = agentStats(radar);
   const recent = recentProbes(radar?.runs || [], snapshot?.checkedAt || 0);
   const recentSources = new Set(recent.map(run => run.source_site)).size;
   const lastSearch = latestTimestamp(history?.recentSearches.map(entry => entry.searchedAt) || []);
@@ -100,12 +101,41 @@ export function StatsDashboard() {
       </section>
       <section className={styles.panel} aria-labelledby="agents-heading">
         <div className={styles.sectionHeader}><div><p className={styles.eyebrow}>PULSUL LIBERGENT</p><h2 id="agents-heading">Agenții, la vedere.</h2></div><Link href="/discovery">Explorează Discovery <ArrowUpRight size={16} aria-hidden="true" /></Link></div>
-        <p className={styles.note}>Ultimele activități înregistrate, nu numărul de agenți care rulează simultan. O perioadă fără activitate nu indică o eroare.</p>
-        <div className={styles.agents}>
-          <article><LogoIcon size={52} /><div><h3>Agent de căutare</h3><span className={styles.badge}>{!history ? "Date indisponibile" : lastSearch ? "Ultima căutare înregistrată" : "În așteptarea primei căutări"}</span><p>{history ? date(lastSearch) : "—"}</p><small>Caută și compară ofertele la cererea utilizatorilor.</small></div></article>
-          <article><MascotNewspaper size={48} /><div><h3>Agent Discovery</h3><span className={styles.badge} data-active={recent.length > 0}>{!radar ? "Date indisponibile" : recent.length ? "Activitate în ultimele 15 min" : "Fără activitate recentă în eșantion"}</span><p>{radar ? date(lastProbe) : "—"}</p><small>Verifică automat sursele. Ultimele {radar?.runs.length ?? "—"} verificări disponibile.</small></div></article>
-          <article><MascotTallHat size={44} /><div><h3>Monitorul surselor</h3><span className={styles.badge}>{radar ? `${radar.sources.filter(source => source.coolingDown).length} surse în pauză` : "Date indisponibile"}</span><p>Reîncercări după verificări nereușite.</p><small>Stare raportată de Discovery, nu monitorizare completă a disponibilității.</small></div></article>
+        <p className={styles.note}>Măsurători din căutările salvate și execuțiile Discovery. Se actualizează la 30 secunde; nu reprezintă un contor al agenților care rulează acum.</p>
+        <div className={styles.agentCards}>
+          <article className={styles.agentCard}>
+            <header><LogoIcon size={52} /><div><h3>Agent de căutare</h3><span className={styles.badge}>{history ? `${sample.size} căutări în eșantion` : "Date indisponibile"}</span></div></header>
+            <dl className={styles.agentMetrics}>
+              <div><dt>Căutări înregistrate · total</dt><dd>{format(history?.totals.searches)}</dd></div>
+              <div><dt>Oferte returnate · eșantion</dt><dd>{format(sample.listings)}</dd></div>
+              <div><dt>Căutări cu rezultate · eșantion</dt><dd>{sample.withResults == null ? "—" : `${sample.withResults}%`}</dd></div>
+              <div><dt>Răspunsuri reușite de la surse</dt><dd>{sample.sourceSuccess == null ? "—" : `${sample.sourceSuccess}%`}</dd></div>
+            </dl>
+            <p className={styles.agentTimestamp}>Ultima căutare: <strong>{history ? date(lastSearch) : "—"}</strong></p>
+            <p className={styles.note}>Ofertele sunt însumate în ultimele {sample.size} căutări disponibile, fără deduplicare între căutări.</p>
+          </article>
+          <article className={styles.agentCard}>
+            <header><MascotNewspaper size={48} /><div><h3>Agent Discovery</h3><span className={styles.badge} data-active={recent.length > 0}>{!radar ? "Date indisponibile" : `${recent.length} verificări în ultimele 15 min · eșantion`}</span></div></header>
+            <dl className={styles.agentMetrics}>
+              <div><dt>Execuții în eșantion</dt><dd>{radar ? format(agents.runs) : "—"}</dd></div>
+              <div><dt>Oferte găsite</dt><dd>{format(agents.offers)}</dd></div>
+              <div><dt>Anunțuri citite</dt><dd>{format(agents.parsed)}</dd></div>
+              <div><dt>Durată mediană / execuție</dt><dd>{agents.medianMs == null ? "—" : `${(agents.medianMs / 1000).toLocaleString("ro-RO", { maximumFractionDigits: 1 })} s`}</dd></div>
+            </dl>
+            {radar && <div className={styles.outcomes}><span data-kind="success">{agents.withOffers} cu oferte</span><span>{agents.empty} fără oferte</span><span data-kind="error">{agents.errors} erori</span></div>}
+            <p className={styles.agentTimestamp}>Ultima verificare: <strong>{radar ? date(lastProbe) : "—"}</strong></p>
+            <p className={styles.note}>Ultimele {radar ? agents.runs : "—"} execuții disponibile. Ofertele pot fi găsite în mai multe execuții.</p>
+          </article>
         </div>
+        <div className={styles.sourceHeading}><h3>Activitate reală, sursă cu sursă</h3><p className={styles.note}>Din aceleași execuții Discovery. Sursele fără execuții în eșantion nu sunt marcate ca active.</p></div>
+        {!radar ? <p className={styles.empty}>{snapshot ? "Datele Discovery sunt indisponibile. Reîncearcă actualizarea." : "Se încarcă execuțiile…"}</p> : !agents.sourceRows.length ? <p className={styles.empty}>Nu există încă execuții sau surse raportate.</p> : <div className={styles.sourceTableWrap} tabIndex={0} role="region" aria-label="Activitate Discovery pe surse, tabel derulabil">
+          <table className={styles.sourceTable}><caption>Execuții și rezultate pentru fiecare sursă · eșantion de {agents.runs} verificări</caption><thead><tr><th scope="col">Sursă</th><th scope="col">Execuții</th><th scope="col">Cu oferte</th><th scope="col">Erori</th><th scope="col">Ultima execuție</th><th scope="col">Următoarea verificare</th></tr></thead><tbody>
+            {agents.sourceRows.map(source => <tr key={source.site}><th scope="row">{source.site}</th><td>{source.checks}</td><td>{source.withOffers}</td><td>{source.errors}</td><td><span className={styles.badge} data-active={source.outcome === "results"}>{source.outcome === "results" ? "Oferte găsite" : source.outcome === "error" ? "Eroare" : source.outcome === "empty" ? "Fără oferte" : "Fără execuții în eșantion"}</span><small>{source.latest ? date(source.latest) : "—"}</small></td><td>{source.coolingDown ? <>Pauză programată<small>{source.retryAt && Number.isFinite(Date.parse(source.retryAt)) ? `Eligibilă după ${date(source.retryAt)}` : "Ora nu este raportată"}</small></> : "Fără pauză raportată"}</td></tr>)}
+          </tbody></table>
+        </div>}
+        <p className={styles.note}>Pauzele pot urma atât verificări reușite, cât și erori. Ora de eligibilitate nu garantează ora următoarei execuții.</p>
+        <div className={styles.repairSummary}><span><strong>{format(agents.openRepairs)}</strong> cazuri sursă + căutare de reverificat</span><span><strong>{format(agents.recovered)}</strong> cazuri cu oferte la ultima reverificare</span></div>
+        <p className={styles.note}>Cazurile de reverificare provin din ultimele maximum 100 de execuții analizate de server; pot include căutări fără rezultate, nu doar erori.</p>
       </section>
       <div className={styles.columns}>
         <section className={styles.panel} aria-labelledby="trend-heading"><p className={styles.eyebrow}>RITMUL CĂUTĂRILOR</p><h2 id="trend-heading">Activitate pe zile</h2><p className={styles.note}>Ultimele {trend.length} zile cu date, din maximum 500 de căutări recente. Zilele sunt în UTC; valorile pot fi parțiale.</p>
