@@ -5,7 +5,7 @@ import styles from "./PricingCards.module.css";
 import Link from "next/link";
 import { LogoIcon } from "@/components/LogoIcon";
 import { BillingPlanPicker } from "@/components/BillingAction";
-import { AGENT_PRICE_RON, PREMIUM_ANNUAL_PRICE_RON, PREMIUM_WEEKLY_PRICE_RON } from "@/lib/pricing";
+import { AGENT_PRICE_RON, PREMIUM_ANNUAL_PRICE_RON, PREMIUM_TRIAL_DAYS, PREMIUM_WEEKLY_PRICE_RON } from "@/lib/pricing";
 
 const plans = [
   {
@@ -14,7 +14,7 @@ const plans = [
     features: ["Căutare pe mai multe marketplace-uri", "Rezultate normalizate și comparabile", "Filtre și sortare rapidă", "Scor agent și recomandări de bază"],
   },
   {
-    id: "premium", name: "Premium", label: "Pachet de căutări", price: PREMIUM_WEEKLY_PRICE_RON, period: "/ săptămână",
+    id: "premium", name: "Premium", label: "Pachet de căutări", price: PREMIUM_ANNUAL_PRICE_RON, period: "/ an",
     description: "Mai multe surse, comparații extinse și alerte pentru produsele pe care le cauți.",
     features: ["Tot ce include Free", "Căutări în magazine și marketplace-uri verificate", "Comparație între produse noi și second-hand", "Monitorizare de preț și alerte de oferte", "Recomandări în funcție de bugetul tău"],
   },
@@ -44,6 +44,7 @@ export function PricingCards({ checkout = false, fit = false }: { checkout?: boo
         <article key={plan.id} data-active={activePlan === plan.id} className={`${fit ? styles.card : ""} relative flex min-w-0 flex-col border-2 border-[#111] p-6 text-[#111] sm:p-8 ${plan.id === "agent" ? "bg-[#FCE7F3] shadow-[6px_6px_0_#FF4B8B]" : "bg-[#F3F0E7] shadow-[6px_6px_0_#111]"}`}>
           <div className="mb-6 flex min-h-16 items-start justify-between gap-3">
             <p className="pt-2 text-[10px] font-bold uppercase tracking-widest text-[#111]/70">{plan.label}</p>
+            {plan.id === "premium" && <span className={styles.trialBadge}>{PREMIUM_TRIAL_DAYS} zile gratis</span>}
             {plan.id === "agent" && <span className={styles.mascot}><LogoIcon size={64} /></span>}
           </div>
           <h3 className="mb-4 text-3xl font-bold tracking-tight">{plan.name}</h3>
@@ -52,7 +53,11 @@ export function PricingCards({ checkout = false, fit = false }: { checkout?: boo
             <span className="text-sm">RON {plan.period}</span>
           </div>
           <p className="mb-6 min-h-8 text-xs text-[#111]/65">
-            {plan.id === "premium" ? `sau ${PREMIUM_ANNUAL_PRICE_RON} RON / an` : plan.id === "agent" ? "Serviciu de negociere · în curând" : "Acces gratuit în beta"}
+            {plan.id === "premium" ? <>
+              <span className={styles.savingsLine}><strong className={styles.savingsBadge}>≈80% economie</strong><span>față de 52 de plăți săptămânale</span></span>
+              <span className={styles.priceAlternative}>≈{Math.round(PREMIUM_ANNUAL_PRICE_RON / 12)} RON/lună, facturat anual · sau {PREMIUM_WEEKLY_PRICE_RON} RON/săptămână</span>
+              <span className={styles.trialNote}>Primele {PREMIUM_TRIAL_DAYS} zile gratuite la primul abonament.</span>
+            </> : plan.id === "agent" ? "Serviciu de negociere · în curând" : "Acces gratuit în beta"}
           </p>
           <p className="mb-6 min-h-24 text-sm leading-relaxed text-[#111]/75">{plan.description}</p>
           <ul className={`${fit ? styles.features : ""} mb-8 flex flex-1 flex-col gap-4 border-t border-dashed border-[#111]/40 pt-6 text-sm leading-relaxed`}>
