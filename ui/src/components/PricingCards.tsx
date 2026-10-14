@@ -23,10 +23,13 @@ const plans = [
 
 export function PricingCards({ checkout = false }: { checkout?: boolean }) {
   return (
-    <div className="mx-auto grid w-full max-w-7xl gap-6 pb-36 lg:grid-cols-3 lg:gap-8">
+    <div className="mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-3 lg:gap-8">
       {plans.map((plan) => (
         <article key={plan.id} className={`relative flex min-w-0 flex-col border-2 border-[#111] p-6 text-[#111] sm:p-8 ${plan.id === "agent" ? "bg-[#FCE7F3] shadow-[6px_6px_0_#FF4B8B]" : "bg-[#F3F0E7] shadow-[6px_6px_0_#111]"}`}>
-          <p className="mb-6 text-[10px] font-bold uppercase tracking-widest text-[#111]/70">{plan.label}</p>
+          <div className="mb-6 flex min-h-16 items-start justify-between gap-3">
+            <p className="pt-2 text-[10px] font-bold uppercase tracking-widest text-[#111]/70">{plan.label}</p>
+            {plan.id === "agent" && <LogoIcon size={64} className="shrink-0 -rotate-6" />}
+          </div>
           <h3 className="mb-4 text-3xl font-bold tracking-tight">{plan.name}</h3>
           <div className="mb-2 flex flex-wrap items-baseline gap-2">
             <span className="text-5xl font-bold tracking-tight">{plan.price}</span>
@@ -45,12 +48,6 @@ export function PricingCards({ checkout = false }: { checkout?: boolean }) {
             <Link href={plan.id === "free" ? "/#cautare" : "/pricing"} className={`flex min-h-12 items-center justify-center border-2 border-[#111] px-4 py-3 text-center text-xs font-bold uppercase tracking-widest shadow-[4px_4px_0_#111] transition-transform hover:-translate-y-0.5 ${plan.id === "premium" ? "bg-[#FF4B8B]" : "bg-white"}`}>
               {plan.id === "free" ? "Caută gratuit →" : "Alege Premium →"}
             </Link>
-          )}
-          {plan.id === "agent" && (
-            <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 left-0 right-0 flex items-center justify-center gap-4">
-              <LogoIcon size={104} className="-rotate-6" />
-              <span className="max-w-32 border-l-2 border-[#FF4B8B] pl-3 text-xs font-bold leading-relaxed">Tu alegi.<br />Eu negociez.</span>
-            </div>
           )}
         </article>
       ))}
