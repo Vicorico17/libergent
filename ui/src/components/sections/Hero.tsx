@@ -102,8 +102,8 @@ export function Hero() {
           <p className="text-base lg:text-lg leading-relaxed max-w-lg" style={{ color: `${INK}E6` }}>
             LiberGent te ajută să cumperi și să vinzi în România. Caută produse noi,
             second-hand și recondiționate pe marketplace-uri și în magazine, compară ofertele
-            și îți explică avantajele, prețurile și riscurile. În Premium, pregătești discuția
-            cu vânzătorul și urmărești negocierea. Iar când vinzi, creezi anunțul o singură
+            și îți explică avantajele, prețurile și riscurile. LiberGent pregătește discuția
+            cu vânzătorul și te ajută să finalizezi negocierea. Iar când vinzi, creezi anunțul o singură
             dată și îl refolosești pe mai multe platforme.
           </p>
 
