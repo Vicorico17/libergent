@@ -11,6 +11,7 @@ type ProbeRun = {
   results_count: number; parsed_count: number; offers: ProbeOffer[]; suggested_queries: string[]; elapsed_ms: number;
   error: string; searched_at: string;
 };
+type ProbeSource = { site: string; status: string; coolingDown: boolean; retryAt: string | null; message: string };
 type ProbeTerm = {
   query: string; origin: string; parentQuery: string; searchCount: number; priority: number;
   usefulCount: number; irrelevantCount: number; lastProbedAt: string | null;
@@ -25,6 +26,7 @@ function formatDate(value: string | null | undefined) {
 export function DiscoveryProbeRadar() {
   const [runs, setRuns] = useState<ProbeRun[]>([]);
   const [terms, setTerms] = useState<ProbeTerm[]>([]);
+  const [sources, setSources] = useState<ProbeSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState<Record<string, string>>({});
@@ -36,10 +38,11 @@ export function DiscoveryProbeRadar() {
       if (!response.ok) throw new Error("Probe radar unavailable");
       setRuns(Array.isArray(payload.runs) ? payload.runs : []);
       setTerms(Array.isArray(payload.terms) ? payload.terms : []);
+      setSources(Array.isArray(payload.sources) ? payload.sources : []);
       setError("");
     } catch (cause) {
       if (cause instanceof Error && cause.name === "AbortError") return;
-      setError("Radarul de căutări este temporar indisponibil. Lista surselor și statusul lor sunt disponibile mai jos.");
+      setError("Verificările automate sunt temporar indisponibile. Lista surselor și statusul lor sunt disponibile mai jos.");
     } finally {
       setLoading(false);
     }
@@ -79,8 +82,8 @@ export function DiscoveryProbeRadar() {
     <header className="flex flex-col gap-3 border-b-2 border-[#111] bg-[#e8e1d3] p-5 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a51d50]">Probe automate · România</p>
-        <h2 id="probe-radar-heading" className="mt-2 text-2xl font-bold uppercase">Radar de căutări</h2>
-        <p className="mt-2 max-w-2xl text-xs leading-relaxed text-[#555]">O căutare de produs la fiecare minut, rotită între marketplace-uri. Termenii populari pornesc din căutări agregate recente; ofertele relevante pot propune variante noi.</p>
+        <h2 id="probe-radar-heading" className="mt-2 text-2xl font-bold uppercase">Verificări automate ale surselor</h2>
+        <p className="mt-2 max-w-2xl text-xs leading-relaxed text-[#555]">Verificăm periodic sursele folosind căutări de produse recurente. Aici vezi istoricul verificărilor automate. Căutarea ta cea mai recentă nu apare imediat. Sursele care refuză cererile sunt reîncercate după o pauză.</p>
       </div>
       <span className="shrink-0 border border-[#111]/30 bg-white/70 px-3 py-2 text-[10px] font-bold uppercase">{loading ? "Se încarcă…" : error ? "Indisponibil temporar" : `${runs.length} verificări recente`}</span>
     </header>
@@ -90,6 +93,16 @@ export function DiscoveryProbeRadar() {
       <button type="button" disabled={loading} onClick={() => { setLoading(true); void refresh(); }} className="mt-3 min-h-11 border border-[#111]/30 bg-white px-4 font-bold text-[#111] disabled:opacity-50">
         {loading ? "Se încarcă…" : "Încearcă din nou"}
       </button>
+    </div> : null}
+
+    {!error && sources.some((source) => source.message) ? <div className="border-b border-[#111]/15 bg-[#fff7ed] p-4 text-xs text-[#7c2d12]" role="status">
+      <p className="font-bold">Surse cu probleme la ultima verificare</p>
+      <ul className="mt-2 space-y-2">
+        {sources.filter((source) => source.message).map((source) => <li key={source.site}>
+          <strong>{source.site}</strong>: {source.status === "rate_limited" ? "cereri limitate" : source.status === "blocked" ? "acces automat refuzat" : "verificare eșuată"}.
+          {source.coolingDown ? ` Pauză până cel puțin la ${formatDate(source.retryAt)}.` : " În așteptarea unei noi verificări."}
+        </li>)}
+      </ul>
     </div> : null}
 
     <div className="grid gap-6 p-4 md:grid-cols-[0.8fr_1.2fr] md:p-6">

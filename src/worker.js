@@ -25,7 +25,7 @@ import { parseListingDetailsHtml } from "./listing-details.js";
 import { resolveViewerLocation, viewerLocationCacheKey } from "./location-intelligence.js";
 import { getSearchQueryError, isPublicSearchQuery, SEARCH_QUERY_LENGTH_MESSAGE, SEARCH_QUERY_REJECTION_MESSAGE } from "./search-policy.js";
 import { applyJevProductDecision } from "./jev.js";
-import { buildProbeSuggestions, chooseProbeTerm, discoveryProbeFailure, DISCOVERY_PROBE_SITES, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
+import { buildProbeSuggestions, chooseProbeSource, chooseProbeTerm, describeProbeError, discoverySourceStates, isEligibleProbeTerm, discoveryProbeFailure, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
   MAX_API_SEARCH_LIMIT,
@@ -587,8 +587,13 @@ async function runDiscoveryProbe(env) {
 
   let term = null;
   const sourceCursor = Number(lease.source_cursor) || 0;
-  const site = DISCOVERY_PROBE_SITES[sourceCursor % DISCOVERY_PROBE_SITES.length];
+  let nextSourceCursor = sourceCursor;
   try {
+    const recentRuns = await listDiscoveryProbeRuns({ limit: 100 }, env);
+    const source = chooseProbeSource(recentRuns, sourceCursor);
+    if (!source) return { status: "cooling_down" };
+    const { site } = source;
+    nextSourceCursor = source.nextCursor;
     const seeds = await readRecentDiscoverySeedQueries({ limit: 100, days: 14, minimumSearchCount: 3 }, env);
     const eligibleSeeds = seeds.filter((seed) => isEligibleProbeQuery(seed.query));
     await upsertDiscoveryProbeTerms(eligibleSeeds.map((seed) => ({
@@ -650,7 +655,7 @@ async function runDiscoveryProbe(env) {
   } finally {
     await releaseDiscoveryProbeLease({
       token: leaseToken,
-      nextSourceCursor: (sourceCursor + 1) % DISCOVERY_PROBE_SITES.length
+      nextSourceCursor
     }, env).catch((error) => console.warn("Failed to release discovery probe lease:", error instanceof Error ? error.message : String(error)));
   }
 }
@@ -1013,10 +1018,18 @@ async function handleApi(request, env, context) {
     if (!isSupabaseConfigured(env)) return json(discoveryProbeFailure("Supabase is not configured."), 503);
     try {
       const [runs, terms] = await Promise.all([
-        listDiscoveryProbeRuns({ limit: 30 }, env),
+        listDiscoveryProbeRuns({ limit: 100 }, env),
         listDiscoveryProbeTerms({ limit: 40 }, env)
       ]);
-      return json({ runs, terms, updatedAt: new Date().toISOString() }, 200);
+      return json({
+        runs: runs.slice(0, 30).map((run) => run.outcome === "error" ? {
+          ...run, error: describeProbeError(run.error).message,
+          failed_sources: (run.failed_sources || []).map((source) => ({ ...source, error: describeProbeError(source.error).message }))
+        } : run),
+        terms: terms.filter(isEligibleProbeTerm),
+        sources: discoverySourceStates(runs),
+        updatedAt: new Date().toISOString()
+      }, 200);
     } catch (error) {
       console.warn("Discovery radar unavailable:", error instanceof Error ? error.message : String(error));
       return json(discoveryProbeFailure(error), 503);

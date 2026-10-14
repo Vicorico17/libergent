@@ -12,12 +12,50 @@ export function discoveryProbeFailure(error) {
     error: "Radarul de căutări este temporar indisponibil. Încearcă din nou mai târziu."
   };
 }
-const QUERY_STOP_WORDS = new Set([
-  "vand", "vanzare", "cumpar", "cumparare", "nou", "noua", "noi", "folosit", "folosita",
-  "stare", "superba", "superb", "oferta", "reducere", "pret", "lei", "ron", "livrare",
-  "produs", "original", "originala", "pentru", "cu", "din", "the", "and", "for", "with",
-  "apple", "samsung", "galaxy", "iphone", "smartphone", "telefon", "telefoane", "mobile"
-]);
+// Only expand with recognizable attributes, never arbitrary seller or metadata words.
+const PROBE_ATTRIBUTE = /^(?:\d{1,4}(?:gb|tb)|black|white|blue|green|red|pink|purple|gold|silver|titanium|negru|alb|albastru|verde|rosu|roz|mov|auriu|argintiu)$/;
+
+export function isEligibleProbeTerm(term) {
+  if (!term || term.status !== "queued" || !isEligibleProbeQuery(term.query)) return false;
+  if (term.origin !== "result_expansion") return true;
+  const parent = normalizeProbeQuery(term.parentQuery);
+  const query = normalizeProbeQuery(term.query);
+  if (!parent || !query.startsWith(`${parent} `)) return false;
+  const additions = query.slice(parent.length + 1).split(" ");
+  return additions.length > 0 && additions.every((token) => PROBE_ATTRIBUTE.test(token));
+}
+
+export function describeProbeError(error = "") {
+  const message = String(error);
+  if (/\b429\b/.test(message)) return { code: "rate_limited", cooldownMs: 15 * 60_000,
+    message: "Sursa limitează cererile (HTTP 429). Verificările automate fac o pauză de cel puțin 15 minute." };
+  if (/\b(?:401|403|407|511)\b|captcha|access denied/i.test(message)) return { code: "blocked", cooldownMs: 30 * 60_000,
+    message: "Sursa a refuzat accesul automat. Verificările fac o pauză de cel puțin 30 de minute; accesul nu este încă restabilit." };
+  return { code: "error", cooldownMs: 5 * 60_000,
+    message: "Verificarea sursei a eșuat. Următoarea încercare automată va fi după o pauză de cel puțin 5 minute." };
+}
+
+export function discoverySourceStates(runs = [], now = Date.now()) {
+  return DISCOVERY_PROBE_SITES.map((site) => {
+    const latest = runs.filter((run) => run.source_site === site)
+      .sort((a, b) => Date.parse(b.searched_at) - Date.parse(a.searched_at))[0];
+    const failure = latest?.outcome === "error" ? describeProbeError(latest.error) : null;
+    const lastAt = Date.parse(latest?.searched_at);
+    const retryAt = Number.isFinite(lastAt) ? lastAt + (failure?.cooldownMs || 3 * 60_000) : 0;
+    return { site, status: failure?.code || latest?.outcome || "unknown",
+      coolingDown: retryAt > now, retryAt: retryAt ? new Date(retryAt).toISOString() : null,
+      message: failure?.message || "" };
+  });
+}
+
+export function chooseProbeSource(runs = [], cursor = 0, now = Date.now()) {
+  const states = discoverySourceStates(runs, now);
+  for (let offset = 0; offset < states.length; offset += 1) {
+    const index = (cursor + offset) % states.length;
+    if (!states[index].coolingDown) return { site: states[index].site, nextCursor: (index + 1) % states.length };
+  }
+  return null;
+}
 
 export function normalizeProbeQuery(value = "") {
   return String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -31,7 +69,7 @@ export function isEligibleProbeQuery(value = "") {
 }
 
 export function chooseProbeTerm(terms = [], random = Math.random) {
-  const eligible = terms.filter((term) => term?.status === "queued" && isEligibleProbeQuery(term.query));
+  const eligible = terms.filter(isEligibleProbeTerm);
   if (!eligible.length) return null;
   const sample = eligible.slice(0, 10);
   const randomValue = Math.max(0, Math.min(0.999999, Number(random()) || 0));
@@ -49,8 +87,9 @@ export function buildProbeSuggestions(query, results = [], limit = 3) {
     .sort((a, b) => (Number(b.relevanceScore) || 0) - (Number(a.relevanceScore) || 0));
 
   for (const item of rankedItems) {
-    const additions = normalizeProbeQuery(item.title).split(" ")
-      .filter((token) => token.length >= 3 && !QUERY_STOP_WORDS.has(token) && !baseTokens.has(token));
+    const additions = normalizeProbeQuery(String(item.title || "").split(/,\s*(?:brand|model|stare)\s*:/i)[0])
+      .replace(/\b(\d{1,4})\s+(gb|tb)\b/g, "$1$2").split(" ")
+      .filter((token) => PROBE_ATTRIBUTE.test(token) && !baseTokens.has(token));
     for (const addition of additions) {
       const suggestion = `${base} ${addition}`.slice(0, 80).trim();
       const normalized = normalizeProbeQuery(suggestion);
