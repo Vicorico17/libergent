@@ -9,7 +9,13 @@ export function parseNemiraHtml(html, limit = 20, { origin = "https://nemira.ro"
     const block = match[1];
     const info = block.match(/<div class="product-info[^>]*>([\s\S]*?)<div class="flex">/i)?.[1] || "";
     const titleMatch = info.match(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
-    const priceMatch = block.match(/data-price-amount="([0-9.]+)"\s+data-price-type="finalPrice"/i);
+    const prices = [...block.matchAll(/<span\b[^>]*data-price-type="(?:finalPrice|oldPrice)"[^>]*>/gi)];
+    const finalPrice = prices.find(([tag]) => /data-price-type="finalPrice"/i.test(tag))?.[0];
+    // Coupon prices require a code. Keep the advertised regular price when the
+    // card supplies only a list price and a conditional coupon offer.
+    const couponOnly = !finalPrice && /class="[^"]*\bcoupon-price\b/i.test(block);
+    const priceTag = finalPrice || (couponOnly ? prices.find(([tag]) => /data-price-type="oldPrice"/i.test(tag))?.[0] : "");
+    const priceMatch = priceTag?.match(/data-price-amount="([0-9.]+)"/i);
     if (!titleMatch || !priceMatch) continue;
     const title = clean(titleMatch[2]);
     const priceValue = Number(priceMatch[1]);
@@ -19,7 +25,8 @@ export function parseNemiraHtml(html, limit = 20, { origin = "https://nemira.ro"
     if (seen.has(url)) continue;
     seen.add(url);
     const imageMatch = block.match(/<img\b[^>]*class="[^"]*product-image-photo[^"]*"[^>]*src="([^"]+)"/i);
-    items.push({ title, price: `${priceValue} RON`, currency: "RON", condition: "Nou", url, imageUrl: imageMatch?.[1] || "" });
+    items.push({ title, price: `${priceValue} RON`, currency: "RON", condition: "Nou", url, imageUrl: imageMatch?.[1] || "",
+      ...(couponOnly ? { priceNote: "Preț fără cupon", priceType: "regular_without_coupon" } : {}) });
     if (items.length >= limit) break;
   }
   return { items, rawItemCount: items.length, totalResults: null };

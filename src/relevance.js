@@ -798,6 +798,12 @@ function hasRequiredTokenEvidence(text, textTokens, token, queryProfile) {
     return true;
   }
 
+  // Romanian drill listings commonly spell out the product instead of using
+  // "bormasina". Keep brand/model and accessory checks unchanged.
+  if (normalizeText(token) === "bormasina" && /\bmasina de gaurit\b/.test(normalizeText(text))) {
+    return true;
+  }
+
   if (["padel", "padla"].includes(normalizeText(token)) && hasPadelProductEvidence(text, textTokens, queryProfile)) {
     return true;
   }

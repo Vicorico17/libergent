@@ -1,0 +1,465 @@
+{
+  "checkedAt": "2026-10-14T17:00:42.417Z",
+  "environment": "local-node-isolated-release",
+  "sources": [
+    {
+      "site": "epantofi.ro",
+      "checks": [
+        {
+          "query": "adidas samba",
+          "ok": true,
+          "raw": 72,
+          "accepted": 12,
+          "error": "",
+          "offers": [
+            {
+              "title": "adidas Sneakers adidas Samba Super 19099 Negru",
+              "priceRon": 397.9,
+              "url": "https://epantofi.ro/p/pantofi-adidas-samba-super-19099-black-runwht",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Og JR0909 Alb",
+              "priceRon": 406.9,
+              "url": "https://epantofi.ro/p/sneakers-adidas-samba-og-jr0909-alb-0000305636416",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Xlg IE1379 Negru",
+              "priceRon": 422.9,
+              "url": "https://epantofi.ro/p/sneakers-adidas-samba-xlg-ie1379-negru-0000305176851",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Xlg JR0934 Alb",
+              "priceRon": 422.9,
+              "url": "https://epantofi.ro/p/sneakers-adidas-samba-xlg-jr0934-alb-0000305219268",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Xlg IE1377 Alb",
+              "priceRon": 432.9,
+              "url": "https://epantofi.ro/p/sneakers-adidas-samba-xlg-ie1377-alb-0000305176936",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Xlg IH4346 Maro",
+              "priceRon": 437.9,
+              "url": "https://epantofi.ro/p/sneakers-adidas-samba-xlg-ih4346-maro-0000305635341",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Og B75806 Alb",
+              "priceRon": 452.9,
+              "url": "https://epantofi.ro/p/pantofi-adidas-samba-og-b75806-ftwwht-cblack-cgrani",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Og B75807 Negru",
+              "priceRon": 452.9,
+              "url": "https://epantofi.ro/p/sneakers-adidas-samba-og-b75807-negru-0000200854410",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Og IG1025 Alb",
+              "priceRon": 462.9,
+              "url": "https://epantofi.ro/p/sneakers-adidas-samba-og-ig1025-alb-0000305189110",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Og KK2277 Bej",
+              "priceRon": 599.9,
+              "url": "https://epantofi.ro/p/sneakers-adidas-samba-og-kk2277-bej-0000306202085",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Og KK3271 Crem",
+              "priceRon": 599.9,
+              "url": "https://epantofi.ro/p/sneakers-adidas-samba-og-kk3271-crem-0000306202023",
+              "priceNote": null
+            },
+            {
+              "title": "adidas Sneakers adidas Samba Xlg IH4347 Negru",
+              "priceRon": 616.9,
+              "url": "https://epantofi.ro/p/sneakers-adidas-samba-xlg-ih4347-negru-0000305714022",
+              "priceNote": null
+            }
+          ]
+        },
+        {
+          "query": "nike air force",
+          "ok": true,
+          "raw": 71,
+          "accepted": 12,
+          "error": "",
+          "offers": [
+            {
+              "title": "Nike Sneakers Nike Air Force 1' 07 Nn HF9983 100 Alb",
+              "priceRon": 454.9,
+              "url": "https://epantofi.ro/p/sneakers-nike-air-force-1-07-nn-hf9983-100-alb-0000304945748",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Air Force 1 07 HQ1497 Verde",
+              "priceRon": 507,
+              "url": "https://epantofi.ro/p/sneakers-nike-air-force-1-07-hq1497-verde-0000305356703",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Air Force 1 (GS) CT3839 700 Maro",
+              "priceRon": 511.9,
+              "url": "https://epantofi.ro/p/sneakers-nike-air-force-1-gs-ct3839-700-maro-0000306199118",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Air Force 1 GS IH4475 025 Gri",
+              "priceRon": 511.9,
+              "url": "https://epantofi.ro/p/sneakers-nike-air-force-1-gs-ih4475-025-gri-0000306199095",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Air Force 1 Fontanka DH1290 001 Bej",
+              "priceRon": 522.9,
+              "url": "https://epantofi.ro/p/pantofi-nike-air-force-1-fontanka-dh1290-001-phantom-phantom-white",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Air Force 1 LE FV5951 Negru",
+              "priceRon": 549.9,
+              "url": "https://epantofi.ro/p/sneakers-nike-air-force-1-le-fv5951-negru-0000305364692",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Air Force 1 LV8 1 (GS) HQ1907 001 Negru",
+              "priceRon": 570.9,
+              "url": "https://epantofi.ro/p/sneakers-nike-air-force-1-lv8-1-gs-hq1907-001-negru-0000306199088",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Air Force 1 '07 Mid DD9625 105 Alb",
+              "priceRon": 598.9,
+              "url": "https://epantofi.ro/p/sneakers-nike-air-force-1-07-mid-dd9625-105-alb-0000304825897",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Air Force 1 '07 Fresh DM0211 100 Alb",
+              "priceRon": 607.9,
+              "url": "https://epantofi.ro/p/pantofi-nike-air-force-1-07-fresh-dm0211-100-white-white-white-0000303951672",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Nike Air Force 1 '07 LVB IH4462 001 Gri",
+              "priceRon": 654.9,
+              "url": "https://epantofi.ro/p/sneakers-nike-nike-air-force-1-07-lvb-ih4462-001-gri-0000306162624",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Air Force 1 High Utility 2.0 DC3584-100 Alb",
+              "priceRon": 745.9,
+              "url": "https://epantofi.ro/p/pantofi-nike-air-force-1-high-utility-2-0-dc3584-100-summit-white-black-summit-white-sail-0000303888879",
+              "priceNote": null
+            },
+            {
+              "title": "Nike Sneakers Nike Air Force 1 Low Sp Uc GORE-TEX DQ7558 101 Alb",
+              "priceRon": 765.9,
+              "url": "https://epantofi.ro/p/pantofi-nike-air-force-1-low-sp-uc-gore-tex-dq7558-101-white-white-sail-white-0000303449377",
+              "priceNote": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "nemira.ro",
+      "checks": [
+        {
+          "query": "dune",
+          "ok": true,
+          "raw": 12,
+          "accepted": 12,
+          "error": "",
+          "offers": [
+            {
+              "title": "Mântuitorul Dunei (Seria DUNE, partea a II-a, ed. 2019)",
+              "priceRon": 64.99,
+              "url": "https://nemira.ro/mantuitorul-dunei-seria-dune-partea-a-ii-a-ed-2019",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Copiii Dunei (Seria DUNE, partea a III-a, ed. 2019)",
+              "priceRon": 74.99,
+              "url": "https://nemira.ro/copiii-dunei-seria-dune-partea-a-iii-a-ed-2019",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Ereticii Dunei (Seria DUNE, partea a V-a, ed. 2019)",
+              "priceRon": 74.99,
+              "url": "https://nemira.ro/ereticii-dunei-seria-dune-partea-a-v-a-ed-2019",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Împăratul-Zeu al Dunei (Seria DUNE, partea a IV-a, ed. 2019)",
+              "priceRon": 74.99,
+              "url": "https://nemira.ro/imparatul-zeu-al-dunei-seria-dune-partea-a-iv-a-ed-2019",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Vânătorii Dunei (Seria DUNE, partea a VII-a)",
+              "priceRon": 74.99,
+              "url": "https://nemira.ro/vanatorii-dunei-seria-dune-partea-vii-brian-herbert-kevin-j-anderson",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Viermii de nisip ai Dunei (Seria DUNE, partea a VIII-a)",
+              "priceRon": 74.99,
+              "url": "https://nemira.ro/viermii-de-nisip-ai-dunei-seria-dune-partea-viii-brian-herbert-kevin-j-anderson",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Canonicatul Dunei (Seria DUNE, partea a VI-a, ed. 2019)",
+              "priceRon": 84.99,
+              "url": "https://nemira.ro/canonicatul-dunei-seria-dune-partea-a-vi-a-ed-2019",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Dune. Casa Atreides",
+              "priceRon": 84.99,
+              "url": "https://nemira.ro/dune-casa-atreides-brian-herbert-kevin-j-anderson",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Dune. Casa Corrino",
+              "priceRon": 84.99,
+              "url": "https://nemira.ro/dune-casa-corrino-brian-herbert-kevin-j-anderson",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Dune. Cruciada mașinilor",
+              "priceRon": 84.99,
+              "url": "https://nemira.ro/dune-cruciada-masinilor-brian-herbert-kevin-j-anderson",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Dune. Jihadul Butlerian",
+              "priceRon": 84.99,
+              "url": "https://nemira.ro/dune-jihadul-butlerian-brian-herbert-kevin-j-anderson",
+              "priceNote": "Preț fără cupon"
+            },
+            {
+              "title": "Dune",
+              "priceRon": 89.99,
+              "url": "https://nemira.ro/dune-frank-herbert",
+              "priceNote": "Preț fără cupon"
+            }
+          ]
+        },
+        {
+          "query": "jocurile foamei",
+          "ok": true,
+          "raw": 6,
+          "accepted": 6,
+          "error": "",
+          "offers": [
+            {
+              "title": "Jocurile foamei (Seria JOCURILE FOAMEI, partea I, ediție sprayed edges, 2026)",
+              "priceRon": 74.99,
+              "url": "https://nemira.ro/jocurile-foamei-trilogia-jocurile-foamei-partea-i-2026",
+              "priceNote": null
+            },
+            {
+              "title": "Revolta (Seria JOCURILE FOAMEI, partea a III-a, ediție sprayed edges, 2026)",
+              "priceRon": 74.99,
+              "url": "https://nemira.ro/revolta-trilogia-jocurile-foamei-partea-a-iii-a-2026",
+              "priceNote": null
+            },
+            {
+              "title": "Sfidarea (Seria JOCURILE FOAMEI, partea a II-a, ediție sprayed edges, 2026)",
+              "priceRon": 74.99,
+              "url": "https://nemira.ro/sfidarea-trilogia-jocurile-foamei-partea-a-ii-a-2026",
+              "priceNote": null
+            },
+            {
+              "title": "Răsăritul în ziua extragerii (Seria JOCURILE FOAMEI, ediție sprayed edges, 2026), cu supracopertă",
+              "priceRon": 85,
+              "url": "https://nemira.ro/rasaritul-in-ziua-extragerii-jocurile-foamei-suzanne-collins-2026",
+              "priceNote": null
+            },
+            {
+              "title": "Balada șerpilor și a păsărilor cântătoare (Seria JOCURILE FOAMEI, ediție sprayed edges, 2026)",
+              "priceRon": 90,
+              "url": "https://nemira.ro/balada-serpilor-si-a-pasarilor-cantatoare-jocurile-foamei-2026",
+              "priceNote": null
+            },
+            {
+              "title": "Pachet Jocurile Foamei 5 vol. (ediție sprayed edges, 2026)",
+              "priceRon": 399.97,
+              "url": "https://nemira.ro/pachet-jocurile-foamei-5-vol-suzanne-collins-2026",
+              "priceNote": null
+            }
+          ]
+        },
+        {
+          "query": "harry potter",
+          "ok": true,
+          "raw": 8,
+          "accepted": 0,
+          "error": "",
+          "offers": []
+        },
+        {
+          "query": "carti copii",
+          "ok": true,
+          "raw": 12,
+          "accepted": 0,
+          "error": "",
+          "offers": []
+        }
+      ]
+    },
+    {
+      "site": "scule.ro",
+      "checks": [
+        {
+          "query": "bormasina bosch",
+          "ok": true,
+          "raw": 16,
+          "accepted": 12,
+          "error": "",
+          "offers": [
+            {
+              "title": "Masina de gaurit/insurubat profesionala cu percutie si 2 acumulatori 18V 2.0 Ah Bosch GSB 185-LI, 50 Nm",
+              "priceRon": 1016.71,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-cu-percutie/masina-de-gaurit-insurubat-profesionala-cu-percutie-si-2-acumulatori-18v-2-0-ah-bosch-gsb-185-li-50-nm-pr_OwZ2ip8N",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit si insurubat cu acumulatori 18V, BOSCH EXPERT L-BOXX, 65 Nm, tip EXSR 18V-90 EXPERT (SOLO)",
+              "priceRon": 1264.69,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-fara-percutie/masina-de-gaurit-si-insurubat-cu-acumulatori-18v-bosch-expert-l-boxx-65-nm-tip-exsr-18v-90-expert-solo-pr_OOjWuA",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit si insurubat cu acumulatori 18V, BOSCH EXPERT EXSR 18V-90FC, 6 in 1, L-BOXX, 65 Nm (SOLO)",
+              "priceRon": 1338.13,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-fara-percutie/masina-de-gaurit-si-insurubat-cu-acumulatori-18v-bosch-expert-exsr-18v-90fc-6-in-1-l-boxx-65-nm-solo-pr_7jmDFm",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit/insurubat 18V, 2x2.0Ah, Bosch GSR 18V-90 C",
+              "priceRon": 1584.2,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-fara-percutie/masina-de-gaurit-insurubat-18v-2x2-0ah-bosch-gsr-18v-90-c-pr_kyqlIn",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit si insurubat cu percutie si acumulatori 18V, BOSCH EXPERT EXSB 18V-150, L-BOXX, 150Nm, SOLO",
+              "priceRon": 1771.14,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-cu-percutie/masina-de-gaurit-si-insurubat-cu-percutie-si-acumulatori-18v-bosch-expert-exsb-18v-150-l-boxx-150nm-solo-pr_X1v6uXQ4",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit si insurubat cu acumulatori 18V 2x4.0Ah, BOSCH EXPERT EXSR 18V-90, L-BOXX, 65 Nm",
+              "priceRon": 2086.84,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-fara-percutie/masina-de-gaurit-si-insurubat-cu-acumulatori-18v-2x4-0ah-bosch-expert-exsr-18v-90-l-boxx-65-nm-pr_LL3LcP",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit si insurubat cu acumulatori 18V, BOSCH EXPERT EXSR 18V-90FC, L-BOXX, 65 Nm, 6 in 1 cu sistem GFA 18-M+W+E (SOLO)",
+              "priceRon": 2116.4,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-fara-percutie/masina-de-gaurit-si-insurubat-cu-acumulatori-18v-bosch-expert-exsr-18v-90fc-l-boxx-65-nm-6-in-1-cu-sistem-gfa-18-m-w-e-solo-pr_PPBmF4",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit si insurubat cu acumulatori 18V, BOSCH EXPERT EXSR 18V-90FC, L-BOXX, 65 Nm, 6 in 1 cu sistem GFA 18-H+M (SOLO)",
+              "priceRon": 2286.17,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-fara-percutie/masina-de-gaurit-si-insurubat-cu-acumulatori-18v-bosch-expert-exsr-18v-90fc-l-boxx-65-nm-6-in-1-cu-sistem-gfa-18-h-m-solo-pr_OO3VHA",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit si insurubat cu acumulatori 18V 3x4.0Ah, BOSCH EXPERT EXSR 18V-90, L-BOXX, 65 Nm",
+              "priceRon": 2310.97,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-fara-percutie/masina-de-gaurit-si-insurubat-cu-acumulatori-18v-3x4-0ah-bosch-expert-exsr-18v-90-l-boxx-65-nm-pr_MM30t5",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit si insurubat cu percutie si acumulatori 18V 2x 8.0Ah, BOSCH EXPERT EXSB 18V-150, L-BOXX, 150Nm",
+              "priceRon": 3444.05,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-cu-percutie/masina-de-gaurit-si-insurubat-cu-percutie-si-acumulatori-18v-2x-8-0ah-bosch-expert-exsb-18v-150-l-boxx-150nm-pr_mAoMhjxp",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit cu percutie BOSCH GSB 185-LI, Li-Ion, 50 Nm, solo",
+              "priceRon": 544.6,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-cu-percutie/masina-de-gaurit-cu-percutie-bosch-gsb-185-li-li-ion-50-nm-solo-pr_lw4GH2r1",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit cu percutie, Bosch EasyImpact 600",
+              "priceRon": 292.7,
+              "url": "https://www.scule.ro/scule-electrice-portabile-220v/masini-de-gaurit/masini-de-gaurit-cu-percutie/masina-de-gaurit-cu-percutie-bosch-easyimpact-600-pr_ZqYzFol",
+              "priceNote": null
+            }
+          ]
+        },
+        {
+          "query": "bosch gsb",
+          "ok": true,
+          "raw": 27,
+          "accepted": 7,
+          "error": "",
+          "offers": [
+            {
+              "title": "Masina de gaurit cu percutie BOSCH GSB13RE",
+              "priceRon": 426.33,
+              "url": "https://www.scule.ro/scule-electrice-portabile-220v/masini-de-gaurit/masini-de-gaurit-cu-percutie/masina-de-gaurit-cu-percutie-bosch-gsb13re-pr_mKYPSRz",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit cu percutie BOSCH GSB 185-LI, Li-Ion, 50 Nm, solo",
+              "priceRon": 544.6,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-cu-percutie/masina-de-gaurit-cu-percutie-bosch-gsb-185-li-li-ion-50-nm-solo-pr_lw4GH2r1",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit cu percutie BOSCH GSB13RE, geanta plastic, 3 burghie",
+              "priceRon": 520.76,
+              "url": "https://www.scule.ro/scule-electrice-portabile-220v/masini-de-gaurit/masini-de-gaurit-cu-percutie/masina-de-gaurit-cu-percutie-bosch-gsb13re-geanta-plastic-3-burghie-pr_PNEpi5W",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit/insurubat profesionala cu percutie si 2 acumulatori 18V 2.0 Ah Bosch GSB 185-LI, 50 Nm",
+              "priceRon": 1016.71,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-cu-percutie/masina-de-gaurit-insurubat-profesionala-cu-percutie-si-2-acumulatori-18v-2-0-ah-bosch-gsb-185-li-50-nm-pr_OwZ2ip8N",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit/insurubat cu percutie 18V, Li-Ion, 110 Nm, Bosch GSB 18V-110C, L-BOXX, solo",
+              "priceRon": 1333.36,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-cu-percutie/masina-de-gaurit-insurubat-cu-percutie-18v-li-ion-110-nm-bosch-gsb-18v-110c-l-boxx-solo-pr_zqmBCM1G",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit/insurubat cu percutie BOSCH PRO GSB18V-52, max. 70 Nm , SOLO",
+              "priceRon": 627.58,
+              "url": "https://www.scule.ro/scule-electrice-cu-acumulatori/masini-de-gaurit-si-insurubat-cu-acumulator/masini-de-gaurit-si-insurubat-cu-acumulator-cu-percutie/masina-de-gaurit-insurubat-cu-percutie-bosch-pro-gsb18v-52-max-70-nm-solo-pr_y15mHr17",
+              "priceNote": null
+            },
+            {
+              "title": "Masina de gaurit cu percutie cu accesorii, Bosch Profesional GSB 600",
+              "priceRon": 412.03,
+              "url": "https://www.scule.ro/scule-electrice-portabile-220v/masini-de-gaurit/masini-de-gaurit-cu-percutie/masina-de-gaurit-cu-percutie-cu-accesorii-bosch-profesional-gsb-600-pr_LXJMiYK",
+              "priceNote": null
+            }
+          ]
+        },
+        {
+          "query": "polizor unghiular",
+          "ok": true,
+          "raw": 29,
+          "accepted": 0,
+          "error": "",
+          "offers": []
+        }
+      ]
+    }
+  ]
+}

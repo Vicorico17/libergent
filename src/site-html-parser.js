@@ -1,3 +1,5 @@
+import { parseSculeHtml } from "./parsers/scule.js";
+import { parseEpantofiHtml } from "./parsers/epantofi.js";
 import { parseOlxHtml } from "./parsers/olx.js";
 import { parseLajumateHtml } from "./parsers/lajumate.js";
 import { parseOkaziiHtml } from "./parsers/okazii.js";
@@ -41,6 +43,10 @@ export function parseSiteHtml({ site, html, url, limit, query = "" }) {
     parsed = parseAutovitHtml(html, limit);
   } else if (site.key === "anuntul.ro") {
     parsed = parseAnuntulHtml(html, limit);
+  } else if (site.key === "scule.ro") {
+    parsed = parseSculeHtml(html, limit, { origin: new URL(url).origin, query });
+  } else if (site.key === "epantofi.ro") {
+    parsed = parseEpantofiHtml(html, limit, { origin: new URL(url).origin });
   } else if (site.key === "emag.ro") {
     parsed = parseEmagHtml(html, limit, { origin: new URL(url).origin });
   } else if (site.key === "evomag.ro") {

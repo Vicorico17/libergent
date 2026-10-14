@@ -7,7 +7,7 @@ export const DISCOVERY_PROBE_GROUPS = [
   { niche: "Modă", sites: ["vinted.ro", "epantofi.ro"], queries: ["adidas samba", "nike air force", "sandale dama"] },
   { niche: "Bricolaj", sites: ["dedeman.ro", "scule.ro"], queries: ["bormasina bosch", "surubelnita electrica", "polizor unghiular"] },
   { niche: "Animale", sites: ["zooplus.ro", "petmart.ro"], queries: ["royal canin", "purina pro plan", "hrana pisici"] },
-  { niche: "Cărți", sites: ["libris.ro", "nemira.ro"], queries: ["dune", "harry potter", "carti copii"] },
+  { niche: "Cărți", sites: ["libris.ro", "nemira.ro"], queries: ["dune", "jocurile foamei", "carti copii"] },
   { niche: "Muzică", sites: ["soundcreation.ro", "mcmusic.ro"], queries: ["chitara electrica", "pian digital", "microfon shure"] },
   { niche: "Ciclism", sites: ["playbike.ro"], queries: ["bicicleta mtb", "casca bicicleta", "bicicleta copii"] },
   { niche: "Sport", sites: ["sportvision.ro"], queries: ["adidas running", "nike running", "minge fotbal"] },
