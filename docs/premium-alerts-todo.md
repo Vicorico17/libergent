@@ -259,18 +259,116 @@ and post-deployment visual acceptance remain open.
 
 ## Premium billing backlog
 
-- [x] Current Premium pricing is **49 RON/week or 499 RON/year**, with a **3-day first-subscription trial**. Server-validated Stripe amounts are `4900`/week and `49900`/year in `ron`. This supersedes the historical 99 RON/month proposal.
-- [ ] **P1** — Finalize tax treatment and alert limits; verify enforcement of the confirmed 3-day first-subscription trial before live checkout activation.
-- [ ] **P1** — Configure Stripe for production; test-mode integration exists, but live billing is not yet enabled.
-- [ ] **P1** — Create production and test-mode Stripe Product and Price records.
-- [x] Authenticated Checkout Session creation and success/cancel return flows implemented for test billing; production acceptance remains open.
-- [ ] **P1** — Store a durable mapping between the Supabase user, Stripe customer, and subscription.
-- [ ] **P1** — Add a signed, idempotent Stripe webhook endpoint.
-- [ ] **P1** — Translate subscription lifecycle events into `user_entitlements` updates.
-- [ ] **P1** — Handle `active`, trial, `past_due`, cancelled, expired, refunded, and grace-period behavior.
-- [x] Billing portal session creation and account UI implemented; production portal configuration and acceptance remain open.
-- [x] Pricing and account UI connected to billing endpoints; test-mode only, with live checkout acceptance still open.
-- [ ] **P1** — Define cancellation, refund, entitlement-expiry, and reactivation rules.
-- [ ] **P1** — Add webhook replay, duplicate-event, failed-payment, cancellation, and authorization tests.
-- [ ] **P1** — Add operational logging and a reconciliation job for Stripe/Supabase entitlement drift.
-- [ ] **P1** — Document production secrets, webhook rotation, support procedures, and rollback steps.
+Stripe launch checklist expanded on **2026-10-19**. The core subscription flow
+exists, but currently accepts test keys only. The earlier billing audit ran
+`node --test src/billing.test.js` with **4/4 mocked tests passing**; this is not
+Stripe sandbox or production acceptance. Deployed secrets, migrations and the
+Stripe account still need verification. This checklist supersedes older billing
+implementation statuses in this document.
+
+### Existing foundations
+
+- [x] Premium prices: **49 RON/week** (`4900`, `ron`) or **499 RON/year**
+  (`49900`, `ron`), with a **3-day first-subscription trial** and card collection.
+- [x] Authenticated Checkout and Customer Portal endpoints, server-side price
+  validation, success/cancel navigation and pricing/account buttons.
+- [x] Raw-body webhook signature verification, current-subscription retrieval,
+  customer/subscription mapping migration and Premium entitlement updates.
+- [x] Active/trial access, immediate `past_due` denial and cancellation mapping.
+  Return URLs alone do not grant access. Operational verification remains open.
+
+### Product and billing decisions
+
+- [ ] Confirm the existing weekly/yearly prices, trial duration and trial eligibility.
+- [ ] Finalize included Premium search/alert limits and enforce them consistently.
+- [ ] Decide tax-inclusive versus tax-exclusive pricing, supported customer
+  countries, B2C/B2B billing details and applicable tax/invoicing requirements
+  with the accountant; configure tax collection accordingly.
+- [ ] Define period-end versus immediate cancellation, weekly/yearly plan changes,
+  proration, failed-payment grace period, reactivation and entitlement expiry.
+- [ ] Define refunds and disputes, including their effect on access; publish the
+  billing terms, renewal/trial disclosures, refund policy and support details.
+- [ ] Decide whether the **999 RON Agent service** launches with Premium payments;
+  finalize fee basis, service duration, completion criteria and refund rules.
+  Agent remains a separate product and entitlement.
+
+### Stripe account, infrastructure and configuration
+
+- [ ] Activate the Stripe business account and complete verification, payout bank
+  details, support contacts, statement descriptor and branding.
+- [ ] Create separate sandbox and live Premium Products/Prices for 49 RON/week
+  and 499 RON/year. Verify currency, amount, recurrence and tax behavior.
+- [ ] Configure Customer Portal payment-method updates, invoices, cancellation and
+  permitted plan changes, including trial behavior and proration.
+- [ ] Configure receipts, trial/renewal communications, failed-payment emails and
+  payment recovery/retry settings to match the agreed policies.
+- [ ] Verify `supabase/search_tracking.sql`, then `supabase/billing.sql`, in each
+  target database, including service-only writes and account ownership isolation.
+- [ ] Configure each environment's Worker secrets/settings: `STRIPE_SECRET_KEY`,
+  `STRIPE_WEEKLY_PRICE_ID`, `STRIPE_ANNUAL_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`,
+  `LIBERGENT_PUBLIC_URL`, `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (or supported
+  service-role credential). Never expose secrets through `NEXT_PUBLIC_*`.
+  `STRIPE_PRICE_ID` is optional legacy monthly reconciliation only.
+- [ ] Register `https://libergent.com/api/billing/webhook` for snapshot events:
+  `checkout.session.completed`, `customer.subscription.created`,
+  `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`
+  and `invoice.payment_failed`. Use separate local/sandbox/live signing secrets.
+- [ ] For local acceptance, forward Stripe CLI events to
+  `http://127.0.0.1:8787/api/billing/webhook` and set the UI return origin to
+  `http://localhost:3000`. Verify deployed HTTPS return URLs before launch.
+
+### Production implementation
+
+- [ ] Replace the `sk_test_`-only guard with explicit test/live configuration and
+  environment validation. Show the test-payment notice only in test mode.
+- [ ] Prevent concurrent/repeated checkout requests from creating duplicate
+  customers or subscriptions: persist the customer and pending checkout, reuse
+  eligible sessions, and pass stable operation-specific Stripe idempotency keys.
+- [ ] Add durable event-ID deduplication and concurrency-safe webhook processing.
+  Verify replay and out-of-order delivery beyond the existing timestamp guard;
+  record completion only after successful processing so retries recover failures.
+- [ ] Pin a supported Stripe API version and test request/event compatibility.
+- [ ] Persist selected price, raw subscription status, trial history, billing
+  period/renewal date and scheduled cancellation in addition to access status.
+- [ ] Show current plan, trial end/next payment, scheduled cancellation and payment
+  problems in the account. Poll authenticated server status after Checkout until
+  activation is confirmed; provide pending/error recovery and a useful next action.
+- [ ] Implement the agreed refund/dispute and payment-failure access policies.
+- [ ] Add structured operational logging, webhook-failure alerts, replay/support
+  procedures and scheduled Stripe/Supabase reconciliation for entitlement drift.
+- [ ] If Agent is included, implement separate one-time Checkout after fee-basis
+  confirmation, durable orders, payment-confirmed fulfillment, Agent entitlement
+  grants and refund handling. The Premium subscription handler does not cover it.
+
+### Acceptance and release
+
+- [ ] Test both plans with real Stripe sandbox sessions and authenticated accounts:
+  first-time trial, returning subscriber without another trial, trial conversion
+  and recurring renewal; advance time with test clocks where supported.
+- [ ] Test declined cards, authentication-required payments, failed renewal,
+  payment recovery and the corresponding loss/restoration of Premium access.
+- [ ] Test trial cancellation, period-end cancellation, expiry, reactivation and
+  all enabled Portal actions, including plan switching and trial preservation.
+- [ ] Test duplicate clicks, concurrent requests, abandoned/expired Checkout
+  sessions, duplicate/delayed/out-of-order webhooks and webhook replay.
+- [ ] Test database/API outages and retries, invalid signatures, wrong prices,
+  wrong-account access and test/live separation. Verify SQL behavior against a
+  real test database; mocked endpoint tests alone are insufficient.
+- [ ] Verify refunds/disputes and, if included, Agent order fulfillment without
+  duplicate service grants or accidental Premium/Agent entitlement crossover.
+- [ ] Document secrets and webhook rotation, monitoring, reconciliation, support
+  and rollback. Disabling new purchases must preserve existing billing handling.
+- [ ] Deploy the verified live configuration and perform an explicitly authorized
+  real purchase/refund smoke test; confirm receipts, Portal access and entitlement
+  activation/expiry. Mark live acceptance complete only with recorded evidence.
+
+Execution order: finalize policies → configure sandbox → harden checkout and
+webhooks → complete account status UI → pass end-to-end acceptance → configure
+and deploy live billing → verify the authorized production smoke test.
+
+References: [billing implementation](../src/billing.js),
+[billing migration](../supabase/billing.sql),
+[billing tests](../src/billing.test.js),
+[Stripe account setup](https://docs.stripe.com/get-started/account/set-up),
+[webhooks](https://docs.stripe.com/webhooks),
+[Customer Portal](https://docs.stripe.com/customer-management).
