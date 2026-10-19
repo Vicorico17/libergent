@@ -1,5 +1,24 @@
 # Marketplace Integration TODO
 
+## Finalize VINDE and agent publishing — 2026-10-19
+
+Owner goal: write an announcement once, or tell an agent what to sell, and have LiberGent publish it to as many supported second-hand marketplaces as possible with minimal extra work.
+
+Implemented foundation: write → review → submit UI, editable extracted details, saved drafts/photos, assisted posting progress, OLX submission code, Okazii feed code, and an authenticated agent CLI. These are not evidence of live marketplace acceptance; automatic publishing remains unfinished until the following checks pass.
+
+- [ ] Activate and verify the publishing backend: apply `supabase/selling.sql`, configure storage, authentication, canonical public URL and encrypted credential storage. Follow [publishing setup](selling-publishing-setup.md).
+- [ ] Complete OLX partner access, production OAuth configuration and seller connection. Publish a seller-authorized real product, verify its receipt/status and link, and test required category fields, expired sessions and reconnecting.
+- [ ] Configure an actual Okazii seller store's feed import, category mapping, delivery and payment. Verify a submitted product appears in the store; distinguish feed inclusion from confirmed publication.
+- [ ] Connect the selling workflow to a user-facing agent integration. Reuse the [agent CLI/API workflow](selling-agent.md), provide secure account connection/session renewal, and support announcement text plus photos without asking users to paste tokens into chat.
+- [ ] Make agent selling end-to-end: collect only missing product details, preserve the seller's facts and publication intent, submit through connected accounts, and report results and remaining actions per marketplace. Retain the same product ID across retries.
+- [ ] Evaluate supported publishing routes for Facebook Marketplace, Publi24, LaJumate, Anunțul.ro, Vinted and Autovit. Implement and validate eligible integrations; keep unsupported destinations explicitly manual and avoid “posted everywhere” claims.
+- [ ] Finish usability acceptance on desktop and mobile: first-time account setup, write/review/submit, photo upload and restoration, missing details, manual corrections, clipboard fallback, return from marketplace, and resuming progress after refresh.
+- [ ] Verify live failure recovery: partial success, duplicate clicks, interrupted uploads, expired authorization, moderation, fees and ambiguous timeouts. Never blindly retry an uncertain publication or report it as published.
+- [ ] Define and expose the post-sale workflow: edit, mark sold and withdraw across supported destinations; clearly identify any manual removal still needed. Add safe cleanup of unreferenced uploaded photos.
+- [ ] Deploy and run a seller-authorized end-to-end acceptance test through both the website and agent. Record dated evidence and actual supported destinations, update setup instructions to match the current UI, and tell the owner when live testing is ready.
+
+Done when a connected seller can provide one announcement and photos through the website or agent, submit without re-entering product details, and see verified per-platform outcomes with clear next actions. Mocked tests and generated feeds alone do not satisfy completion.
+
 Current owner priorities: see the [October 14 launch checklist](premium-alerts-todo.md#current-launch-checklist--2026-10-14), including Discovery improvements, source expansion, and ChatGPT/Claude connectors. The inventory below remains a technical reference; historical status does not imply current live acceptance.
 
 
