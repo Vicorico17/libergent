@@ -1,0 +1,30 @@
+.tickerTrack {
+  display: flex;
+  width: max-content;
+  white-space: nowrap;
+  will-change: transform;
+  animation: tickerScroll 60s linear infinite;
+}
+
+/* Equal groups include their trailing spacing. Moving exactly one group leaves
+   an identical copy in its place, making the iteration boundary invisible. */
+.tickerGroup {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-around;
+  min-width: 100vw;
+  gap: 2rem;
+  padding-right: 2rem;
+}
+
+@keyframes tickerScroll {
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tickerTrack {
+    animation: none;
+    will-change: auto;
+  }
+}

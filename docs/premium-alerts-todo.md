@@ -1,6 +1,6 @@
 # Premium, Product, and Launch TODO
 
-Last prioritized: 2026-10-14
+Last prioritized: 2026-10-19
 Implementation and production status audit: 2026-09-13 (unless noted below)
 
 See [the September launch audit](launch-audit-2026-09-13.md) for the comparison
@@ -20,6 +20,15 @@ order and product packaging below. Detailed historical checklists remain useful
 implementation references; a checked implementation is not proof of production
 acceptance. This update reviewed repository code and documentation, not live
 payments, seller conversations, or marketplace publication.
+
+### Landing-page ticker finalization — 2026-10-19
+
+- [ ] **Finalize the seamless scrolling text bar.** The repeated-group CSS loop
+  replaces the jump-to-zero animation. Verify at least two full loops on desktop,
+  mobile and wide screens, including font loading, resizing and reduced-motion
+  preferences. Confirm there is no visible jump, gap or horizontal page overflow
+  on the deployed landing page before marking complete. Local lint and TypeScript
+  checks passed; production visual acceptance remains open.
 
 ### Priority and execution order
 

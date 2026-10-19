@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import styles from "./Navbar.module.css";
 import { LogoIcon } from "./LogoIcon";
 import { AccountNavLink } from "./AccountNavLink";
 import { PremiumNavLink } from "./PremiumNavLink";
@@ -18,27 +19,6 @@ const navLinks = [
 ];
 
 function Marquee() {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const posRef = useRef(0);
-  const rafRef = useRef<number>(0);
-
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
-
-    const half = track.scrollWidth / 2;
-
-    const step = () => {
-      posRef.current -= 0.6;
-      if (posRef.current <= -half) posRef.current = 0;
-      track.style.transform = `translateX(${posRef.current}px)`;
-      rafRef.current = requestAnimationFrame(step);
-    };
-
-    rafRef.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []);
-
   const segments = `${TICKER_TEXT}      `.split("+++");
 
   const renderSegments = () =>
@@ -51,17 +31,21 @@ function Marquee() {
 
   return (
     <div className="overflow-hidden bg-[#101010] text-white py-[7px] select-none">
+      <span className="sr-only">{TICKER_TEXT}</span>
       <div
-        ref={trackRef}
-        className="flex whitespace-nowrap will-change-transform"
+        aria-hidden="true"
+        className={styles.tickerTrack}
         style={{ fontFamily: "var(--font-mono-var), monospace" }}
       >
-        <span className="text-[10px] font-bold tracking-[0.14em] uppercase mr-8">
-          {renderSegments()}
-        </span>
-        <span className="text-[10px] font-bold tracking-[0.14em] uppercase mr-8">
-          {renderSegments()}
-        </span>
+        {[0, 1].map((group) => (
+          <div key={group} className={styles.tickerGroup}>
+            {[0, 1].map((copy) => (
+              <span key={copy} className="shrink-0 text-[10px] font-bold tracking-[0.14em] uppercase">
+                {renderSegments()}
+              </span>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );
