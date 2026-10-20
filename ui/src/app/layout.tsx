@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Press_Start_2P, Inter, Caveat, Space_Mono, DotGothic16, VT323, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const pixel = Press_Start_2P({
@@ -141,6 +142,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col">
         <GoogleAnalytics measurementId={googleAnalyticsId} />
         {children}
+        <Analytics />
       </body>
     </html>
   );
