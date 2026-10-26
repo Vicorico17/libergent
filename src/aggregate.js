@@ -1,3 +1,4 @@
+import { isAdultProductQuery, isPornographicQuery } from "./search-policy.js";
 import { normalizeListing } from "./normalize.js";
 import { classifyListingIntent, getQueryBrandTerms, tokenize } from "./relevance.js";
 import { classifyMarketSegment } from "./market-segment.js";
@@ -1031,7 +1032,7 @@ function isBlockedMarketplaceResult(result) {
   return /cloudflare challenge|anti-bot|blocked/i.test(messages);
 }
 
-export function aggregateMarketplaceResults(results, { condition = "any", creditBudget = null, creditsUsed = null, viewerLocation = null } = {}) {
+export function aggregateMarketplaceResults(results, { condition = "any", creditBudget = null, creditsUsed = null, viewerLocation = null, allowAdult = false } = {}) {
   const queryUnderstanding = understandMarketplaceQuery(results.find((result) => result?.query)?.query || "");
   const normalizedResults = results.map((result) => {
     if (!result.ok) {
@@ -1045,6 +1046,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     const queryMismatchItemCount = Math.max(0, parsedItemCount - matchedItemCount);
     const classifiedItems = sortItemsByFreshness(
       result.items
+        .filter((item) => !isPornographicQuery(JSON.stringify(item)) && (allowAdult || !isAdultProductQuery(JSON.stringify(item))))
         .map(normalizeListing)
         .map((item) => ({ ...item, marketType: classifyMarketSegment(item) }))
         .map((item) => classifyListingIntent(item, result.query))

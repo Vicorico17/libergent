@@ -1,3 +1,4 @@
+import { adultGateResponse, hasAdultConfirmation, issueAdultConfirmation, needsAdultConfirmation } from "./adult-access.js";
 import { searchAcrossSites } from "./app.js";
 import { handleSelling } from "./selling.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
@@ -24,7 +25,7 @@ import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomania
 import { benchmarkMarketplaceWithBrowser, normalizeBrowserEngine, revealOlxPhonesWithBrowser, searchMarketplacesWithBrowser } from "./providers/cloudflare-browser.js";
 import { parseListingDetailsHtml } from "./listing-details.js";
 import { resolveViewerLocation, viewerLocationCacheKey } from "./location-intelligence.js";
-import { getSearchQueryError, isPublicSearchQuery, SEARCH_QUERY_LENGTH_MESSAGE, SEARCH_QUERY_REJECTION_MESSAGE } from "./search-policy.js";
+import { getSearchQueryError, isAdultProductQuery, isPublicSearchQuery, SEARCH_QUERY_LENGTH_MESSAGE, SEARCH_QUERY_REJECTION_MESSAGE } from "./search-policy.js";
 import { applyJevProductDecision } from "./jev.js";
 import { buildProbeSuggestions, chooseProbeSource, chooseScheduledProbeTerm, discoveryProbeSeeds, probeQueryNiche, probeRecoveryAttempt, shouldTryProbeBrowser, mergeProbeRecovery, diagnoseProbeRun, discoveryRepairQueue, describeProbeError, discoverySourceStates, isEligibleProbeTerm, discoveryProbeFailure, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
 import {
@@ -141,7 +142,7 @@ function preferBrowserFallback(directResult, browserResult) {
 }
 
 function buildSearchCacheRequest(request, params, viewerLocation = null, tier = "premium") {
-  const cacheUrl = new URL(`/api/search/${tier}-cache/v10`, request.url);
+  const cacheUrl = new URL(`/api/search/${tier}-cache/v11`, request.url);
   cacheUrl.searchParams.set("q", params.query.trim().toLocaleLowerCase("ro-RO"));
   cacheUrl.searchParams.set("condition", params.condition);
   cacheUrl.searchParams.set("provider", params.provider);
@@ -159,7 +160,7 @@ async function readSearchCache(cacheRequest) {
   const response = await cache.match(cacheRequest).catch(() => null);
   if (!response) return null;
   const payload = await response.json().catch(() => null);
-  if (!payload) return null;
+  if (!payload || isAdultProductQuery(JSON.stringify(payload))) return null;
   payload.summary = { ...payload.summary, cacheHit: true, browserSessionsUsed: 0 };
   return json(payload, 200);
 }
@@ -523,6 +524,7 @@ async function deliverAlertDigest(profile, events, env) {
 }
 
 async function runAlertProfile(profile, env) {
+  if (isAdultProductQuery(profile.query)) return { id: profile.id, status: "skipped", events: 0 };
   const entitlement = await readPremiumEntitlement(profile.user_id, profile.email, env);
   if (!entitlement.active) {
     await updateAlertProfileInSupabase({ id: profile.id, userId: profile.user_id, changes: { status: "paused", last_error: "Premium entitlement is inactive." } }, env);
@@ -899,6 +901,25 @@ async function handleApi(request, env, context) {
 
   const url = new URL(request.url);
   const apiPath = normalizeApiPathname(url.pathname);
+  if (apiPath === "/api/adult-access") {
+    if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    const origin = request.headers.get("origin");
+    const publicOrigin = String(env.LIBERGENT_PUBLIC_URL || "").replace(/\/+$/, "");
+    if (origin && origin !== url.origin && origin !== publicOrigin) return json({ error: "Origin not allowed" }, 403);
+    const parsed = await parseJsonRequest(request);
+    if (parsed.error) return json({ error: parsed.error }, 400);
+    if (parsed.data?.confirm === true) {
+      const confirmation = await issueAdultConfirmation(env);
+      return confirmation ? json(confirmation) : json({ error: "Confirmarea 18+ nu este configurata." }, 503);
+    }
+    const target = new URL(request.url);
+    target.searchParams.set("q", String(parsed.data?.query || ""));
+    target.searchParams.set("category", String(parsed.data?.category || ""));
+    return json({ required: needsAdultConfirmation(target), confirmed: await hasAdultConfirmation(request, env) });
+  }
+  const adultSearch = needsAdultConfirmation(url);
+  const allowAdult = adultSearch && await hasAdultConfirmation(request, env);
+  if (["/api/search", "/api/search/free", "/api/search/premium"].includes(apiPath) && adultSearch && !allowAdult) return adultGateResponse();
 
   if (apiPath.startsWith("/api/selling/")) return handleSelling(request, env, authenticateSupabaseUser);
 
@@ -1038,10 +1059,11 @@ async function handleApi(request, env, context) {
   if (apiPath === "/api/discovery/probes" && request.method === "GET") {
     if (!isSupabaseConfigured(env)) return json(discoveryProbeFailure("Supabase is not configured."), 503);
     try {
-      const [runs, terms] = await Promise.all([
+      const [allRuns, terms] = await Promise.all([
         listDiscoveryProbeRuns({ limit: 100 }, env),
         listDiscoveryProbeTerms({ limit: 200 }, env)
       ]);
+      const runs = allRuns.filter((run) => isPublicSearchQuery(run.query) && !isAdultProductQuery(JSON.stringify(run.offers || [])));
       return json({
         runs: runs.slice(0, 30).map((run) => ({
           ...run, diagnostic: diagnoseProbeRun(run), recovery: probeRecoveryAttempt(run),
@@ -1094,10 +1116,10 @@ async function handleApi(request, env, context) {
       const cacheRequest = buildSearchCacheRequest(request, {
         query, condition, provider: freeProvider, site, limit, maxPages
       }, viewerLocation, "free");
-      const cachedResponse = await readSearchCache(cacheRequest);
+      const cachedResponse = adultSearch ? null : await readSearchCache(cacheRequest);
       if (cachedResponse) {
         const payload = await cachedResponse.clone().json();
-        await persistSearchEvent(buildHistoryEntry({ query, condition, provider: freeProvider, siteKeys, payload }), env);
+        if (!adultSearch) await persistSearchEvent(buildHistoryEntry({ query, condition, provider: freeProvider, siteKeys, payload }), env);
         return cachedResponse;
       }
 
@@ -1108,14 +1130,15 @@ async function handleApi(request, env, context) {
         limit,
         maxPages,
         siteKeys,
+        allowAdult,
         viewerLocation
       });
 
-      await persistSearchEvent(buildHistoryEntry({ query, condition, provider: freeProvider, siteKeys, payload }), env);
-      await persistVehiclePriceHistory(payload.results || [], env);
+      if (!adultSearch) await persistSearchEvent(buildHistoryEntry({ query, condition, provider: freeProvider, siteKeys, payload }), env);
+      if (!adultSearch) await persistVehiclePriceHistory(payload.results || [], env);
       payload.searchTier = "free";
       payload.summary.cacheHit = false;
-      writeSearchCache(cacheRequest, payload, context);
+      if (!adultSearch) writeSearchCache(cacheRequest, payload, context);
       return json(payload, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1149,15 +1172,15 @@ async function handleApi(request, env, context) {
       }
 
       const cacheRequest = buildSearchCacheRequest(request, params, viewerLocation);
-      const cachedResponse = await readSearchCache(cacheRequest);
+      const cachedResponse = adultSearch ? null : await readSearchCache(cacheRequest);
       if (cachedResponse) return cachedResponse;
 
       const premiumSiteKeys = [...new Set(getPremiumSiteKeys(query))];
       const freeSiteKeys = [...new Set(getFreeSearchSiteKeys(site, query).filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey)))];
       const eligibleSiteKeys = [...new Set([...freeSiteKeys, ...premiumSiteKeys])];
       const [freePayload, directPremiumPayload] = await Promise.all([
-        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages, siteKeys: freeSiteKeys, aggregate: false }),
-        searchAcrossSites({ query, condition, provider: "direct", limit, maxPages: 1, siteKeys: premiumSiteKeys, aggregate: false })
+        searchAcrossSites({ allowAdult, query, condition, provider: "direct", limit, maxPages, siteKeys: freeSiteKeys, aggregate: false }),
+        searchAcrossSites({ allowAdult, query, condition, provider: "direct", limit, maxPages: 1, siteKeys: premiumSiteKeys, aggregate: false })
       ]);
       const directResults = [...freePayload.results, ...directPremiumPayload.results];
       const directBySite = new Map(directResults.map((result) => [result.site, result]));
@@ -1197,7 +1220,8 @@ async function handleApi(request, env, context) {
           condition,
           creditBudget: freePayload.summary?.creditBudget || 0,
           creditsUsed: freePayload.summary?.creditsUsed || 0,
-          viewerLocation
+          viewerLocation,
+          allowAdult
         }
       );
       payload.summary.jevDecision = await applyJevProductDecision(payload, { env, query, condition });
@@ -1231,9 +1255,9 @@ async function handleApi(request, env, context) {
       }));
       payload.summary.cacheHit = false;
 
-      await persistSearchEvent(buildHistoryEntry({ query, condition, provider: "premium-kitesurf", siteKeys: eligibleSiteKeys, payload }), env);
-      await persistVehiclePriceHistory([...freeResults, ...premiumResults], env);
-      writeSearchCache(cacheRequest, payload, context);
+      if (!adultSearch) await persistSearchEvent(buildHistoryEntry({ query, condition, provider: "premium-kitesurf", siteKeys: eligibleSiteKeys, payload }), env);
+      if (!adultSearch) await persistVehiclePriceHistory([...freeResults, ...premiumResults], env);
+      if (!adultSearch) writeSearchCache(cacheRequest, payload, context);
       return json(payload, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1834,7 +1858,15 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith("/api/")) {
-      return handleApi(request, env, context);
+      const response = await handleApi(request, env, context);
+      // Defense in depth for detail/image-intent endpoints and legacy snapshots.
+      // Product titles can reveal adult content even when the request URL does not.
+      if (response.headers.get("content-type")?.includes("application/json") && response.ok
+          && url.pathname !== "/api/adult-access") {
+        const payload = await response.clone().text();
+        if (isAdultProductQuery(payload) && !await hasAdultConfirmation(request, env)) return adultGateResponse();
+      }
+      return response;
     }
 
     return env.ASSETS.fetch(request);

@@ -4,6 +4,8 @@ import { Fragment, Suspense, useState, useEffect, useMemo, useRef, type ReactNod
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { BadgeCheck, Bookmark, Calculator, CalendarDays, Check, ChevronDown as ChevronDownIcon, ClipboardCheck, Crown, ExternalLink, Lock, MapPin, MessageSquare, RotateCcw, ShieldCheck, Tag, ThumbsDown, ThumbsUp } from "lucide-react"
+import { AdultSearchGate } from "@/components/AdultSearchGate"
+import { AdultProductSearch } from "@/components/AdultProductSearch"
 import { LogoIcon } from "@/components/LogoIcon"
 import { PremiumSearchAnimation } from "@/components/search/PremiumSearchAnimation"
 import { PremiumNavLink } from "@/components/PremiumNavLink"
@@ -3733,10 +3735,19 @@ function LoadingState() {
   )
 }
 
+function GatedSearchContent() {
+  const params = useSearchParams()
+  const query = params.get("q") || ""
+  const category = params.get("category") || ""
+  return <AdultSearchGate key={query + ":" + category} query={query} category={category}>
+    {(token) => token ? <AdultProductSearch key={token} token={token} initialQuery={query} /> : <SearchResultsContent />}
+  </AdultSearchGate>
+}
+
 export default function SearchPage() {
   return (
     <Suspense fallback={<LoadingState />}>
-      <SearchResultsContent />
+      <GatedSearchContent />
     </Suspense>
   )
 }

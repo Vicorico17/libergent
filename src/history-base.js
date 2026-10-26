@@ -1,4 +1,4 @@
-import { isPublicSearchQuery } from "./search-policy.js";
+import { isAdultProductQuery, isPublicSearchQuery } from "./search-policy.js";
 
 export const MAX_HISTORY_ENTRIES = 500;
 export const HISTORY_RECENT_LIMIT = 100;
@@ -57,7 +57,7 @@ export function buildHistoryEntry({ query, condition, provider, siteKeys, payloa
 }
 
 export function buildHistoryPayloadFromEntries(entries) {
-  const publicEntries = entries.filter((entry) => isPublicSearchQuery(entry?.query));
+  const publicEntries = entries.filter((entry) => isPublicSearchQuery(entry?.query) && !isAdultProductQuery(JSON.stringify(entry.bestOffer || {})));
   const queryCounts = new Map();
   const keywordCounts = new Map();
   const dailyCounts = new Map();

@@ -1,3 +1,4 @@
+import { adultGateResponse, hasAdultConfirmation, needsAdultConfirmation } from "./adult-access.js";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -19,7 +20,7 @@ import { buildSourceCatalog } from "./source-catalog.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { resolveViewerLocation } from "./location-intelligence.js";
-import { getSearchQueryError } from "./search-policy.js";
+import { getSearchQueryError, isAdultProductQuery } from "./search-policy.js";
 import worker from "./worker.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
@@ -43,7 +44,11 @@ function normalizeApiPathname(pathname = "") {
 }
 
 function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
+  if (statusCode < 400 && isAdultProductQuery(JSON.stringify(payload)) && !res.adultAccessConfirmed) {
+    statusCode = 403;
+    payload = { code: "adult_confirmation_required", error: "Confirma explicit ca ai cel putin 18 ani pentru a continua." };
+  }
+  res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   res.end(JSON.stringify(payload, null, 2));
 }
 
@@ -221,6 +226,24 @@ function readJsonBody(req, maxBytes = MAX_JSON_BODY_BYTES) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
   const apiPath = normalizeApiPathname(url.pathname);
+  const accessRequest = new Request(url, { headers: req.headers });
+  const adultSearch = needsAdultConfirmation(url);
+  const allowAdult = adultSearch && await hasAdultConfirmation(accessRequest, process.env);
+  res.adultAccessConfirmed = allowAdult;
+  if (["/api/search", "/api/search/free", "/api/search/premium"].includes(apiPath) && adultSearch && !allowAdult) {
+    const response = adultGateResponse();
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(await response.text());
+    return;
+  }
+  if (apiPath === "/api/adult-access") {
+    const parsed = req.method === "POST" ? await readJsonBody(req) : null;
+    if (parsed?.error) { sendJson(res, 400, { error: parsed.error }); return; }
+    const response = await worker.fetch(new Request(url, { method: req.method, headers: req.headers, ...(parsed ? { body: JSON.stringify(parsed.data) } : {}) }), process.env, {});
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(await response.text());
+    return;
+  }
 
   if (apiPath.startsWith("/api/selling/")) {
     const chunks = [];
@@ -309,8 +332,8 @@ const server = http.createServer(async (req, res) => {
         : site === "default"
           ? getDefaultSiteKeys()
           : [getSite(site).key];
-      const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys, viewerLocation });
-      await logSearchEvent({ query, condition, provider, siteKeys, payload });
+      const payload = await searchAcrossSites({ allowAdult, query, condition, provider, limit, maxPages, siteKeys, viewerLocation });
+      if (!adultSearch) await logSearchEvent({ query, condition, provider, siteKeys, payload });
       sendJson(res, 200, payload);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -364,20 +387,21 @@ const server = http.createServer(async (req, res) => {
       const freeSiteKeys = (site === "all" ? getSiteKeysForAllSearch(query) : getDefaultSiteKeys())
         .filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey));
       const [freePayload, premiumPayload] = await Promise.all([
-        searchAcrossSites({ query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages, siteKeys: freeSiteKeys }),
-        searchAcrossSites({ query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages: 1, siteKeys: premiumSiteKeys })
+        searchAcrossSites({ allowAdult, query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages, siteKeys: freeSiteKeys }),
+        searchAcrossSites({ allowAdult, query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages: 1, siteKeys: premiumSiteKeys })
       ]);
       const payload = aggregateMarketplaceResults([...freePayload.results, ...premiumPayload.results], {
         condition,
         creditBudget: freePayload.summary?.creditBudget || 0,
         creditsUsed: freePayload.summary?.creditsUsed || 0,
-        viewerLocation
+        viewerLocation,
+        allowAdult
       });
       payload.searchTier = "premium";
       payload.summary.premiumMarketplaces = premiumSiteKeys.length;
       payload.summary.browserSessionsUsed = 0;
       payload.summary.browserFallbackMarketplaces = [];
-      await logSearchEvent({ query, condition, provider: "premium-direct", siteKeys: [...freeSiteKeys, ...premiumSiteKeys], payload });
+      if (!adultSearch) await logSearchEvent({ query, condition, provider: "premium-direct", siteKeys: [...freeSiteKeys, ...premiumSiteKeys], payload });
       sendJson(res, 200, payload);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

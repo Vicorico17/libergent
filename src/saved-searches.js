@@ -1,3 +1,4 @@
+import { isAdultProductQuery } from "./search-policy.js";
 import { normalizeLeadEmail } from "./leads.js";
 
 const MAX_QUERY_LENGTH = 240;
@@ -12,6 +13,7 @@ function normalizeText(value, maxLength) {
 export function normalizeSavedSearchPayload(body = {}) {
   const email = normalizeLeadEmail(body.email);
   const query = normalizeText(body.query, MAX_QUERY_LENGTH);
+  if (isAdultProductQuery(query)) throw new Error("Adult searches cannot be saved or emailed.");
 
   if (!email || !EMAIL_PATTERN.test(email)) {
     throw new Error("Expected a valid email address.");

@@ -1,5 +1,5 @@
 import { understandMarketplaceQuery } from "./query-understanding.js";
-import { getSearchQueryError } from "./search-policy.js";
+import { isPublicSearchQuery } from "./search-policy.js";
 
 export const DISCOVERY_PROBE_GROUPS = [
   { niche: "Casă și mobilier", sites: ["mobexpert.ro", "thehome.ro"], queries: ["canapea extensibila", "masa dining", "scaun birou"] },
@@ -190,7 +190,7 @@ export function normalizeProbeQuery(value = "") {
 
 export function isEligibleProbeQuery(value = "") {
   const query = String(value || "").trim();
-  return query.length >= 3 && query.length <= 80 && !getSearchQueryError(query)
+  return query.length >= 3 && query.length <= 80 && isPublicSearchQuery(query)
     && (CURATED_QUERIES.has(normalizeProbeQuery(query)) || Boolean(understandMarketplaceQuery(query).category));
 }
 
@@ -219,7 +219,7 @@ export function buildProbeSuggestions(query, results = [], limit = 3) {
     for (const addition of additions) {
       const suggestion = `${base} ${addition}`.slice(0, 80).trim();
       const normalized = normalizeProbeQuery(suggestion);
-      if (!normalized || normalized === normalizeProbeQuery(base) || getSearchQueryError(suggestion)) continue;
+      if (!normalized || normalized === normalizeProbeQuery(base) || !isPublicSearchQuery(suggestion)) continue;
       const understanding = understandMarketplaceQuery(suggestion);
       if (understanding.category !== baseUnderstanding.category) continue;
       suggestions.add(suggestion);
