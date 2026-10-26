@@ -85,6 +85,25 @@ payments, seller conversations, or marketplace publication.
    in ChatGPT and Claude. The existing selling CLI is not a shipped connector;
    local MCP work is not completion until committed, deployed and tested in both.
 
+### Adult product search with age confirmation — 2026-10-26
+
+- [ ] Add a separate **18+ sexual-wellness product category**, including product
+  searches such as Lovense vibrators. Scope is non-pornographic product discovery
+  and comparison, not pornography.
+- [ ] Require explicit confirmation that the user is **18 or older** before
+  accessing the category, running an adult-product search, or showing its results.
+  Define confirmation lifetime and enforce the gate on both UI and API paths,
+  including direct links and cached results; declining or leaving it unanswered
+  must not expose adult-product results.
+- [ ] Identify suitable retailers with permitted search routes; validate product
+  relevance, prices, availability and links before advertising coverage. Add
+  source and niche documentation only when the actual integration is verified.
+- [ ] Define and add acceptance tests for confirmation, refusal, missing/expired
+  confirmation, direct API requests, cached-result leakage and representative
+  Lovense queries, while preserving ordinary search behavior.
+
+This is an open product requirement, not an implemented or deployed feature.
+
 ### Completed foundations from the recent work
 
 - [x] Three pricing offers: Free, Premium search pack and Libergent Agent at 999 RON.
