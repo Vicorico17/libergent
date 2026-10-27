@@ -246,7 +246,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (apiPath === "/mcp" || apiPath.startsWith("/api/selling/")) {
+  if (apiPath === "/mcp" || apiPath === "/api/integrations/v1/search" || apiPath.startsWith("/api/selling/")) {
     const chunks = [];
     let size = 0;
     for await (const chunk of req) {

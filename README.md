@@ -571,3 +571,12 @@ Production deployment is also automated by [.github/workflows/deploy-cloudflare.
 - Browser Run cannot solve CAPTCHA or override marketplace access policy.
 - Kitesurf is a beta, non-pixel-perfect browser and cannot negotiate bot challenges with real Chromium TLS fingerprints; incompatible sources fall back only where Chromium is explicitly allowed.
 - Search-by-image remains an unfinished integration and should not be advertised as active.
+
+### External storefront API (BLANĂ pilot)
+
+The opt-in `/api/integrations/v1/search` reuses the direct search engine with scoped,
+revocable integration keys, persistent quotas/cache, bounded enrichment, and
+text-evidenced fur-coat filters. Public Free search is unchanged. See the
+[versioned API contract, deployment steps, MCP assessment, and Vercel example](docs/storefront-integration-v1.md).
+The integration is disabled until explicitly provisioned; no personal session or
+administrator key should be shared with a storefront.

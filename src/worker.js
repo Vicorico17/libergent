@@ -1,3 +1,5 @@
+import { handleIntegration } from './integration.js';
+export { IntegrationGateway } from './integration.js';
 import { adultGateResponse, hasAdultConfirmation, issueAdultConfirmation, needsAdultConfirmation } from "./adult-access.js";
 import { searchAcrossSites } from "./app.js";
 import { handleMcp } from "./mcp.js";
@@ -1980,6 +1982,10 @@ async function handleApiWithContentPolicy(request, env, context) {
 export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/integrations/v1/search") {
+      return handleIntegration(request, env);
+    }
 
     if (normalizeApiPathname(url.pathname) === "/mcp") {
       return handleMcp(request, env, (apiRequest) => handleApiWithContentPolicy(apiRequest, env, context));
