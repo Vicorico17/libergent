@@ -13,7 +13,7 @@
     "test:mcp": "node --test src/mcp.test.js",
     "check:mcp": "node scripts/check-mcp.js",
     "check": "npm run check:cli && npm run test",
-    "build:ui": "npm --prefix ui ci && npm --prefix ui run build",
+    "build:ui": "npm --prefix ui ci --include=dev && npm --prefix ui run build",
     "verify:ui-auth-config": "node scripts/verify-ui-auth-config.js",
     "lint:ui:ci": "npm --prefix ui ci --include=dev && npm --prefix ui run lint:ci",
     "dev": "node src/dev.js",
@@ -26,6 +26,7 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.12",
     "wrangler": "4.93.1"
   },
   "dependencies": {

@@ -6,6 +6,13 @@ Production: [libergent.com](https://libergent.com)
 
 ### ChatGPT and Claude connector prototype
 
+For developer-key agent integrations, use the new opt-in `/api/v1/mcp` adapter
+documented in [Agent integrations](docs/agent-integrations.md). It shares the
+versioned API’s credentials, search quotas and cache. The older `/mcp` below
+remains a separate prototype. Production enablement is unchanged; a scoped
+[BLANĂ acceptance preview](docs/fau-blana-agent-handoff.md) is available.
+
+
 The shared Streamable HTTP MCP endpoint is `/mcp`. It is disabled by default;
 set `LIBERGENT_MCP_ENABLED=1` to enable it in a development environment.
 The first milestone exposes three read-only tools: `search_products`,
@@ -571,3 +578,21 @@ Production deployment is also automated by [.github/workflows/deploy-cloudflare.
 - Browser Run cannot solve CAPTCHA or override marketplace access policy.
 - Kitesurf is a beta, non-pixel-perfect browser and cannot negotiate bot challenges with real Chromium TLS fingerprints; incompatible sources fall back only where Chromium is explicitly allowed.
 - Search-by-image remains an unfinished integration and should not be advertised as active.
+
+### Developer API
+
+Open `/developers` to try a no-key demo, create test/live API keys, see usage,
+and copy curl, JavaScript or Python requests. `GET /api/v1/search` is the general
+product-search API; fur-coat filters are optional. BLANĂ is an example consumer.
+
+- `GET /api/v1/demo` — simulated response, no account or marketplace requests
+- `GET /api/v1/sources` — supported API sources
+- `GET /api/v1/openapi.json` — downloadable OpenAPI 3.1 contract
+- `GET /api/v1/search?q=iphone%2015` — scoped API key required
+- `/api/v1/mcp` — authenticated Streamable HTTP tools for agent hosts, separately enabled
+
+See [developer quickstart and setup](docs/developer-api.md) and the
+[detailed listing/filter contract](docs/storefront-integration-v1.md).
+Self-service needs the developer SQL migration and explicit feature flags; public
+Free search and MCP enablement are unchanged. No personal session or admin key
+should be shared with an API consumer.

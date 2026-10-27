@@ -152,7 +152,9 @@ function attributes(product) {
     ["Brand", product?.brand?.name || product?.brand],
     ["Categorie", /^https?:\/\//i.test(String(product?.category || "")) ? "" : product?.category],
     ["Culoare", product?.color],
-    ["SKU", product?.sku]
+    ["SKU", product?.sku],
+    ["Size", product?.size],
+    ["Material", product?.material]
   ];
   for (const [label, rawValue] of simpleValues) {
     const value = usefulText(rawValue || "");

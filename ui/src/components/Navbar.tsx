@@ -15,6 +15,7 @@ const navLinks = [
   { label: "VINDE", href: "/vinde" },
   { label: "DISCOVERY", href: "/discovery" },
   { label: "STATS", href: "/stats" },
+  { label: "API", href: "/developers" },
   { label: "PREMIUM", href: "/pricing" },
 ];
 

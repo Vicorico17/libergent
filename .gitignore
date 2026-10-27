@@ -11,3 +11,5 @@ data/
 .openclaw-inbound-forwarder-state.json
 
 /supabase/.temp/
+.dev.vars
+.dev.vars.*
