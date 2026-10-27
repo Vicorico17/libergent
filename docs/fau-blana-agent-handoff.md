@@ -4,14 +4,14 @@ Implement a server-side Libergent catalog integration in the existing BLANĂ sit
 
 ## Connection
 
-An isolated Libergent test deployment is available at:
+Use the production Cloudflare domain for the integration:
 
 ```text
-LIBERGENT_API_ORIGIN=https://libergent-integration-preview.vic-cazacu.workers.dev
+LIBERGENT_API_ORIGIN=https://libergent.com
 LIBERGENT_API_KEY=<supply privately through the deployment's server environment>
 ```
 
-Do not request the key in chat, put it in tool/model arguments, commit it, expose it in static JS, or prefix it with `NEXT_PUBLIC_`. The owner has the credential separately. This preview key is restricted to read-only OLX search/detail access, 10 requests/minute and 100/day; it expires November 3, 2026. The API can be tested until that expiry, after which the key must be rotated or the app moved to a provisioned stable deployment.
+Do not request the key in chat, put it in tool/model arguments, commit it, expose it in static JS, or prefix it with `NEXT_PUBLIC_`. The owner has the credential separately. The initial BLANĂ key is restricted to read-only OLX search/detail access, 10 requests/minute and 100/day; it expires November 3, 2026. The API can be tested until that expiry, after which the key must be rotated through operator provisioning. Self-service key creation requires the separate Supabase migration and enablement described in `developer-api.md`.
 
 Use the REST API for the website. A direct request from the website's server is:
 
