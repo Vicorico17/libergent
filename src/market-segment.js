@@ -1,3 +1,5 @@
+import { productCondition } from "./product-condition.js";
+
 const RETAIL_SOURCE_TYPES = new Set(["price_aggregator", "retailer"]);
 
 function normalized(value = "") {
@@ -19,11 +21,12 @@ export function classifyMarketSegment(item = {}) {
   const sourceType = normalized(item.sourceType || "classifieds");
   const sellerType = normalized(item.sellerType);
 
+  if (productCondition(item.condition) === "used") return "secondary";
   if (RETAIL_SOURCE_TYPES.has(sourceType)) return "retail";
 
   if (sourceType === "retailer_marketplace") {
     if (/persoana|privat|individual|private|user/.test(sellerType)) return "secondary";
-    if (/magazin|profesionist|business|retailer|commerci|company|firma|store/.test(sellerType)) return "retail";
+    if (/magazin|profesionist|business|retailer|comerci|commerci|company|firma|store/.test(sellerType)) return "retail";
     return "mixed";
   }
 

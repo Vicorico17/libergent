@@ -21,3 +21,12 @@ test("uses the same extensible profile for other common products", () => {
   assert.equal(understandMarketplaceQuery("air fryer philips").category, "kitchen");
   assert.equal(understandMarketplaceQuery("canapea extensibila").category, null);
 });
+
+test("ambiguous car makes need vehicle context and do not override tech families", () => {
+  for (const query of ["iphone 13 mini", "ipad mini", "mac mini m2", "smart tv samsung", "nintendo ds", "samsung galaxy s24 2024"]) {
+    assert.notEqual(understandMarketplaceQuery(query).category, "vehicle", query);
+  }
+  for (const query of ["mini cooper", "mini countryman 2019", "smart fortwo", "ds 7", "mg zs", "seat leon", "mini diesel 2018"]) {
+    assert.equal(understandMarketplaceQuery(query).category, "vehicle", query);
+  }
+});

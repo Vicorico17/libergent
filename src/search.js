@@ -530,6 +530,8 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
     ? requestedTargetPages
     : 1;
 
+  if (firstPage.hasNextPage === false) exhaustedReason = "no-next-page";
+
   for (let page = 2; page <= targetPages; page += 1) {
     if (items.length >= effectiveLimit) {
       exhaustedReason = "limit";

@@ -1,3 +1,4 @@
+import { hasForwardPage } from "./pagination.js";
 import { extractImageCandidate } from "./image.js";
 
 function cleanText(value = "") {
@@ -76,9 +77,6 @@ function parseTotalResults(text = "") {
   return Number.isFinite(value) ? value : null;
 }
 
-function hasNextPage(html) {
-  return /[?&]page=\d+/i.test(html) || /rel="next"/i.test(html);
-}
 
 function splitGridItems(html) {
   const matches = [...html.matchAll(/<div\b(?=[^>]*data-testid="grid-item")[^>]*>/gi)];
@@ -178,7 +176,7 @@ export function parseVintedMarkdown(markdown, limit) {
   };
 }
 
-export function parseVintedHtml(html, limit) {
+export function parseVintedHtml(html, limit, { url = "" } = {}) {
   const blocks = splitGridItems(html);
   const items = blocks
     .map(parseGridItem)
@@ -189,6 +187,6 @@ export function parseVintedHtml(html, limit) {
     items,
     totalResults: parseTotalResults(stripTags(html)),
     rawItemCount: blocks.length,
-    hasNextPage: hasNextPage(html)
+    hasNextPage: hasForwardPage(html, url)
   };
 }

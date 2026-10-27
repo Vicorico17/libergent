@@ -1,3 +1,4 @@
+import { hasForwardPage } from "./pagination.js";
 import { extractImageCandidate } from "./image.js";
 
 function decodeHtmlEntities(value = "") {
@@ -42,7 +43,8 @@ function splitListingBlocks(html) {
   if (articleMatches.length) {
     return articleMatches.map((match, index) => {
       const start = match.index;
-      const end = articleMatches[index + 1]?.index ?? html.length;
+      const closing = html.indexOf("</article>", start);
+      const end = Math.min(articleMatches[index + 1]?.index ?? html.length, closing < 0 ? html.length : closing + 10);
       return html.slice(start, end);
     });
   }
@@ -57,11 +59,8 @@ function splitListingBlocks(html) {
 
 function parsePrice(block) {
   const text = stripTags(block);
-  const match =
-    text.match(/(\d[\d.,\s]*)\s*EUR\b/i) ||
-    text.match(/(\d[\d.,\s]*)\s*€/i) ||
-    text.match(/(\d[\d.,\s]*)\s*(RON|Lei)\b/i);
-  return match ? `${match[1].trim()} ${match[2] || "EUR"}` : "";
+  const match = text.match(/(?<![a-z0-9])(\d{1,3}(?:[ .]\d{3})+(?:[,.]\d{2})?|\d+(?:[,.]\d{2})?)\s*(EUR|€|RON|Lei)(?=\W|$)/i);
+  return match ? `${match[1].trim()} ${match[2]}` : "";
 }
 
 function parseTitle(block) {
@@ -153,28 +152,31 @@ function parseJsonLdOffers(html) {
     const title = offer?.itemOffered?.name || "";
     return {
       title: cleanText(title),
+      url: toAbsoluteUrl(offer?.url || offer?.itemOffered?.url || ""),
       price: price ? `${price} ${currency}`.trim() : "",
       currency: cleanText(currency)
     };
   });
 }
 
-function hasNextPage(html) {
-  return /\/autoturisme\/[^"]+\/\?page=\d+/i.test(html) || /aria-label="Next"/i.test(html);
-}
 
-export function parseAutovitHtml(html, limit) {
+export function parseAutovitHtml(html, limit, { url = "" } = {}) {
   const blocks = splitListingBlocks(html);
   const jsonLdOffers = parseJsonLdOffers(html);
   const items = blocks
     .map(parseListingBlock)
     .filter(Boolean)
-    .map((item, index) => {
+    .map((item) => {
       if (item.price) {
         return item;
       }
 
-      const offer = jsonLdOffers[index];
+      const identity = value => value.toLowerCase().replace(/\s+/g, " ").trim();
+      const canonicalUrl = value => value.split(/[?#]/)[0].replace(/\/$/, "");
+      const byUrl = jsonLdOffers.filter(candidate => candidate.url && canonicalUrl(candidate.url) === canonicalUrl(item.url));
+      const byTitle = jsonLdOffers.filter(candidate => !candidate.url && identity(candidate.title) === identity(item.title));
+      const matches = byUrl.length ? byUrl : byTitle;
+      const offer = matches.length === 1 ? matches[0] : null;
       if (!offer?.price) {
         return item;
       }
@@ -191,6 +193,6 @@ export function parseAutovitHtml(html, limit) {
     items,
     totalResults: parseTotalResults(html),
     rawItemCount: blocks.length,
-    hasNextPage: hasNextPage(html)
+    hasNextPage: hasForwardPage(html, url)
   };
 }

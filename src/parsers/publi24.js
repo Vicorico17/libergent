@@ -1,3 +1,4 @@
+import { hasForwardPage } from "./pagination.js";
 import { extractImageCandidate } from "./image.js";
 
 function decodeHtmlEntities(value = "") {
@@ -94,11 +95,8 @@ function parseTotalResults(html) {
   return Number.isFinite(value) ? value : null;
 }
 
-function hasNextPage(html) {
-  return /[?&amp;]pag=\d+/i.test(html) || /[?&]pag=\d+/i.test(html);
-}
 
-export function parsePubli24Html(html, limit, { origin = "https://www.publi24.ro" } = {}) {
+export function parsePubli24Html(html, limit, { origin = "https://www.publi24.ro", url = "" } = {}) {
   const blocks = splitArticleBlocks(html);
   const items = blocks
     .map((block) => parseArticleBlock(block, origin))
@@ -109,6 +107,6 @@ export function parsePubli24Html(html, limit, { origin = "https://www.publi24.ro
     items,
     totalResults: parseTotalResults(html),
     rawItemCount: blocks.length,
-    hasNextPage: hasNextPage(html)
+    hasNextPage: hasForwardPage(html, url)
   };
 }

@@ -1,3 +1,5 @@
+import { productCondition } from "./product-condition.js";
+
 import { normalizeListing } from "./normalize.js";
 import { classifyListingIntent, getQueryBrandTerms, tokenize } from "./relevance.js";
 import { classifyMarketSegment } from "./market-segment.js";
@@ -77,13 +79,10 @@ function compareDuplicateCandidates(candidate, current) {
 }
 
 function matchesCondition(item, condition) {
-  const normalized = (item.condition || "").toLowerCase();
-  if (condition === "new") {
-    return normalized.includes("nou");
-  }
-  if (condition === "used") {
-    return normalized.includes("utilizat") || normalized.includes("folosit") || normalized.includes("second");
-  }
+  const state = productCondition(item.condition);
+  if (condition === "new") return state === "new";
+  // Retain ungraded second-hand inventory without relabeling it as used.
+  if (condition === "used") return state === "used" || (state === "unknown" && !isNewProductSource(item));
   return true;
 }
 
@@ -960,6 +959,23 @@ function semanticMatchTier(item) {
   return 1;
 }
 
+function comparableRetailOffer(used, retail) {
+  if (!used) return true;
+  if (used.queryCategory !== "phone") return true;
+  const config = item => {
+    const title = stripDiacritics(String(item.title || "").toLowerCase());
+    const model = title.match(/\b(iphone\s*\d{1,2}e?|(?:samsung\s*(?:galaxy\s*)?|galaxy\s*)[sa]\d{2})\b((?:\s+(?:pro|max|mini|plus|ultra)\b)*)/);
+    const capacity = title.match(/\b(\d+)\s*(gb|tb)\b/);
+    return model && capacity ? {
+      model: (model[1] + model[2]).replace(/(?:samsung|galaxy)\s*/g, "").replace(/\s+/g, ""),
+      storage: Number(capacity[1]) * (capacity[2] === "tb" ? 1024 : 1)
+    } : null;
+  };
+  const usedConfig = config(used);
+  const retailConfig = config(retail);
+  return Boolean(usedConfig && retailConfig && usedConfig.model === retailConfig.model && usedConfig.storage === retailConfig.storage);
+}
+
 function buildPriceIntelligence({ usedMedianPriceRon, newMedianPriceRon, globalMedianPriceRon, usedPricedItems, newPricedItems, allPricedItems, bestUsedOffer, bestNewBenchmark }) {
   const benchmarkPriceRon = Number.isFinite(bestNewBenchmark?.priceRon) ? bestNewBenchmark.priceRon : null;
   const lowestNewPriceRon = newPricedItems.length
@@ -1048,7 +1064,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
         .map(normalizeListing)
         .map((item) => ({ ...item, marketType: classifyMarketSegment(item) }))
         .map((item) => classifyListingIntent(item, result.query))
-        .filter((item) => matchesCondition(item, condition))
+        .filter((item) => matchesCondition(item, condition) || (condition === "used" && isNewProductSource(item)))
     );
     const {
       productMatches,
@@ -1255,16 +1271,12 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       a.proximity.distanceKm - b.proximity.distanceKm ||
       b.recommendationScore - a.recommendationScore
     )[0] || null;
+  for (const item of rankedCandidates) {
+    item.isComparableNewBenchmark = isNewProductSource(item) && productCondition(item.condition) === "new" && comparableRetailOffer(bestUsedOffer, item);
+  }
   const bestNewBenchmark = rankedCandidates
-    .filter((item) => isNewProductSource(item))
-    .sort((a, b) => {
-      const aHasSevereRisk = a.riskFlags?.some((flag) => flag.severity === "bad") ? 1 : 0;
-      const bHasSevereRisk = b.riskFlags?.some((flag) => flag.severity === "bad") ? 1 : 0;
-      return aHasSevereRisk - bHasSevereRisk ||
-        semanticMatchTier(b) - semanticMatchTier(a) ||
-        b.recommendationScore - a.recommendationScore ||
-        safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon);
-    })[0] || null;
+    .filter((item) => item.isComparableNewBenchmark)
+    .sort((a, b) => safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon) || b.recommendationScore - a.recommendationScore)[0] || null;
   const recommendedOffers = pickTopRecommendationsByMarketplace(rankedCandidates);
   const successfulResults = rankedResults.filter((result) => result.ok);
   const failedResults = rankedResults.filter((result) => !result.ok);

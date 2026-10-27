@@ -1,3 +1,4 @@
+import { hasForwardPage } from "./pagination.js";
 import { extractImageCandidate } from "./image.js";
 
 function cleanText(value = "") {
@@ -163,9 +164,6 @@ function parseHtmlTotalResults(html) {
   return Number.isFinite(value) ? value : null;
 }
 
-function hasNextPage(html) {
-  return /href="[^"]*[?&]page=\d+/i.test(html) || /data-testid="pagination-forward"/i.test(html);
-}
 
 function collectListingCards(html, limit = Number.POSITIVE_INFINITY) {
   const matches = [];
@@ -276,7 +274,7 @@ export function parseOlxMarkdown(markdown, limit) {
   };
 }
 
-export function parseOlxHtml(html, limit) {
+export function parseOlxHtml(html, limit, { url = "" } = {}) {
   const blocks = collectListingCards(html, limit);
   let embeddedImages;
   const getEmbeddedImages = () => {
@@ -292,6 +290,6 @@ export function parseOlxHtml(html, limit) {
     items,
     totalResults: parseHtmlTotalResults(html),
     rawItemCount: countListingCards(html),
-    hasNextPage: hasNextPage(html)
+    hasNextPage: hasForwardPage(html, url)
   };
 }

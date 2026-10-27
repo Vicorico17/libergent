@@ -631,3 +631,46 @@ test("phone title model and storage cannot be overridden by description comparis
   const base = classifyListingIntent({ title: "iPhone 15 128GB", description: "Nu este Pro Max", price: "2500 lei", priceRon: 2500 }, "iphone 15");
   assert.equal(base.isRecommendedCandidate, true);
 });
+
+test("complete tech products keep attribute and included-accessory descriptions", () => {
+  for (const [query, title] of [
+    ["iphone 13 mini", "Apple iPhone 13 mini 128GB"],
+    ["iphone 15", "iPhone 15 128GB dual sim"],
+    ["iphone 15 pro", "iPhone 15 Pro 128GB adus din USA"],
+    ["iphone 13", "iPhone 13 128GB baterie noua"],
+    ["iphone 13", "iPhone 13 128GB ecran inlocuit"],
+    ["ps5", "Consola Sony PS5 cu controller"],
+    ["ps5", "Consola Sony PS5 cu 2 controllere si jocuri"]
+  ]) {
+    const result = classifyListingIntent({ title, price: "1800 lei", priceRon: 1800 }, query);
+    assert.equal(result.isRecommendedCandidate, true, `${title}: ${result.rejectionReasons}`);
+  }
+});
+
+test("context exceptions still reject actual parts, broken phones and console accessories", () => {
+  for (const [query, title] of [
+    ["iphone 13", "Baterie noua pentru iPhone 13"],
+    ["iphone 13", "Display iPhone 13 nou"],
+    ["iphone 15", "Adaptor dual sim pentru iPhone 15"],
+    ["iphone 15", "iPhone 15 dual sim placa defecta"],
+    ["iphone 13", "iPhone 13 baterie noua ecran spart"],
+    ["ps5", "Controller pentru Sony PS5"],
+    ["ps5", "Jocuri PS5"]
+  ]) assert.equal(classifyListingIntent({ title, price: "1800 lei", priceRon: 1800 }, query).isRecommendedCandidate, false, title);
+});
+
+test("use explicit description model variants when title omits the variant", () => {
+  for (const [query, title, description, accepted] of [
+    ["iphone 15 pro", "iPhone 15", "iPhone 15 Pro Max 256GB, stare impecabila", false],
+    ["iphone 15 pro max", "iPhone 15", "iPhone 15 Pro Max 256GB, stare impecabila", true],
+    ["iphone 15", "iPhone 15", "Nu este iPhone 15 Pro Max", true],
+    ["iphone 15", "iPhone 15", "Upgrade la iPhone 15 Pro Max", true],
+    ["iphone 15 pro", "iPhone 15", "Upgrade la iPhone 15 Pro Max", false],
+    ["iphone 15 pro", "iPhone 15", "iPhone 15 128GB; MacBook Pro disponibil separat", false],
+    ["iphone 15 pro", "iPhone 15 Pro", "Comparabil cu iPhone 15 Pro Max", true],
+    ["samsung galaxy s24 ultra", "Samsung Galaxy S24", "Samsung Galaxy S24 Ultra 256GB", true]
+  ]) {
+    const result = classifyListingIntent({ title, description, price: "3000 lei", priceRon: 3000 }, query);
+    assert.equal(result.isRecommendedCandidate, accepted, `${query}: ${description}: ${result.rejectionReasons}`);
+  }
+});

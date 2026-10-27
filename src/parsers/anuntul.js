@@ -1,3 +1,4 @@
+import { hasForwardPage } from "./pagination.js";
 import { extractImageCandidate } from "./image.js";
 
 function decodeHtmlEntities(value = "") {
@@ -136,11 +137,8 @@ function parseTotalResults(html) {
   return Number.isFinite(value) ? value : null;
 }
 
-function hasNextPage(html) {
-  return /rel=["']next["']/i.test(html) || /[?&](?:amp;)?page=\d+/i.test(html);
-}
 
-export function parseAnuntulHtml(html, limit) {
+export function parseAnuntulHtml(html, limit, { url = "" } = {}) {
   const blocks = splitListingBlocks(html);
   const items = blocks
     .map(parseListingBlock)
@@ -151,6 +149,6 @@ export function parseAnuntulHtml(html, limit) {
     items,
     totalResults: parseTotalResults(html),
     rawItemCount: blocks.length,
-    hasNextPage: hasNextPage(html)
+    hasNextPage: hasForwardPage(html, url)
   };
 }
