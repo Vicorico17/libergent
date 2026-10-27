@@ -4,6 +4,70 @@ LiberGent is a Romanian product-search and deal-ranking application. A user ente
 
 Production: [libergent.com](https://libergent.com)
 
+### ChatGPT and Claude connector prototype
+
+The shared Streamable HTTP MCP endpoint is `/mcp`. It is disabled by default;
+set `LIBERGENT_MCP_ENABLED=1` to enable it in a development environment.
+The first milestone exposes three read-only tools: `search_products`,
+`get_listing_details`, and `list_sources`. It is a transport for Libergent's
+existing search and decision engine, not a separate shopping recommender.
+
+Run locally with mock marketplace results:
+
+```bash
+LIBERGENT_MCP_ENABLED=1 LIBERGENT_MOCK_SEARCH=1 npm run dev:api
+```
+
+In a second terminal:
+
+```bash
+npm run test:mcp
+npm run check:mcp
+```
+
+The HTTP smoke check initializes MCP, discovers tools, and reads the source
+catalog; it does not run a live marketplace search. An alternate endpoint can
+be passed with `npm run check:mcp -- https://your-test-host/mcp`.
+
+`search_products` accepts `query`, `tier` (`free` or `premium`), `condition` (`any`, `used`, `new`),
+`maxPriceRon`, optional `city`, and `limit` (1–20). Budget filtering applies to
+known item prices in the shared Libergent engine before selecting recommendations;
+delivery and other fees are not included. Both search APIs accept `maxPriceRon`,
+and the website sends its maximum-price filter after a short debounce. Cache keys
+include the budget. The new-price benchmark
+is returned separately and can exceed the budget. City is a proximity preference,
+not a strict location filter. Connector calls never infer user location from the
+AI platform's IP address. Responses expose source coverage, cache status, and the
+search timestamp. The connector passes through Libergent's best offer, best used
+offer, closest used offer, retail benchmark, recommended alternatives, reasons,
+risks, confidence, price intelligence, and Jev decisions. It never picks a fallback
+winner or re-ranks results. The website also preserves the engine's selected cards;
+local display filters may hide a selection but do not invent a replacement.
+
+Free search is anonymous. Premium routes through the existing authenticated
+Libergent API and reuses its user validation, subscription checks, browser fallbacks,
+and Jev selection. For development, it accepts an existing Libergent session bearer
+credential in the transport Authorization header, never in tool arguments.
+OAuth account linking and refresh are not implemented yet, so this does not provide
+a finished sign-in experience in ChatGPT or Claude. Do not paste credentials in chat.
+
+The endpoint is stateless and uses JSON responses. It rejects unexpected Origin
+headers and bodies larger than 64 KiB. Additional exact browser origins can be
+configured with `LIBERGENT_MCP_ALLOWED_ORIGINS`. An optional Cloudflare rate-limit
+binding named `MCP_RATE_LIMITER` is supported; without that binding there is no
+connector request quota. An unlisted URL is not private access control.
+
+Status: protocol integration, mock search, URL restrictions, cache reuse, and
+Worker bundling are tested. Public enablement still needs bounded search latency,
+configured quotas and cost controls, monitoring, and actual conversation tests
+in ChatGPT and Claude using a reachable HTTPS test endpoint. Premium account
+linking, interactive cards, and directory submission are later milestones.
+Subscription checks are enforced by the existing API; OAuth account linking and
+token lifecycle management remain prerequisites for the public authenticated beta.
+
+References: [ChatGPT MCP setup](https://developers.openai.com/plugins/build/mcp-server)
+and [Claude custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+
 ### Search healthcheck
 
 Open `/health` (also linked as **Stare servicii** in the footer) and run a test query.

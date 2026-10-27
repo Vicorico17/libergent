@@ -39,6 +39,7 @@ type Conversation = {
   messages: Array<{ id: string; direction: "inbound" | "outbound"; text: string; timestamp: string }>;
 };
 type DealEvent = { id: number; event_type: string; stage: string; details: { agreedPriceRon?: number; outcomeReason?: string }; created_at: string };
+type DealCall = { id: string; destination: string; objective: string; status: string; recording_ready: boolean; recording_deleted_at: string | null; duration_seconds: number | null; created_at: string };
 
 const STAGES: Record<string, string> = {
   draft: "Pregătire", contacting: "Contact inițiat", negotiating: "În discuție",
@@ -66,11 +67,20 @@ function DealContent() {
   const params = useSearchParams();
   const requestedListingUrl = params.get("url") || "";
   const account = useAccountSession();
+  const [agentAccess, setAgentAccess] = useState<{ userId: string; error: string } | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [draft, setDraft] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [events, setEvents] = useState<DealEvent[]>([]);
+  const [calls, setCalls] = useState<DealCall[]>([]);
+  const [callTo, setCallTo] = useState("");
+  const [callObjective, setCallObjective] = useState("");
+  const [recordingConsentEvidence, setRecordingConsentEvidence] = useState("");
+  const [contactPermitted, setContactPermitted] = useState(false);
+  const [recordingNotice, setRecordingNotice] = useState(false);
+  const [recordingUrl, setRecordingUrl] = useState("");
+  const callAttempt = useRef<{ signature: string; key: string } | null>(null);
   const [replyConversationId, setReplyConversationId] = useState("");
   const [replyText, setReplyText] = useState("");
   const [modelReason, setModelReason] = useState("");
@@ -96,11 +106,12 @@ function DealContent() {
   const selected = deals.find((deal) => deal.id === selectedId) || null;
   const replyConversation = conversations.find((item) => item.id === replyConversationId) || null;
 
-  function showDetail(payload: { openingDraft?: string; conversations?: Conversation[]; events?: DealEvent[]; replyDraft?: string | null; replyConversationId?: string | null }, dealId = "") {
+  function showDetail(payload: { openingDraft?: string; conversations?: Conversation[]; events?: DealEvent[]; calls?: DealCall[]; replyDraft?: string | null; replyConversationId?: string | null }, dealId = "") {
     if (dealId && selectedDealRef.current !== dealId) return;
     setDraft(String(payload.openingDraft || ""));
     setConversations(Array.isArray(payload.conversations) ? payload.conversations : []);
     setEvents(Array.isArray(payload.events) ? payload.events : []);
+    setCalls(Array.isArray(payload.calls) ? payload.calls : []);
     setReplyText(String(payload.replyDraft || ""));
     setModelReason("");
     setReplyConversationId(String(payload.replyConversationId || ""));
@@ -111,6 +122,7 @@ function DealContent() {
     let active = true;
     dealRequest("/api/deals").then((payload) => {
       if (!active) return;
+      setAgentAccess({ userId: account.userId, error: "" });
       const next = Array.isArray(payload.deals) ? payload.deals as Deal[] : [];
       setDeals(next);
       const chosen = next.find((item) => item.listing_url === requestedListingUrl) || next[0];
@@ -121,13 +133,18 @@ function DealContent() {
         setAgreedTerms(chosen.agreed_terms || "");
         dealRequest(`/api/deals/${chosen.id}`).then((detail) => { if (active) showDetail(detail, chosen.id); }).catch(() => { if (active) setDraft(""); });
       }
-    }).catch((failure) => { if (active) setError(failure instanceof Error ? failure.message : "Nu am putut încărca negocierile."); });
+    }).catch((failure) => {
+      if (active) setAgentAccess({ userId: account.userId, error: failure instanceof Error ? failure.message : "Nu am putut încărca negocierile." });
+    });
     return () => { active = false; };
-  }, [account.status, requestedListingUrl]);
+  }, [account.status, account.userId, requestedListingUrl]);
 
   function selectDeal(deal: Deal) {
     selectedDealRef.current = deal.id;
     setSelectedId(deal.id);
+    setCallTo(""); setCallObjective(""); setRecordingConsentEvidence(""); setContactPermitted(false); setRecordingNotice(false); callAttempt.current = null;
+    if (recordingUrl) URL.revokeObjectURL(recordingUrl);
+    setRecordingUrl("");
     setAgreedPrice(deal.agreed_price_ron ? String(deal.agreed_price_ron) : "");
     setAgreedTerms(deal.agreed_terms || "");
     showDetail({});
@@ -203,15 +220,82 @@ function DealContent() {
     finally { setModelBusy(false); }
   }
 
+  async function approveCall() {
+    if (!selected || busy) return;
+    const signature = JSON.stringify([selected.id, callTo, callObjective, recordingConsentEvidence]);
+    if (!callAttempt.current || callAttempt.current.signature !== signature) callAttempt.current = { signature, key: crypto.randomUUID() };
+    setBusy(true); setError("");
+    try {
+      await dealRequest(`/api/deals/${selected.id}/calls`, "POST", {
+        to: callTo, objective: callObjective, contactSource: selected.listing_url,
+        buyerApproved: true, contactPermitted, recordingNoticeAcknowledged: recordingNotice, recordingConsentEvidence,
+        idempotencyKey: callAttempt.current.key
+      });
+      showDetail(await dealRequest(`/api/deals/${selected.id}`), selected.id);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Apelul nu a putut fi inițiat."); }
+    finally { setBusy(false); }
+  }
+
+  async function refreshCall(call: DealCall) {
+    if (!selected) return;
+    try {
+      const payload = await dealRequest(`/api/deals/${selected.id}/calls/${call.id}`);
+      setCalls((current) => current.map((item) => item.id === call.id ? payload.call as DealCall : item));
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Starea apelului nu a putut fi verificată."); }
+  }
+
+  async function stopCall(call: DealCall) {
+    if (!selected) return;
+    setBusy(true); setError("");
+    try {
+      const payload = await dealRequest(`/api/deals/${selected.id}/calls/${call.id}/stop`, "POST");
+      setCalls((current) => current.map((item) => item.id === call.id ? payload.call as DealCall : item));
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Apelul nu a putut fi oprit."); }
+    finally { setBusy(false); }
+  }
+
+  async function playRecording(call: DealCall) {
+    if (!selected) return;
+    try {
+      const session = (await getSupabaseBrowserClient()?.auth.getSession())?.data.session;
+      if (!session?.access_token) throw new Error("Conectează-te pentru a asculta înregistrarea.");
+      const response = await fetch(`/api/deals/${selected.id}/calls/${call.id}/recording`, { headers: { authorization: `Bearer ${session.access_token}` } });
+      if (!response.ok) throw new Error("Înregistrarea nu este disponibilă.");
+      const url = URL.createObjectURL(await response.blob());
+      if (recordingUrl) URL.revokeObjectURL(recordingUrl);
+      setRecordingUrl(url);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Înregistrarea nu a putut fi încărcată."); }
+  }
+
+  async function deleteRecording(call: DealCall) {
+    if (!selected) return;
+    setBusy(true); setError("");
+    try {
+      const payload = await dealRequest(`/api/deals/${selected.id}/calls/${call.id}/recording`, "DELETE");
+      setCalls((current) => current.map((item) => item.id === call.id ? payload.call as DealCall : item));
+      if (recordingUrl) URL.revokeObjectURL(recordingUrl);
+      setRecordingUrl("");
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Înregistrarea nu a putut fi ștearsă."); }
+    finally { setBusy(false); }
+  }
+
   if (account.status === "checking") return <p>Verificăm contul...</p>;
   if (account.status === "signed_out") return <p>Conectează-te pentru a porni o negociere. <Link href="/auth?next=%2Fdeals" className="underline">Conectare</Link></p>;
 
+  if (agentAccess?.userId !== account.userId) return <p className="p-6">Verificăm accesul Libergent Agent...</p>;
+  if (agentAccess.error) return <main className="mx-auto max-w-3xl px-4 py-10">
+    <h1 className="text-2xl font-bold">Libergent Agent</h1>
+    <p role="alert" className="my-5">{agentAccess.error}</p>
+    <p className="mb-5 text-sm">Premium oferă căutarea avansată. Libergent Agent este serviciul separat pentru contactarea vânzătorilor și negociere.</p>
+    <Link href="/pricing" className="font-bold underline">Vezi planurile</Link>
+  </main>;
+
   return <main className="mx-auto max-w-6xl px-4 py-10 text-[#111]">
     <Link href="/search" className="text-xs font-bold uppercase underline">← Înapoi la căutare</Link>
-    <p className="mt-8 text-xs font-bold uppercase text-[#FF3366]">Premium · Asistent de negociere</p>
+    <p className="mt-8 text-xs font-bold uppercase text-[#FF3366]">Libergent Agent · Asistent de negociere</p>
     <h1 className="mt-2 text-3xl font-black uppercase">De la anunț la tranzacție</h1>
     <p className="mt-3 max-w-3xl text-sm leading-relaxed">Stabilește limita de preț și condițiile tale. Urmărește separat contactul, termenii acceptați și cumpărarea confirmată.</p>
-    {error && <p role="alert" className="mt-6 border border-[#FF3366] bg-white p-4 text-sm">{error} {error.includes("Premium") && <Link href="/pricing" className="font-bold underline">Vezi Premium</Link>}</p>}
+    {error && <p role="alert" className="mt-6 border border-[#FF3366] bg-white p-4 text-sm">{error} {error.includes("Libergent Agent") && <Link href="/pricing" className="font-bold underline">Vezi Libergent Agent</Link>}</p>}
     <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <section className="border border-black bg-white p-5">
         <h2 className="text-lg font-black uppercase">Brief nou</h2>
@@ -239,6 +323,28 @@ function DealContent() {
           <div><h3 className="text-base font-black">{selected.listing_title}</h3><p className="text-xs">{selected.marketplace} · {STAGES[selected.stage] || selected.stage}{selected.paused_at ? " · Pauză" : ""}</p><p className="mt-1 text-xs">Limită: {selected.brief.maxPriceRon} RON · Oferta inițială: {selected.brief.openingOfferRon ?? "nesetată"}</p><a href={selected.listing_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-bold underline">Deschide anunțul</a></div>
           <div className="border border-black bg-[#F5F3EE] p-4"><p className="text-xs font-bold uppercase">Mesaj inițial pregătit</p><p className="mt-2 whitespace-pre-wrap text-sm">{draft || "Se pregătește mesajul..."}</p><button type="button" disabled={!draft} onClick={() => navigator.clipboard.writeText(draft).catch(() => setError("Copierea a eșuat."))} className="mt-3 text-xs font-bold uppercase underline">Copiază pentru contactul permis pe marketplace</button></div>
           <p className="text-xs leading-relaxed">Mesajul pregătit nu este trimis automat. Folosește contactul permis de marketplace și marchează progresul după ce verifici răspunsul sellerului.</p>
+          <div className="border-t border-black pt-4">
+            <h4 className="text-sm font-black uppercase">Apel prin Masscall</h4>
+            <p className="mt-2 text-xs">Aprobă un singur apel de maximum cinci minute pentru acest anunț. Agentul se prezintă ca AI, anunță înregistrarea și nu poate accepta o cumpărare. Verifică dacă sursa și canalul permit contactul telefonic.</p>
+            {!selected.paused_at && !["completed", "lost", "cancelled"].includes(selected.stage) && <div className="mt-3 grid gap-3">
+              <label className="grid gap-1 text-xs font-bold uppercase">Telefon destinatar (+40)<input className={INPUT} type="tel" value={callTo} onChange={(event) => setCallTo(event.target.value)} placeholder="+407xxxxxxxx" /></label>
+              <label className="grid gap-1 text-xs font-bold uppercase">Scopul exact al apelului<textarea className={INPUT} rows={3} maxLength={1000} value={callObjective} onChange={(event) => setCallObjective(event.target.value)} placeholder="Verifică disponibilitatea și starea produsului." /></label>
+              <p className="text-xs">Identitate apelant: numărul LiberGent configurat pentru serviciul dedicat. Fapte disponibile: titlul și prețul anunțului, oferta inițială și întrebările din brief. Sursă: {selected.listing_url}</p>
+              <label className="flex gap-2 text-xs"><input type="checkbox" checked={contactPermitted} onChange={(event) => setContactPermitted(event.target.checked)} />Am verificat că pot contacta telefonic acest destinatar prin sursa indicată.</label>
+              <label className="flex gap-2 text-xs"><input type="checkbox" checked={recordingNotice} onChange={(event) => setRecordingNotice(event.target.checked)} />Destinatarul pilot a acceptat înregistrarea înainte de apel; agentul o va anunța la început.</label>
+              <label className="grid gap-1 text-xs font-bold uppercase">Dovada acordului pentru înregistrare<input className={INPUT} maxLength={300} value={recordingConsentEvidence} onChange={(event) => setRecordingConsentEvidence(event.target.value)} placeholder="Data și sursa acordului destinatarului pilot" /></label>
+              <button type="button" className={BUTTON} disabled={busy || !callTo || !callObjective.trim() || !contactPermitted || !recordingNotice || !recordingConsentEvidence.trim()} onClick={approveCall}>Aprobă și pornește un apel</button>
+            </div>}
+            {calls.map((call) => <div key={call.id} className="mt-3 border border-black p-3 text-xs">
+              <p><strong>{call.destination}</strong> · {call.status} · {new Date(call.created_at).toLocaleString("ro-RO")}{call.duration_seconds !== null ? ` · ${call.duration_seconds}s` : ""}</p>
+              <p className="mt-1">Scop: {call.objective}</p>
+              <div className="mt-2 flex flex-wrap gap-3"><button type="button" className="font-bold underline" onClick={() => refreshCall(call)}>Actualizează starea</button>
+                {["queued", "ringing", "in-progress"].includes(call.status) && <button type="button" className="font-bold underline" disabled={busy} onClick={() => stopCall(call)}>Oprește apelul</button>}
+                {call.recording_ready && !call.recording_deleted_at && <><button type="button" className="font-bold underline" onClick={() => playRecording(call)}>Ascultă înregistrarea</button><button type="button" className="font-bold underline" disabled={busy} onClick={() => deleteRecording(call)}>Șterge înregistrarea</button></>}
+              </div>
+            </div>)}
+            {recordingUrl && <audio className="mt-3 w-full" controls src={recordingUrl} />}
+          </div>
           <div className="border-t border-black pt-4">
             <div className="flex items-center justify-between gap-3"><h4 className="text-sm font-black uppercase">Discuția cu sellerul</h4><button type="button" className="text-xs font-bold uppercase underline" onClick={() => dealRequest(`/api/deals/${selected.id}`).then((detail) => showDetail(detail, selected.id)).catch(() => setError("Nu am putut reîncărca mesajele."))}>Actualizează</button></div>
             {!conversations.length && <p className="mt-2 text-xs">Niciun mesaj WhatsApp asociat acestui anunț. Discuțiile de pe marketplace rămân pe pagina anunțului.</p>}

@@ -352,15 +352,15 @@ test("Premium search attempts Kitesurf for every empty selected source before bo
   assert.equal(kitesurfDiagnostics.every((entry) => entry.ok === false), true);
 });
 
-test("keeps deal records behind Premium and scopes reads to the authenticated owner", async (t) => {
+test("keeps deal records behind Agent and scopes reads to the authenticated owner", async (t) => {
   const originalFetch = globalThis.fetch;
   const seen = [];
-  let premium = false;
+  let agent = false;
   globalThis.fetch = async (url) => {
     const requestUrl = String(url);
     seen.push(requestUrl);
     if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
-    if (requestUrl.includes("/user_entitlements")) return new Response(JSON.stringify(premium ? [{ plan: "premium", status: "active" }] : []), { status: 200 });
+    if (requestUrl.includes("/agent_entitlements")) return new Response(JSON.stringify(agent ? [{ status: "active" }] : []), { status: 200 });
     if (requestUrl.includes("/deal_cases")) return new Response(JSON.stringify([]), { status: 200 });
     throw new Error(`Unexpected fetch: ${requestUrl}`);
   };
@@ -369,12 +369,55 @@ test("keeps deal records behind Premium and scopes reads to the authenticated ow
   const request = () => new Request("https://libergent.test/api/deals", { headers: { authorization: "Bearer buyer-token" } });
   const free = await worker.fetch(request(), env);
   assert.equal(free.status, 403);
-  assert.equal((await free.json()).code, "premium_required");
+  assert.equal((await free.json()).code, "agent_required");
   assert.equal(seen.some((entry) => entry.includes("/deal_cases")), false);
-  premium = true;
+  agent = true;
   const paid = await worker.fetch(request(), env);
   assert.equal(paid.status, 200);
   assert.equal(new URL(seen.find((entry) => entry.includes("/deal_cases"))).searchParams.get("user_id"), "eq.buyer-1");
+});
+
+test("deal call approval reserves one provider call across duplicate requests", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const dealId = "11111111-1111-4111-8111-111111111111";
+  const callId = "22222222-2222-4222-8222-222222222222";
+  const key = "33333333-3333-4333-8333-333333333333";
+  const listingUrl = "https://www.olx.ro/d/oferta/phone-ID123.html";
+  let call = null;
+  let providerPosts = 0;
+  globalThis.fetch = async (url, init = {}) => {
+    const target = String(url);
+    if (target.endsWith("/auth/v1/user")) return Response.json({ id: "buyer-1", email: "premium@example.test" });
+    if (target.includes("/agent_entitlements")) return Response.json([{ status: "active" }]);
+    if (target.includes("/deal_cases")) return Response.json([{ id: dealId, user_id: "buyer-1", stage: "draft", paused_at: null, listing_url: listingUrl, listing_title: "Phone", listing_price: "1200 RON", brief: { maxPriceRon: 1500, openingOfferRon: 1100, questions: [] } }]);
+    if (target.includes("/deal_calls")) {
+      if (init.method === "POST") {
+        if (call) return Response.json([]);
+        call = { ...JSON.parse(init.body), id: callId, status: "pending", created_at: new Date().toISOString(), provider_call_id: "" };
+        return Response.json([call], { status: 201 });
+      }
+      if (init.method === "PATCH") { call = { ...call, ...JSON.parse(init.body) }; return Response.json([call]); }
+      if (target.includes("idempotency_key")) return Response.json(call ? [call] : []);
+      return Response.json(call ? [call] : []);
+    }
+    if (target === "https://masscall.example/v1/calls") {
+      providerPosts++;
+      assert.equal(init.headers.authorization, `Bearer ${"s".repeat(40)}`);
+      assert.equal(JSON.parse(init.body).callId, callId);
+      return Response.json({ providerCallId: "CA" + "a".repeat(32), status: "queued" }, { status: 201 });
+    }
+    throw new Error(`Unexpected fetch ${target}`);
+  };
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const env = { SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "secret", LIBERGENT_PREMIUM_EMAILS: "premium@example.test", LIBERGENT_CALLING_ENABLED: "1", LIBERGENT_ALLOWED_DESTINATIONS: "+40712345679", LIBERGENT_RECORDING_RETENTION_DAYS: "7", MASSCALL_SERVICE_URL: "https://masscall.example", MASSCALL_SERVICE_TOKEN: "s".repeat(40), MASSCALL_CALLER_ID: "+40712345678" };
+  const body = { to: "+40712345679", objective: "Check condition", contactSource: listingUrl, recordingConsentEvidence: "Test recipient agreed", buyerApproved: true, contactPermitted: true, recordingNoticeAcknowledged: true, idempotencyKey: key };
+  const request = () => new Request(`https://libergent.test/api/deals/${dealId}/calls`, { method: "POST", headers: { authorization: "Bearer buyer-token", "content-type": "application/json" }, body: JSON.stringify(body) });
+  const first = await worker.fetch(request(), env);
+  assert.equal(first.status, 201);
+  const repeated = await worker.fetch(request(), env);
+  assert.equal(repeated.status, 200);
+  assert.equal(providerPosts, 1);
+  assert.equal((await repeated.json()).call.provider_call_id, "CA" + "a".repeat(32));
 });
 
 test("rejects a deal agreement above the buyer's ceiling before writing", async (t) => {
@@ -383,7 +426,7 @@ test("rejects a deal agreement above the buyer's ceiling before writing", async 
   globalThis.fetch = async (url, init = {}) => {
     const requestUrl = String(url);
     if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
-    if (requestUrl.includes("/user_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
+    if (requestUrl.includes("/agent_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
     if (requestUrl.includes("/deal_cases")) {
       if (init.method === "PATCH") patches++;
       return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111", user_id: "buyer-1", stage: "negotiating", paused_at: null, brief: { maxPriceRon: 1800 } }]), { status: 200 });
@@ -412,7 +455,7 @@ test("a repeated deal reply returns its saved send attempt without calling the b
   globalThis.fetch = async (url, init = {}) => {
     const requestUrl = String(url);
     if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
-    if (requestUrl.includes("/user_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
+    if (requestUrl.includes("/agent_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
     if (requestUrl.includes("/deal_cases")) return new Response(JSON.stringify([{ id: dealId, user_id: "buyer-1", listing_url: listingUrl, stage: "negotiating", brief: { maxPriceRon: 1800 } }]), { status: 200 });
     if (requestUrl.includes("/whatsapp_messages")) return new Response(JSON.stringify([row]), { status: 200 });
     if (requestUrl.includes("/deal_send_attempts")) {
@@ -440,7 +483,7 @@ test("AI deal proposal requires a configured model and never contacts the seller
   globalThis.fetch = async (url) => {
     const requestUrl = String(url);
     if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
-    if (requestUrl.includes("/user_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
+    if (requestUrl.includes("/agent_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
     if (requestUrl.includes("/deal_cases")) return new Response(JSON.stringify([{ id: dealId, user_id: "buyer-1", listing_url: listingUrl, listing_title: "Test", stage: "negotiating", brief: { maxPriceRon: 1800, openingOfferRon: 1500, questions: [] } }]), { status: 200 });
     if (requestUrl.includes("/whatsapp_messages")) return new Response(JSON.stringify([
       { message_id: "out", direction: "outbound", to_number: "+40722123456", text: "Salut", received_at: "2026-09-28T10:00:00Z", raw: { userId: "buyer-1", listing: { url: listingUrl } } },
@@ -472,6 +515,7 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
     if (requestUrl === "https://supabase.example/auth/v1/user") {
       return new Response(JSON.stringify({ id: "user-1", email: "buyer@example.test" }), { status: 200 });
     }
+    if (requestUrl.includes("/agent_entitlements")) return Response.json([{ status: "active" }]);
     if (requestUrl.startsWith("https://supabase.example/rest/v1/whatsapp_messages")) {
       storedMessage = JSON.parse(init.body);
       return new Response(null, { status: 201 });
@@ -513,7 +557,7 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
 
 test("requires the OpenClaw bridge token before sending WhatsApp messages", async (t) => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ id: "user-1" }), { status: 200 });
+  globalThis.fetch = async (url) => Response.json(String(url).includes("/agent_entitlements") ? [{ status: "active" }] : { id: "user-1" });
   t.after(() => {
     globalThis.fetch = originalFetch;
   });
@@ -746,6 +790,7 @@ test("does not report bridge application failures as successful delivery", async
   let writes = 0;
   globalThis.fetch = async (url) => {
     if (String(url).endsWith("/auth/v1/user")) return Response.json({ id: "buyer" });
+    if (String(url).includes("/agent_entitlements")) return Response.json([{ status: "active" }]);
     if (String(url).includes("/rest/")) writes++;
     return Response.json({ ok: true, result: { ok: false, error: "delivery rejected" } });
   };

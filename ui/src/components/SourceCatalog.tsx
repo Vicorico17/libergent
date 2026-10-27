@@ -2,11 +2,20 @@
 
 import { useEffect, useState } from "react";
 
-type Source = { domain: string; tier: "free" | "premium"; status: string; selection: string; productionValidation?: Array<{ checkedAt: string; accepted: number }>; directValidation?: { checkedAt: string; queriesChecked: number; queriesWithAcceptedOffers: number } };
+type Source = { domain: string; sourceCategory?: string; tier: "free" | "premium"; status: string; selection: string; productionValidation?: Array<{ checkedAt: string; accepted: number }>; directValidation?: { checkedAt: string; queriesChecked: number; queriesWithAcceptedOffers: number } };
+
+const CATEGORY_LABELS: Record<string, string> = {
+  retail: "Retail · produse noi",
+  second_hand: "Second-hand · anunțuri",
+  refurbished: "Recondiționate",
+  mixed: "Marketplace mixt",
+  price_comparison: "Comparatoare de preț retail",
+};
 
 export function SourceCatalog() {
   const [sources, setSources] = useState<Source[]>([]);
   const [failed, setFailed] = useState(false);
+  const [category, setCategory] = useState("");
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/sources", { signal: controller.signal })
@@ -31,15 +40,23 @@ export function SourceCatalog() {
         Facebook Marketplace nu este integrat în căutarea automată.
         Testele directe de mai jos sunt verificări punctuale din mediul de test, nu monitorizare continuă sau confirmare a prețurilor.
       </p>
+      <label className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+        Tipul sursei
+        <select value={category} onChange={(event) => setCategory(event.target.value)} className="border border-[#111111] bg-white p-2">
+          <option value="">Toate tipurile</option>
+          {Object.entries(CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </label>
       {failed ? <p role="status" className="mt-4">Lista surselor nu poate fi încărcată acum. Reîncarcă pagina pentru a încerca din nou.</p> : !sources.length ? <p role="status" className="mt-4">Se încarcă sursele…</p> : (
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           {(["free", "premium"] as const).map((tier) => (
             <div key={tier}>
               <h3 className="mb-3 text-lg font-bold">{tier === "free" ? "Free" : "Premium · în evaluare"}</h3>
               <ul className="grid gap-2 text-sm sm:grid-cols-2">
-                {sources.filter((source) => source.tier === tier).map((source) => (
+                {sources.filter((source) => source.tier === tier && (!category || source.sourceCategory === category)).map((source) => (
                   <li key={source.domain} className="border border-[#11111133] p-3">
                     <span className="font-semibold">{source.domain}</span>
+                    <span className="mt-1 block text-xs font-semibold">{CATEGORY_LABELS[source.sourceCategory || ""] || "Tip neconfirmat"}</span>
                     <span className="mt-1 block text-xs text-[#555]">
                       {source.status === "experimental" ? "Experimental · " : ""}
                       {source.selection === "vehicles" ? "Autoturisme" : source.selection === "refurbished-tech" ? "Tehnologie recondiționată" : "În funcție de căutare"}

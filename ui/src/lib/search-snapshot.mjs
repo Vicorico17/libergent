@@ -3,8 +3,8 @@ export const SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const PREFIX = "libergent:search-snapshot:v1:";
 const MAX_SNAPSHOTS = 5;
 
-export function searchSnapshotKey({ userId = "", tier = "free", query = "", near = "", limit = 0, pages = 0 }) {
-  return PREFIX + JSON.stringify([userId, tier, query.trim().toLocaleLowerCase("ro-RO"), near.trim().toLocaleLowerCase("ro-RO"), limit, pages]);
+export function searchSnapshotKey({ userId = "", tier = "free", query = "", near = "", limit = 0, pages = 0, maxPriceRon = 0 }) {
+  return PREFIX + JSON.stringify([userId, tier, query.trim().toLocaleLowerCase("ro-RO"), near.trim().toLocaleLowerCase("ro-RO"), limit, pages, maxPriceRon]);
 }
 
 export function readSearchSnapshot(storage, key, now = Date.now()) {

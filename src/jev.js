@@ -1,4 +1,5 @@
 import { buildAbortSignal } from "./abort.js";
+import { classifyOfferKind, canCompareRetailOffers } from "./market-segment.js";
 
 const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 const JEV_TIMEOUT_MS = 2800;
@@ -10,9 +11,7 @@ function candidatePool(results, segment) {
     .filter((item) => item && item.url && Number.isFinite(item.priceRon) && item.priceRon > 0)
     .filter((item) => item.isRecommendedCandidate === true)
     .filter((item) => !(item.riskFlags || []).some((flag) => flag.severity === "bad"))
-    .filter((item) => segment === "new"
-      ? item.marketType === "retail" || item.sourceType === "retail"
-      : item.marketType !== "retail" && item.sourceType !== "retail")
+    .filter((item) => classifyOfferKind(item) === segment)
     .sort(compareCandidates);
   const seen = new Set();
   const uniqueCandidates = candidates.filter((item) => {
@@ -90,7 +89,12 @@ export async function applyJevProductDecision(payload, { env, query, condition }
   const apiKey = String(env.JEV_API_KEY || "").trim();
   if (!apiKey) return { ...base, status: "unavailable" };
 
-  const used = candidatePool(payload.results, "used");
+  const maxPriceRon = payload.summary?.maxPriceRon;
+  const eligibleResults = (payload.results || []).map((source) => ({
+    ...source,
+    items: (source.items || []).filter((item) => maxPriceRon == null || item.priceRon <= maxPriceRon)
+  }));
+  const used = condition === "new" ? [] : candidatePool(eligibleResults, "used");
   const fresh = candidatePool(payload.results, "new");
   const choiceMaps = {};
   const questions = {};
@@ -145,6 +149,14 @@ export async function applyJevProductDecision(payload, { env, query, condition }
         jevDecision: { provider: "jev", confidence, candidateCount: choiceMaps[key].size }
       };
       selections += 1;
+    }
+    if (selections && payload.summary.priceIntelligence) {
+      const usedOffer = payload.summary.bestUsedOffer;
+      const newOffer = payload.summary.bestNewBenchmark;
+      payload.summary.priceIntelligence.savingsVsNewPct = canCompareRetailOffers(usedOffer, newOffer)
+        && Number.isFinite(usedOffer?.priceRon) && usedOffer.priceRon > 0
+        && Number.isFinite(newOffer?.priceRon) && newOffer.priceRon > 0
+        ? Math.round((1 - usedOffer.priceRon / newOffer.priceRon) * 100) : null;
     }
     return {
       ...base,

@@ -748,7 +748,7 @@ test("phone savings require matching model and known capacity in retail and used
       makeResult('olx.ro', 'iphone 15', [{ title: 'iPhone 15 256GB', condition: 'Folosit', price: '2000 lei', sourceType: 'classifieds', url: 'https://olx.ro/used' }]),
       makeResult('retail.ro', 'iphone 15', [{ title: retailTitle, condition: 'Nou', price: '3000 lei', sourceType: 'retailer', url: 'https://retail.ro/new' }])
     ]);
-    assert.equal(result.summary.bestNewBenchmark, null, retailTitle);
+    assert.ok(result.summary.bestNewBenchmark, "A different retail configuration remains a reference, never a savings claim");
     assert.equal(result.summary.priceIntelligence.savingsVsNewPct, null);
     assert.equal(result.results[1].items.length, 1, 'Other retail configurations remain browsable');
     assert.equal(result.results[1].items[0].isComparableNewBenchmark, false);
@@ -783,4 +783,71 @@ test("ranks recommendations closer to requester location when listing quality is
   });
 
   assert.equal(aggregated.bestOffer?.url, "https://vinted.ro/cluj");
+});
+
+test("refurbished shop stock cannot set the new retail price or savings benchmark", () => {
+  const result = aggregateMarketplaceResults([
+    makeResult("olx.ro", "iphone 15 pro", [{ title: "iPhone 15 Pro 256GB", price: "2500 lei", condition: "Folosit", url: "https://olx.ro/used" }]),
+    makeResult("altex.ro", "iphone 15 pro", [
+      { title: "iPhone 15 Pro 256GB", price: "2000 lei", condition: "Recondiționat", sourceType: "retailer", url: "https://altex.ro/refurb" },
+      { title: "iPhone 15 Pro 256GB", price: "4000 lei", condition: "Nou", sourceType: "retailer", url: "https://altex.ro/new" }
+    ])
+  ]);
+  assert.equal(result.summary.bestNewBenchmark.url, "https://altex.ro/new");
+  assert.equal(result.summary.priceIntelligence.newLowestRon, 4000);
+  assert.equal(result.summary.priceIntelligence.newPricedListingsRon, 1);
+});
+
+test("a retail price for different storage cannot produce a savings claim", () => {
+  const result = aggregateMarketplaceResults([
+    makeResult("olx.ro", "iphone 15 pro", [{ title: "iPhone 15 Pro 256GB", price: "2500 lei", condition: "Folosit", url: "https://olx.ro/used" }]),
+    makeResult("altex.ro", "iphone 15 pro", [{ title: "iPhone 15 Pro 128GB", price: "4000 lei", condition: "Nou", sourceType: "retailer", url: "https://altex.ro/new" }])
+  ]);
+  assert.ok(result.summary.bestNewBenchmark);
+  assert.equal(result.summary.priceIntelligence.savingsVsNewPct, null);
+});
+
+test("a used-condition search retains a separate new retail comparison", () => {
+  const result = aggregateMarketplaceResults([
+    makeResult("olx.ro", "iphone 15 pro", [{ title: "iPhone 15 Pro 256GB", price: "2500 lei", condition: "Folosit", url: "https://olx.ro/used" }]),
+    makeResult("altex.ro", "iphone 15 pro", [{ title: "iPhone 15 Pro 256GB", price: "4000 lei", condition: "Nou", sourceType: "retailer", url: "https://altex.ro/new" }])
+  ], { condition: "used" });
+  assert.equal(result.summary.bestUsedOffer.url, "https://olx.ro/used");
+  assert.equal(result.summary.bestNewBenchmark.url, "https://altex.ro/new");
+  assert.equal(result.summary.priceIntelligence.savingsVsNewPct, 38);
+});
+
+test("deduplication keeps the lower price for equivalent new retail products", () => {
+  const result = aggregateMarketplaceResults([
+    makeResult("altex.ro", "iphone 15 pro", [{ title: "iPhone 15 Pro 256GB", price: "4000 lei", condition: "Nou", sourceType: "retailer", postedAt: "Azi", imageUrl: "https://altex.ro/photo.jpg", url: "https://altex.ro/new" }]),
+    makeResult("evomag.ro", "iphone 15 pro", [{ title: "iPhone 15 Pro 256GB", price: "3500 lei", condition: "Nou", sourceType: "retailer", url: "https://evomag.ro/new" }])
+  ]);
+  assert.equal(result.summary.bestNewBenchmark.priceRon, 3500);
+  assert.equal(result.summary.priceIntelligence.newLowestRon, 3500);
+});
+
+test("shared search decisions enforce budget without biasing market comparisons", () => {
+  const sources = [
+    makeResult("olx.ro", "iphone 15 pro", [
+      { title: "iPhone 15 Pro 256GB", price: "2500 lei", condition: "Folosit", url: "https://olx.ro/affordable" },
+      { title: "iPhone 15 Pro 256GB", price: "3000 lei", condition: "Folosit", url: "https://olx.ro/expensive" },
+      { title: "iPhone 15 Pro 256GB", condition: "Folosit", url: "https://olx.ro/unknown" }
+    ]),
+    makeResult("altex.ro", "iphone 15 pro", [{ title: "iPhone 15 Pro 256GB", price: "4000 lei", condition: "Nou", sourceType: "retailer", url: "https://altex.ro/new" }])
+  ];
+  const unbounded = aggregateMarketplaceResults(sources, { condition: "used" });
+  const bounded = aggregateMarketplaceResults(sources, { condition: "used", maxPriceRon: 2600 });
+  assert.equal(bounded.summary.bestOffer.url, "https://olx.ro/affordable");
+  assert.equal(bounded.summary.bestUsedOffer.url, "https://olx.ro/affordable");
+  assert.deepEqual(bounded.summary.rankedOffers.map((item) => item.url), ["https://olx.ro/affordable"]);
+  assert.ok(bounded.summary.recommendedOffers.every((item) => item.priceRon <= 2600));
+  assert.equal(bounded.summary.bestNewBenchmark.priceRon, 4000);
+  assert.equal(bounded.summary.priceIntelligence.usedMedianRon, unbounded.summary.priceIntelligence.usedMedianRon);
+  const empty = aggregateMarketplaceResults(sources, { condition: "used", maxPriceRon: 1 });
+  assert.equal(empty.bestOffer, null);
+  assert.equal(empty.summary.bestUsedOffer, null);
+  assert.equal(empty.summary.closestUsedOffer, null);
+  assert.deepEqual(empty.summary.rankedOffers, []);
+  assert.deepEqual(empty.summary.recommendedOffers, []);
+  assert.equal(empty.summary.bestNewBenchmark.priceRon, 4000);
 });

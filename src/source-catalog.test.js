@@ -29,3 +29,16 @@ test("source catalog exposes fresh direct and production evidence without droppi
     assert.ok(source.browserValidation.some(check => check.accepted > 0 && check.priceVerified));
   }
 });
+
+test("every registered source has an explicit customer-facing inventory category", () => {
+  const catalog = buildSourceCatalog();
+  const allowed = new Set(["retail", "second_hand", "refurbished", "mixed", "price_comparison"]);
+  assert.ok(catalog.every(source => allowed.has(source.sourceCategory)));
+  const category = domain => catalog.find(source => source.domain === domain).sourceCategory;
+  assert.equal(category("altex.ro"), "retail");
+  assert.equal(category("olx.ro"), "second_hand");
+  assert.equal(category("flip.ro"), "refurbished");
+  assert.equal(category("klap.ro"), "refurbished");
+  assert.equal(category("emag.ro"), "mixed");
+  assert.equal(category("compari.ro"), "price_comparison");
+});

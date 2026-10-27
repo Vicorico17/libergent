@@ -22,7 +22,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { SNAPSHOT_MAX_AGE_MS, searchSnapshotKey, readSearchSnapshot, writeSearchSnapshot, describeSnapshotChange } from "@/lib/search-snapshot.mjs"
 import { useAccountSession } from "@/lib/use-account-session"
 import { rememberRecentSearch } from "@/lib/recent-searches"
-import { mapOffer, mapSearchResults, type ListingDetails, type SearchPayload, type SearchResultItem } from "./search-data"
+import { canCompareRetailOffers, mapOffer, mapSearchResults, type ListingDetails, type SearchPayload, type SearchResultItem } from "./search-data"
 
 // — Constants —
 const CREAM  = "#F5F3EE"
@@ -57,7 +57,7 @@ const SOURCE_TYPE_OPTIONS = [
   { value: "price_aggregator", label: "agregatoare" },
   { value: "retailer", label: "retaileri" },
 ]
-const COND_OPTIONS = ["nou", "folosit", "ca nou", "bun", "acceptabil"]
+const COND_OPTIONS = ["nou", "folosit", "recondiționat", "resigilat", "ca nou", "bun", "acceptabil"]
 
 type MarketplaceStatus = {
   successful: number
@@ -1668,7 +1668,7 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
           title={message}
         >
           <MessageSquare size={13} strokeWidth={2.2} />
-          {sendState === "sending" ? "Se trimite..." : sendState === "sent" ? "Mesaj preluat" : "Contactează sellerul"}
+          {sendState === "sending" ? "Se trimite..." : sendState === "sent" ? "Mesaj preluat" : "Agent: contactează sellerul"}
         </button>
       ) : (
         <span
@@ -2164,7 +2164,8 @@ function ClosestDealCard({ item, viewerCity, isBestOverall, onInspect }: { item:
 
 function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: SearchResultItem; usedItem: SearchResultItem | null; priceBenchmark?: PriceBenchmark; onInspect: (item: SearchResultItem) => void }) {
   const usedPrice = usedItem?.price ?? null
-  const difference = usedPrice !== null && item.price !== null && usedPrice > 0 && item.price > 0
+  const comparable = canCompareRetailOffers(usedItem, item)
+  const difference = comparable && usedPrice !== null && item.price !== null && usedPrice > 0 && item.price > 0
     ? item.price - usedPrice : null
   const savings = difference !== null && item.price ? Math.round(difference / item.price * 100) : null
 
@@ -2183,8 +2184,9 @@ function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: Se
           <p className="text-[24px] font-bold" style={{ color: PINK }}>{item.priceLabel}</p>
           <div className="mt-4 grid grid-cols-1 gap-2 text-[9px] font-bold uppercase sm:grid-cols-2">
             <span className="p-3" style={{ border: `1px solid ${INK}22`, background: CREAM }}>Oferta second-hand afișată<br />{formatRon(usedPrice)}{usedItem && <span className="mt-1 block normal-case">{usedItem.title} · {usedItem.source}</span>}</span>
-            <span className="p-3" style={{ border: `1px solid ${INK}22`, background: CREAM }}>Cel mai mic preț nou găsit în sursele selectate<br />{formatRon(item.price)}<span className="mt-1 block normal-case">{item.source}</span></span>
+            <span className="p-3" style={{ border: `1px solid ${INK}22`, background: CREAM }}>Cel mai mic preț nou {comparable ? "pentru varianta comparată" : "găsit în sursele selectate"}<br />{formatRon(item.price)}<span className="mt-1 block normal-case">{item.source}</span></span>
           </div>
+          {usedItem && !comparable && <p className="mt-3 text-[11px]">Modelul sau configurația nu sunt confirmate ca identice. Nu calculăm o economie între aceste oferte.</p>}
           {savings !== null && difference !== null && (
             <p className="mt-3 text-[11px] font-bold uppercase" style={{ color: savings > 0 ? GREEN : PINK }}>
               {difference > 0 ? `Second-hand este cu ${formatRon(difference)} (${Math.abs(savings)}%) mai ieftin.`
@@ -2756,6 +2758,11 @@ function SearchResultsContent() {
   const [conditions, setConditions] = useState<Set<string>>(() => readSearchFiltersStorage().conditions)
   const [priceMin, setPriceMin]     = useState(() => readSearchFiltersStorage().priceMin)
   const [priceMax, setPriceMax]     = useState(() => readSearchFiltersStorage().priceMax)
+  const [searchBudget, setSearchBudget] = useState(priceMax)
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchBudget(priceMax), 500)
+    return () => clearTimeout(timer)
+  }, [priceMax])
   const [time, setTime]             = useState("--:--")
   const [results, setResults]       = useState<SearchResultItem[]>([])
   const [bestUsedOffer, setBestUsedOffer] = useState<SearchResultItem | null>(null)
@@ -2822,7 +2829,7 @@ function SearchResultsContent() {
 
   const isPremiumAccount = accountPlan === "premium"
   const effectiveSearchTier: SearchTier = isPremiumAccount ? "premium" : "free"
-  const snapshotKey = searchSnapshotKey({ userId: account.userId, tier: effectiveSearchTier, query, near, limit: SEARCH_RESULT_LIMIT, pages: SEARCH_PAGE_LIMIT })
+  const snapshotKey = searchSnapshotKey({ userId: account.userId, tier: effectiveSearchTier, query, near, limit: SEARCH_RESULT_LIMIT, pages: SEARCH_PAGE_LIMIT, maxPriceRon: Number(searchBudget) > 0 ? Number(searchBudget) : 0 })
   const premiumLocked = searchTier === "premium" && accountPlan === "free"
 
   function selectSearchTier(nextTier: SearchTier) {
@@ -3044,6 +3051,7 @@ function SearchResultsContent() {
       })
       if (near) params.set("near", near)
       if (forceRefresh) params.set("refresh", "1")
+      if (Number(searchBudget) > 0) params.set("maxPriceRon", searchBudget)
 
       const searchEndpoint = effectiveSearchTier === "premium" ? "/api/search/premium" : "/api/search/free"
       const runSearch = async () => {
@@ -3095,9 +3103,9 @@ function SearchResultsContent() {
           setFeedbackExclusions(nextSnapshot.exclusions)
           setFeedbackNotice(null)
           setResults(mapped)
-          setBestUsedOffer(mapOffer(payload.summary?.bestUsedOffer, mapped) || mapped.find((item) => item.sourceKind === "used") || null)
+          setBestUsedOffer(mapOffer(payload.summary?.bestUsedOffer, mapped))
           setClosestUsedOffer(mapOffer(payload.summary?.closestUsedOffer, mapped))
-          setBestNewBenchmark(mapOffer(payload.summary?.bestNewBenchmark, mapped) || mapped.find((item) => item.sourceKind === "new" && item.isComparableNewBenchmark !== false) || null)
+          setBestNewBenchmark(mapOffer(payload.summary?.bestNewBenchmark, mapped))
           setJevDecision(effectiveSearchTier === "premium" ? payload.summary?.jevDecision || { status: "missing" } : null)
           setViewerLocation(payload.summary?.viewerLocation?.city
             ? { city: payload.summary.viewerLocation.city, source: payload.summary.viewerLocation.source || "edge" }
@@ -3179,7 +3187,7 @@ function SearchResultsContent() {
       controller.abort()
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
     }
-  }, [account.userId, accountPlan, effectiveSearchTier, near, query, refreshRequest, snapshotKey])
+  }, [account.userId, accountPlan, effectiveSearchTier, near, query, refreshRequest, snapshotKey, searchBudget])
 
   useEffect(() => {
     const initial = setTimeout(() => setTime(formatSearchTime()), 0)
@@ -3266,20 +3274,17 @@ function SearchResultsContent() {
   }, [conditions, feedbackExclusions, priceMax, priceMin, query, results, sort, sourceTypes, sources])
 
   const shownBestOffer = useMemo(() => {
-    const original = bestUsedOffer ? filteredResults.find((item) => item.id === bestUsedOffer.id) : null
-    return original || filteredResults.find((item) => item.sourceKind === "used") || null
+    return bestUsedOffer && filteredResults.some((item) => item.id === bestUsedOffer.id) ? bestUsedOffer : null
   }, [bestUsedOffer, filteredResults])
 
   const shownNewBenchmark = useMemo(() => {
     // A retail reference remains useful when shopping only for used products or
     // within a used-product budget. Honor explicit source exclusions and feedback.
-    const candidates = [...results, ...(bestNewBenchmark ? [bestNewBenchmark] : [])].filter((item) =>
-      item.sourceKind === "new" && item.isComparableNewBenchmark !== false && item.price !== null && item.price > 0 &&
-      !feedbackExclusions.some((exclusion) => isExcludedByFeedback(item, exclusion)) &&
-      !(sources.size > 0 && SOURCES_LIST.includes(item.source) && !sources.has(item.source))
-    )
-    return candidates.sort((a, b) => priceForSort(a, Infinity) - priceForSort(b, Infinity) || compareByRank(a, b))[0] || null
-  }, [bestNewBenchmark, feedbackExclusions, results, sources])
+    if (!bestNewBenchmark) return null
+    if (feedbackExclusions.some((exclusion) => isExcludedByFeedback(bestNewBenchmark, exclusion))) return null
+    if (sources.size > 0 && SOURCES_LIST.includes(bestNewBenchmark.source) && !sources.has(bestNewBenchmark.source)) return null
+    return bestNewBenchmark
+  }, [bestNewBenchmark, feedbackExclusions, sources])
 
   const shownClosestOffer = useMemo(() => {
     if (!closestUsedOffer) return null
@@ -3311,7 +3316,9 @@ function SearchResultsContent() {
     }).filter((entry) => entry.count > 0)
   }, [results])
 
-  const visibleRegularResults = [...visibleUsedResults, ...visibleNewBenchmarkResults]
+  const mixedResults = regularResults.filter((item) => item.sourceKind === "mixed")
+  const visibleMixedResults = mixedResults.slice(0, visibleCount)
+  const visibleRegularResults = [...visibleUsedResults, ...visibleNewBenchmarkResults, ...visibleMixedResults]
 
   const marketplaceValue = marketplaceStatus.total ? `${marketplaceStatus.successful}/${marketplaceStatus.total}` : "0/0"
   const updatedLabel = searchedAt ? formatDateTime(searchedAt) : "în timp real"
@@ -3698,7 +3705,7 @@ function SearchResultsContent() {
           <div className="flex flex-col xl:flex-row gap-6 items-start">
             <div className="flex-1 w-full min-w-0">
               <div className="flex justify-between items-end mb-4 px-1">
-                <h2 className="text-[14px] font-bold uppercase">Second-hand deals</h2>
+                <h2 className="text-[14px] font-bold uppercase">Second-hand și recondiționate</h2>
                 <div className="flex items-center gap-2 text-[11px]">
                   <span style={{ color: INK + "66" }}>Sortare după:</span>
                   <button className="font-bold uppercase flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity" style={{ color: INK }}>
@@ -3736,7 +3743,7 @@ function SearchResultsContent() {
               {newBenchmarkResults.length > 0 && (
                 <section className="mt-8">
                   <div className="mb-4 flex items-end justify-between px-1">
-                    <h2 className="text-[14px] font-bold uppercase">New price benchmarks</h2>
+                    <h2 className="text-[14px] font-bold uppercase">Produse noi · prețuri retail</h2>
                     <span className="text-[11px] font-bold uppercase" style={{ color: INK + "66" }}>
                       agregatoare + retaileri
                     </span>
@@ -3757,6 +3764,22 @@ function SearchResultsContent() {
                         onToggleCompare={toggleComparedListing}
                         onFeedback={handleOfferFeedback}
                       />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {visibleMixedResults.length > 0 && (
+                <section className="mt-8">
+                  <h2 className="mb-4 text-[14px] font-bold uppercase">Marketplace · tipul ofertei neconfirmat</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {visibleMixedResults.map((item) => (
+                      <ResultCard key={item.id} item={item} query={query} searchTier={searchTier}
+                        isLoggedIn={isLoggedIn} onInspect={setSelectedListing}
+                        conversationStatus={item.url ? conversationStatuses[item.url] : undefined}
+                        isSaved={savedListings.has(listingStorageId(item))} onToggleSaved={toggleSavedListing}
+                        isCompared={activeComparedListings.some((entry) => entry.id === item.id)} onToggleCompare={toggleComparedListing}
+                        onFeedback={handleOfferFeedback} />
                     ))}
                   </div>
                 </section>

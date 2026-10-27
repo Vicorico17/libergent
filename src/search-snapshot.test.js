@@ -28,7 +28,7 @@ test("reload restores exact order, recommendation, collection time and rejected 
 test("snapshot keys isolate accounts, tiers, locations and request bounds", () => {
   const input = { query: "iphone 15", tier: "premium", userId: "buyer", near: "Cluj", limit: 100, pages: 2 };
   assert.equal(searchSnapshotKey(input), searchSnapshotKey({ ...input, query: " IPHONE 15 " }));
-  for (const change of [{ userId: "other" }, { userId: "" }, { tier: "free" }, { near: "Bucuresti" }, { limit: 10 }, { pages: 1 }, { query: "iphone 16" }]) {
+  for (const change of [{ userId: "other" }, { userId: "" }, { tier: "free" }, { near: "Bucuresti" }, { limit: 10 }, { pages: 1 }, { maxPriceRon: 100 }, { query: "iphone 16" }]) {
     assert.notEqual(searchSnapshotKey(input), searchSnapshotKey({ ...input, ...change }));
   }
 });

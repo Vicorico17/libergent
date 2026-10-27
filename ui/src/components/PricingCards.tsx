@@ -15,7 +15,7 @@ const plans = [
   },
   {
     id: "premium", name: "Premium", label: "Pachet de căutări", price: PREMIUM_WEEKLY_PRICE_RON, period: "/ săptămână",
-    description: "Mai multe surse, comparații extinse și alerte pentru produsele pe care le cauți.",
+    description: "Căutare Premium: mai multe surse, comparații extinse și alerte. Contactul cu vânzătorii și negocierea sunt incluse separat în Libergent Agent.",
     features: ["Tot ce include Free", "Căutări în magazine și marketplace-uri verificate", "Comparație între produse noi și second-hand", "Monitorizare de preț și alerte de oferte", "Recomandări în funcție de bugetul tău"],
   },
   {

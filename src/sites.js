@@ -13,6 +13,9 @@ function encodeSearchText(value) {
 const VERIFIED_RETAIL_SEARCH_URLS = {
   "scule.ro": (query) => `https://www.scule.ro/?searchword=${encodeSearchText(query)}&search=1`,
   "nichiduta.ro": (query) => `https://www.nichiduta.ro/cauta?q=${encodeSearchText(query)}`,
+  // Noriel's catalog endpoint renders product cards; its Magento-style
+  // catalogsearch URL returns a 403/empty response in source validation.
+  "noriel.ro": (query) => `https://noriel.ro/catalog?q=${encodeSearchText(query)}`,
   "buzzsneakers.ro": (query) => `https://www.buzzsneakers.ro/produse?search=${encodeSearchText(query)}`,
   "sneakerindustry.ro": (query) => `https://sneakerindustry.ro/search?q=${encodeSearchText(query)}`,
   "modlet.ro": (query) => `https://www.modlet.ro/catalog?q=${encodeSearchText(query)}`,

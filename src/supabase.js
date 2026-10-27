@@ -16,6 +16,7 @@ const DEFAULT_WHATSAPP_MESSAGES_TABLE = "whatsapp_messages";
 const DEFAULT_DEAL_CASES_TABLE = "deal_cases";
 const DEFAULT_DEAL_SEND_ATTEMPTS_TABLE = "deal_send_attempts";
 const DEFAULT_DEAL_EVENTS_TABLE = "deal_events";
+const DEFAULT_DEAL_CALLS_TABLE = "deal_calls";
 const DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE = "vehicle_price_observations";
 const DEFAULT_SHOP_SUGGESTIONS_TABLE = "shop_suggestions";
 const DEFAULT_USER_ENTITLEMENTS_TABLE = "user_entitlements";
@@ -49,6 +50,7 @@ function getSupabaseConfig(env = process.env) {
   const dealCasesTable = normalizePublicRestTableName(env.SUPABASE_DEAL_CASES_TABLE, DEFAULT_DEAL_CASES_TABLE);
   const dealSendAttemptsTable = normalizePublicRestTableName(env.SUPABASE_DEAL_SEND_ATTEMPTS_TABLE, DEFAULT_DEAL_SEND_ATTEMPTS_TABLE);
   const dealEventsTable = normalizePublicRestTableName(env.SUPABASE_DEAL_EVENTS_TABLE, DEFAULT_DEAL_EVENTS_TABLE);
+  const dealCallsTable = normalizePublicRestTableName(env.SUPABASE_DEAL_CALLS_TABLE, DEFAULT_DEAL_CALLS_TABLE);
   const vehiclePriceObservationsTable = normalizePublicRestTableName(env.SUPABASE_VEHICLE_PRICE_OBSERVATIONS_TABLE, DEFAULT_VEHICLE_PRICE_OBSERVATIONS_TABLE);
   const shopSuggestionsTable = normalizePublicRestTableName(env.SUPABASE_SHOP_SUGGESTIONS_TABLE, DEFAULT_SHOP_SUGGESTIONS_TABLE);
   const userEntitlementsTable = normalizePublicRestTableName(env.SUPABASE_USER_ENTITLEMENTS_TABLE, DEFAULT_USER_ENTITLEMENTS_TABLE);
@@ -64,7 +66,7 @@ function getSupabaseConfig(env = process.env) {
     return null;
   }
 
-  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable, dealCasesTable, dealSendAttemptsTable, dealEventsTable, vehiclePriceObservationsTable, shopSuggestionsTable, userEntitlementsTable, alertProfilesTable, alertListingStateTable, alertEventsTable, notificationDeliveriesTable, discoveryProbeTermsTable, discoveryProbeRunsTable, discoveryProbeStateTable };
+  return { url, apiKey, table, queryStatsTable, keywordStatsTable, feedbackTable, emailLeadsTable, savedSearchesTable, whatsappMessagesTable, dealCasesTable, dealSendAttemptsTable, dealEventsTable, dealCallsTable, vehiclePriceObservationsTable, shopSuggestionsTable, userEntitlementsTable, alertProfilesTable, alertListingStateTable, alertEventsTable, notificationDeliveriesTable, discoveryProbeTermsTable, discoveryProbeRunsTable, discoveryProbeStateTable };
 }
 
 function getRequestHeaders(apiKey) {
@@ -430,6 +432,16 @@ export async function readPremiumEntitlement(userId, email = "", env = process.e
   return { active: row?.plan === "premium" && row?.status === "active" && unexpired, plan: row?.plan || "free", source: "database", expiresAt: row?.expires_at || null };
 }
 
+// Agent access is independent of search subscriptions and Premium beta overrides.
+export async function readAgentEntitlement(userId, env = process.env) {
+  if (!getSupabaseConfig(env) || !userId) return { active: false, plan: "agent", source: "none" };
+  const query = new URLSearchParams({ select: "status,expires_at", user_id: `eq.${userId}`, limit: "1" });
+  const rows = await requestSupabase(`agent_entitlements?${query}`, { method: "GET" }, env);
+  const row = Array.isArray(rows) ? rows[0] : null;
+  const unexpired = row?.expires_at == null || new Date(row.expires_at).getTime() > Date.now();
+  return { active: row?.status === "active" && unexpired, plan: "agent", source: "database", expiresAt: row?.expires_at || null };
+}
+
 export async function readBillingCustomer(userId, env = process.env) {
   const query = new URLSearchParams({ select: "user_id,stripe_customer_id,stripe_subscription_id", user_id: `eq.${userId}`, limit: "1" });
   const rows = await requestSupabase(`billing_customers?${query}`, { method: "GET" }, env);
@@ -704,6 +716,53 @@ export async function listDealEventsFromSupabase(id, userId, env = process.env) 
   if (!config) throw new Error("Supabase is not configured.");
   const query = new URLSearchParams({ select: "id,event_type,stage,details,created_at", deal_id: `eq.${id}`, user_id: `eq.${userId}`, order: "created_at.desc", limit: "100" });
   const rows = await requestSupabase(`${config.dealEventsTable}?${query.toString()}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function listDealCalls(dealId, userId, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ select: "*", deal_id: `eq.${dealId}`, user_id: `eq.${userId}`, order: "created_at.desc", limit: "20" });
+  const rows = await requestSupabase(`${config.dealCallsTable}?${query}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function getDealCall(id, dealId, userId, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ select: "*", id: `eq.${id}`, deal_id: `eq.${dealId}`, user_id: `eq.${userId}`, limit: "1" });
+  const rows = await requestSupabase(`${config.dealCallsTable}?${query}`, { method: "GET" }, env);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+export async function reserveDealCall(entry, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const rows = await requestSupabase(`${config.dealCallsTable}?on_conflict=idempotency_key`, {
+    method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify(entry)
+  }, env);
+  if (Array.isArray(rows) && rows[0]) return { created: true, call: rows[0] };
+  const query = new URLSearchParams({ select: "*", idempotency_key: `eq.${entry.idempotency_key}`, user_id: `eq.${entry.user_id}`, limit: "1" });
+  const existing = await requestSupabase(`${config.dealCallsTable}?${query}`, { method: "GET" }, env);
+  return { created: false, call: Array.isArray(existing) ? existing[0] || null : null };
+}
+
+export async function updateDealCall(id, userId, changes, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ id: `eq.${id}`, user_id: `eq.${userId}` });
+  const rows = await requestSupabase(`${config.dealCallsTable}?${query}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ ...changes, updated_at: new Date().toISOString() })
+  }, env);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+export async function listExpiredDealCalls(cutoff, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ select: "id,user_id,provider_call_id", created_at: `lt.${cutoff}`, provider_call_id: "neq.", recording_deleted_at: "is.null", order: "created_at.asc", limit: "100" });
+  const rows = await requestSupabase(`${config.dealCallsTable}?${query}`, { method: "GET" }, env);
   return Array.isArray(rows) ? rows : [];
 }
 

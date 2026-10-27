@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { loadEnv } from "./env.js";
+
+loadEnv(process.cwd());
 
 const processes = [
   spawn(process.execPath, ["src/server.js"], {

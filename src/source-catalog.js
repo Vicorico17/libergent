@@ -6,6 +6,11 @@ import { SOURCE_VALIDATION_SNAPSHOT } from "./source-validation-snapshot.js";
 export function buildSourceCatalog() {
   return Object.entries(SITES).map(([domain, site]) => ({
     domain,
+    sourceType: site.sourceType || "classifieds",
+    sourceCategory: FREE_TECH_SITE_KEYS.includes(domain) ? "refurbished"
+      : site.sourceType === "price_aggregator" ? "price_comparison"
+      : site.sourceType === "retailer_marketplace" ? "mixed"
+      : site.sourceType === "retailer" ? "retail" : "second_hand",
     tier: PREMIUM_SITE_KEYS.includes(domain) ? "premium" : "free",
     status: site.integrationStatus,
     productionValidation: SOURCE_VALIDATION_SNAPSHOT[domain]?.productionChecks?.map((check) => ({

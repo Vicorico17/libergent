@@ -1,5 +1,33 @@
 # Premium deal agent: seller contact through completed transaction
 
+## Access split — 2026-10-14
+
+Premium is premium search; Libergent Agent is the separately priced 999 RON
+outreach/negotiation service. The historical Premium-gated pilot description
+below is superseded by this access split.
+
+- Apply `supabase/agent_entitlements.sql` before deploying the new access checks.
+  This creates a private, service-role-managed table separate from Premium's
+  `user_entitlements`; Premium billing cannot grant or revoke Agent access.
+- An account needs an `active` Agent row with a future `expires_at` (or an
+  explicitly non-expiring grant) for deal APIs, proposals, calls and all outgoing
+  seller messages, including initial messages without a deal ID. Expired,
+  cancelled and missing grants are denied. Missing schema/database failures
+  fail closed with an unavailable response.
+- Premium allowlists and beta flags do not grant Agent access. Agent access does
+  not automatically grant Premium search; a bundle has not been decided.
+- Existing conversation history remains readable by its authenticated owner.
+- Trusted administration can grant a controlled pilot account; production grants
+  must eventually come from separately verified Agent payment fulfillment.
+  This change does not migrate every Premium subscriber, activate payments,
+  apply the SQL, or contact any sellers.
+- Fee basis, duration, number of sellers/products, usage limits and completion/
+  refund policy remain product decisions. No arbitrary quota is implemented.
+- Regression coverage: `src/agent-access.test.js` and the Agent cases in
+  `src/worker.test.js`. Verify real database grants and both deployment runtimes
+  before launch.
+
+
 Updated: 2026-09-28 (local pilot implementation)
 
 ## Product goal
