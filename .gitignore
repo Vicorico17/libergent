@@ -9,3 +9,5 @@ data/
 .openclaw-bridge.env
 .openclaw-inbound-forwarder.env
 .openclaw-inbound-forwarder-state.json
+
+/supabase/.temp/
