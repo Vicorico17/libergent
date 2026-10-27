@@ -44,7 +44,6 @@ function inferConversationStatus(messages) {
   for (const message of [...inbound].reverse()) {
     const text = message.text.toLowerCase();
     if (/nu mai (este|e) disponibil|s-a vandut|s a vandut|vandut|vândut|indisponibil/.test(text)) return "unavailable";
-    if (/de acord|ramane stabilit|rămâne stabilit|batut palma|bătut palma|ne-am inteles|ne am inteles/.test(text)) return "deal_agreed";
     if (/pret|preț|oferta|ofertă|negoci|ultimul pret|ultimul preț/.test(text)) return "negotiating";
   }
   return "replied";
