@@ -131,6 +131,20 @@ export async function searchIntegration(params, deps = {}) {
 export class IntegrationGateway {
   constructor(state, env) { this.state = state; this.env = env; this.inflight = new Map(); }
   async fetch(request) {
+    if (new URL(request.url).pathname === '/internal/mcp-admission') {
+      const now = Date.now();
+      const retryAfter = await this.state.storage.transaction(async tx => {
+        const previous = await tx.get('mcp-usage') || {};
+        const minute = Math.floor(now / 60000), day = Math.floor(now / 86400000);
+        const minuteCount = previous.minute === minute ? previous.minuteCount : 0;
+        const dayCount = previous.day === day ? previous.dayCount : 0;
+        if (dayCount >= 2000) return 86400 - Math.floor(now / 1000) % 86400;
+        if (minuteCount >= 120) return 60 - Math.floor(now / 1000) % 60;
+        await tx.put('mcp-usage', { minute, day, minuteCount: minuteCount + 1, dayCount: dayCount + 1 });
+        return 0;
+      });
+      return retryAfter ? failure('mcp_quota_exceeded', 429, { 'retry-after': String(retryAfter) }) : json({ allowed: true });
+    }
     if (new URL(request.url).pathname === '/internal/usage') {
       const usage = await this.state.storage.get('usage') || {};
       const now = Date.now();

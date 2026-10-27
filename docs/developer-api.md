@@ -24,6 +24,7 @@ curl --fail-with-body --get "$LIBERGENT_API_ORIGIN/api/v1/search" \
 | `GET /api/v1/sources` | None | Supported source IDs |
 | `GET /api/v1/openapi.json` | None | OpenAPI 3.1 spec for client generation / API tools |
 | `GET /api/v1/search` | API key | General product search |
+| `/api/v1/mcp` | API key | Read-only agent tools over Streamable HTTP; separately enabled |
 | `GET /api/developer/keys` | Existing account session | Own key metadata, never secrets/hashes |
 | `POST /api/developer/keys` | Verified account session | Create a key; raw secret returned once |
 | `DELETE /api/developer/keys/:id` | Verified account session | Revoke an owned key |
@@ -100,7 +101,7 @@ The plain Node server supports the developer page, demo, sources and spec. Full 
 
 ## Status and follow-up
 
-Implemented: general v1 API, compatible legacy route, self-service test/live keys, dashboard, usage, scopes, revocation, expiry, account-wide quotas, cache, demo, OpenAPI and examples. Existing website/Free/Premium search paths remain unchanged; navigation only gains an API link. MCP stays disabled and is not automatically authenticated by these API keys.
+Implemented: general v1 API, compatible legacy route, self-service test/live keys, dashboard, usage, scopes, revocation, expiry, account-wide quotas, cache, demo, OpenAPI and examples. Existing website/Free/Premium search paths remain unchanged; navigation only gains an API link. The new `/api/v1/mcp` adapter accepts the same developer keys when separately enabled. The older `/mcp` stays disabled and does not accept these keys. See [agent integrations](agent-integrations.md).
 
 Validation on 2026-10-27:
 

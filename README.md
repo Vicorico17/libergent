@@ -6,6 +6,12 @@ Production: [libergent.com](https://libergent.com)
 
 ### ChatGPT and Claude connector prototype
 
+For developer-key agent integrations, use the new opt-in `/api/v1/mcp` adapter
+documented in [Agent integrations](docs/agent-integrations.md). It shares the
+versioned API’s credentials, search quotas and cache. The older `/mcp` below
+remains a separate prototype; neither endpoint is enabled by this PR.
+
+
 The shared Streamable HTTP MCP endpoint is `/mcp`. It is disabled by default;
 set `LIBERGENT_MCP_ENABLED=1` to enable it in a development environment.
 The first milestone exposes three read-only tools: `search_products`,
@@ -582,6 +588,7 @@ product-search API; fur-coat filters are optional. BLANĂ is an example consumer
 - `GET /api/v1/sources` — supported API sources
 - `GET /api/v1/openapi.json` — downloadable OpenAPI 3.1 contract
 - `GET /api/v1/search?q=iphone%2015` — scoped API key required
+- `/api/v1/mcp` — authenticated Streamable HTTP tools for agent hosts, separately enabled
 
 See [developer quickstart and setup](docs/developer-api.md) and the
 [detailed listing/filter contract](docs/storefront-integration-v1.md).
