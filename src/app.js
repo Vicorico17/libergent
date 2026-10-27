@@ -387,6 +387,7 @@ export async function searchAcrossSites({
   maxPages,
   siteKeys = getDefaultSiteKeys(),
   viewerLocation = null,
+  maxPriceRon,
   aggregate = true
 }) {
   const requestedProvider = normalizeSearchProvider(provider);
@@ -406,6 +407,7 @@ export async function searchAcrossSites({
         condition,
         creditBudget,
         creditsUsed: 0,
+        maxPriceRon,
         viewerLocation
       }
     );
@@ -432,6 +434,7 @@ export async function searchAcrossSites({
 
   return aggregateMarketplaceResults(rawResults, {
     condition,
+    maxPriceRon,
     creditBudget,
     creditsUsed: rawResults.reduce((sum, result) => sum + (result.ok ? result.creditsUsed || 0 : 0), 0),
     viewerLocation

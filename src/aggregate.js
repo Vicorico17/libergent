@@ -1,6 +1,6 @@
 import { normalizeListing } from "./normalize.js";
 import { classifyListingIntent, getQueryBrandTerms, tokenize } from "./relevance.js";
-import { classifyMarketSegment } from "./market-segment.js";
+import { classifyMarketSegment, classifyOfferKind, canCompareRetailOffers } from "./market-segment.js";
 import { understandMarketplaceQuery } from "./query-understanding.js";
 import { buildListingProximity, publicViewerLocation } from "./location-intelligence.js";
 
@@ -17,7 +17,7 @@ function median(values) {
 }
 
 function isNewProductSource(item = {}) {
-  return classifyMarketSegment(item) === "retail";
+  return classifyOfferKind(item) === "new";
 }
 
 function normalizeIdentityText(value = "") {
@@ -55,6 +55,12 @@ function compareDuplicateCandidates(candidate, current) {
     return candidate;
   }
 
+  // Equivalent new products must retain the cheapest observed payable price.
+  if (isNewProductSource(candidate) && isNewProductSource(current)) {
+    const difference = safePriceForTieBreak(candidate.priceRon) - safePriceForTieBreak(current.priceRon);
+    if (difference !== 0 && !Number.isNaN(difference)) return difference < 0 ? candidate : current;
+  }
+
   const candidateScore = Number.isFinite(candidate.offerScore) ? candidate.offerScore : 0;
   const currentScore = Number.isFinite(current.offerScore) ? current.offerScore : 0;
   if (candidateScore !== currentScore) {
@@ -77,12 +83,13 @@ function compareDuplicateCandidates(candidate, current) {
 }
 
 function matchesCondition(item, condition) {
-  const normalized = (item.condition || "").toLowerCase();
+  const normalized = stripDiacritics((item.condition || "").toLowerCase());
+  const previouslyOwned = /\b(used|utilizat\w*|folosit\w*|second|refurbished|reconditionat\w*|resigilat\w*|ca nou|like new|open.box)\b/.test(normalized);
   if (condition === "new") {
-    return normalized.includes("nou");
+    return !previouslyOwned && /\b(nou|noua|new|sigilat\w*)\b/.test(normalized);
   }
   if (condition === "used") {
-    return normalized.includes("utilizat") || normalized.includes("folosit") || normalized.includes("second");
+    return previouslyOwned;
   }
   return true;
 }
@@ -923,7 +930,7 @@ function extractVehicleYear(item = {}) {
 }
 
 function isComparableCandidate(item, candidate) {
-  if (isNewProductSource(candidate) !== isNewProductSource(item)) return false;
+  if (classifyOfferKind(candidate) !== classifyOfferKind(item)) return false;
   if (item.comparableKey && candidate.comparableKey !== item.comparableKey) return false;
 
   if (item.queryCategory === "vehicle") {
@@ -966,7 +973,7 @@ function buildPriceIntelligence({ usedMedianPriceRon, newMedianPriceRon, globalM
     ? newPricedItems.reduce((lowest, item) => Math.min(lowest, item.priceRon), Number.POSITIVE_INFINITY)
     : null;
   const usedBestPriceRon = Number.isFinite(bestUsedOffer?.priceRon) ? bestUsedOffer.priceRon : null;
-  const savingsVsNewPct = Number.isFinite(usedBestPriceRon) && Number.isFinite(benchmarkPriceRon) && benchmarkPriceRon > 0
+  const savingsVsNewPct = canCompareRetailOffers(bestUsedOffer, bestNewBenchmark) && Number.isFinite(usedBestPriceRon) && Number.isFinite(benchmarkPriceRon) && benchmarkPriceRon > 0
     ? Math.round((1 - (usedBestPriceRon / benchmarkPriceRon)) * 100)
     : null;
   const primaryMedian = Number.isFinite(usedMedianPriceRon) ? usedMedianPriceRon : globalMedianPriceRon;
@@ -1031,7 +1038,7 @@ function isBlockedMarketplaceResult(result) {
   return /cloudflare challenge|anti-bot|blocked/i.test(messages);
 }
 
-export function aggregateMarketplaceResults(results, { condition = "any", creditBudget = null, creditsUsed = null, viewerLocation = null } = {}) {
+export function aggregateMarketplaceResults(results, { condition = "any", maxPriceRon, creditBudget = null, creditsUsed = null, viewerLocation = null } = {}) {
   const queryUnderstanding = understandMarketplaceQuery(results.find((result) => result?.query)?.query || "");
   const normalizedResults = results.map((result) => {
     if (!result.ok) {
@@ -1046,9 +1053,9 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     const classifiedItems = sortItemsByFreshness(
       result.items
         .map(normalizeListing)
-        .map((item) => ({ ...item, marketType: classifyMarketSegment(item) }))
+        .map((item) => ({ ...item, marketType: classifyMarketSegment(item), offerKind: classifyOfferKind(item) }))
         .map((item) => classifyListingIntent(item, result.query))
-        .filter((item) => matchesCondition(item, condition))
+        .filter((item) => matchesCondition(item, condition) || (condition === "used" && isNewProductSource(item)))
     );
     const {
       productMatches,
@@ -1109,9 +1116,9 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       ...item,
       site: result.site
     })));
-  const usedPricedItems = allPricedItems.filter((item) => item.marketType === "secondary");
-  const newPricedItems = allPricedItems.filter((item) => item.marketType === "retail");
-  const mixedPricedItems = allPricedItems.filter((item) => item.marketType === "mixed");
+  const usedPricedItems = allPricedItems.filter((item) => item.offerKind === "used");
+  const newPricedItems = allPricedItems.filter((item) => item.offerKind === "new");
+  const mixedPricedItems = allPricedItems.filter((item) => item.offerKind === "mixed");
 
   const averagePriceRon = allPricedItems.length
     ? allPricedItems.reduce((sum, item) => sum + item.priceRon, 0) / allPricedItems.length
@@ -1147,7 +1154,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const allPoolsBySegment = new Map();
   for (const item of rankedBaseCandidates) {
     if (item.queryCategory === "vehicle") continue;
-    const segment = isNewProductSource(item) ? "new" : "used";
+    const segment = classifyOfferKind(item);
     const allKey = `${segment}:all`;
     const allPool = allPoolsBySegment.get(allKey) || [];
     allPool.push(item);
@@ -1162,7 +1169,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const comparisonContexts = new Map();
   const getComparisonContext = (item) => {
     if (item.queryCategory === "vehicle") return null;
-    const segment = isNewProductSource(item) ? "new" : "used";
+    const segment = classifyOfferKind(item);
     const key = item.comparableKey ? `${segment}:key:${item.comparableKey}` : `${segment}:all`;
     if (comparisonContexts.has(key)) return comparisonContexts.get(key);
     const pool = item.comparableKey ? comparisonPools.get(key) || [] : allPoolsBySegment.get(key) || [];
@@ -1178,8 +1185,8 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
     const comparisonContext = getComparisonContext(item);
     const comparisonPool = comparisonContext
       ? (item.comparableKey
-        ? comparisonPools.get(`${isNewProductSource(item) ? "new" : "used"}:key:${item.comparableKey}`) || []
-        : allPoolsBySegment.get(`${isNewProductSource(item) ? "new" : "used"}:all`) || [])
+        ? comparisonPools.get(`${classifyOfferKind(item)}:key:${item.comparableKey}`) || []
+        : allPoolsBySegment.get(`${classifyOfferKind(item)}:all`) || [])
       : rankedBaseCandidates.filter((candidate) => isComparableCandidate(item, candidate));
     const pricedComparisonCount = comparisonContext?.pricedPoolCount ?? comparisonPool.filter(
       (candidate) => Number.isFinite(candidate.priceRon) && candidate.priceRon > 0
@@ -1236,13 +1243,19 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
         })
     };
   });
-  const saferCandidates = rankedCandidates.filter((item) => !item.riskFlags?.some((flag) => flag.severity === "bad"));
-  const bestOffer = saferCandidates[0] || rankedCandidates[0] || null;
-  const bestUsedOffer = saferCandidates.find((item) => !isNewProductSource(item))
-    || rankedCandidates.find((item) => !isNewProductSource(item))
+  // Keep the full market sample for price intelligence and retail comparisons.
+  // Buying decisions, however, must satisfy the user's constraints in every client.
+  const eligibleCandidates = rankedCandidates.filter((item) =>
+    (condition === "any" || matchesCondition(item, condition)) &&
+    (maxPriceRon === undefined || (Number.isFinite(item.priceRon) && item.priceRon > 0 && item.priceRon <= maxPriceRon))
+  );
+  const saferCandidates = eligibleCandidates.filter((item) => !item.riskFlags?.some((flag) => flag.severity === "bad"));
+  const bestOffer = saferCandidates[0] || eligibleCandidates[0] || null;
+  const bestUsedOffer = saferCandidates.find((item) => item.offerKind === "used")
+    || eligibleCandidates.find((item) => item.offerKind === "used")
     || null;
-  const nearbyUsedCandidates = rankedCandidates.filter((item) =>
-    !isNewProductSource(item) &&
+  const nearbyUsedCandidates = eligibleCandidates.filter((item) =>
+    item.offerKind === "used" &&
     item.proximity &&
     item.recommendationScore >= 55
   );
@@ -1256,16 +1269,17 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       b.recommendationScore - a.recommendationScore
     )[0] || null;
   const bestNewBenchmark = rankedCandidates
-    .filter((item) => isNewProductSource(item))
+    .filter((item) => isNewProductSource(item) && Number.isFinite(item.priceRon) && item.priceRon > 0)
     .sort((a, b) => {
       const aHasSevereRisk = a.riskFlags?.some((flag) => flag.severity === "bad") ? 1 : 0;
       const bHasSevereRisk = b.riskFlags?.some((flag) => flag.severity === "bad") ? 1 : 0;
-      return aHasSevereRisk - bHasSevereRisk ||
+      return Number(canCompareRetailOffers(bestUsedOffer, b)) - Number(canCompareRetailOffers(bestUsedOffer, a)) ||
+        aHasSevereRisk - bHasSevereRisk ||
         semanticMatchTier(b) - semanticMatchTier(a) ||
-        b.recommendationScore - a.recommendationScore ||
-        safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon);
+        safePriceForTieBreak(a.priceRon) - safePriceForTieBreak(b.priceRon) ||
+        b.recommendationScore - a.recommendationScore;
     })[0] || null;
-  const recommendedOffers = pickTopRecommendationsByMarketplace(rankedCandidates);
+  const recommendedOffers = pickTopRecommendationsByMarketplace(eligibleCandidates);
   const successfulResults = rankedResults.filter((result) => result.ok);
   const failedResults = rankedResults.filter((result) => !result.ok);
   const parsedListings = successfulResults.reduce((sum, result) => sum + (result.parsedItemCount ?? result.rawItemCount ?? 0), 0);
@@ -1305,6 +1319,8 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
       searchedAt: new Date().toISOString(),
       condition,
       conditionLabel: condition === "new" ? "Nou" : condition === "used" ? "Folosit" : "Oricare",
+      maxPriceRon: maxPriceRon ?? null,
+      rankedOffers: eligibleCandidates,
       queryUnderstanding,
       recommendationMode: bestUsedOffer?.recommendation?.strong ? "deal" : "match",
       viewerLocation: publicViewerLocation(viewerLocation),

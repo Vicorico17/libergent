@@ -1,9 +1,11 @@
 import { searchAcrossSites } from "./app.js";
+import { handleMcp } from "./mcp.js";
 import { handleSelling } from "./selling.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildConversationHistory, getConversationById, normalizeDeliveryStatus } from "./conversations.js";
 import { buildDealOpeningDraft, buildDealReplyDraft, normalizeDealChange, normalizeDealCreate } from "./deals.js";
 import { generateDealReplyWithModel } from "./deal-ai.js";
+import { callBrief, masscallRequest, normalizeCallApproval, validProviderCallId } from "./masscall.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
 import { runMarketplaceHealthChecks } from "./health.js";
 import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
@@ -11,7 +13,8 @@ import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { buildAlertEvents, MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
 import { claimDiscoveryProbeLease, completeAlertProfileCheck, createAlertProfileInSupabase, deleteAlertProfileInSupabase, findWhatsAppConversationOwner, insertAlertEventsInSupabase, insertDiscoveryProbeRun, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertListingStatesFromSupabase, listAlertProfilesFromSupabase, listDiscoveryProbeRuns, listDiscoveryProbeTerms, listDueAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, markDiscoveryProbeTermSearched, readPremiumEntitlement, readRecentDiscoverySeedQueries, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, recordDiscoveryProbeFeedback, recordNotificationDeliveryInSupabase, releaseDiscoveryProbeLease, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase, upsertAlertListingStatesInSupabase, upsertDiscoveryProbeTerms } from "./supabase.js";
-import { createDealCaseInSupabase, getDealCaseFromSupabase, listDealCasesFromSupabase, listDealEventsFromSupabase, reserveDealSendAttempt, updateDealCaseInSupabase, updateDealSendAttempt } from "./supabase.js";
+import { readAgentEntitlement, createDealCaseInSupabase, getDealCaseFromSupabase, listDealCasesFromSupabase, listDealEventsFromSupabase, reserveDealSendAttempt, updateDealCaseInSupabase, updateDealSendAttempt } from "./supabase.js";
+import { getDealCall, listDealCalls, listExpiredDealCalls, reserveDealCall, updateDealCall } from "./supabase.js";
 import { applyBillingSubscription, readBillingCustomer, readBillingCustomerByStripeId } from "./supabase.js";
 import { assertConfiguredPrice, configuredPriceIds, createCheckoutSession, createPortalSession, entitlementFromSubscription, isBillingConfigured, isCheckoutConfigured, stripeGet, verifyStripeEvent } from "./billing.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
@@ -33,6 +36,7 @@ import {
   MAX_API_SEARCH_PAGES,
   MAX_IMAGE_PROXY_BYTES,
   MAX_JSON_BODY_BYTES,
+  parseMaxPriceRon,
   parseBoundedPositiveInteger
 } from "./api-params.js";
 
@@ -141,9 +145,10 @@ function preferBrowserFallback(directResult, browserResult) {
 }
 
 function buildSearchCacheRequest(request, params, viewerLocation = null, tier = "premium") {
-  const cacheUrl = new URL(`/api/search/${tier}-cache/v10`, request.url);
+  const cacheUrl = new URL(`/api/search/${tier}-cache/v11`, request.url);
   cacheUrl.searchParams.set("q", params.query.trim().toLocaleLowerCase("ro-RO"));
   cacheUrl.searchParams.set("condition", params.condition);
+  cacheUrl.searchParams.set("maxPriceRon", String(params.maxPriceRon ?? ""));
   cacheUrl.searchParams.set("provider", params.provider);
   cacheUrl.searchParams.set("site", params.site);
   cacheUrl.searchParams.set("limit", String(params.limit ?? ""));
@@ -339,6 +344,7 @@ function getSearchRequestParams(url) {
   return {
     query,
     condition: url.searchParams.get("condition") || "any",
+    maxPriceRon: parseMaxPriceRon(url.searchParams.get("maxPriceRon")),
     provider: url.searchParams.get("provider") || "auto",
     site: url.searchParams.get("site") || "default",
     limit: parseBoundedPositiveInteger(url.searchParams.get("limit"), {
@@ -684,6 +690,19 @@ async function authenticatePremiumUser(request, env, premiumMessage = "Premium e
   if (!auth.user) return { response: json({ error: auth.error }, auth.status) };
   const entitlement = await readPremiumEntitlement(auth.user.id, auth.user.email || "", env).catch(() => ({ active: false, plan: "free" }));
   if (!entitlement.active) return { response: json({ error: premiumMessage, code: "premium_required" }, 403) };
+  return { user: auth.user, entitlement };
+}
+
+async function authenticateAgentUser(request, env) {
+  const auth = await authenticateSupabaseUser(request, env);
+  if (!auth.user) return { response: json({ ok: false, error: auth.error }, auth.status) };
+  let entitlement;
+  try {
+    entitlement = await readAgentEntitlement(auth.user.id, env);
+  } catch {
+    return { response: json({ ok: false, error: "Accesul Libergent Agent nu poate fi verificat momentan.", code: "agent_access_unavailable" }, 503) };
+  }
+  if (!entitlement.active) return { response: json({ ok: false, error: "Contactarea vânzătorilor și negocierea necesită Libergent Agent. Premium include căutarea avansată.", code: "agent_required" }, 403) };
   return { user: auth.user, entitlement };
 }
 
@@ -1083,7 +1102,7 @@ async function handleApi(request, env, context) {
 
   if (apiPath === "/api/search" || apiPath === "/api/search/free") {
     try {
-      const { query, condition, provider, site, limit, maxPages } = getSearchRequestParams(url);
+      const { query, condition, provider, site, limit, maxPages, maxPriceRon } = getSearchRequestParams(url);
       const viewerLocation = resolveViewerLocation({
         cf: request.cf,
         headers: request.headers,
@@ -1092,7 +1111,7 @@ async function handleApi(request, env, context) {
       const siteKeys = getFreeSearchSiteKeys(site, query);
       const freeProvider = provider === "auto" ? "direct" : provider;
       const cacheRequest = buildSearchCacheRequest(request, {
-        query, condition, provider: freeProvider, site, limit, maxPages
+        query, condition, provider: freeProvider, site, limit, maxPages, maxPriceRon
       }, viewerLocation, "free");
       const cachedResponse = await readSearchCache(cacheRequest);
       if (cachedResponse) {
@@ -1105,6 +1124,7 @@ async function handleApi(request, env, context) {
         query,
         condition,
         provider: freeProvider,
+        maxPriceRon,
         limit,
         maxPages,
         siteKeys,
@@ -1138,7 +1158,7 @@ async function handleApi(request, env, context) {
 
     try {
       const params = getSearchRequestParams(url);
-      const { query, condition, provider, site, limit, maxPages } = params;
+      const { query, condition, provider, site, limit, maxPages, maxPriceRon } = params;
       const viewerLocation = resolveViewerLocation({
         cf: request.cf,
         headers: request.headers,
@@ -1196,6 +1216,7 @@ async function handleApi(request, env, context) {
         {
           condition,
           creditBudget: freePayload.summary?.creditBudget || 0,
+          maxPriceRon,
           creditsUsed: freePayload.summary?.creditsUsed || 0,
           viewerLocation
         }
@@ -1472,14 +1493,96 @@ async function handleApi(request, env, context) {
 
   if (apiPath === "/api/deals" || apiPath.startsWith("/api/deals/")) {
     if (!isSupabaseConfigured(env)) return json({ error: "Supabase is not configured." }, 503);
-    const premium = await authenticatePremiumUser(request, env, "Asistentul de negociere este disponibil în Premium.");
-    if (premium.response) return premium.response;
-    const userId = premium.user.id;
-    const [dealId = "", subroute = "", extra = ""] = apiPath === "/api/deals" ? [] : apiPath.slice("/api/deals/".length).split("/");
+    const agent = await authenticateAgentUser(request, env);
+    if (agent.response) return agent.response;
+    const userId = agent.user.id;
+    const [dealId = "", subroute = "", extra = "", action = "", overflow = ""] = apiPath === "/api/deals" ? [] : apiPath.slice("/api/deals/".length).split("/");
     if (dealId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dealId)) return json({ error: "Invalid deal ID." }, 400);
-    if (extra || (subroute && subroute !== "suggest")) return json({ error: "Not found" }, 404);
+    if (overflow || (subroute && !["suggest", "calls"].includes(subroute)) || (subroute !== "calls" && (extra || action))) return json({ error: "Not found" }, 404);
 
     try {
+      if (dealId && subroute === "calls") {
+        const deal = await getDealCaseFromSupabase(dealId, userId, env);
+        if (!deal) return json({ error: "Deal not found." }, 404);
+        if (!extra && request.method === "GET") return json({ ok: true, calls: await listDealCalls(dealId, userId, env) });
+        if (!extra && request.method === "POST") {
+          const parsed = await parseJsonRequest(request);
+          if (parsed.error) return json({ error: parsed.error }, parsed.error.includes("large") ? 413 : 400);
+          const approval = normalizeCallApproval(parsed.data || {}, deal, env);
+          const previous = await listDealCalls(dealId, userId, env);
+          if (previous.some((call) => ["pending", "unknown", "queued", "ringing", "in-progress"].includes(call.status) && call.idempotency_key !== approval.idempotencyKey)) return json({ error: "This deal already has a pending or active call." }, 409);
+          const today = new Date().toISOString().slice(0, 10);
+          const configuredDaily = Number(env.LIBERGENT_CALLS_PER_DEAL_PER_DAY || 1);
+          const maxDaily = Number.isInteger(configuredDaily) && configuredDaily >= 1 && configuredDaily <= 10 ? configuredDaily : 1;
+          if (previous.filter((call) => call.created_at?.startsWith(today) && call.idempotency_key !== approval.idempotencyKey).length >= maxDaily) return json({ error: "Daily call limit reached for this deal." }, 429);
+          const now = new Date().toISOString();
+          const snapshot = callBrief(deal, approval.objective);
+          let reservation;
+          try {
+            reservation = await reserveDealCall({
+              idempotency_key: approval.idempotencyKey, deal_id: dealId, user_id: userId,
+              destination: approval.destination, objective: approval.objective, contact_source: approval.contactSource,
+              recording_consent_evidence: approval.recordingConsentEvidence,
+              brief_snapshot: snapshot, buyer_approved_at: now, contact_permitted_at: now, recording_notice_acknowledged_at: now
+            }, env);
+          } catch (error) {
+            if (/duplicate key|23505/.test(error instanceof Error ? error.message : "")) return json({ error: "Another pilot call is active." }, 409);
+            throw error;
+          }
+          const { created, call } = reservation;
+          if (!call) throw new Error("Could not reserve the call.");
+          if (!created) {
+            if (call.deal_id !== dealId || call.destination !== approval.destination || call.objective !== approval.objective || call.contact_source !== approval.contactSource || call.recording_consent_evidence !== approval.recordingConsentEvidence || call.brief_snapshot !== snapshot) return json({ error: "Idempotency key was used for a different call." }, 409);
+            return json({ ok: true, call }, 200);
+          }
+          try {
+            const provider = await masscallRequest("/v1/calls", { method: "POST", body: {
+              callId: call.id, idempotencyKey: approval.idempotencyKey, to: approval.destination,
+              objective: snapshot, contactSource: approval.contactSource, recordingRequired: true
+            }, env });
+            if (!validProviderCallId(provider.providerCallId)) throw new Error("Masscall returned an invalid call ID.");
+            const updated = await updateDealCall(call.id, userId, { provider_call_id: provider.providerCallId, status: provider.status || "queued" }, env);
+            return json({ ok: true, call: updated }, 201);
+          } catch (error) {
+            const status = error?.status && error.status < 500 ? "failed" : "unknown";
+            const updated = await updateDealCall(call.id, userId, { status, failure_code: status === "failed" ? "provider_rejected" : "submission_uncertain" }, env);
+            return json({ error: status === "unknown" ? "Call submission is uncertain. Check status; do not retry with a new key." : "Masscall rejected the call.", call: updated }, status === "unknown" ? 502 : 422);
+          }
+        }
+        if (!/^[0-9a-f-]{36}$/i.test(extra) || !["", "stop", "recording"].includes(action)) return json({ error: "Not found" }, 404);
+        const call = await getDealCall(extra, dealId, userId, env);
+        if (!call) return json({ error: "Call not found." }, 404);
+        if (!action && request.method === "GET") {
+          if (!validProviderCallId(call.provider_call_id)) return json({ ok: true, call });
+          try {
+            const state = await masscallRequest(`/v1/calls/${call.provider_call_id}`, { env });
+            const updated = await updateDealCall(call.id, userId, {
+              status: state.status, duration_seconds: state.durationSeconds ?? null,
+              recording_id: state.recordingId || "", recording_ready: state.recordingReady === true,
+              failure_code: state.failureCode || ""
+            }, env);
+            return json({ ok: true, call: updated });
+          } catch { return json({ ok: true, call: { ...call, status: "unknown" }, stale: true }); }
+        }
+        if (action === "stop" && request.method === "POST") {
+          if (!validProviderCallId(call.provider_call_id)) return json({ error: "This call has no provider ID; status is uncertain." }, 409);
+          const state = await masscallRequest(`/v1/calls/${call.provider_call_id}/stop`, { method: "POST", env });
+          const updated = await updateDealCall(call.id, userId, { status: state.status || "canceled" }, env);
+          return json({ ok: true, call: updated });
+        }
+        if (action === "recording" && request.method === "GET") {
+          if (!validProviderCallId(call.provider_call_id) || !call.recording_ready || call.recording_deleted_at) return json({ error: "Recording is not available." }, 409);
+          const audio = await masscallRequest(`/v1/calls/${call.provider_call_id}/recording`, { env });
+          return new Response(audio.body, { status: 200, headers: { "content-type": "audio/mpeg", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
+        }
+        if (action === "recording" && request.method === "DELETE") {
+          if (!validProviderCallId(call.provider_call_id)) return json({ error: "Call has no provider ID." }, 409);
+          await masscallRequest(`/v1/calls/${call.provider_call_id}/recording`, { method: "DELETE", env });
+          const updated = await updateDealCall(call.id, userId, { recording_ready: false, recording_id: "", recording_deleted_at: new Date().toISOString() }, env);
+          return json({ ok: true, call: updated });
+        }
+        return json({ error: "Method not allowed" }, 405);
+      }
       if (request.method === "POST" && dealId && subroute === "suggest") {
         const deal = await getDealCaseFromSupabase(dealId, userId, env);
         if (!deal) return json({ error: "Deal not found." }, 404);
@@ -1501,7 +1604,8 @@ async function handleApi(request, env, context) {
           const conversations = buildConversationHistory(rows, { userId }).filter((item) => item.listingUrl === deal.listing_url);
           const replyConversation = conversations.find((item) => item.messages.at(-1)?.direction === "inbound");
           const events = await listDealEventsFromSupabase(dealId, userId, env);
-          return json({ ok: true, deal, events, openingDraft: buildDealOpeningDraft(deal), conversations,
+          const calls = await listDealCalls(dealId, userId, env);
+          return json({ ok: true, deal, events, calls, openingDraft: buildDealOpeningDraft(deal), conversations,
             replyDraft: buildDealReplyDraft(deal, replyConversation), replyConversationId: replyConversation?.id || null });
         }
         return json({ ok: true, deals: await listDealCasesFromSupabase(userId, env) });
@@ -1555,8 +1659,8 @@ async function handleApi(request, env, context) {
       return json({ error: "Method not allowed" }, 405);
     }
 
-    const auth = await authenticateSupabaseUser(request, env);
-    if (!auth.user) return json({ ok: false, error: auth.error }, auth.status);
+    const auth = await authenticateAgentUser(request, env);
+    if (auth.response) return auth.response;
 
     if (!env.OPENCLAW_BRIDGE_URL || !env.OPENCLAW_BRIDGE_TOKEN) {
       return json({ ok: false, error: "WhatsApp bridge is not configured." }, 503);
@@ -1581,8 +1685,6 @@ async function handleApi(request, env, context) {
     let dealAttemptKey = "";
     if (body.dealId) {
       if (!body.conversationId) return json({ error: "Deal replies require an existing conversation." }, 400);
-      const entitlement = await readPremiumEntitlement(auth.user.id, auth.user.email || "", env).catch(() => ({ active: false }));
-      if (!entitlement.active) return json({ error: "Premium required for deal-agent messages.", code: "premium_required" }, 403);
       dealAttemptKey = String(body.idempotencyKey || "");
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(dealAttemptKey)) {
         return json({ error: "A valid idempotency key is required for deal messages." }, 400);
@@ -1833,6 +1935,10 @@ export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
 
+    if (normalizeApiPathname(url.pathname) === "/mcp") {
+      return handleMcp(request, env, (apiRequest) => handleApi(apiRequest, env, context));
+    }
+
     if (url.pathname.startsWith("/api/")) {
       return handleApi(request, env, context);
     }
@@ -1843,8 +1949,25 @@ export default {
     applyEnv(env);
     const scheduledAt = new Date(Number(controller?.scheduledTime) || Date.now());
     context.waitUntil((async () => {
-      await runDiscoveryProbe(env);
-      if (scheduledAt.getUTCMinutes() === 15) await runDuePremiumAlerts(env);
+      try { await runDiscoveryProbe(env); }
+      catch (error) { console.error("Discovery probe run failed", error instanceof Error ? error.message : String(error)); }
+      if (scheduledAt.getUTCMinutes() === 15) {
+        try { await runDuePremiumAlerts(env); }
+        catch (error) { console.error("Premium alert run failed", error instanceof Error ? error.message : String(error)); }
+        const days = Number(env.LIBERGENT_RECORDING_RETENTION_DAYS);
+        if (Number.isInteger(days) && days >= 1 && days <= 30 && env.MASSCALL_SERVICE_URL && env.MASSCALL_SERVICE_TOKEN) {
+          const cutoff = new Date(scheduledAt.getTime() - days * 86400000).toISOString();
+          for (const call of await listExpiredDealCalls(cutoff, env)) {
+            if (!validProviderCallId(call.provider_call_id)) continue;
+            try {
+              await masscallRequest(`/v1/calls/${call.provider_call_id}/recording`, { method: "DELETE", env });
+              await updateDealCall(call.id, call.user_id, { recording_ready: false, recording_id: "", recording_deleted_at: new Date().toISOString() }, env);
+            } catch (error) {
+              console.error("Recording retention deletion failed", call.id, error instanceof Error ? error.message : String(error));
+            }
+          }
+        }
+      }
     })());
   }
 };

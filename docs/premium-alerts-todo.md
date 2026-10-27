@@ -21,6 +21,15 @@ implementation references; a checked implementation is not proof of production
 acceptance. This update reviewed repository code and documentation, not live
 payments, seller conversations, or marketplace publication.
 
+### Confirmed product split
+
+- [x] **Premium = premium search.** Expanded search and offer comparison at
+  **49 RON/week or 499 RON/year**, with **3 days free** on the first subscription.
+  Premium does not include seller outreach or negotiation on the buyer's behalf.
+- [x] **Libergent Agent = acting on your behalf.** The separate **999 RON** service
+  contacts sellers, checks details and availability, follows up, negotiates within
+  the buyer's budget, and helps arrange the deal with the buyer's approval.
+
 ### Landing-page ticker finalization — 2026-10-19
 
 - [ ] **Finalize the seamless scrolling text bar.** The repeated-group CSS loop
@@ -32,13 +41,13 @@ payments, seller conversations, or marketplace publication.
 
 ### Priority and execution order
 
-1. [ ] **Define Premium vs. Libergent Agent.** Premium is the search pack:
-   **49 RON/week or 499 RON/year, with 3 days free on the first subscription**.
-   Agent is the separate **999 RON** seller-contact and negotiation service.
+1. [ ] **Implement the confirmed product split and finalize service limits.**
+   Keep premium search under Premium and outreach/negotiation under Agent.
    Finalize included sources, search/alert limits, whether Agent includes Premium,
    number of products/sellers, service duration, fee basis, completion criteria,
-   cancellation and refund rules. Implement separate entitlements: the existing
-   deal pilot is still Premium-gated and must match the new packaging.
+   cancellation and refund rules. Separate Agent access checks and a private
+   entitlement table are implemented locally; apply the migration and verify
+   production grants before marking this workstream complete.
 2. [ ] **Implement production payments.** Build on the existing Stripe test flow.
    Add explicit live-mode configuration (the current billing guard accepts only
    `sk_test_`), configure weekly/annual products and webhooks, and verify the
@@ -77,15 +86,70 @@ payments, seller conversations, or marketplace publication.
    freshness, latency, cost and failure behavior; keep experimental sources
    clearly labeled. See [the marketplace inventory](marketplace-integration-todo.md).
 8. [ ] **Build ChatGPT and Claude connectors.** Define the shared authenticated
-   API/MCP capabilities and each client's supported connection method. Start with
-   search and offer comparison; expose account-scoped alerts, deal status and
-   selling only with the appropriate entitlement and explicit approval for sends,
-   publishing or purchases. Implement connection, revocation, scopes, ownership,
-   errors and setup instructions. Verify a complete real-client flow separately
-   in ChatGPT and Claude. The existing selling CLI is not a shipped connector;
-   local MCP work is not completion until committed, deployed and tested in both.
+   API/MCP capabilities and each client's supported connection method. The goal
+   is to make Libergent's search, decisions and workflows available in both chats;
+   the clients must present Libergent's recommendations and must not choose a
+   replacement winner.
+   Owner reaffirmed this task on **2026-10-19**. The connector must expose
+   **Libergent's own search, decisions, explanations and workflows**; clients
+   present those results rather than independently choosing replacement offers.
+   The local code already has a stateless MCP endpoint, `search_products`,
+   `get_listing_details`, and `list_sources`. Search passes Libergent's budget,
+   ranking, price intelligence and Jev decisions through; Premium requests use
+   the existing entitlement check when a bearer token is present. This is a local
+   prototype, not a connected or deployed product. Complete in this order:
+   1. [ ] **Set and document the first release scope.** Free users get public
+      search; linked Premium accounts get premium search and Jev decisions; the
+      separate Libergent Agent entitlement gates seller outreach and negotiation.
+      Decide which account tools ship first (alerts, saved offers, deal status,
+      selling drafts) and defer any action whose underlying service or safeguards
+      are not ready.
+   2. [ ] **Review and isolate the existing implementation.** Separate connector
+      files and required shared search changes from unrelated uncommitted product
+      work. Review tool schemas, outputs, search parity, listing URL restrictions,
+      pricing/filter behavior, error handling and deployment flags; then commit
+      this slice with its setup and test instructions.
+   3. [ ] **Implement account linking.** Add an OAuth authorization flow that
+      lets a user sign in to their existing Libergent account, approve the
+      requested access, and connect it from each client. Support authorization
+      code with PKCE, client registration as required, short-lived scoped access
+      tokens, refresh-token rotation, disconnect and immediate revocation. Never
+      ask users to paste session tokens into chat or tool arguments.
+   4. [ ] **Enforce scopes and product entitlements in every tool.** Keep free
+      search public. Check the connected user's Premium entitlement for premium
+      search and Jev; check the independent Agent entitlement for seller contact,
+      negotiation and calls. Scope every private read/write to the authenticated
+      user. Require explicit approval before sending a message, placing a call,
+      publishing a listing or taking another consequential action.
+   5. [ ] **Expand the tool set from existing Libergent services.** First add
+      account-scoped read tools for alerts/events, saved offers and deal status.
+      Then add supported Agent workflows and Vinde draft/publication tools, each
+      using existing services, ownership checks, idempotency and confirmation.
+      Return Libergent's decision and state; do not recreate business logic in the
+      MCP adapter.
+   6. [ ] **Prepare for production load and failures.** Set per-account and
+      anonymous rate limits, search deadlines, bounded browser/cost budgets,
+      partial-result behavior and safe retries. Add metrics for latency, source
+      coverage, OAuth failures, tool errors and cost. Do not log tokens or private
+      listing/account data unnecessarily. Keep a feature flag and rollback path.
+   7. [ ] **Deploy an isolated staging endpoint.** Configure HTTPS, OAuth
+      metadata/callbacks, secret storage, database migrations and test accounts.
+      Verify connect/disconnect, revocation, expiry, plan changes, cross-account
+      isolation, source failures and every write-action confirmation.
+   8. [ ] **Run end-to-end tests in ChatGPT and Claude.** Connect a fresh account
+      in each client; test Free, Premium and Agent permissions, Romanian prompts,
+      Libergent's exact recommendations, empty/partial results and expired access.
+      Confirm each client supports the chosen auth flow and MCP transport.
+   9. [ ] **Release and support the connector.** Prepare setup/onboarding guides,
+      support contact, privacy and terms disclosures, reviewer test cases and
+      platform-specific packages/listings. Submit for public distribution, address
+      review feedback, publish, and monitor connection success and tool quality.
 
 ### Completed foundations from the recent work
+
+- [x] Implement separate Agent entitlement checks for deals, proposals, calls and
+  all outbound seller messages, with denial/expiry/independence tests. Local code
+  only: `supabase/agent_entitlements.sql` still needs deployment and live acceptance.
 
 - [x] Three pricing offers: Free, Premium search pack and Libergent Agent at 999 RON.
 - [x] Premium leads with 49 RON/week and a 3-day trial; 499 RON/year remains available.

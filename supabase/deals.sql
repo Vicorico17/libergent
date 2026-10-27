@@ -44,6 +44,39 @@ alter table public.deal_send_attempts enable row level security;
 revoke all on table public.deal_send_attempts from anon, authenticated;
 grant all on table public.deal_send_attempts to service_role;
 
+create table if not exists public.deal_calls (
+  id uuid primary key default gen_random_uuid(),
+  idempotency_key uuid not null unique,
+  deal_id uuid not null references public.deal_cases(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  destination text not null,
+  objective text not null,
+  contact_source text not null,
+  recording_consent_evidence text not null,
+  brief_snapshot text not null,
+  buyer_approved_at timestamptz not null,
+  contact_permitted_at timestamptz not null,
+  recording_notice_acknowledged_at timestamptz not null,
+  status text not null default 'pending' check (status in ('pending','unknown','queued','ringing','in-progress','completed','failed','busy','no-answer','canceled')),
+  provider_call_id text not null default '',
+  recording_id text not null default '',
+  recording_ready boolean not null default false,
+  recording_deleted_at timestamptz,
+  duration_seconds integer,
+  failure_code text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists deal_calls_owner_idx on public.deal_calls (user_id, deal_id, created_at desc);
+create unique index if not exists deal_calls_one_active_per_deal_idx on public.deal_calls (deal_id)
+where status in ('pending','unknown','queued','ringing','in-progress');
+create unique index if not exists deal_calls_one_active_pilot_idx on public.deal_calls ((true))
+where status in ('pending','unknown','queued','ringing','in-progress');
+alter table public.deal_calls enable row level security;
+revoke all on table public.deal_calls from anon, authenticated;
+grant all on table public.deal_calls to service_role;
+
 create table if not exists public.deal_events (
   id bigint generated always as identity primary key,
   deal_id uuid not null references public.deal_cases(id) on delete cascade,

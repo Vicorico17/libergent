@@ -1,3 +1,7 @@
+import { classifyOfferKind, canCompareRetailOffers } from "../../../../src/market-segment.js";
+
+export { canCompareRetailOffers };
+
 export type ApiListing = {
   title?: string;
   price?: number | string | null;
@@ -185,7 +189,7 @@ export type SearchResultItem = {
   sourceType: string;
   marketType: "retail" | "secondary" | "mixed" | null;
   sourceGroup: string;
-  sourceKind: "used" | "new";
+  sourceKind: "used" | "new" | "mixed";
   sourceKindLabel: string;
   sellerType: string;
   city: string;
@@ -375,7 +379,7 @@ export function mapSearchResults(payload: SearchPayload): SearchResultItem[] {
 }
 
 export function mapBestOffer(payload: SearchPayload, results: SearchResultItem[]): SearchResultItem | null {
-  return mapOffer(payload.summary?.bestOffer, results) || results[0] || null;
+  return mapOffer(payload.summary?.bestOffer, results);
 }
 
 export function mapOffer(offer: ApiListing | null | undefined, results: SearchResultItem[]): SearchResultItem | null {
@@ -411,7 +415,7 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
   const priceRon = getPriceRon(item);
   const sourceType = normalizeSourceType(item.sourceType);
   const sourceGroup = getSourceGroup(sourceType);
-  const sourceKind = getSourceKind(sourceType);
+  const sourceKind = classifyOfferKind({ ...item, sourceType });
   const sellerType = String(item.sellerType || "").trim();
 
   return {
@@ -426,7 +430,7 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
       : null,
     sourceGroup,
     sourceKind,
-    sourceKindLabel: getSourceKindLabel(sourceKind, sourceGroup),
+    sourceKindLabel: getSourceKindLabel(sourceKind, sourceGroup, item.condition),
     sellerType,
     city: item.location || "România",
     condition: normalizeCondition(item.condition, sourceType),
@@ -481,8 +485,11 @@ function getSourceKind(sourceType: string): "used" | "new" {
   return NEW_SOURCE_TYPES.has(sourceType) ? "new" : "used";
 }
 
-function getSourceKindLabel(sourceKind: "used" | "new", sourceGroup: string) {
-  if (sourceKind === "used") return "second-hand";
+function getSourceKindLabel(sourceKind: "used" | "new" | "mixed", sourceGroup: string, condition = "") {
+  if (sourceKind === "mixed") return "marketplace · tip neconfirmat";
+  if (/recondi|refurb|renewed/i.test(condition)) return "recondiționat";
+  if (/resigil|open.box/i.test(condition)) return "resigilat";
+  if (sourceKind === "used") return sourceGroup === "retailer" ? "second-hand · magazin" : "second-hand";
   if (sourceGroup === "price_aggregator") return "preț nou · agregator";
   return "preț nou · retailer";
 }
@@ -824,7 +831,9 @@ function normalizeCondition(condition = "", sourceType = "classifieds") {
   const value = condition.trim().toLowerCase();
   if (!value && getSourceKind(sourceType) === "new") return "nou";
   if (!value) return "acceptabil";
-  if (value.includes("ca nou")) return "ca nou";
+  if (/recondi|refurb|renewed/.test(value)) return "recondiționat";
+  if (/resigil|open.box/.test(value)) return "resigilat";
+  if (value.includes("ca nou") || value.includes("like new")) return "ca nou";
   if (value.includes("nou") || value.includes("new")) return "nou";
   if (value.includes("bun") || value.includes("used") || value.includes("utilizat") || value.includes("folosit")) {
     return "folosit";

@@ -27,6 +27,7 @@ import {
   MAX_API_SEARCH_PAGES,
   MAX_IMAGE_PROXY_BYTES,
   MAX_JSON_BODY_BYTES,
+  parseMaxPriceRon,
   parseBoundedPositiveInteger
 } from "./api-params.js";
 
@@ -222,17 +223,18 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
   const apiPath = normalizeApiPathname(url.pathname);
 
-  if (apiPath.startsWith("/api/selling/")) {
+  if (apiPath === "/mcp" || apiPath.startsWith("/api/selling/")) {
     const chunks = [];
     let size = 0;
     for await (const chunk of req) {
       size += chunk.length;
-      if (size > 10 * 1024 * 1024) { sendJson(res, 413, { error: "Request too large." }); return; }
+      if (size > (apiPath === "/mcp" ? 64 * 1024 : 10 * 1024 * 1024)) { sendJson(res, 413, { error: "Request too large." }); return; }
       chunks.push(chunk);
     }
     const response = await worker.fetch(new Request(url, {
       method: req.method,
       headers: {
+        ...(apiPath === "/mcp" ? req.headers : {}),
         authorization: String(req.headers.authorization || ""),
         cookie: String(req.headers.cookie || ""),
         "content-type": String(req.headers["content-type"] || "application/json")
@@ -244,7 +246,29 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (apiPath === "/api/deals" || apiPath.startsWith("/api/deals/")) {
+  if (apiPath.startsWith("/api/billing/")) {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+      if (chunks.reduce((total, value) => total + value.length, 0) > 65536) {
+        sendJson(res, 413, { error: "Request too large." });
+        return;
+      }
+    }
+    const response = await worker.fetch(new Request(url, {
+      method: req.method,
+      headers: {
+        authorization: String(req.headers.authorization || ""),
+        "stripe-signature": String(req.headers["stripe-signature"] || "")
+      },
+      ...(req.method === "POST" ? { body: Buffer.concat(chunks) } : {})
+    }), process.env, {});
+    res.writeHead(response.status, { "Content-Type": response.headers.get("content-type") || "application/json" });
+    res.end(await response.text());
+    return;
+  }
+
+  if (apiPath === "/api/deals" || apiPath.startsWith("/api/deals/") || apiPath === "/api/whatsapp/send" || apiPath === "/api/conversations" || apiPath.startsWith("/api/conversations/")) {
     const parsed = req.method === "POST" || req.method === "PATCH" ? await readJsonBody(req) : null;
     if (parsed?.error) { sendJson(res, parsed.error.includes("large") ? 413 : 400, { error: parsed.error }); return; }
     const response = await worker.fetch(new Request(url, {
@@ -309,7 +333,8 @@ const server = http.createServer(async (req, res) => {
         : site === "default"
           ? getDefaultSiteKeys()
           : [getSite(site).key];
-      const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys, viewerLocation });
+      const maxPriceRon = parseMaxPriceRon(url.searchParams.get("maxPriceRon"));
+      const payload = await searchAcrossSites({ query, condition, provider, limit, maxPages, siteKeys, viewerLocation, maxPriceRon });
       await logSearchEvent({ query, condition, provider, siteKeys, payload });
       sendJson(res, 200, payload);
     } catch (error) {
@@ -361,6 +386,7 @@ const server = http.createServer(async (req, res) => {
       const limit = parseBoundedPositiveInteger(limitParam, { name: "limit", max: MAX_API_SEARCH_LIMIT });
       const maxPages = parseBoundedPositiveInteger(pagesParam, { name: "pages", max: MAX_API_SEARCH_PAGES });
       const premiumSiteKeys = getPremiumSiteKeys(query);
+      const maxPriceRon = parseMaxPriceRon(url.searchParams.get("maxPriceRon"));
       const freeSiteKeys = (site === "all" ? getSiteKeysForAllSearch(query) : getDefaultSiteKeys())
         .filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey));
       const [freePayload, premiumPayload] = await Promise.all([
@@ -369,6 +395,7 @@ const server = http.createServer(async (req, res) => {
       ]);
       const payload = aggregateMarketplaceResults([...freePayload.results, ...premiumPayload.results], {
         condition,
+        maxPriceRon,
         creditBudget: freePayload.summary?.creditBudget || 0,
         creditsUsed: freePayload.summary?.creditsUsed || 0,
         viewerLocation
