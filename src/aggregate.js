@@ -5,7 +5,7 @@ import { normalizeListing } from "./normalize.js";
 import { classifyListingIntent, getQueryBrandTerms, tokenize } from "./relevance.js";
 import { classifyMarketSegment } from "./market-segment.js";
 import { understandMarketplaceQuery } from "./query-understanding.js";
-import { buildListingProximity, publicViewerLocation } from "./location-intelligence.js";
+import { buildListingProximity, publicViewerLocation, resolveViewerLocation } from "./location-intelligence.js";
 
 function median(values) {
   if (!values.length) {
@@ -1048,8 +1048,9 @@ function isBlockedMarketplaceResult(result) {
   return /cloudflare challenge|anti-bot|blocked/i.test(messages);
 }
 
-export function aggregateMarketplaceResults(results, { condition = "any", creditBudget = null, creditsUsed = null, viewerLocation = null, allowAdult = false } = {}) {
+export function aggregateMarketplaceResults(results, { condition = "any", creditBudget = null, creditsUsed = null, viewerLocation = null, requesterLocation = "", allowAdult = false } = {}) {
   const queryUnderstanding = understandMarketplaceQuery(results.find((result) => result?.query)?.query || "");
+  viewerLocation ||= resolveViewerLocation({ overrideCity: requesterLocation });
   const normalizedResults = results.map((result) => {
     if (!result.ok) {
       return result;
@@ -1141,10 +1142,14 @@ export function aggregateMarketplaceResults(results, { condition = "any", credit
   const allBestCandidates = allScoredItems.map((item) => {
     const referenceMedianRon = getComparableReferenceMedian(item, allScoredItems, medianContext);
     const enrichedItem = enrichItemWithDealIntelligence(item, referenceMedianRon, condition);
+    const proximity = buildListingProximity(enrichedItem, viewerLocation);
+    const baseScore = scoreGlobalRecommendation(enrichedItem, referenceMedianRon, condition);
+    const distance = proximity?.distanceKm;
+    const locality = !Number.isFinite(distance) ? null : distance <= 5 ? 100 : distance <= 25 ? 90 : distance <= 75 ? 75 : distance <= 150 ? 60 : distance <= 300 ? 45 : 30;
     return {
       ...enrichedItem,
-      proximity: buildListingProximity(enrichedItem, viewerLocation),
-      recommendationScore: scoreGlobalRecommendation(enrichedItem, referenceMedianRon, condition)
+      proximity,
+      recommendationScore: locality === null ? baseScore : Math.round(baseScore * 0.9 + locality * 0.1)
     };
   });
   const rankedBaseCandidates = allBestCandidates

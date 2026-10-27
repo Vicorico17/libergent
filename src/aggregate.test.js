@@ -754,3 +754,33 @@ test("phone savings require matching model and known capacity in retail and used
     assert.equal(result.results[1].items[0].isComparableNewBenchmark, false);
   }
 });
+
+test("ranks recommendations closer to requester location when listing quality is similar", () => {
+  const query = "MacBook Air M1";
+  const aggregated = aggregateMarketplaceResults([
+    makeResult("olx.ro", query, [
+      {
+        title: "MacBook Air M1 8GB 256GB",
+        price: "2900 lei",
+        condition: "folosit",
+        location: "Bucuresti",
+        postedAt: "Azi",
+        url: "https://olx.ro/bucuresti"
+      }
+    ]),
+    makeResult("vinted.ro", query, [
+      {
+        title: "MacBook Air M1 8GB 256GB",
+        price: "2920 lei",
+        condition: "folosit",
+        location: "Cluj-Napoca",
+        postedAt: "Azi",
+        url: "https://vinted.ro/cluj"
+      }
+    ])
+  ], {
+    requesterLocation: "Cluj-Napoca"
+  });
+
+  assert.equal(aggregated.bestOffer?.url, "https://vinted.ro/cluj");
+});

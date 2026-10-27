@@ -2743,7 +2743,7 @@ function SearchResultsContent() {
     rememberRecentSearch(query)
   }, [query])
   const searchTier: SearchTier = searchParams.get("tier") === "premium" ? "premium" : "free"
-  const near = String(searchParams.get("near") || "").trim()
+  const near = String(searchParams.get("near") || searchParams.get("requesterLocation") || searchParams.get("location") || "").trim()
   const [refreshRequest, setRefreshRequest] = useState(0)
   const consumedRefresh = useRef(0)
   const activeSnapshot = useRef<{ key: string; value: SearchSnapshot } | null>(null)

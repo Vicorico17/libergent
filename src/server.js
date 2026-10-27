@@ -316,7 +316,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const viewerLocation = resolveViewerLocation({
         headers: req.headers,
-        overrideCity: url.searchParams.get("near") || "",
+        overrideCity: url.searchParams.get("near") || url.searchParams.get("requesterLocation") || url.searchParams.get("location") || "",
         fallbackCity: process.env.LIBERGENT_DEMO_CITY || ""
       });
       const limit = parseBoundedPositiveInteger(limitParam, {
@@ -374,7 +374,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const viewerLocation = resolveViewerLocation({
         headers: req.headers,
-        overrideCity: url.searchParams.get("near") || "",
+        overrideCity: url.searchParams.get("near") || url.searchParams.get("requesterLocation") || url.searchParams.get("location") || "",
         fallbackCity: process.env.LIBERGENT_DEMO_CITY || ""
       });
       if (site !== "all" && site !== "default") {

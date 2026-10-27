@@ -1114,7 +1114,7 @@ async function handleApi(request, env, context) {
       const viewerLocation = resolveViewerLocation({
         cf: request.cf,
         headers: request.headers,
-        overrideCity: url.searchParams.get("near") || ""
+        overrideCity: url.searchParams.get("near") || url.searchParams.get("requesterLocation") || url.searchParams.get("location") || ""
       });
       const siteKeys = getFreeSearchSiteKeys(site, query);
       const freeProvider = provider === "auto" ? "direct" : provider;
@@ -1170,7 +1170,7 @@ async function handleApi(request, env, context) {
       const viewerLocation = resolveViewerLocation({
         cf: request.cf,
         headers: request.headers,
-        overrideCity: url.searchParams.get("near") || ""
+        overrideCity: url.searchParams.get("near") || url.searchParams.get("requesterLocation") || url.searchParams.get("location") || ""
       });
       if (site !== "all" && site !== "default") {
         return json({ error: "Premium search currently supports site=all or site=default." }, 400);

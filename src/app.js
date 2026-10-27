@@ -388,6 +388,7 @@ export async function searchAcrossSites({
   maxPages,
   siteKeys = getDefaultSiteKeys(),
   viewerLocation = null,
+  requesterLocation = "",
   aggregate = true,
   allowAdult = false
 }) {
@@ -411,6 +412,7 @@ export async function searchAcrossSites({
         creditBudget,
         creditsUsed: 0,
         viewerLocation,
+        requesterLocation,
         allowAdult
       }
     );
@@ -440,6 +442,7 @@ export async function searchAcrossSites({
     creditBudget,
     creditsUsed: rawResults.reduce((sum, result) => sum + (result.ok ? result.creditsUsed || 0 : 0), 0),
     viewerLocation,
+    requesterLocation,
     allowAdult
   });
 }
