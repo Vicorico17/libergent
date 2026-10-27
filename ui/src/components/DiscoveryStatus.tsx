@@ -54,6 +54,7 @@ export function DiscoveryStatus() {
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState("");
+  const [selectedTier, setSelectedTier] = useState<"free" | "premium">("free");
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
@@ -89,19 +90,20 @@ export function DiscoveryStatus() {
         <span className="font-bold text-[#14532d]">{availableCount} cu oferte</span>
         <span className="font-bold text-[#991b1b]">{unavailableCount} fără oferte la verificare</span>
       </p>
-      <div className="grid items-start gap-6 md:grid-cols-2">
+      <div role="tablist" aria-label="Filtrează sursele după plan" className="mb-4 grid grid-cols-2 border-2 border-[#111111]">
         {(["free", "premium"] as const).map(tier => {
-          const tierRows = rows.filter(row => row.source.tier === tier);
-          const visibleRows = filtered.filter(row => row.source.tier === tier);
-          return <section key={tier} aria-labelledby={`discovery-${tier}`} className="min-w-0 border-2 border-[#111111] bg-white/40">
-            <header className={`border-b-2 border-[#111111] p-4 ${tier === "free" ? "bg-[#dcfce7]" : "bg-[#ffe4ef]"}`}>
-              <div className="flex items-center justify-between gap-3">
-                <h2 id={`discovery-${tier}`} className="text-base font-bold">{tier === "free" ? "Free" : "Premium"}</h2>
-                <span className="border border-[#111111]/30 bg-white/60 px-2 py-1 text-xs font-bold tabular-nums">{tierRows.length} surse</span>
-              </div>
-            </header>
+          const count = rows.filter(row => row.source.tier === tier).length;
+          return <button key={tier} type="button" role="tab" aria-selected={selectedTier === tier}
+            aria-controls="discovery-source-list" onClick={() => setSelectedTier(tier)}
+            className={`flex min-h-14 items-center justify-between gap-3 px-4 text-left text-sm font-bold transition-colors ${tier === "free" ? "border-r-2 border-[#111111]" : ""} ${selectedTier === tier ? (tier === "free" ? "bg-[#dcfce7]" : "bg-[#ffe4ef]") : "bg-white/60 hover:bg-white"}`}>
+            <span>{tier === "free" ? "Free" : "Premium"}</span>
+            <span className="border border-[#111111]/30 bg-white/60 px-2 py-1 text-xs tabular-nums">{count} surse</span>
+          </button>;
+        })}
+      </div>
+      <section role="tabpanel" id="discovery-source-list" aria-label={`Surse ${selectedTier === "free" ? "Free" : "Premium"}`} className="min-w-0 border-2 border-[#111111] bg-white/40">
             <ul className="divide-y divide-[#111111]/15">
-              {visibleRows.map(({ source, check }) => <li key={source.domain} className={`border-l-4 px-4 py-2 transition-colors ${check.state === "available" ? "border-[#16a34a] bg-[#f0fdf4]" : check.state === "unknown" ? "border-[#999] bg-[#f5f5f5]" : "border-[#dc2626] bg-[#fef2f2]"}`}>
+              {filtered.filter(row => row.source.tier === selectedTier).map(({ source, check }) => <li key={source.domain} className={`border-l-4 px-4 py-2 transition-colors ${check.state === "available" ? "border-[#16a34a] bg-[#f0fdf4]" : check.state === "unknown" ? "border-[#999] bg-[#f5f5f5]" : "border-[#dc2626] bg-[#fef2f2]"}`}>
                 <div className="flex items-center justify-between gap-3">
                   <a href={`https://${source.domain}`} target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-0 flex-1 items-center text-xs font-medium hover:underline">
                     <span className="break-all">{source.domain}</span><span className="sr-only"> (se deschide într-o filă nouă)</span>
@@ -112,10 +114,8 @@ export function DiscoveryStatus() {
                 {check.reason && <p className="truncate pb-1 text-[10px] text-[#991b1b]" title={check.reason}>{check.reason}</p>}
               </li>)}
             </ul>
-            {!visibleRows.length && <p className="p-5 text-sm text-[#555]">Nicio sursă {tier === "free" ? "Free" : "Premium"} pentru filtrele alese.</p>}
-          </section>;
-        })}
-      </div>
+            {!filtered.some(row => row.source.tier === selectedTier) && <p className="p-5 text-sm text-[#555]">Nicio sursă {selectedTier === "free" ? "Free" : "Premium"} pentru filtrele alese.</p>}
+      </section>
       {!filtered.length && <p className="py-10 text-sm">Nicio sursă pentru filtrele alese. Încearcă alt nume.</p>}
     </>}
   </>;
