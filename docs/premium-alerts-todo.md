@@ -87,10 +87,10 @@ payments, seller conversations, or marketplace publication.
 
 ### Adult product search with age confirmation — 2026-10-26
 
-- [ ] Add a separate **18+ sexual-wellness product category**, including product
+- [x] Add a separate **18+ sexual-wellness product category** (local implementation), including product
   searches such as Lovense vibrators. Scope is non-pornographic product discovery
   and comparison, not pornography.
-- [ ] Require explicit confirmation that the user is **18 or older** before
+- [x] Require explicit confirmation that the user is **18 or older** (local implementation) before
   accessing the category, running an adult-product search, or showing its results.
   Define confirmation lifetime and enforce the gate on both UI and API paths,
   including direct links and cached results; declining or leaving it unanswered
@@ -98,11 +98,27 @@ payments, seller conversations, or marketplace publication.
 - [ ] Identify suitable retailers with permitted search routes; validate product
   relevance, prices, availability and links before advertising coverage. Add
   source and niche documentation only when the actual integration is verified.
-- [ ] Define and add acceptance tests for confirmation, refusal, missing/expired
+- [x] Define and add local acceptance tests for confirmation, refusal, missing/expired
   confirmation, direct API requests, cached-result leakage and representative
   Lovense queries, while preserving ordinary search behavior.
 
-This is an open product requirement, not an implemented or deployed feature.
+The gate is implemented locally; it has not been published or deployed. See
+[implementation, configuration and limitations](adult-product-search.md).
+Retailer coverage and production acceptance remain open.
+
+### Services and location-based real estate — planning only
+
+- [ ] Define services search: requested service, location/service area, price and
+  scope, availability, provider evidence, comparable quotes and clear unknowns.
+  Validate suitable sources and ranking before implementation.
+- [ ] Define real-estate/land deal finding for the requested location. Compare
+  total price, price per square metre, area, intravilan/extravilan status, road
+  access, utilities and planning evidence. Label missing or unverified facts as
+  unknown and link supporting evidence. Rank the best fit/value using these
+  factors and buyer constraints, not the cheapest listing alone.
+- [ ] Specify location matching, comparable parcels, source freshness, duplicate
+  listings and verification steps. Services and land categories are TODO-only;
+  no category implementation is included in the adult-search work.
 
 ### Completed foundations from the recent work
 

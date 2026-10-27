@@ -1,4 +1,5 @@
 import { getDefaultSiteKeys, getSite } from "./sites.js";
+import { isAdultProductQuery, isPornographicQuery } from "./search-policy.js";
 import { runSearch } from "./search.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildMockSearchResult } from "./mock.js";
@@ -387,8 +388,11 @@ export async function searchAcrossSites({
   maxPages,
   siteKeys = getDefaultSiteKeys(),
   viewerLocation = null,
-  aggregate = true
+  aggregate = true,
+  allowAdult = false
 }) {
+  if (isPornographicQuery(query)) throw new Error("Pornographic searches are not supported.");
+  if (isAdultProductQuery(query) && !allowAdult) throw new Error("Adult confirmation required before searching.");
   const requestedProvider = normalizeSearchProvider(provider);
   const orderedSiteKeys = [...new Set(siteKeys)].sort((a, b) => getSite(a).priority - getSite(b).priority);
   const creditBudget = getCreditBudget(orderedSiteKeys, requestedProvider);
@@ -406,7 +410,8 @@ export async function searchAcrossSites({
         condition,
         creditBudget,
         creditsUsed: 0,
-        viewerLocation
+        viewerLocation,
+        allowAdult
       }
     );
   }
@@ -434,6 +439,7 @@ export async function searchAcrossSites({
     condition,
     creditBudget,
     creditsUsed: rawResults.reduce((sum, result) => sum + (result.ok ? result.creditsUsed || 0 : 0), 0),
-    viewerLocation
+    viewerLocation,
+    allowAdult
   });
 }

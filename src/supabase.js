@@ -1,6 +1,5 @@
 import {
-  HISTORY_DAILY_LIMIT,
-  HISTORY_RECENT_LIMIT,
+  buildHistoryPayloadFromEntries,
   HISTORY_TOP_KEYWORD_LIMIT,
   HISTORY_TOP_QUERY_LIMIT,
   MAX_HISTORY_ENTRIES
@@ -210,6 +209,7 @@ export async function updateShopSuggestionStatusInSupabase(id, status, env = pro
 }
 
 export async function insertSearchEventToSupabase(entry, env = process.env) {
+  if (!isPublicSearchQuery(entry.query)) return false;
   const config = getSupabaseConfig(env);
   if (!config) {
     return false;
@@ -938,40 +938,8 @@ export async function readSupabaseHistoryPayload(env = process.env) {
     throw new Error("Supabase is not configured.");
   }
 
-  const [allRecentSearches, allTopQueries, allTopKeywords, totalSearches, uniqueQueries, uniqueKeywords] = await Promise.all([
-    readSearchEventsFromSupabase({}, env),
-    readTopQueriesFromSupabase({ limit: MAX_HISTORY_ENTRIES }, env),
-    readTopKeywordsFromSupabase({ limit: MAX_HISTORY_ENTRIES }, env),
-    requestSupabaseCount(`${config.table}?select=id`, env),
-    requestSupabaseCount(`${config.queryStatsTable}?select=query`, env),
-    requestSupabaseCount(`${config.keywordStatsTable}?select=keyword`, env)
-  ]);
-  const recentSearches = allRecentSearches.filter((entry) => isPublicSearchQuery(entry.query));
-  const topQueries = allTopQueries.filter((entry) => isPublicSearchQuery(entry.value)).slice(0, HISTORY_TOP_QUERY_LIMIT);
-  const topKeywords = allTopKeywords.filter((entry) => isPublicSearchQuery(entry.value)).slice(0, HISTORY_TOP_KEYWORD_LIMIT);
-
-  const dailyCounts = new Map();
-
-  for (const entry of recentSearches) {
-    const day = String(entry.searchedAt || "").slice(0, 10);
-    if (day) {
-      dailyCounts.set(day, (dailyCounts.get(day) || 0) + 1);
-    }
-  }
-
-  return {
-    updatedAt: new Date().toISOString(),
-    totals: {
-      searches: totalSearches,
-      uniqueQueries,
-      uniqueKeywords
-    },
-    topQueries,
-    topKeywords,
-    dailyTrend: [...dailyCounts.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-HISTORY_DAILY_LIMIT)
-      .map(([date, count]) => ({ date, count })),
-    recentSearches: recentSearches.slice(0, HISTORY_RECENT_LIMIT)
-  };
+  // Rebuild public aggregates from eligible events. Legacy keyword aggregates
+  // cannot distinguish a benign token that came from a private adult query.
+  const entries = await readSearchEventsFromSupabase({}, env);
+  return { ...buildHistoryPayloadFromEntries(entries), scope: "recent-public-events" };
 }

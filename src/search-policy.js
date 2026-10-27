@@ -14,6 +14,17 @@ const OFFENSIVE_WORDS = new Set([
 export const SEARCH_QUERY_REJECTION_MESSAGE = "Caută un produs fără limbaj ofensator sau date personale.";
 export const SEARCH_QUERY_LENGTH_MESSAGE = "Căutarea poate avea cel mult 120 de caractere.";
 
+export function isAdultProductQuery(query) {
+  const value = String(query || "").normalize("NFKD").replace(/[\u0300-\u036f\u200b-\u200d\ufeff]/g, "").toLowerCase();
+  const compact = value.replace(/[^a-z0-9]/g, "");
+  return /lovense|satisfyer|womanizer|wevibe|fleshlight|sexualwellness|sexshop|sextoy|jucariisexuale|jucariierotice/.test(compact)
+    || /\b(vibrator\w*|vibratoare\w*|dildo\w*|masturbator\w*|butt\s*plug|anal\s*plug|lelo|erotic\w*|porn\w*|xxx|bdsm)\b/.test(value);
+}
+
+export function isPornographicQuery(query) {
+  return /\b(porn\w*|xxx|onlyfans|sex\s*(?:video|film)|filme?\s*(?:sex|adult))\b/i.test(String(query || ""));
+}
+
 function normalizedWords(query) {
   const words = String(query || "")
     .normalize("NFD")
@@ -46,6 +57,7 @@ export function getSearchQueryError(query) {
   const value = String(query || "").trim();
   if (!value) return null;
   if (value.length > 120) return SEARCH_QUERY_LENGTH_MESSAGE;
+  if (isPornographicQuery(value)) return SEARCH_QUERY_REJECTION_MESSAGE;
   if (containsPersonalData(value) || normalizedWords(value).some((word) => OFFENSIVE_WORDS.has(word))) {
     return SEARCH_QUERY_REJECTION_MESSAGE;
   }
@@ -53,5 +65,5 @@ export function getSearchQueryError(query) {
 }
 
 export function isPublicSearchQuery(query) {
-  return Boolean(String(query || "").trim()) && !getSearchQueryError(query);
+  return Boolean(String(query || "").trim()) && !getSearchQueryError(query) && !isAdultProductQuery(query);
 }

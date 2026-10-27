@@ -1,3 +1,4 @@
+import { isAdultProductQuery } from "./search-policy.js";
 const MAX_QUERY_LENGTH = 240;
 const MAX_ACTIVE_ALERTS = 5;
 const ALLOWED_FREQUENCIES = new Set(["daily", "immediate"]);
@@ -12,6 +13,7 @@ function boundedNumber(value, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
 
 export function normalizeAlertProfile(body = {}) {
   const query = String(body.query || "").trim().slice(0, MAX_QUERY_LENGTH);
+  if (isAdultProductQuery(query)) throw new Error("Adult searches cannot create background alerts.");
   if (!query) throw new Error("Expected a search query.");
 
   const frequency = ALLOWED_FREQUENCIES.has(body.frequency) ? body.frequency : "daily";
