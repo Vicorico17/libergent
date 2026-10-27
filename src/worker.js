@@ -1,3 +1,5 @@
+import { handleDeveloper } from './developer-api.js';
+import { handleApiReference } from './developer-reference.js';
 import { handleIntegration } from './integration.js';
 export { IntegrationGateway } from './integration.js';
 import { adultGateResponse, hasAdultConfirmation, issueAdultConfirmation, needsAdultConfirmation } from "./adult-access.js";
@@ -1983,7 +1985,9 @@ export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
 
-    if (url.pathname === "/api/integrations/v1/search") {
+    if (url.pathname.startsWith('/api/developer/')) return handleDeveloper(request, env);
+    if (['/api/v1/demo', '/api/v1/sources', '/api/v1/openapi.json'].includes(url.pathname)) return handleApiReference(request);
+    if (url.pathname === "/api/v1/search" || url.pathname === "/api/integrations/v1/search") {
       return handleIntegration(request, env);
     }
 

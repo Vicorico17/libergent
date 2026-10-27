@@ -572,11 +572,19 @@ Production deployment is also automated by [.github/workflows/deploy-cloudflare.
 - Kitesurf is a beta, non-pixel-perfect browser and cannot negotiate bot challenges with real Chromium TLS fingerprints; incompatible sources fall back only where Chromium is explicitly allowed.
 - Search-by-image remains an unfinished integration and should not be advertised as active.
 
-### External storefront API (BLANĂ pilot)
+### Developer API
 
-The opt-in `/api/integrations/v1/search` reuses the direct search engine with scoped,
-revocable integration keys, persistent quotas/cache, bounded enrichment, and
-text-evidenced fur-coat filters. Public Free search is unchanged. See the
-[versioned API contract, deployment steps, MCP assessment, and Vercel example](docs/storefront-integration-v1.md).
-The integration is disabled until explicitly provisioned; no personal session or
-administrator key should be shared with a storefront.
+Open `/developers` to try a no-key demo, create test/live API keys, see usage,
+and copy curl, JavaScript or Python requests. `GET /api/v1/search` is the general
+product-search API; fur-coat filters are optional. BLANĂ is an example consumer.
+
+- `GET /api/v1/demo` — simulated response, no account or marketplace requests
+- `GET /api/v1/sources` — supported API sources
+- `GET /api/v1/openapi.json` — downloadable OpenAPI 3.1 contract
+- `GET /api/v1/search?q=iphone%2015` — scoped API key required
+
+See [developer quickstart and setup](docs/developer-api.md) and the
+[detailed listing/filter contract](docs/storefront-integration-v1.md).
+Self-service needs the developer SQL migration and explicit feature flags; public
+Free search and MCP enablement are unchanged. No personal session or admin key
+should be shared with an API consumer.

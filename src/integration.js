@@ -1,10 +1,11 @@
+import { lookupDeveloperKey, API_SOURCES } from './developer-store.js';
 import { runSearch } from './search.js';
 import { getSite } from './sites.js';
 import { isPublicSearchQuery, isAdultProductQuery } from './search-policy.js';
 import { parseListingDetailsHtml } from './listing-details.js';
 import { normalizeIntegrationListing } from './integration-listings.js';
 
-export const INTEGRATION_SOURCES = ['olx.ro', 'publi24.ro', 'okazii.ro'];
+export const INTEGRATION_SOURCES = API_SOURCES;
 const TTL = 900000;
 const json = (body, status = 200, headers = {}) => Response.json(body, { status, headers: { 'cache-control': 'no-store', ...headers } });
 const failure = (code, status, headers) => json({ apiVersion: '1', error: { code } }, status, headers);
@@ -18,7 +19,11 @@ export async function authenticateIntegration(request, env) {
   try { keys = JSON.parse(env.LIBERGENT_INTEGRATION_KEYS || '[]'); } catch { return { response: failure('configuration_error', 503) }; }
   if (!Array.isArray(keys)) return { response: failure('configuration_error', 503) };
   const hash = await keyHash(token);
-  const config = keys.find(k => k && typeof k === 'object' && k.keyHash === hash);
+  let config = keys.find(k => k && typeof k === 'object' && k.keyHash === hash);
+  if (!config) {
+    try { config = await lookupDeveloperKey(hash, env); }
+    catch { return { response: failure('authentication_unavailable', 503) }; }
+  }
   if (!config || config.revoked || !Number.isFinite(Date.parse(config.expiresAt)) || Date.parse(config.expiresAt) <= Date.now()) return { response: failure('invalid_credentials', 401) };
   if (!Array.isArray(config.scopes) || !config.scopes.includes('search:read')) return { response: failure('insufficient_scope', 403) };
   if (typeof config.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(config.id) || ![config.perMinute, config.perDay].every(n => Number.isInteger(n) && n > 0)
@@ -34,7 +39,7 @@ export function parseIntegrationQuery(url, config) {
   const limit = p.get('limit') || '20';
   const category = p.get('category') || 'any';
   const material = p.get('material') || 'any';
-  const details = p.get('details') || 'true';
+  const details = p.get('details') || (url.pathname.startsWith('/api/v1/') ? 'false' : 'true');
   if (!isPublicSearchQuery(query) || !/^\d+$/.test(limit) || +limit < 1 || +limit > 20
     || !['any', 'full_fur_coat'].includes(category) || !['any', 'natural', 'synthetic', 'unknown'].includes(material)
     || !['true', 'false'].includes(details) || !sites.length || sites.some(s => !config.sites.includes(s))) throw Error('invalid_parameters');
@@ -42,6 +47,7 @@ export function parseIntegrationQuery(url, config) {
   return { query, sites, limit: +limit, category, material, details: details === 'true' };
 }
 export async function handleIntegration(request, env) {
+  if (!['/api/v1/search', '/api/integrations/v1/search'].includes(new URL(request.url).pathname)) return failure('not_found', 404);
   if (env.LIBERGENT_INTEGRATIONS_ENABLED !== '1') return failure('not_found', 404);
   if (request.method !== 'GET') return failure('method_not_allowed', 405, { allow: 'GET' });
   const auth = await authenticateIntegration(request, env);
@@ -115,7 +121,7 @@ export async function searchIntegration(params, deps = {}) {
   }));
   const items = listings.filter(item => (params.category === 'any' || item.classification.category === params.category)
     && (params.material === 'any' || item.classification.material === params.material)).slice(0, params.limit);
-  return { apiVersion: '1', searchedAt, expiresAt: new Date(Date.parse(searchedAt) + TTL).toISOString(),
+  return { apiVersion: '1', mode: 'live', searchedAt, expiresAt: new Date(Date.parse(searchedAt) + TTL).toISOString(),
     partial: sources.some(s => s.status !== 'ok') || listings.some(i => i.detailStatus === 'unavailable'),
     sources: sources.map(({ items, ...s }) => ({ ...s, candidateCount: items.length })),
     inspectedCount: listings.length, items };
@@ -125,6 +131,14 @@ export async function searchIntegration(params, deps = {}) {
 export class IntegrationGateway {
   constructor(state, env) { this.state = state; this.env = env; this.inflight = new Map(); }
   async fetch(request) {
+    if (new URL(request.url).pathname === '/internal/usage') {
+      const usage = await this.state.storage.get('usage') || {};
+      const now = Date.now();
+      return json({ minuteRequests: usage.minute === Math.floor(now / 60000) ? usage.minuteCount : 0,
+        dayRequests: usage.day === Math.floor(now / 86400000) ? usage.dayCount : 0,
+        minuteResetsAt: new Date((Math.floor(now / 60000) + 1) * 60000).toISOString(),
+        dayResetsAt: new Date((Math.floor(now / 86400000) + 1) * 86400000).toISOString() });
+    }
     const auth = await authenticateIntegration(request, this.env);
     if (auth.response) return auth.response;
     let params;
@@ -148,7 +162,7 @@ export class IntegrationGateway {
     const coalesced = Boolean(pending);
     if (!pending) {
       if (this.inflight.size >= 2) return failure('busy', 429, { 'retry-after': '20' });
-      pending = this.search(params).then(async payload => {
+      pending = (auth.config.mode === 'test' ? Promise.resolve(buildSandboxSearch(params)) : this.search(params)).then(async payload => {
         // No success-shaped cache entry when every source fails. Retry is still quota-bound.
         if (payload.sources.some(s => s.status === 'ok') && new TextEncoder().encode(JSON.stringify(payload)).length <= 120000) {
           await this.state.storage.transaction(async tx => {
@@ -170,4 +184,14 @@ export class IntegrationGateway {
     return json({ ...payload, cache: { status: coalesced ? 'coalesced' : 'miss', ageSeconds: 0 } }, payload.sources.every(s => s.status === 'failed') ? 502 : 200);
   }
   search(params) { return searchIntegration(params); }
+}
+
+// Sandbox responses never execute a provider or fetch product images.
+export function buildSandboxSearch(params = { query: 'iphone 15', sites: ['olx.ro'], limit: 1, category: 'any', material: 'any' }) {
+  const searchedAt = new Date().toISOString();
+  const item = normalizeIntegrationListing({ title: `Example result: ${params.query}` }, 'sandbox');
+  const items = (params.category === 'any' || item.classification.category === params.category)
+    && (params.material === 'any' || item.classification.material === params.material) ? [item] : [];
+  return { apiVersion: '1', mode: 'test', simulated: true, searchedAt, expiresAt: new Date(Date.now() + TTL).toISOString(), partial: false,
+    sources: params.sites.map(source => ({ source, status: 'ok', candidateCount: 1, simulated: true })), inspectedCount: 1, items };
 }

@@ -1,5 +1,5 @@
 // Vercel Node.js Function. Keep this module server-side; no NEXT_PUBLIC_* secrets.
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 40 };
 export default async function handler(req, res) {
   if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return res.status(405).json({ error: 'method_not_allowed' }); }
   const origin = process.env.LIBERGENT_API_ORIGIN;
@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     const url = new URL('/api/integrations/v1/search', origin);
     // Fixed server-owned query: never forward arbitrary visitor URLs or headers.
     url.search = new URLSearchParams({ q: 'haina blana', sites: 'olx.ro', category: 'full_fur_coat', material: 'natural', limit: '20', details: 'true' }).toString();
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(25000), redirect: 'error' });
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(35000), redirect: 'error' });
     if (!response.ok) {
       res.setHeader('Cache-Control', 'no-store');
       if (response.status === 429) res.setHeader('Retry-After', response.headers.get('retry-after') || '60');

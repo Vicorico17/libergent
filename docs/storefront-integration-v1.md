@@ -1,6 +1,8 @@
-# Storefront integration v1 — BLANĂ pilot
+# Listing contract v1 — optional BLANĂ filters
 
-Status: implemented on a feature branch; production deployment and credential provisioning are intentionally not performed. This is a read-only integration, independent of personal Supabase sessions and Premium entitlement. The existing anonymous `/api/search/free`, website, Premium search, and disabled MCP transport retain their behavior.
+The general platform and self-service onboarding are documented in [Developer API](developer-api.md). `/api/v1/search` is the canonical endpoint, with `details=false` by default. The original `/api/integrations/v1/search` path remains compatible, including its `details=true` default. Fur filtering is optional; all supported product queries work without it.
+
+Status: implemented on a feature branch; production deployment and credential provisioning are intentionally not performed. Search uses scoped API keys, independent of personal Supabase sessions and Premium entitlement. Self-service key management uses the existing signed-in account; personal sessions are never shared with API consumers. The existing anonymous `/api/search/free`, website, Premium search, and disabled MCP transport retain their behavior.
 
 ## Contract
 
@@ -66,7 +68,7 @@ Search cards alone do not prove active availability. Detail extraction reuses th
 
 All-source failure returns HTTP 502 with the same search envelope and per-source safe error codes. Partial source/detail failure returns 200 with `partial: true`; usable cards survive detail failures. Empty filtered results are a valid 200. Source failure codes: `timeout`, `source_unavailable`. Other errors use `{ "apiVersion":"1", "error":{"code":"..."} }`: 400 invalid parameters; 401 missing/invalid/revoked/expired credentials; 403 missing scope; 404 disabled route; 405 wrong method; 429 quota/busy with Retry-After; 503 configuration/storage/service failure. Internal exception strings and credentials are not returned.
 
-Search fetches have an 8-second deadline, followed by a 12-second total detail budget (3 concurrent detail requests, 3 seconds each, 2 MiB body cap). Thus external I/O is bounded to approximately 20 seconds plus parsing/storage overhead. Abort signals propagate to the existing direct parser; response deadlines also handle noncooperative dependencies. Detail redirects are rejected to prevent leaving the allowed hosts. Slow/challenged detail pages become unavailable, not active.
+Search fetches have an 8-second deadline, followed by a 12-second total detail budget (3 concurrent detail requests, 3 seconds each, 2 MiB body cap). Marketplace I/O is bounded to approximately 20 seconds plus parsing/storage overhead. Self-service keys also require two database authorization checks with a 5-second deadline each; use a 35-second client timeout. Abort signals propagate to the existing direct parser; response deadlines also handle noncooperative dependencies. Detail redirects are rejected to prevent leaving the allowed hosts. Slow/challenged detail pages become unavailable, not active.
 
 A Durable Object per integration stores counters and 15-minute snapshots; fixed UTC minute/day windows count every valid authorized request including hits, coalesced requests, busy rejections, and source failures. Invalid parameters/authentication do not consume search quota. Daily rollover is midnight UTC. At most two distinct searches run per integration; identical concurrent requests coalesce. Up to 32 cached query variants are retained, with expired/oldest eviction. All-source failures and payloads exceeding 120,000 serialized UTF-8 bytes are not cached (protecting storage value limits). Partial results can be cached and are labeled. Cache status is `hit`, `miss`, or `coalesced`; cached verification timestamps never advance. There is no cross-integration cache/credential sharing. Storage failure fails closed.
 
@@ -78,7 +80,7 @@ Cloudflare runtime bindings/settings:
 
 - `INTEGRATION_GATEWAY`: Durable Object binding to exported `IntegrationGateway`; SQLite migration tag `integration-gateway-v1` is included in `wrangler.toml`.
 - `LIBERGENT_INTEGRATIONS_ENABLED=1`: explicit opt-in. Unset/other values keep route at 404.
-- `LIBERGENT_INTEGRATION_KEYS`: secret JSON array. Each record requires `id`, `keyHash`, `scopes`, `sites`, positive integer `perMinute`, positive integer `perDay`, ISO `expiresAt`; optional boolean `revoked`.
+- `LIBERGENT_INTEGRATION_KEYS`: optional operator-managed secret JSON array; ordinary developers use self-service keys instead. Each record requires `id`, `keyHash`, `scopes`, `sites`, positive integer `perMinute`, positive integer `perDay`, ISO `expiresAt`; optional boolean `revoked`.
 - No new Supabase, administrator, Browser Run, model, or personal session credentials are required.
 
 Example configuration shape (placeholder hash, not a usable credential):
@@ -120,7 +122,7 @@ Before public MCP enablement: configure mandatory distributed quotas/cost contro
 
 ## Verification and remaining acceptance
 
-Validation performed: `npm run check` passed all 337 backend tests; Worker dry-run bundle passed. `node scripts/check-integration-runtime.js` passed with real local workerd/SQLite storage, fixture search, cache persistence and daily quota across a runtime restart. No marketplace requests are made by that smoke test.
+Validation performed: `npm run check` passed the backend suite (see the current PR for counts); Worker dry-run bundle passed. `node scripts/check-integration-runtime.js` passed with real local workerd/SQLite storage, fixture search, cache persistence and daily quota across a runtime restart. No marketplace requests are made by that smoke test.
 
 Automated tests cover auth/scope/revocation/expiry, malformed parameters and limits, persisted concurrent minute/day quota, cache reuse across restart, classification and missing fields, original photo provenance, source/detail failures, timeout, URL/redirect protection, and disabled Worker/MCP routes. Existing backend regression suite is run as well. Fixtures prove contracts, not current marketplace precision/recall.
 
