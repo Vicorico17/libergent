@@ -3,10 +3,10 @@ export const config = { maxDuration: 40 };
 export default async function handler(req, res) {
   if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return res.status(405).json({ error: 'method_not_allowed' }); }
   const origin = process.env.LIBERGENT_API_ORIGIN;
-  const key = process.env.LIBERGENT_INTEGRATION_KEY;
+  const key = process.env.LIBERGENT_API_KEY || process.env.LIBERGENT_INTEGRATION_KEY;
   if (!origin || !key) return res.status(503).json({ error: 'catalog_not_configured' });
   try {
-    const url = new URL('/api/integrations/v1/search', origin);
+    const url = new URL('/api/v1/search', origin);
     // Fixed server-owned query: never forward arbitrary visitor URLs or headers.
     url.search = new URLSearchParams({ q: 'haina blana', sites: 'olx.ro', category: 'full_fur_coat', material: 'natural', limit: '20', details: 'true' }).toString();
     const response = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(35000), redirect: 'error' });

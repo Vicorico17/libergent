@@ -49,7 +49,7 @@ The adapter rejects unexpected browser Origins, limits request bodies to 64 KiB,
 
 ## Enablement and acceptance
 
-No deployed flags changed in this task. Configure the general developer API first, using [its setup guide](developer-api.md), then explicitly set:
+Production flags are unchanged. The separate BLANĂ acceptance preview now enables `/api/v1/mcp` with a scoped operator-managed key; see the [handoff](fau-blana-agent-handoff.md). Configure the general developer API first, using [its setup guide](developer-api.md), then explicitly set:
 
 ```text
 LIBERGENT_INTEGRATIONS_ENABLED=1

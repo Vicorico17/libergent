@@ -73,7 +73,7 @@ The search engine has an 8-second budget followed by a 12-second total detail bu
 
 ## Operator setup — once per deployment, not per developer
 
-No deployed settings or schemas were changed by this implementation.
+Production settings and schemas remain unchanged. A separate scoped acceptance preview is deployed as described below; self-service account provisioning is not enabled there.
 
 1. Review the PR and deploy to an isolated preview first. This repository automatically deploys production on merge to `main`; do not merge merely to obtain a test URL.
 2. Apply `supabase/developer-api.sql` to the intended Supabase project. It creates two new RLS-protected tables and three service-role-only RPCs; it does not change existing search/account tables. It is idempotent.
@@ -105,13 +105,17 @@ Implemented: general v1 API, compatible legacy route, self-service test/live key
 
 Validation on 2026-10-27:
 
-- `npm run check`: 348 tests passed, including real PostgreSQL migration/RLS/ownership/key-creation limits and a create → authenticate → sandbox search → revoke → reject flow.
+- `npm run check`: 355 tests passed, including real PostgreSQL migration/RLS/ownership/key-creation limits and a create → authenticate → sandbox search → revoke → reject flow.
 - `npm --prefix ui run lint:ci`: passed.
 - `npm --prefix ui run build -- --webpack`: passed, with `/developers` statically exported. Webpack was used for this isolated checkout's shared local dependencies; no framework configuration was changed.
 - `npx wrangler deploy --dry-run`: passed; no upload or deployment.
 - `node scripts/check-integration-runtime.js`: passed with local workerd/SQLite quota/cache persistence across restart.
 - Fresh local Chrome profile: desktop and 390px mobile rendering, no-key demo, query/language examples, clipboard copying, sign-in return URL, no horizontal overflow, and no page runtime errors. External browser requests were blocked; real account sign-in was not exercised.
 
- Remote Supabase Auth email flows, production load/monitoring, live-source accuracy and consumer deployment require staging acceptance. There is no deployed developer API URL claimed by this PR.
+ Remote Supabase Auth email flows, production load/monitoring, live-source accuracy and consumer deployment require staging acceptance. The stable production developer API is not deployed; the isolated acceptance preview is available as described below.
 
 Later work: wider validated source coverage, async jobs/webhooks, scheduled refresh and last-good inventory snapshots, billing and organization/team management. Those are not prerequisites for a developer to obtain a scoped key and integrate the current API once the deployment is provisioned.
+
+### Isolated BLANĂ acceptance preview
+
+A separate `libergent-integration-preview` Worker was provisioned on October 27, 2026 using `wrangler.integration-preview.toml`. It has its own Durable Object namespace and a scoped, expiring operator-managed BLANĂ key; it has no website/account/cron/production bindings. The stable production API and self-service database migration remain undeployed. The preview supports REST and authenticated MCP. See the [FAU agent handoff](fau-blana-agent-handoff.md) for the endpoint, verified live results and integration steps. Do not reuse the preview configuration to deploy production.

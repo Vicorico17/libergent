@@ -9,7 +9,8 @@ Production: [libergent.com](https://libergent.com)
 For developer-key agent integrations, use the new opt-in `/api/v1/mcp` adapter
 documented in [Agent integrations](docs/agent-integrations.md). It shares the
 versioned API’s credentials, search quotas and cache. The older `/mcp` below
-remains a separate prototype; neither endpoint is enabled by this PR.
+remains a separate prototype. Production enablement is unchanged; a scoped
+[BLANĂ acceptance preview](docs/fau-blana-agent-handoff.md) is available.
 
 
 The shared Streamable HTTP MCP endpoint is `/mcp`. It is disabled by default;
