@@ -30,7 +30,7 @@ function conversationId(phone, listingUrl = "") {
 
 export function normalizeDeliveryStatus(payload = {}, fallback = "unknown") {
   if (payload.ok === false || payload.result?.ok === false) return "failed";
-  const status = String(payload.deliveryStatus || payload.status || payload.result?.status || "").toLowerCase();
+  const status = String(payload.deliveryStatus || payload.status || payload.result?.deliveryStatus || payload.result?.status || "").toLowerCase();
   if (["queued", "sent", "delivered", "failed", "unavailable"].includes(status)) return status;
   if (status === "read") return "delivered";
   return fallback;

@@ -121,6 +121,19 @@ and location-based property/land search. These do not block the current API test
 - [ ] Deploy and measure recovery/cost with actual source outages. More frequent
   refreshes of partial results can increase direct and Premium fallback requests.
 
+## Agent message acceptance evidence — 2026-10-30
+
+- [x] Require a valid provider message ID before reporting a send as accepted;
+  remove fabricated outbound IDs for missing or malformed bridge receipts.
+- [x] Treat unconfirmed/transport outcomes as unknown, explicit provider
+  rejections as failed, and support nested delivery-status receipts.
+- [x] Do not save successful outbound history for uncertain sends; retain deal
+  attempt reservations so replay cannot contact the bridge again.
+- [x] Test malformed responses, provider rejection, transport-error redaction,
+  nested receipts and unknown deal-attempt replay without real seller contact.
+- [ ] One-off sends still need durable idempotency. Provider receipt callbacks,
+  reconciliation of unknown attempts and the controlled live pilot remain open.
+
 ## Current launch checklist — 2026-10-14
 
 This is the active owner-requested to-do list. It supersedes the older execution

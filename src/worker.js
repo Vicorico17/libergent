@@ -1,4 +1,5 @@
 import { checkFreeSearchLimits } from "./free-search-limits.js";
+import { parseWhatsAppSendReceipt } from "./whatsapp-receipt.js";
 import { searchCacheLifetimeSeconds, isSearchCacheFresh } from "./search-cache-policy.js";
 import { getFreeSearchProvider, getFreeSearchSiteKeys } from "./free-search-policy.js";
 import { handleAgentMcp } from './agent-mcp.js';
@@ -11,7 +12,7 @@ import { searchAcrossSites } from "./app.js";
 import { handleMcp } from "./mcp.js";
 import { handleSelling } from "./selling.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
-import { buildConversationHistory, getConversationById, normalizeDeliveryStatus } from "./conversations.js";
+import { buildConversationHistory, getConversationById } from "./conversations.js";
 import { buildDealOpeningDraft, buildDealReplyDraft, normalizeDealChange, normalizeDealCreate } from "./deals.js";
 import { generateDealReplyWithModel } from "./deal-ai.js";
 import { callBrief, masscallRequest, normalizeCallApproval, validProviderCallId } from "./masscall.js";
@@ -1775,14 +1776,20 @@ async function handleApi(request, env, context) {
         body: JSON.stringify({ target, message, ...(dealAttemptKey ? { idempotencyKey: dealAttemptKey } : {}) })
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || normalizeDeliveryStatus(payload) === "failed") {
+      const receipt = parseWhatsAppSendReceipt(payload);
+      if (!response.ok || !receipt.accepted) {
+        const outcome = receipt.status === "failed" ? "failed" : "unknown";
         if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
-          status: payload.ok === false ? "failed" : "unknown", error: String(payload.error || `Bridge returned ${response.status}`).slice(0, 500)
+          status: outcome, error: `Bridge returned ${response.status}; send outcome ${outcome}.`
         }, env).catch(() => null);
-        return json({ ok: false, error: payload.error || `WhatsApp bridge failed (${response.status}).` }, 502);
+        return json({ ok: false, code: outcome === "unknown" ? "send_outcome_unknown" : "send_rejected",
+          deliveryStatus: outcome,
+          error: outcome === "unknown"
+            ? "Message acceptance could not be confirmed. Review its outcome before sending again."
+            : "The messaging provider rejected the message." }, 502);
       }
-      const deliveryStatus = normalizeDeliveryStatus(payload, "queued");
-      const messageId = String(payload.messageId || payload.result?.messageId || `outbound:${target}:${Date.now()}`);
+      const deliveryStatus = receipt.status;
+      const messageId = receipt.messageId;
       const timestamp = new Date().toISOString();
       let historySaved = false;
       let historyError = "";
@@ -1823,7 +1830,8 @@ async function handleApi(request, env, context) {
       if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
         status: "unknown", error: (error instanceof Error ? error.message : String(error)).slice(0, 500)
       }, env).catch(() => null);
-      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 502);
+      return json({ ok: false, code: "send_outcome_unknown", deliveryStatus: "unknown",
+        error: "Message acceptance could not be confirmed. Review its outcome before sending again." }, 502);
     }
   }
 
