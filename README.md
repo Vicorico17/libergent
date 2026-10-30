@@ -4,6 +4,9 @@ LiberGent is a Romanian product-search and deal-ranking application. A user ente
 
 Production: [libergent.com](https://libergent.com)
 
+Project status: [remaining implementation work](docs/premium-alerts-todo.md) and
+[test preparation, acceptance checks and completion criteria](docs/release-acceptance-checklist.md).
+
 ### ChatGPT and Claude connector prototype
 
 For developer-key agent integrations, use the new opt-in `/api/v1/mcp` adapter

@@ -19,6 +19,9 @@ This reconciles the owner's project review list. PR #38 supplied the canonical
 Developer API; follow-up work is on PR #39. A pushed change is not a deployment.
 Live staging/account acceptance is deferred until the owner is ready.
 
+For the separate verification list, owner preparation, expected results and
+release completion criteria, use [the release acceptance checklist](release-acceptance-checklist.md).
+
 ### Continuation checkpoint
 
 Keep this file as the persistent task list between work sessions. Start with the
