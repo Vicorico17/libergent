@@ -19,6 +19,18 @@ PREMIUM_JEV_ENABLED = "1"
 PREMIUM_JEV_MODEL = "jev-latest"
 LIBERGENT_INTEGRATIONS_ENABLED = "1"
 LIBERGENT_AGENT_MCP_ENABLED = "1"
+LIBERGENT_FREE_SEARCH_LIMITS_ENABLED = "1"
+
+# Approximate per-location burst protection; not a worldwide spending cap.
+[[ratelimits]]
+name = "FREE_SEARCH_CLIENT_LIMITER"
+namespace_id = "1101"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "FREE_SEARCH_TOTAL_LIMITER"
+namespace_id = "1102"
+simple = { limit = 300, period = 60 }
 
 # Persistent integration cache and quota counters.
 [[durable_objects.bindings]]

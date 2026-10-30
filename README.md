@@ -158,6 +158,19 @@ providers or non-Free source IDs return HTTP 400 before any cache or upstream
 request. The Worker and Node development server share this policy. CLI and
 authenticated administrative diagnostics retain their separate provider controls.
 
+The production and staging Worker configurations enable Free search burst limits:
+60 requests per minute per connecting IP and 300 per minute across clients, shared
+by `/api/search` and `/api/search/free`, including cached searches and `refresh=1`.
+Shared networks also share the IP allowance. These are approximate limits per
+Cloudflare location, not a strict worldwide quota or spending cap
+([Cloudflare documentation](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)).
+Denied requests return 429; missing or failing enabled bindings return 503. Both
+include `Retry-After: 60` and `Cache-Control: no-store`, before search work.
+Staging uses separate namespaces. Local Node development has no edge limiter;
+MCP and developer API routes retain their own controls. To disable this guard for
+rollback, set `LIBERGENT_FREE_SEARCH_LIMITS_ENABLED=0` and redeploy; this removes
+burst protection. Deployment and traffic tuning remain pending.
+
 ### Premium test
 
 Premium includes the query-routed Free sources, seven general retail/price-benchmark adapters, and seven fashion retailers for fashion-related searches:

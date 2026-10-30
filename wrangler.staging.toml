@@ -16,6 +16,18 @@ LIBERGENT_DEVELOPER_API_ENABLED = "1"
 LIBERGENT_AGENT_MCP_ENABLED = "1"
 LIBERGENT_MCP_ENABLED = "0"
 PREMIUM_JEV_ENABLED = "0"
+LIBERGENT_FREE_SEARCH_LIMITS_ENABLED = "1"
+
+# Separate namespaces prevent staging traffic consuming production allowances.
+[[ratelimits]]
+name = "FREE_SEARCH_CLIENT_LIMITER"
+namespace_id = "1201"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "FREE_SEARCH_TOTAL_LIMITER"
+namespace_id = "1202"
+simple = { limit = 300, period = 60 }
 
 # No scheduled probes, outreach configuration, billing secrets or Browser Run.
 [triggers]

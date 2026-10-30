@@ -1,3 +1,4 @@
+import { checkFreeSearchLimits } from "./free-search-limits.js";
 import { getFreeSearchProvider, getFreeSearchSiteKeys } from "./free-search-policy.js";
 import { handleAgentMcp } from './agent-mcp.js';
 import { handleDeveloper } from './developer-api.js';
@@ -1997,6 +1998,10 @@ export default {
     }
 
     if (url.pathname.startsWith("/api/")) {
+      if (["/api/search", "/api/search/free"].includes(normalizeApiPathname(url.pathname))) {
+        const limited = await checkFreeSearchLimits(request, env);
+        if (limited) return limited;
+      }
       return handleApiWithContentPolicy(request, env, context);
     }
 

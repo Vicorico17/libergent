@@ -30,7 +30,7 @@ Live staging/account acceptance is deferred until the owner is ready.
 | P1 | VINDE | Drafts, images, OLX/Okazii/assisted workflows exist | Real seller connections/publication acceptance, ambiguous-failure recovery, sold synchronization and cross-platform withdrawal. |
 | P1 | ChatGPT/Claude connectors | Separate Free trial and API-key MCP implementations exist | Actual owner conversations, OAuth for hosted clients, paid-call identity/metering/limits and release acceptance. |
 | P1 | Browser journeys | Backend, protocol, SQL and local Worker acceptance coverage expanded | Automated browser login/search/checkout/alerts/selling journeys, mobile and account switching. CLI acceptance is not browser coverage. |
-| P1 | Operations and cost controls | Durable API quotas, source probes and Free-provider boundary exist | Production dashboards/alerts, website ingress quotas, cost measurements, provider outage acceptance and rollback exercises. |
+| P1 | Operations and cost controls | Durable API quotas, source probes, Free-provider boundary and local-tested edge burst limits exist | Deploy/tune edge limits; strict worldwide quotas, production dashboards/alerts, cost measurements, provider outage acceptance and rollback exercises. |
 | P1 | Account/support lifecycle | Authentication and private account features exist | Account deletion/export, retention execution, concrete support route and product-policy reconciliation. |
 | P2 | Image search | Validation stub only | Integrate a provider, validate results and complete UI/API flow before advertising. |
 | P2 | Documentation | API and this backlog reconciled | Continue correcting older Premium-vs-Agent and implementation-vs-production claims. |
@@ -38,6 +38,19 @@ Live staging/account acceptance is deferred until the owner is ready.
 
 Deferred expansion: passkeys, verified adult-product retailers, services search,
 and location-based property/land search. These do not block the current API tests.
+
+## Free search ingress protection — 2026-10-30
+
+- [x] Add Worker burst limits shared across public Free aliases and forced refreshes,
+  before cache reads, history writes or marketplace requests.
+- [x] Configure 60 requests/minute per IP and 300/minute shared across clients;
+  staging has separate namespaces. Shared networks share the IP allowance.
+- [x] Return uncached 429 with retry guidance on denial; fail closed with 503
+  when enabled bindings are missing, malformed or unavailable.
+- [x] Test cross-alias/client accounting, no work after denial, failure handling
+  and successful Free searches. Local Node development is outside this edge guard.
+- [ ] Deploy and tune with actual traffic; Cloudflare limits are approximate and
+  per location. Strict worldwide quotas, dashboards and cost caps remain open.
 
 ## Free search cost boundary — 2026-10-30
 
