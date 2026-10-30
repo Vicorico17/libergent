@@ -93,6 +93,21 @@ and location-based property/land search. These do not block the current API test
   responses and recovery from partial snapshots.
 - [ ] Verify multi-source sampling and outage recovery on the deployed API.
 
+## Direct source retry behavior — 2026-10-30
+
+- [x] Recheck OLX and Okazii from local Node: `iphone 15` still returns HTTP
+  403 from OLX and a Cloudflare challenge from Okazii, before parser execution.
+  This is not evidence of production recovery or a parser defect.
+- [x] Stop repeating direct HTML requests rejected with permanent 4xx or 429
+  across header-profile and whole-search retry layers; JSON failures also retain
+  their upstream status and avoid immediate retry on these responses.
+- [x] Preserve bounded recovery for temporary errors (including 408/425/5xx)
+  and the existing Vinted challenge behavior, except when throttled with 429.
+- [x] Regression coverage checks exact upstream request counts, returned status
+  metadata and successful recovery after temporary failures.
+- [ ] Restore/revalidate OLX and Okazii access from the production runtime.
+  Retry changes reduce wasted requests; they do not restore blocked sources.
+
 ## Current launch checklist — 2026-10-14
 
 This is the active owner-requested to-do list. It supersedes the older execution

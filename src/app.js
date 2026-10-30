@@ -73,6 +73,7 @@ function buildSiteFailureResult({ siteKey, query, condition, provider, error, at
     condition,
     provider: resolvedProvider,
     attempts,
+    ...(Number.isInteger(error?.upstreamStatus) ? { upstreamStatus: error.upstreamStatus } : {}),
     error: error instanceof Error ? error.message : String(error)
   };
 }
@@ -199,9 +200,14 @@ async function searchSiteOnce({ siteKey, query, condition, provider, limit, maxP
 
 function isRetryableResult(result) {
   if (!result.ok) {
+    // Never immediately repeat a rate-limited request, even a challenge response.
+    if (result.upstreamStatus === 429) return false;
     if (/Cloudflare challenge/i.test(result.error || "")) {
       return result.site === "vinted.ro";
     }
+
+    if (result.upstreamStatus >= 400 && result.upstreamStatus < 500
+      && ![408, 425].includes(result.upstreamStatus)) return false;
 
     return !/Missing environment variables|Unsupported site/i.test(result.error || "");
   }
