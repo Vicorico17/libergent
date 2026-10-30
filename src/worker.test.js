@@ -556,6 +556,8 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
   assert.match(payload.conversationId, /^wa_/);
   assert.equal(payload.historySaved, true);
   assert.equal(bridgeRequest.url, "https://bridge.example/whatsapp/send");
+  assert.equal(bridgeRequest.init.redirect, "error");
+  assert.ok(bridgeRequest.init.signal instanceof AbortSignal);
   assert.equal(bridgeRequest.init.headers.authorization, "Bearer secret");
   assert.equal(bridgeRequest.init.body, JSON.stringify({ target: "+40722123456", message: "Salut", idempotencyKey: "22222222-2222-4222-8222-222222222222" }));
   assert.equal(storedMessage.raw.userId, "user-1");

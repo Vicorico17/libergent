@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const SESSIONS_DIR = process.env.OPENCLAW_SESSIONS_DIR || "/docker/openclaw-dngq/data/.openclaw/agents/main/sessions";
 const WEBHOOK_URL = String(process.env.LIBERGENT_INBOUND_WEBHOOK_URL || "").replace(/\/+$/, "");
@@ -16,9 +17,11 @@ function loadState() {
   }
 }
 
-function saveState(state) {
+export function saveState(state, stateFile = STATE_FILE) {
   const seen = Array.from(state.seen).slice(-5000);
-  fs.writeFileSync(STATE_FILE, JSON.stringify({ seen }, null, 2));
+  const temporary = `${stateFile}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify({ seen }, null, 2), { mode: 0o600 });
+  fs.renameSync(temporary, stateFile);
 }
 
 function readJson(file) {
@@ -41,7 +44,7 @@ function extractText(content) {
   return "";
 }
 
-function readInboundMessages(session) {
+export function readInboundMessages(session) {
   if (!fs.existsSync(session.file)) return [];
   const lines = fs.readFileSync(session.file, "utf8").split(/\n+/).filter(Boolean);
   const messages = [];
@@ -54,11 +57,13 @@ function readInboundMessages(session) {
     }
     const message = entry?.message;
     if (entry?.type !== "message" || message?.role !== "user" || message?.sourceChannel !== "whatsapp") continue;
+    if (typeof entry.id !== "string" || !entry.id.trim() || entry.id.length > 512) continue;
     const from = String(message.senderE164 || message.senderId || "").trim();
     const text = extractText(message.content).trim();
     if (!/^\+\d{8,15}$/.test(from) || !text) continue;
     messages.push({
       messageId: entry.id,
+      ...(typeof message.replyToMessageId === "string" && message.replyToMessageId.trim() ? { replyToMessageId: message.replyToMessageId.trim() } : {}),
       from,
       to: message.to || "",
       text,
@@ -69,18 +74,25 @@ function readInboundMessages(session) {
   return messages;
 }
 
-async function postInbound(message) {
-  const response = await fetch(WEBHOOK_URL, {
+export async function postInbound(message, { url = WEBHOOK_URL, token = WEBHOOK_TOKEN, fetchImpl = fetch } = {}) {
+  const target = new URL(url);
+  if (target.username || target.password || (target.protocol !== "https:" && !(target.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname)))) {
+    throw new Error("Use HTTPS for the inbound webhook, or HTTP on localhost.");
+  }
+  if (!token) throw new Error("Inbound webhook token is not configured.");
+  const response = await fetchImpl(target.href, {
     method: "POST",
+    redirect: "error",
+    signal: AbortSignal.timeout(15000),
     headers: {
-      Authorization: `Bearer ${WEBHOOK_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify(message)
   });
   const payload = await response.text();
   if (!response.ok) {
-    throw new Error(`Webhook failed (${response.status}): ${payload}`);
+    throw new Error(`Webhook failed (${response.status}).`);
   }
   let result;
   try {
@@ -89,7 +101,7 @@ async function postInbound(message) {
     throw new Error("Webhook returned an invalid JSON response.");
   }
   if (result?.ok !== true) {
-    throw new Error(`Webhook did not accept the message: ${payload}`);
+    throw new Error("Webhook did not accept the message.");
   }
   return payload;
 }
@@ -103,15 +115,27 @@ async function scanOnce(state) {
       if (state.seen.has(message.messageId)) continue;
       await postInbound(message);
       state.seen.add(message.messageId);
-      console.log(`forwarded inbound WhatsApp message ${message.messageId} from ${message.from}`);
+      console.log(`forwarded inbound WhatsApp message ${message.messageId}`);
     }
   }
   saveState(state);
 }
 
-const state = loadState();
-console.log(`OpenClaw inbound forwarder watching ${SESSIONS_DIR}`);
-setInterval(() => {
-  scanOnce(state).catch((error) => console.error(error instanceof Error ? error.message : String(error)));
-}, POLL_MS);
-scanOnce(state).catch((error) => console.error(error instanceof Error ? error.message : String(error)));
+export function createPollRunner(scan, onError) {
+  let active = false;
+  return async () => {
+    if (active) return;
+    active = true;
+    try { await scan(); }
+    catch (error) { onError(error); }
+    finally { active = false; }
+  };
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const state = loadState();
+  const poll = createPollRunner(() => scanOnce(state), error => console.error(error instanceof Error ? error.message : String(error)));
+  console.log(`OpenClaw inbound forwarder watching ${SESSIONS_DIR}`);
+  setInterval(poll, Number.isFinite(POLL_MS) && POLL_MS >= 1000 ? POLL_MS : 3000);
+  void poll();
+}

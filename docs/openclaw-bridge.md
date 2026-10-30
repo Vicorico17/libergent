@@ -43,5 +43,24 @@ requests from existing inbound history. Authenticated inbound stop requests are
 saved before ownership lookup; sends from any buyer/listing to that number return
 409. Missing or failing preference storage returns 503 before provider contact.
 An ordinary reply never clears the stop, and deleting history does not remove it.
-Voice-call enforcement and verified opt-in recovery remain pending. The guard
+New voice-call submissions also check this stop table before reservation/dialing.
+Verified opt-in recovery remains pending. The guard
 cannot cancel an already in-flight or accepted send; no live seller test has run.
+
+Inbound webhook messages now require a stable, non-empty string `messageId`
+(maximum 512 characters). Replays preserve the original stored message instead
+of rewriting ownership. The optional `replyToMessageId` identifies the outbound
+provider message being quoted. It is accepted only when our stored outbound
+receipt matches that ID **and** the inbound seller number; an unknown or mismatched
+reference stays unassigned without falling back to another listing. Without a
+reference, the existing unambiguous-owner/listing rule applies. Forwarder records
+with no stable ID are skipped; inspect provider data before enabling a new source.
+
+Deploy the updated `scripts/openclaw-inbound-forwarder.js` on the bridge host:
+polls no longer overlap, webhook requests have a 15-second timeout and reject
+redirects, and checkpoint writes use an atomic rename. It forwards an explicit
+`message.replyToMessageId` when present; whether the deployed OpenClaw channel
+supplies that field still needs a real fixture. The Worker bounds outbound sends
+at 35 seconds and rejects redirects; a timeout stays unknown and cannot be
+resent with the same reserved key. Receipt callbacks/operator reconciliation
+remain separate work, not implied by these transport checks.

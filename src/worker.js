@@ -768,7 +768,16 @@ function normalizeInboundWhatsAppPayload(body = {}) {
   const text = String(body.text || body.message || body.content || "").trim();
   const timestamp = String(body.timestamp || body.receivedAt || new Date().toISOString()).trim();
   const to = String(body.to || body.to_number || "").trim();
-  const messageId = String(body.messageId || body.message_id || "").trim();
+  const rawMessageId = body.messageId || body.message_id;
+  const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
+  if (!messageId || messageId.length > 512 || /[\u0000-\u001f]/.test(messageId)) {
+    throw new Error("Expected a stable provider messageId.");
+  }
+  const replyToMessageId = body.replyToMessageId;
+  if (replyToMessageId !== undefined && (typeof replyToMessageId !== "string" || !replyToMessageId.trim()
+    || replyToMessageId.length > 512 || /[\u0000-\u001f]/.test(replyToMessageId))) {
+    throw new Error("Expected replyToMessageId to be a valid provider message ID.");
+  }
   if (!/^\+\d{8,15}$/.test(from)) {
     throw new Error("Expected from to be an E.164 phone number.");
   }
@@ -781,6 +790,7 @@ function normalizeInboundWhatsAppPayload(body = {}) {
     text,
     timestamp,
     messageId,
+    replyToMessageId: replyToMessageId?.trim() || "",
     channel: "whatsapp",
     raw: body.raw || body
   };
@@ -1068,7 +1078,7 @@ async function handleApi(request, env, context) {
     try {
       // Persist a seller-wide stop before attempting account/listing attribution.
       if (isSellerStopRequest(inbound.text)) await stopWhatsAppContact(inbound.from, env);
-      const owner = await findWhatsAppConversationOwner(inbound.from, env);
+      const owner = await findWhatsAppConversationOwner(inbound.from, env, inbound.replyToMessageId);
       // Ownership comes only from our outbound history, never bridge metadata.
       inbound.raw = inbound.raw && typeof inbound.raw === "object" && !Array.isArray(inbound.raw)
         ? { ...inbound.raw } : {};
@@ -1550,6 +1560,13 @@ async function handleApi(request, env, context) {
           const parsed = await parseJsonRequest(request);
           if (parsed.error) return json({ error: parsed.error }, parsed.error.includes("large") ? 413 : 400);
           const approval = normalizeCallApproval(parsed.data || {}, deal, env);
+          try {
+            if (await isWhatsAppContactStopped(approval.destination, env)) {
+              return json({ ok: false, code: "seller_contact_stopped", error: "Seller contact has stopped for this number." }, 409);
+            }
+          } catch {
+            return json({ ok: false, code: "contact_preferences_unavailable", error: "Contact preferences are temporarily unavailable." }, 503);
+          }
           const previous = await listDealCalls(dealId, userId, env);
           if (previous.some((call) => ["pending", "unknown", "queued", "ringing", "in-progress"].includes(call.status) && call.idempotency_key !== approval.idempotencyKey)) return json({ error: "This deal already has a pending or active call." }, 409);
           const today = new Date().toISOString().slice(0, 10);
@@ -1786,6 +1803,8 @@ async function handleApi(request, env, context) {
       const bridgeUrl = String(env.OPENCLAW_BRIDGE_URL).replace(/\/+$/, "");
       const response = await fetch(`${bridgeUrl}/whatsapp/send`, {
         method: "POST",
+        redirect: "error",
+        signal: AbortSignal.timeout(35000),
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${env.OPENCLAW_BRIDGE_TOKEN}`

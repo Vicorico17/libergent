@@ -84,3 +84,34 @@ test('seller stops persist before attribution and block all buyers/listings with
   assert.equal((await db.query('select count(*)::int as count from whatsapp_contact_stops')).rows[0].count, 5);
   assert.equal((await db.query("select has_table_privilege('authenticated','whatsapp_contact_stops','SELECT') as allowed")).rows[0].allowed, false);
 });
+
+test('voice calls honor seller stops and preference outages before reserving or dialing', async t => {
+  const before = { ...process.env };
+  t.after(() => { for (const key of Object.keys(process.env)) if (!(key in before)) delete process.env[key]; Object.assign(process.env, before); });
+  const listing = 'https://listing.test/item';
+  const id = '11111111-1111-4111-8111-111111111111';
+  const env = { SUPABASE_URL: 'https://db.test', SUPABASE_SECRET_KEY: 'test', LIBERGENT_CALLING_ENABLED: '1',
+    LIBERGENT_ALLOWED_DESTINATIONS: '+40722123456', LIBERGENT_RECORDING_RETENTION_DAYS: '7',
+    MASSCALL_SERVICE_URL: 'https://calls.test', MASSCALL_SERVICE_TOKEN: 'a'.repeat(40), MASSCALL_CALLER_ID: '+40722999999' };
+  for (const status of [200, 503]) {
+    let sideEffects = 0;
+    const mock = t.mock.method(globalThis, 'fetch', async url => {
+      const path = new URL(url).pathname;
+      if (path.endsWith('/auth/v1/user')) return Response.json({ id: 'buyer' });
+      if (path.endsWith('/agent_entitlements')) return Response.json([{ status: 'active' }]);
+      if (path.endsWith('/deal_cases')) return Response.json([{ id, listing_url: listing, stage: 'negotiating' }]);
+      if (path.endsWith('/whatsapp_contact_stops')) return Response.json([{ seller_phone: '+40722123456' }], { status });
+      sideEffects++; throw Error('No reservation or provider call expected');
+    });
+    const response = await worker.fetch(new Request(`https://app.test/api/deals/${id}/calls`, {
+      method: 'POST', headers: { authorization: 'Bearer test', 'content-type': 'application/json' },
+      body: JSON.stringify({ to: '+40722123456', idempotencyKey: crypto.randomUUID(), objective: 'Check availability',
+        contactSource: listing, recordingConsentEvidence: 'Test recipient consent', buyerApproved: true,
+        contactPermitted: true, recordingNoticeAcknowledged: true })
+    }), env);
+    assert.equal(response.status, status === 200 ? 409 : 503);
+    assert.equal((await response.json()).code, status === 200 ? 'seller_contact_stopped' : 'contact_preferences_unavailable');
+    assert.equal(sideEffects, 0);
+    mock.mock.restore();
+  }
+});

@@ -65,3 +65,53 @@ test('unlabelled replies stay separate when a seller has multiple listings', () 
   }
   assert.equal(conversations.find(item => !item.listingUrl).messages.length, 2);
 });
+
+test('quoted provider message IDs identify the exact owner/listing and never fall back to another seller', async t => {
+  const before = { ...process.env };
+  t.after(() => { for (const key of Object.keys(process.env)) if (!(key in before)) delete process.env[key]; Object.assign(process.env, before); });
+  for (const match of [outbound('owner', 'https://listing.test/a'), outbound('other', 'https://listing.test/b'),
+    { ...outbound('wrong', 'https://listing.test/c'), to_number: '+40722999999' }, null]) {
+    let stored; let lookups = 0;
+    const mock = t.mock.method(globalThis, 'fetch', async (input, init = {}) => {
+      const url = new URL(input);
+      if (init.method === 'POST') { stored = JSON.parse(init.body); return new Response(null, { status: 201 }); }
+      lookups++;
+      assert.equal(url.searchParams.get('message_id'), 'eq.provider-original');
+      assert.equal(url.searchParams.get('to_number'), `eq.${phone}`);
+      return Response.json(match ? [{ ...match, message_id: 'provider-original' }] : []);
+    });
+    const input = await request().json();
+    const response = await worker.fetch(new Request('https://app.test/api/openclaw/inbound', {
+      method: 'POST', headers: { authorization: 'Bearer inbound-test', 'content-type': 'application/json' },
+      body: JSON.stringify({ ...input, replyToMessageId: 'provider-original' })
+    }), env);
+    assert.equal(response.status, 200);
+    assert.equal(lookups, 1);
+    assert.equal(stored.raw.userId, match?.to_number === phone ? match.raw.userId : undefined);
+    assert.equal(stored.raw.listing?.url, match?.to_number === phone ? match.raw.listing.url : undefined);
+    mock.mock.restore();
+  }
+});
+
+test('malformed quoted message references reject before database work', async t => {
+  t.mock.method(globalThis, 'fetch', () => assert.fail('No database call expected'));
+  for (const reference of ['', {}, 'x'.repeat(513), 'bad\nreference']) {
+    const response = await worker.fetch(new Request('https://app.test/api/openclaw/inbound', {
+      method: 'POST', headers: { authorization: 'Bearer inbound-test', 'content-type': 'application/json' },
+      body: JSON.stringify({ from: phone, text: 'Reply', messageId: 'incoming-test', replyToMessageId: reference })
+    }), env);
+    assert.equal(response.status, 400);
+  }
+});
+
+test('inbound messages require stable IDs before storage or stop handling', async t => {
+  t.mock.method(globalThis, 'fetch', () => assert.fail('No database call expected'));
+  for (const messageId of [undefined, {}, '', 'x'.repeat(513), 'bad\nID']) {
+    const response = await worker.fetch(new Request('https://app.test/api/openclaw/inbound', {
+      method: 'POST', headers: { authorization: 'Bearer inbound-test', 'content-type': 'application/json' },
+      body: JSON.stringify({ from: phone, text: 'Reply', messageId })
+    }), env);
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /stable provider messageId/);
+  }
+});

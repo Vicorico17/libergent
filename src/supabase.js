@@ -607,7 +607,7 @@ export async function insertWhatsAppInboundToSupabase(entry, env = process.env) 
   await requestSupabase(`${config.whatsappMessagesTable}?on_conflict=message_id`, {
     method: "POST",
     headers: {
-      Prefer: "resolution=merge-duplicates,return=minimal"
+      Prefer: "resolution=ignore-duplicates,return=minimal"
     },
     body: JSON.stringify(row)
   }, env);
@@ -658,7 +658,18 @@ export async function readWhatsAppMessagesFromSupabase({ limit = 500, userId = "
   return Array.isArray(rows) ? rows : [];
 }
 
-export async function findWhatsAppConversationOwner(sellerPhone, env = process.env) {
+export async function findWhatsAppConversationOwner(sellerPhone, env = process.env, replyToMessageId = "") {
+  if (replyToMessageId) {
+    const config = getSupabaseConfig(env);
+    if (!config) throw new Error("Supabase is not configured.");
+    const query = new URLSearchParams({ select: "message_id,direction,to_number,raw", message_id: `eq.${replyToMessageId}`,
+      direction: "eq.outbound", to_number: `eq.${sellerPhone}`, limit: "2" });
+    const rows = await requestSupabase(`${config.whatsappMessagesTable}?${query}`, { method: "GET" }, env);
+    if (!Array.isArray(rows) || rows.length !== 1) return null;
+    const row = rows[0];
+    return row.message_id === replyToMessageId && row.direction === "outbound" && row.to_number === sellerPhone && row.raw?.userId
+      ? row.raw : null;
+  }
   const rows = await readWhatsAppMessagesFromSupabase({ limit: 1000, sellerPhone, direction: "outbound" }, env);
   if (rows.length >= 1000) return null;
   const matchingOutbound = rows.filter((row) =>
