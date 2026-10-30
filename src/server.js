@@ -246,18 +246,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (apiPath === "/mcp" || apiPath.startsWith("/api/selling/")) {
+  if (apiPath === "/mcp" || apiPath.startsWith("/api/selling/") || apiPath.startsWith("/api/developer/") || apiPath.startsWith("/api/v1/")) {
     const chunks = [];
     let size = 0;
     for await (const chunk of req) {
       size += chunk.length;
-      if (size > (apiPath === "/mcp" ? 64 * 1024 : 10 * 1024 * 1024)) { sendJson(res, 413, { error: "Request too large." }); return; }
+      if (size > (apiPath.startsWith("/api/selling/") ? 10 * 1024 * 1024 : 64 * 1024)) { sendJson(res, 413, { error: "Request too large." }); return; }
       chunks.push(chunk);
     }
     const response = await worker.fetch(new Request(url, {
       method: req.method,
       headers: {
-        ...(apiPath === "/mcp" ? req.headers : {}),
+        ...req.headers,
         authorization: String(req.headers.authorization || ""),
         cookie: String(req.headers.cookie || ""),
         "content-type": String(req.headers["content-type"] || "application/json")

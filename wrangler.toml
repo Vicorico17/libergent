@@ -17,3 +17,33 @@ crons = ["* * * * *"]
 OPENCLAW_BRIDGE_URL = "https://bridge.srv1648069.hstgr.cloud"
 PREMIUM_JEV_ENABLED = "1"
 PREMIUM_JEV_MODEL = "jev-latest"
+
+# Dedicated owner trial endpoint. It exposes only /mcp and keeps public
+# Premium/account actions disabled. Do not copy these settings to production.
+[env.mcp-test]
+name = "libergent-mcp-test"
+workers_dev = true
+
+[env.mcp-test.vars]
+LIBERGENT_MCP_ENABLED = "1"
+LIBERGENT_MCP_TEST_MODE = "1"
+PREMIUM_JEV_ENABLED = "0"
+OPENCLAW_BRIDGE_URL = "https://bridge.srv1648069.hstgr.cloud"
+PREMIUM_JEV_MODEL = "jev-latest"
+
+[env.mcp-test.triggers]
+crons = []
+
+[[env.mcp-test.ratelimits]]
+name = "MCP_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 40, period = 60 }
+
+[[env.mcp-test.ratelimits]]
+name = "MCP_SEARCH_LIMITER"
+namespace_id = "1002"
+simple = { limit = 8, period = 60 }
+
+[env.mcp-test.observability]
+enabled = true
+head_sampling_rate = 1

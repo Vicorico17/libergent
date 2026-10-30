@@ -13,6 +13,35 @@ is implemented or has been explicitly confirmed in the target environment;
 unchecked operational items must be completed before the corresponding test or
 launch.
 
+## Repository fixes — 2026-10-30
+
+- [x] Reject explicit Premium MCP requests instead of silently downgrading to Free;
+  preserve the age-confirmation error without exposing blocked listing details.
+- [x] Replace outdated Premium connector tests with Free-only contract checks;
+  cover missing/broken trial quotas, search quota denial and isolated routing.
+- [x] Gate the unfinished Developer API portal behind an honest status page.
+  Its draft component is preserved; key management and `/api/v1/*` backend
+  implementation remain open. Development-page claims now match availability.
+- [x] Include the existing UI statistics data tests in `npm run check` and CI.
+- [ ] Deploy and verify this batch in the target environment.
+
+## Developer API implementation — 2026-10-30
+
+- [x] Add opt-in key management, read-only v1 search/sources, simulated demo,
+  OpenAPI, and shared Node/Worker routing.
+- [x] Add private SQL tables and atomic functions for key creation limits,
+  per-account quotas, expiry, revocation and account disablement.
+- [x] Connect the portal to runtime availability and implemented capabilities;
+  remove draft claims for unsupported enrichment, material filters and API-key MCP.
+- [x] Add API/security regression tests and ephemeral Postgres migration tests to CI.
+- [ ] Apply `supabase/developer_api.sql` in staging and verify multi-session
+  contention, real authentication, browser key management, marketplace results
+  and latency. Set `LIBERGENT_DEVELOPER_API_ENABLED=1` only after configuration.
+- [x] Local live smoke: `iphone 15` returned four offers from Publi24, with OLX
+  and Okazii reported unavailable. This single local query is not production
+  coverage acceptance.
+- [ ] Production deployment and acceptance. No database or deployment changed locally.
+
 ## Current launch checklist — 2026-10-14
 
 This is the active owner-requested to-do list. It supersedes the older execution
@@ -93,57 +122,55 @@ payments, seller conversations, or marketplace publication.
    Owner reaffirmed this task on **2026-10-19**. The connector must expose
    **Libergent's own search, decisions, explanations and workflows**; clients
    present those results rather than independently choosing replacement offers.
-   The local code already has a stateless MCP endpoint, `search_products`,
-   `get_listing_details`, and `list_sources`. Search passes Libergent's budget,
-   ranking, price intelligence and Jev decisions through; Premium requests use
-   the existing entitlement check when a bearer token is present. This is a local
-   prototype, not a connected or deployed product. Complete in this order:
-   1. [ ] **Set and document the first release scope.** Free users get public
-      search; linked Premium accounts get premium search and Jev decisions; the
-      separate Libergent Agent entitlement gates seller outreach and negotiation.
-      Decide which account tools ship first (alerts, saved offers, deal status,
-      selling drafts) and defer any action whose underlying service or safeguards
-      are not ready.
-   2. [ ] **Review and isolate the existing implementation.** Separate connector
-      files and required shared search changes from unrelated uncommitted product
-      work. Review tool schemas, outputs, search parity, listing URL restrictions,
-      pricing/filter behavior, error handling and deployment flags; then commit
-      this slice with its setup and test instructions.
-   3. [ ] **Implement account linking.** Add an OAuth authorization flow that
-      lets a user sign in to their existing Libergent account, approve the
-      requested access, and connect it from each client. Support authorization
-      code with PKCE, client registration as required, short-lived scoped access
-      tokens, refresh-token rotation, disconnect and immediate revocation. Never
-      ask users to paste session tokens into chat or tool arguments.
-   4. [ ] **Enforce scopes and product entitlements in every tool.** Keep free
-      search public. Check the connected user's Premium entitlement for premium
-      search and Jev; check the independent Agent entitlement for seller contact,
-      negotiation and calls. Scope every private read/write to the authenticated
-      user. Require explicit approval before sending a message, placing a call,
-      publishing a listing or taking another consequential action.
-   5. [ ] **Expand the tool set from existing Libergent services.** First add
-      account-scoped read tools for alerts/events, saved offers and deal status.
-      Then add supported Agent workflows and Vinde draft/publication tools, each
-      using existing services, ownership checks, idempotency and confirmation.
-      Return Libergent's decision and state; do not recreate business logic in the
-      MCP adapter.
-   6. [ ] **Prepare for production load and failures.** Set per-account and
-      anonymous rate limits, search deadlines, bounded browser/cost budgets,
-      partial-result behavior and safe retries. Add metrics for latency, source
-      coverage, OAuth failures, tool errors and cost. Do not log tokens or private
-      listing/account data unnecessarily. Keep a feature flag and rollback path.
-   7. [ ] **Deploy an isolated staging endpoint.** Configure HTTPS, OAuth
-      metadata/callbacks, secret storage, database migrations and test accounts.
-      Verify connect/disconnect, revocation, expiry, plan changes, cross-account
-      isolation, source failures and every write-action confirmation.
-   8. [ ] **Run end-to-end tests in ChatGPT and Claude.** Connect a fresh account
-      in each client; test Free, Premium and Agent permissions, Romanian prompts,
-      Libergent's exact recommendations, empty/partial results and expired access.
-      Confirm each client supports the chosen auth flow and MCP transport.
-   9. [ ] **Release and support the connector.** Prepare setup/onboarding guides,
-      support contact, privacy and terms disclosures, reviewer test cases and
-      platform-specific packages/listings. Submit for public distribution, address
-      review feedback, publish, and monitor connection success and tool quality.
+   The MCP implementation is committed in the repository. It exposes
+   `search_products`, `get_listing_details`, and `list_sources`; search uses
+   Libergent's ranking, price analysis and Jev decisions. The endpoint remains
+   disabled in production. The owner's immediate goal is to call Libergent from
+   their own ChatGPT and Claude accounts, inspect actual search behavior, then
+   decide the Premium per-call rate. Connector Free stays free; connector Premium
+   is charged per call. Do not charge during the owner's initial trial. Complete
+   in this order:
+   1. [x] **Prepare a limited test release.** Keep Free searches free. The first
+      public connector trial is Free-only: Premium is unavailable until customer
+      identity and per-call charging are in place. Keep account features and write
+      actions unavailable. The isolated MCP-only worker and kill switch are
+      implemented locally; request and search quotas are configured. Confirm the
+      search timeout and source/cost ceilings before broader live traffic.
+   2. [ ] **Record Free test usage without charging.** Meter each call with a
+      request ID, query, duration, cache state, source coverage, result count and
+      outcome. Avoid caller IPs, tokens and unnecessary personal account data;
+      set log retention. Use the owner's test traffic to learn which searches the
+      clients send and estimate cost per call. Structured logging is implemented
+      locally; verify Workers Logs retention and access in Cloudflare.
+   3. [x] **Deploy the isolated test endpoint over HTTPS.** The `/mcp` endpoint
+      is live at `https://libergent-mcp-test.vic-cazacu.workers.dev/mcp`; a remote
+      MCP handshake confirmed all three tools and 12 Free sources. All other
+      paths return 404 and the test environment has no scheduled jobs. See the
+      [owner connection and usage guide](connector-test.md).
+   4. [ ] **Connect the owner's ChatGPT and Claude accounts.** Add the remote
+      endpoint from the guide and confirm each client can discover the tools.
+   5. [ ] **Run the owner's live search trial.** Try representative Romanian and
+      English prompts, filters and follow-up questions in both clients. Compare
+      the query sent, sources actually searched, Libergent's selected offers and
+      explanation, response time, failures and cache behavior. Fix issues in
+      Libergent's search or the MCP input/output mapping based on those results.
+   6. [ ] **Turn on Premium pay-per-call from observed usage.** Set the Premium
+      price per call and define when a call is billable, how cache hits and
+      failed/partial searches are handled, customer confirmation, usage display,
+      refunds and spend limits. Add customer identity, a metering ledger, payment
+      integration and receipts. Premium stays unavailable in the connector until
+      this work is complete. Free searches must never incur a connector fee.
+   7. [ ] **Add account-linked and paid features after the trial.** Implement
+      OAuth, token revocation and per-user scopes when private or paid access is
+      needed. Premium search must check Premium entitlement; outreach,
+      negotiation and calls must independently check Libergent Agent. Require
+      approval for messages, calls, purchases or publishing. Add alerts, saved
+      offers, deal status and Vinde tools only as their underlying workflows are
+      ready.
+   8. [ ] **Harden and release broadly.** Verify quotas, cost ceilings, privacy,
+      monitoring, failure handling, account isolation and rollback. Prepare
+      onboarding, support/privacy information and platform-specific public
+      distribution materials only when broader access is intended.
 
 ### Adult product search with age confirmation — 2026-10-26
 

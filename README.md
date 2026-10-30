@@ -29,7 +29,7 @@ The HTTP smoke check initializes MCP, discovers tools, and reads the source
 catalog; it does not run a live marketplace search. An alternate endpoint can
 be passed with `npm run check:mcp -- https://your-test-host/mcp`.
 
-`search_products` accepts `query`, `tier` (`free` or `premium`), `condition` (`any`, `used`, `new`),
+`search_products` accepts `query`, `tier` (`free` only), `condition` (`any`, `used`, `new`),
 `maxPriceRon`, optional `city`, and `limit` (1–20). Budget filtering applies to
 known item prices in the shared Libergent engine before selecting recommendations;
 delivery and other fees are not included. Both search APIs accept `maxPriceRon`,
@@ -44,18 +44,20 @@ risks, confidence, price intelligence, and Jev decisions. It never picks a fallb
 winner or re-ranks results. The website also preserves the engine's selected cards;
 local display filters may hide a selection but do not invent a replacement.
 
-Free search is anonymous. Premium routes through the existing authenticated
-Libergent API and reuses its user validation, subscription checks, browser fallbacks,
-and Jev selection. For development, it accepts an existing Libergent session bearer
-credential in the transport Authorization header, never in tool arguments.
-OAuth account linking and refresh are not implemented yet, so this does not provide
-a finished sign-in experience in ChatGPT or Claude. Do not paste credentials in chat.
+Free search is anonymous and never billable. The connector rejects explicit
+Premium requests rather than silently substituting Free results. Premium remains
+available through the website API, but is unavailable through MCP until customer
+identity and per-call charging are implemented. Transport credentials are not
+forwarded by this Free-only connector. OAuth account linking and refresh remain
+unfinished; do not paste credentials in chat.
 
 The endpoint is stateless and uses JSON responses. It rejects unexpected Origin
 headers and bodies larger than 64 KiB. Additional exact browser origins can be
 configured with `LIBERGENT_MCP_ALLOWED_ORIGINS`. An optional Cloudflare rate-limit
 binding named `MCP_RATE_LIMITER` is supported; without that binding there is no
-connector request quota. An unlisted URL is not private access control.
+connector request quota. The isolated `LIBERGENT_MCP_TEST_MODE=1` deployment
+requires both `MCP_RATE_LIMITER` and `MCP_SEARCH_LIMITER` and fails closed when
+those bindings are missing or fail. An unlisted URL is not private access control.
 
 Status: protocol integration, mock search, URL restrictions, cache reuse, and
 Worker bundling are tested. Public enablement still needs bounded search latency,
@@ -67,6 +69,59 @@ token lifecycle management remain prerequisites for the public authenticated bet
 
 References: [ChatGPT MCP setup](https://developers.openai.com/plugins/build/mcp-server)
 and [Claude custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+
+### Developer API v1
+
+The `/developers/` portal checks `/api/developer/config` at runtime and stays
+unavailable until `LIBERGENT_DEVELOPER_API_ENABLED=1` and server-side Supabase
+credentials are configured. Apply `supabase/developer_api.sql` first. This
+migration creates private key/account/usage tables and service-role-only RPCs;
+never expose the Supabase secret to API consumers. In local development set
+`LIBERGENT_PUBLIC_URL=http://localhost:3000` so browser Origin checks match the UI.
+Both the Node development server and Worker route these APIs through the same handler.
+
+Confirmed Libergent accounts can create test/live keys, list metadata, revoke
+keys, and inspect shared account usage. Keys contain 256 random bits, expire in
+90 days, and are stored only as SHA-256 hashes. The plaintext appears once in the
+creation response. There are at most five active keys and twenty creations per
+UTC day per account. Revocation and account disablement are checked before each
+request, including cache hits. Disable a developer account using the trusted
+administrative database path: set `developer_accounts.disabled=true` for its user.
+
+- `GET /api/v1/demo`: fixed simulated search, no account or marketplace request.
+- `GET /api/v1/openapi.json`: supported API contract.
+- `GET /api/v1/sources`: allowed domains, authenticated with a developer bearer key.
+- `GET /api/v1/search?q=iphone%2015&sites=olx,publi24&limit=10`: authenticated search.
+  Optional filters are `condition=any|used|new` and positive `maxPriceRon`.
+  Unknown parameters are rejected.
+- `/api/developer/keys` (GET/POST), `/api/developer/keys/:id` (DELETE), and
+  `/api/developer/usage` (GET): account management using the existing Supabase
+  session bearer credential, not a developer key.
+
+Live keys allow 200 requests/day and 10/minute; test keys allow 1,000/day and
+60/minute. These fixed limits are enforced atomically in Postgres across all keys
+owned by an account, with separate counters per mode. Source-list calls, cached
+searches, and searches that fail after quota reservation count. Invalid inputs and
+invalid credentials do not consume quota. HTTP 429 includes `Retry-After`.
+There is no billing, automatic upgrade, or paid-provider fallback.
+
+Search uses the shared direct parsers and ranking engine with one page and up to
+20 candidates per source, across OLX, Publi24 and Okazii (all three by default). Up to 20 ranked offers
+are returned along with Libergent's decisions. Marketplace work has a 25-second
+deadline and abort signal; database validation can add up to eight seconds.
+Use a 45-second client timeout. Complete live responses may be cached for fifteen
+minutes; partial failures are not cached. `searchedAt` remains the original fetch
+time on cache hits, and availability remains unknown. Test mode is explicitly
+simulated and never calls a marketplace; it never shares live cache entries.
+Adult-product access, specialized material filters, listing enrichment, authenticated
+MCP and OAuth linking are not part of this API release.
+
+Validation: `npm run check` includes API regression tests and an ephemeral PGlite
+Postgres migration test. The latter validates actual SQL, caps, reset behavior,
+revocation and permissions, but serializes database sessions. Before production
+activation, verify multi-session contention in staging, Supabase authentication,
+key creation/revocation in the browser, real source coverage and response latency.
+No production migration or enablement is performed by these tests.
 
 ### Search healthcheck
 
