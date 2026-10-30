@@ -36,6 +36,21 @@ export function normalizeSellingListing(input, userId, env) {
     olx: { categoryId: Number(olx.categoryId), cityId: Number(olx.cityId), districtId: Number(olx.districtId) || undefined, advertiserType: olx.advertiserType, attributes } };
 }
 const jobQuery = (userId, listingId, platform) => `${ownerQuery(userId)}&listing_id=eq.${listingId}${platform ? `&platform=eq.${platform}` : ''}`;
+async function readOkaziiFeedDrafts(userId, env) {
+  const drafts = []; let cursor = '';
+  // Keyset pagination tolerates a PostgREST cap smaller than our requested page.
+  // Never return a truncated feed that an importer could interpret as removals.
+  for (let page = 0; page < 21; page++) {
+    const rows = await store(env, 'selling_drafts', `${ownerQuery(userId)}&okazii_enabled=eq.true&order=id.asc&limit=200${cursor ? `&id=gt.${cursor}` : ''}`);
+    if (!Array.isArray(rows)) fail('Feed-ul nu poate fi confirmat integral.', 503);
+    if (!rows.length) return drafts;
+    for (const row of rows) {
+      if (!uuid.test(row?.id || '') || (cursor && row.id <= cursor) || drafts.length >= 2000) fail('Feed-ul depășește limita sau nu poate fi citit integral.', 503);
+      cursor = row.id; drafts.push(row);
+    }
+  }
+  fail('Feed-ul nu poate fi citit integral. Reîncearcă mai târziu.', 503);
+}
 export async function publishOlx({ userId, draft, env }) {
   const query = jobQuery(userId, draft.id, 'olx');
   const [existing] = await store(env, 'selling_publications', query);
@@ -49,8 +64,7 @@ export async function publishOlx({ userId, draft, env }) {
   let result;
   try {
     const advert = await olxRequest('/adverts', token, 'POST', payload);
-    if (!advert?.id) throw new Error('Missing provider receipt');
-    result = { status: advert.status === 'active' ? 'published' : 'pending', provider_id: String(advert.id), provider_status: String(advert.status || 'pending'), url: safeOlxUrl(advert.url), message: advert.status === 'active' ? 'Publicat pe OLX.' : 'Primit de OLX. Poate necesita moderare, confirmare sau plată.' };
+    result = olxPublicationReceipt(advert);
   } catch (error) {
     result = { status: error.definitive ? 'failed' : 'unknown', message: error.definitive ? [error.message, ...(error.fields || [])].join(' ') : 'OLX nu a confirmat rezultatul. Verifică anunțurile în contul OLX înainte de o nouă încercare.' };
   }
@@ -59,7 +73,23 @@ export async function publishOlx({ userId, draft, env }) {
   return saved;
 }
 export function safeOlxUrl(value) {
-  try { const url = new URL(value); return url.protocol === 'https:' && ['olx.ro', 'www.olx.ro'].includes(url.hostname) ? url.href : ''; } catch { return ''; }
+  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password && ['olx.ro', 'www.olx.ro'].includes(url.hostname) ? url.href : ''; } catch { return ''; }
+}
+export function olxPublicationReceipt(advert, expectedId = '') {
+  const id = typeof advert?.id === 'number' && Number.isSafeInteger(advert.id) ? String(advert.id)
+    : typeof advert?.id === 'string' ? advert.id : '';
+  if (!/^[1-9]\d*$/.test(id) || (expectedId && id !== expectedId)) throw new SellingError('OLX nu a confirmat identitatea anunțului.', 502);
+  const providerStatus = typeof advert.status === 'string' ? advert.status : '';
+  let status = 'unknown'; let message = 'Starea anunțului nu este confirmată. Verifică în contul OLX.';
+  if (providerStatus === 'active') { status = 'published'; message = 'Publicat pe OLX.'; }
+  else if (['new', 'limited', 'unconfirmed', 'unpaid'].includes(providerStatus)) {
+    status = 'pending'; message = 'Primit de OLX. Poate necesita moderare, confirmare sau plată.';
+  } else if (['removed_by_user', 'outdated', 'blocked', 'disabled'].includes(providerStatus)) {
+    status = 'inactive'; message = 'Anunțul nu este activ pe OLX. Verifică starea în contul OLX.';
+  } else if (['moderated', 'removed_by_moderator'].includes(providerStatus)) {
+    status = 'rejected'; message = 'Anunț respins de moderarea OLX. Verifică motivul în contul OLX.';
+  }
+  return { status, provider_id: id, provider_status: providerStatus, url: safeOlxUrl(advert.url), message };
 }
 export async function handleSelling(request, env, authenticate) {
   try { return await route(request, env, authenticate); }
@@ -87,7 +117,7 @@ async function route(request, env, authenticate) {
     if (!uuid.test(feedMatch[1])) fail('Feed inexistent.', 404);
     const [feed] = await store(env, 'selling_feeds', `token=eq.${feedMatch[1]}`);
     if (!feed) fail('Feed inexistent.', 404);
-    const drafts = await store(env, 'selling_drafts', `${ownerQuery(feed.user_id)}&okazii_enabled=eq.true&order=created_at.asc`);
+    const drafts = await readOkaziiFeedDrafts(feed.user_id, env);
     return new Response(okaziiFeed(drafts), { headers: { 'content-type': 'application/xml; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });
   }
   const auth = await authenticate(request, env);
@@ -178,10 +208,22 @@ async function route(request, env, authenticate) {
   if (path === '/api/selling/refresh' && method === 'POST') {
     const body = await readBody(request); if (!uuid.test(body?.id || '')) fail('Anunț invalid.');
     const query = jobQuery(userId, body.id, 'olx'); const [job] = await store(env, 'selling_publications', query);
-    if (job?.provider_id && /^\d+$/.test(job.provider_id)) {
-      const advert = await olxRequest(`/adverts/${job.provider_id}`, await olxAccessToken(userId, env));
-      await store(env, 'selling_publications', query, 'PATCH', { status: advert.status === 'active' ? 'published' : 'pending', provider_status: advert.status, url: safeOlxUrl(advert.url), message: `Stare OLX: ${advert.status}`, updated_at: new Date().toISOString() });
+    if (!job) fail('Nu există o trimitere OLX pentru acest anunț.', 404);
+    const token = await olxAccessToken(userId, env);
+    let receipt;
+    if (job.provider_id && /^[1-9]\d*$/.test(job.provider_id)) {
+      const advert = await olxRequest(`/adverts/${job.provider_id}`, token);
+      receipt = olxPublicationReceipt(advert, job.provider_id);
+    } else if (['sending', 'unknown'].includes(job.status)) {
+      // Read-only recovery: the original POST uses the draft UUID as external_id.
+      // An absent/ambiguous match is never permission to issue another POST.
+      const adverts = await olxRequest(`/adverts?${new URLSearchParams({ external_id: body.id, limit: '2', offset: '0' })}`, token);
+      if (!Array.isArray(adverts)) fail('Răspuns OLX invalid. Starea trimiterii nu a fost schimbată.', 502);
+      if (adverts.length === 1 && String(adverts[0]?.external_id) === body.id) receipt = olxPublicationReceipt(adverts[0]);
+      else receipt = { status: 'unknown', message: 'Nu există o potrivire unică confirmată. Verifică anunțurile în contul OLX; nu retrimite automat.' };
     }
+    const updateQuery = !job.provider_id && ['sending', 'unknown'].includes(job.status) ? `${query}&status=eq.${job.status}` : query;
+    if (receipt) await store(env, 'selling_publications', updateQuery, 'PATCH', { ...receipt, updated_at: new Date().toISOString() });
     return json({ publications: await store(env, 'selling_publications', jobQuery(userId, body.id)) });
   }
   if (path === '/api/selling/okazii/remove' && method === 'POST') {
