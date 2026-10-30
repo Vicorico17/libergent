@@ -179,3 +179,14 @@ test('self-service end-to-end: SQL-issued test key authenticates, uses sandbox a
     assert.equal((await handleIntegration(searchRequest, testEnv)).status, 401);
   } finally { await db.close(); }
 });
+
+test('availability is public, fail-closed on missing configuration, and isolated from the Free MCP trial', async () => {
+  const request = () => new Request('https://api.test/api/developer/config');
+  for (const missing of ['LIBERGENT_DEVELOPER_API_ENABLED', 'LIBERGENT_INTEGRATIONS_ENABLED', 'SUPABASE_URL', 'SUPABASE_SECRET_KEY', 'INTEGRATION_GATEWAY']) {
+    const incomplete = { ...env }; delete incomplete[missing];
+    assert.deepEqual(await (await worker.fetch(request(), incomplete)).json(), { available: false });
+  }
+  assert.deepEqual(await (await worker.fetch(request(), env)).json(), { available: true });
+  assert.equal((await worker.fetch(request(), { ...env, LIBERGENT_MCP_TEST_MODE: '1' })).status, 404);
+  assert.equal((await worker.fetch(new Request(request(), { method: 'POST' }), env)).status, 405);
+});

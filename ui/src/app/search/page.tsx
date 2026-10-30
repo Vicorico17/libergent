@@ -22,6 +22,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
 import { SNAPSHOT_MAX_AGE_MS, searchSnapshotKey, readSearchSnapshot, writeSearchSnapshot, describeSnapshotChange } from "@/lib/search-snapshot.mjs"
 import { useAccountSession } from "@/lib/use-account-session"
 import { rememberRecentSearch } from "@/lib/recent-searches"
+import { getMessageAttempt, finishMessageAttempt } from "@/lib/message-attempt"
 import { canCompareRetailOffers, mapOffer, mapSearchResults, type ListingDetails, type SearchPayload, type SearchResultItem } from "./search-data"
 
 // — Constants —
@@ -1575,6 +1576,7 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
       setSendState("sending")
       setSendError("")
       setDeliveryStatus("unknown")
+      const attempt = await getMessageAttempt({ userId: session.user.id, target: phone, listingUrl: item.url || "", message })
       const response = await fetch("/api/whatsapp/send", {
         method: "POST",
         headers: {
@@ -1583,6 +1585,7 @@ function SellerMessageActions({ item, query }: { item: SearchResultItem; query: 
         },
         body: JSON.stringify({
           target: phone,
+          idempotencyKey: attempt.key,
           message,
           listing: {
             url: item.url,
@@ -2602,11 +2605,13 @@ function ConversationCenter({ enabled, onStatusesChange }: { enabled: boolean; o
       const client = getSupabaseBrowserClient()
       const session = client ? (await client.auth.getSession()).data.session : null
       if (!session?.access_token) throw new Error("Sesiunea a expirat. Conectează-te din nou.")
+      const attempt = await getMessageAttempt({ userId: session.user.id, target: selected.sellerPhone, listingUrl: selected.listingUrl, message })
       const response = await fetch("/api/whatsapp/send", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
           conversationId: selected.id,
+          idempotencyKey: attempt.key,
           target: selected.sellerPhone,
           message,
           listing: { url: selected.listingUrl, title: selected.listingTitle, marketplace: selected.marketplace, price: selected.listingPrice }
@@ -2614,6 +2619,7 @@ function ConversationCenter({ enabled, onStatusesChange }: { enabled: boolean; o
       })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok || payload.ok === false) throw new Error(payload.error || "Răspunsul nu a putut fi trimis.")
+      if (payload.historySaved) finishMessageAttempt(attempt)
       setReplyText("")
       if (!payload.historySaved) setError("Mesajul a fost preluat, dar istoricul nu a putut fi salvat. Nu îl retrimite automat.")
       else await loadConversations(selected.id)

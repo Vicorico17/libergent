@@ -4,7 +4,7 @@ export type SellPhoto = { url: string; name: string; file?: File; uploadedUrl?: 
 export type SellProduct = { title: string; description: string; price: string; location: string; category: string; condition: string };
 export type Publication = { platform: string; status: string; message: string; url?: string; provider_status?: string };
 export type OlxSettings = { categoryId: number; cityId: number; districtId?: number; advertiserType: string; attributes: { code: string; value?: string | number; values?: string[] }[] };
-export const publicationLabels: Record<string, string> = { sending: 'Trimitere în curs — verifică în contul OLX', published: 'Publicat', pending: 'În așteptare la OLX', failed: 'Respins — poți corecta și reîncerca', unknown: 'Rezultat neconfirmat — verifică în contul OLX', feed_ready: 'În feed — așteaptă importul Okazii', error: 'Necesită atenție' };
+export const publicationLabels: Record<string, string> = { sending: 'Trimitere în curs — verifică în contul OLX', published: 'Publicat', pending: 'În așteptare la OLX', inactive: 'Inactiv pe OLX', rejected: 'Respins de moderarea OLX', failed: 'Respins — poți corecta și reîncerca', unknown: 'Rezultat neconfirmat — verifică în contul OLX', feed_ready: 'În feed — așteaptă importul Okazii', error: 'Necesită atenție' };
 
 export async function sellingRequest(path: string, method = 'GET', body?: unknown) {
   const client = getSupabaseBrowserClient();

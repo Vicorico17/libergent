@@ -1,3 +1,9 @@
+import { checkFreeSearchLimits } from "./free-search-limits.js";
+import { isSellerStopRequest } from "./contact-stop.js";
+import { stopWhatsAppContact, isWhatsAppContactStopped } from "./supabase.js";
+import { parseWhatsAppSendReceipt } from "./whatsapp-receipt.js";
+import { searchCacheLifetimeSeconds, isSearchCacheFresh } from "./search-cache-policy.js";
+import { getFreeSearchProvider, getFreeSearchSiteKeys } from "./free-search-policy.js";
 import { handleAgentMcp } from './agent-mcp.js';
 import { handleDeveloper } from './developer-api.js';
 import { handleApiReference } from './developer-reference.js';
@@ -8,7 +14,7 @@ import { searchAcrossSites } from "./app.js";
 import { handleMcp } from "./mcp.js";
 import { handleSelling } from "./selling.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
-import { buildConversationHistory, getConversationById, normalizeDeliveryStatus } from "./conversations.js";
+import { buildConversationHistory, getConversationById } from "./conversations.js";
 import { buildDealOpeningDraft, buildDealReplyDraft, normalizeDealChange, normalizeDealCreate } from "./deals.js";
 import { generateDealReplyWithModel } from "./deal-ai.js";
 import { callBrief, masscallRequest, normalizeCallApproval, validProviderCallId } from "./masscall.js";
@@ -26,7 +32,7 @@ import { assertConfiguredPrice, configuredPriceIds, createCheckoutSession, creat
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { normalizeOfferFeedbackPayload } from "./feedback.js";
 import { buildSourceCatalog } from "./source-catalog.js";
-import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getDefaultSiteKeys, getPremiumSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getPremiumSiteKeys, getSite } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
@@ -47,7 +53,6 @@ import {
 } from "./api-params.js";
 
 const LEAD_API_PATHS = new Set(["/api/leads", "/api/lead", "/api/email-leads", "/api/email_leads", "/api/waitlist"]);
-const SEARCH_CACHE_SECONDS = 300;
 const MARKETPLACE_CONTACT_CACHE_SECONDS = 900;
 const MARKETPLACE_DETAILS_CACHE_SECONDS = 1800;
 const MAX_MARKETPLACE_DETAILS_HTML_BYTES = 6 * 1024 * 1024;
@@ -170,20 +175,22 @@ async function readSearchCache(cacheRequest) {
   const response = await cache.match(cacheRequest).catch(() => null);
   if (!response) return null;
   const payload = await response.json().catch(() => null);
-  if (!payload || isAdultProductQuery(JSON.stringify(payload))) return null;
+  if (!isSearchCacheFresh(payload, response.headers.get("x-libergent-cached-at"))
+    || isAdultProductQuery(JSON.stringify(payload))) return null;
   payload.summary = { ...payload.summary, cacheHit: true, browserSessionsUsed: 0 };
   return json(payload, 200);
 }
 
 function writeSearchCache(cacheRequest, payload, context) {
   const cache = globalThis.caches?.default;
-  // Do not pin a transport failure or an empty search for the next five minutes.
-  if (!cache || !payload.results?.some((result) => result.ok && result.items?.length)) return;
+  const lifetime = searchCacheLifetimeSeconds(payload);
+  if (!cache || !lifetime) return;
   const response = new Response(JSON.stringify(payload), {
     status: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": `public, max-age=${SEARCH_CACHE_SECONDS}`
+      "cache-control": `public, max-age=${lifetime}`,
+      "x-libergent-cached-at": String(Date.now())
     }
   });
   const operation = cache.put(cacheRequest, response).catch(() => {});
@@ -364,13 +371,6 @@ function getSearchRequestParams(url) {
   };
 }
 
-function getFreeSearchSiteKeys(site, query) {
-  return site === "all"
-    ? getSiteKeysForAllSearch(query)
-    : site === "default"
-      ? getDefaultSiteKeys()
-      : [getSite(site).key];
-}
 
 async function searchPremiumBrowserSites(env, { query, limit, siteKeys, engine = "chromium" }) {
   if (!siteKeys.length) return [];
@@ -768,7 +768,16 @@ function normalizeInboundWhatsAppPayload(body = {}) {
   const text = String(body.text || body.message || body.content || "").trim();
   const timestamp = String(body.timestamp || body.receivedAt || new Date().toISOString()).trim();
   const to = String(body.to || body.to_number || "").trim();
-  const messageId = String(body.messageId || body.message_id || "").trim();
+  const rawMessageId = body.messageId || body.message_id;
+  const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
+  if (!messageId || messageId.length > 512 || /[\u0000-\u001f]/.test(messageId)) {
+    throw new Error("Expected a stable provider messageId.");
+  }
+  const replyToMessageId = body.replyToMessageId;
+  if (replyToMessageId !== undefined && (typeof replyToMessageId !== "string" || !replyToMessageId.trim()
+    || replyToMessageId.length > 512 || /[\u0000-\u001f]/.test(replyToMessageId))) {
+    throw new Error("Expected replyToMessageId to be a valid provider message ID.");
+  }
   if (!/^\+\d{8,15}$/.test(from)) {
     throw new Error("Expected from to be an E.164 phone number.");
   }
@@ -781,6 +790,7 @@ function normalizeInboundWhatsAppPayload(body = {}) {
     text,
     timestamp,
     messageId,
+    replyToMessageId: replyToMessageId?.trim() || "",
     channel: "whatsapp",
     raw: body.raw || body
   };
@@ -1062,11 +1072,18 @@ async function handleApi(request, env, context) {
     }
 
     if (!isSupabaseConfigured(env)) {
-      return json({ ok: false, error: "Supabase is not configured." }, 200);
+      return json({ ok: false, error: "Supabase is not configured." }, 503);
     }
 
     try {
-      const owner = await findWhatsAppConversationOwner(inbound.from, env).catch(() => null);
+      // Persist a seller-wide stop before attempting account/listing attribution.
+      if (isSellerStopRequest(inbound.text)) await stopWhatsAppContact(inbound.from, env);
+      const owner = await findWhatsAppConversationOwner(inbound.from, env, inbound.replyToMessageId);
+      // Ownership comes only from our outbound history, never bridge metadata.
+      inbound.raw = inbound.raw && typeof inbound.raw === "object" && !Array.isArray(inbound.raw)
+        ? { ...inbound.raw } : {};
+      delete inbound.raw.userId;
+      delete inbound.raw.listing;
       if (owner?.userId) {
         inbound.raw = {
           ...(inbound.raw || {}),
@@ -1141,7 +1158,7 @@ async function handleApi(request, env, context) {
         overrideCity: url.searchParams.get("near") || url.searchParams.get("requesterLocation") || url.searchParams.get("location") || ""
       });
       const siteKeys = getFreeSearchSiteKeys(site, query);
-      const freeProvider = provider === "auto" ? "direct" : provider;
+      const freeProvider = getFreeSearchProvider(provider);
       const cacheRequest = buildSearchCacheRequest(request, {
         query, condition, provider: freeProvider, site, limit, maxPages, maxPriceRon
       }, viewerLocation, "free");
@@ -1543,6 +1560,13 @@ async function handleApi(request, env, context) {
           const parsed = await parseJsonRequest(request);
           if (parsed.error) return json({ error: parsed.error }, parsed.error.includes("large") ? 413 : 400);
           const approval = normalizeCallApproval(parsed.data || {}, deal, env);
+          try {
+            if (await isWhatsAppContactStopped(approval.destination, env)) {
+              return json({ ok: false, code: "seller_contact_stopped", error: "Seller contact has stopped for this number." }, 409);
+            }
+          } catch {
+            return json({ ok: false, code: "contact_preferences_unavailable", error: "Contact preferences are temporarily unavailable." }, 503);
+          }
           const previous = await listDealCalls(dealId, userId, env);
           if (previous.some((call) => ["pending", "unknown", "queued", "ringing", "in-progress"].includes(call.status) && call.idempotency_key !== approval.idempotencyKey)) return json({ error: "This deal already has a pending or active call." }, 409);
           const today = new Date().toISOString().slice(0, 10);
@@ -1716,13 +1740,19 @@ async function handleApi(request, env, context) {
       return json({ ok: false, error: "Message cannot be empty." }, 400);
     }
 
-    let dealAttemptKey = "";
+    const sendAttemptKey = String(body.idempotencyKey || "");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sendAttemptKey)) {
+      return json({ error: "A valid idempotency key is required for messages." }, 400);
+    }
+    try {
+      if (await isWhatsAppContactStopped(target, env)) {
+        return json({ ok: false, code: "seller_contact_stopped", error: "Seller contact has stopped for this number." }, 409);
+      }
+    } catch {
+      return json({ ok: false, code: "contact_preferences_unavailable", error: "Contact preferences are temporarily unavailable." }, 503);
+    }
     if (body.dealId) {
       if (!body.conversationId) return json({ error: "Deal replies require an existing conversation." }, 400);
-      dealAttemptKey = String(body.idempotencyKey || "");
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(dealAttemptKey)) {
-        return json({ error: "A valid idempotency key is required for deal messages." }, 400);
-      }
       try {
         const deal = await getDealCaseFromSupabase(String(body.dealId), auth.user.id, env);
         if (!deal || deal.listing_url !== listing.url) return json({ error: "Deal not found for this listing." }, 404);
@@ -1748,14 +1778,16 @@ async function handleApi(request, env, context) {
       }
     }
 
-    if (dealAttemptKey) {
+    if (sendAttemptKey) {
       try {
         const { created, attempt } = await reserveDealSendAttempt({
-          idempotency_key: dealAttemptKey, deal_id: String(body.dealId), user_id: auth.user.id,
-          seller_phone: target, message
+          idempotency_key: sendAttemptKey, deal_id: body.dealId ? String(body.dealId) : null, user_id: auth.user.id,
+          seller_phone: target, message, listing_url: listing.url || ""
         }, env);
         if (!created) {
-          if (!attempt || attempt.deal_id !== String(body.dealId) || attempt.seller_phone !== target || attempt.message !== message) {
+          if (!attempt || attempt.deal_id !== (body.dealId ? String(body.dealId) : null)
+            || (!body.dealId && attempt.listing_url !== (listing.url || ""))
+            || attempt.seller_phone !== target || attempt.message !== message) {
             return json({ error: "Idempotency key belongs to another request." }, 409);
           }
           if (attempt.status === "accepted") return json({ ok: true, deduplicated: true, target, messageId: attempt.provider_message_id,
@@ -1771,21 +1803,29 @@ async function handleApi(request, env, context) {
       const bridgeUrl = String(env.OPENCLAW_BRIDGE_URL).replace(/\/+$/, "");
       const response = await fetch(`${bridgeUrl}/whatsapp/send`, {
         method: "POST",
+        redirect: "error",
+        signal: AbortSignal.timeout(35000),
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${env.OPENCLAW_BRIDGE_TOKEN}`
         },
-        body: JSON.stringify({ target, message, ...(dealAttemptKey ? { idempotencyKey: dealAttemptKey } : {}) })
+        body: JSON.stringify({ target, message, ...(sendAttemptKey ? { idempotencyKey: sendAttemptKey } : {}) })
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || normalizeDeliveryStatus(payload) === "failed") {
-        if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
-          status: payload.ok === false ? "failed" : "unknown", error: String(payload.error || `Bridge returned ${response.status}`).slice(0, 500)
+      const receipt = parseWhatsAppSendReceipt(payload);
+      if (!response.ok || !receipt.accepted) {
+        const outcome = receipt.status === "failed" ? "failed" : "unknown";
+        if (sendAttemptKey) await updateDealSendAttempt(sendAttemptKey, auth.user.id, {
+          status: outcome, error: `Bridge returned ${response.status}; send outcome ${outcome}.`
         }, env).catch(() => null);
-        return json({ ok: false, error: payload.error || `WhatsApp bridge failed (${response.status}).` }, 502);
+        return json({ ok: false, code: outcome === "unknown" ? "send_outcome_unknown" : "send_rejected",
+          deliveryStatus: outcome,
+          error: outcome === "unknown"
+            ? "Message acceptance could not be confirmed. Review its outcome before sending again."
+            : "The messaging provider rejected the message." }, 502);
       }
-      const deliveryStatus = normalizeDeliveryStatus(payload, "queued");
-      const messageId = String(payload.messageId || payload.result?.messageId || `outbound:${target}:${Date.now()}`);
+      const deliveryStatus = receipt.status;
+      const messageId = receipt.messageId;
       const timestamp = new Date().toISOString();
       let historySaved = false;
       let historyError = "";
@@ -1800,7 +1840,7 @@ async function handleApi(request, env, context) {
       } catch (error) {
         historyError = error instanceof Error ? error.message : String(error);
       }
-      if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
+      if (sendAttemptKey) await updateDealSendAttempt(sendAttemptKey, auth.user.id, {
         status: "accepted", provider_message_id: messageId, delivery_status: deliveryStatus, history_saved: historySaved,
         error: historyError.slice(0, 500)
       }, env);
@@ -1823,10 +1863,11 @@ async function handleApi(request, env, context) {
         historyError: historyError || null
       }, 200);
     } catch (error) {
-      if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
+      if (sendAttemptKey) await updateDealSendAttempt(sendAttemptKey, auth.user.id, {
         status: "unknown", error: (error instanceof Error ? error.message : String(error)).slice(0, 500)
       }, env).catch(() => null);
-      return json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 502);
+      return json({ ok: false, code: "send_outcome_unknown", deliveryStatus: "unknown",
+        error: "Message acceptance could not be confirmed. Review its outcome before sending again." }, 502);
     }
   }
 
@@ -1986,6 +2027,11 @@ export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
 
+    // Keep the owner trial isolated from website, account and developer routes.
+    if (env.LIBERGENT_MCP_TEST_MODE === "1" && normalizeApiPathname(url.pathname) !== "/mcp") {
+      return json({ error: "Not found" }, 404);
+    }
+
     if (url.pathname === '/api/v1/mcp') return handleAgentMcp(request, env);
     if (url.pathname.startsWith('/api/developer/')) return handleDeveloper(request, env);
     if (['/api/v1/demo', '/api/v1/sources', '/api/v1/openapi.json'].includes(url.pathname)) return handleApiReference(request);
@@ -1998,6 +2044,10 @@ export default {
     }
 
     if (url.pathname.startsWith("/api/")) {
+      if (["/api/search", "/api/search/free"].includes(normalizeApiPathname(url.pathname))) {
+        const limited = await checkFreeSearchLimits(request, env);
+        if (limited) return limited;
+      }
       return handleApiWithContentPolicy(request, env, context);
     }
 

@@ -21,6 +21,9 @@ const NAV_LINKS = {
     { label: "Termeni", href: "/termeni" },
     { label: "Cookie-uri", href: "#" },
   ],
+  Development: [
+    { label: "MCP, API și integrări", href: "/development" },
+  ],
 };
 
 
@@ -34,7 +37,7 @@ export function Footer() {
 
         {/* Brand, product links and legal links */}
         <div
-          className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-0"
+          className="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-0"
           style={{ borderBottom: `1px solid ${CREAM}12` }}
         >
           {/* Col 1: Brand */}

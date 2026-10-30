@@ -4,6 +4,9 @@ LiberGent is a Romanian product-search and deal-ranking application. A user ente
 
 Production: [libergent.com](https://libergent.com)
 
+Project status: [remaining implementation work](docs/premium-alerts-todo.md) and
+[test preparation, acceptance checks and completion criteria](docs/release-acceptance-checklist.md).
+
 ### ChatGPT and Claude connector prototype
 
 For developer-key agent integrations, use the new opt-in `/api/v1/mcp` adapter
@@ -36,7 +39,7 @@ The HTTP smoke check initializes MCP, discovers tools, and reads the source
 catalog; it does not run a live marketplace search. An alternate endpoint can
 be passed with `npm run check:mcp -- https://your-test-host/mcp`.
 
-`search_products` accepts `query`, `tier` (`free` or `premium`), `condition` (`any`, `used`, `new`),
+`search_products` accepts `query`, `tier` (`free` only), `condition` (`any`, `used`, `new`),
 `maxPriceRon`, optional `city`, and `limit` (1–20). Budget filtering applies to
 known item prices in the shared Libergent engine before selecting recommendations;
 delivery and other fees are not included. Both search APIs accept `maxPriceRon`,
@@ -51,18 +54,20 @@ risks, confidence, price intelligence, and Jev decisions. It never picks a fallb
 winner or re-ranks results. The website also preserves the engine's selected cards;
 local display filters may hide a selection but do not invent a replacement.
 
-Free search is anonymous. Premium routes through the existing authenticated
-Libergent API and reuses its user validation, subscription checks, browser fallbacks,
-and Jev selection. For development, it accepts an existing Libergent session bearer
-credential in the transport Authorization header, never in tool arguments.
-OAuth account linking and refresh are not implemented yet, so this does not provide
-a finished sign-in experience in ChatGPT or Claude. Do not paste credentials in chat.
+Free search is anonymous and never billable. The connector rejects explicit
+Premium requests rather than silently substituting Free results. Premium remains
+available through the website API, but is unavailable through MCP until customer
+identity and per-call charging are implemented. Transport credentials are not
+forwarded by this Free-only connector. OAuth account linking and refresh remain
+unfinished; do not paste credentials in chat.
 
 The endpoint is stateless and uses JSON responses. It rejects unexpected Origin
 headers and bodies larger than 64 KiB. Additional exact browser origins can be
 configured with `LIBERGENT_MCP_ALLOWED_ORIGINS`. An optional Cloudflare rate-limit
 binding named `MCP_RATE_LIMITER` is supported; without that binding there is no
-connector request quota. An unlisted URL is not private access control.
+connector request quota. The isolated `LIBERGENT_MCP_TEST_MODE=1` deployment
+requires both `MCP_RATE_LIMITER` and `MCP_SEARCH_LIMITER` and fails closed when
+those bindings are missing or fail. An unlisted URL is not private access control.
 
 Status: protocol integration, mock search, URL restrictions, cache reuse, and
 Worker bundling are tested. Public enablement still needs bounded search latency,
@@ -74,6 +79,29 @@ token lifecycle management remain prerequisites for the public authenticated bet
 
 References: [ChatGPT MCP setup](https://developers.openai.com/plugins/build/mcp-server)
 and [Claude custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+
+### Developer API v1
+
+The implementation merged from PR #38 is the canonical developer API. See
+[Developer API setup](docs/developer-api.md) and [authenticated MCP](docs/agent-integrations.md).
+Apply `supabase/developer-api.sql` (hyphenated filename); there is no second
+underscore-named migration. Keys live in Supabase; shared quota counters and
+search caches live in the `IntegrationGateway` Durable Object.
+
+The portal checks `/api/developer/config` at runtime before showing key controls.
+The public demo and integration reference stay accessible when self-service keys
+are disabled. The legacy Free-only `/mcp` owner trial is separate from the
+API-key-authenticated `/api/v1/mcp` integration.
+
+Run `npm run check:integration-runtime` to verify authentication, persistent quotas
+and cache restoration in local workerd. Run `npm run check:developer-api -- https://YOUR-STAGING-HOST`
+with `LIBERGENT_ACCEPTANCE_SESSION_TOKEN` set to a verified test account's Supabase
+session token to check real key creation, simulated search, usage and revocation.
+Set `LIBERGENT_ACCEPTANCE_SECOND_SESSION_TOKEN` for another test account to verify
+ownership isolation. The check creates one test key and revokes it in cleanup;
+it never prints keys or contacts marketplaces. Use `wrangler.staging.toml` and
+the [staging checklist](docs/developer-api.md#staging-account-acceptance-checklist)
+when ready; the existing integration-only preview cannot test account management.
 
 ### Search healthcheck
 
@@ -127,7 +155,30 @@ The [September 28 Discovery audit](docs/source-availability-2026-09-28.md) check
 | Flip | Refurbished technology | Relevant technology queries only | Direct |
 | Klap | Refurbished technology | Relevant technology queries only | Direct |
 
-Free API requests resolve `provider=auto` to direct access and never start automatic Browser Run sessions.
+Free API requests accept only `provider=auto` or `provider=direct`; both resolve
+to direct access and never start automatic Browser Run sessions. Explicit paid
+providers or non-Free source IDs return HTTP 400 before any cache or upstream
+request. The Worker and Node development server share this policy. CLI and
+authenticated administrative diagnostics retain their separate provider controls.
+
+The production and staging Worker configurations enable Free search burst limits:
+60 requests per minute per connecting IP and 300 per minute across clients, shared
+by `/api/search` and `/api/search/free`, including cached searches and `refresh=1`.
+Shared networks also share the IP allowance. These are approximate limits per
+Cloudflare location, not a strict worldwide quota or spending cap
+([Cloudflare documentation](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)).
+Denied requests return 429; missing or failing enabled bindings return 503. Both
+include `Retry-After: 60` and `Cache-Control: no-store`, before search work.
+Staging uses separate namespaces. Local Node development has no edge limiter;
+MCP and developer API routes retain their own controls. To disable this guard for
+rollback, set `LIBERGENT_FREE_SEARCH_LIMITS_ENABLED=0` and redeploy; this removes
+burst protection. Deployment and traffic tuning remain pending.
+
+Website search snapshots last five minutes when complete, or one minute when a
+source fails or later result pages cannot be retrieved. Empty and failed-only
+searches are not cached. Snapshot age is checked on reads, so old partial results
+and legacy entries without timestamps trigger a fresh search. This policy applies
+to both Free and Premium; Premium authorization still runs before cache access.
 
 ### Premium test
 
@@ -543,7 +594,7 @@ Client-side Google Analytics is enabled only when `NEXT_PUBLIC_GA_MEASUREMENT_ID
 
 Seller conversation APIs validate the Supabase access token and filter history by account ID. Direct client access to WhatsApp message rows is disabled through RLS. Ambiguous inbound ownership is intentionally left unassigned rather than risking cross-account disclosure. Bridge setup is documented in [docs/openclaw-bridge.md](docs/openclaw-bridge.md).
 
-The Premium deal pilot is implemented locally at `/deals`. Before using it against a Supabase project, apply [the deal schema](supabase/deals.sql) and configure the existing Supabase service credentials. The deal API checks Premium entitlement and account ownership. Deal-linked replies reserve an idempotent send attempt before calling the bridge. The initial message is a draft for an allowed seller-contact route; autonomous negotiation, channel-permission review, provider receipts, and production acceptance remain open. See [the deal-agent plan](docs/premium-deal-agent.md).
+The Premium deal pilot is implemented locally at `/deals`. Before using it against a Supabase project, apply [the deal schema](supabase/deals.sql) and configure the existing Supabase service credentials. The deal API checks Agent entitlement and account ownership. All WhatsApp sends require a UUID idempotency key and reserve an attempt before calling the bridge. Reapply `supabase/deals.sql` before deploying the matching Worker/UI; see [message retry and deployment details](docs/openclaw-bridge.md). The initial message is a draft for an allowed seller-contact route; autonomous negotiation, channel-permission review, provider receipts, and production acceptance remain open. See [the deal-agent plan](docs/premium-deal-agent.md).
 
 Set `OPENAI_API_KEY` and `DEAL_AGENT_OPENAI_MODEL` to enable the optional reply proposal button. The server sends the buyer brief and the last six conversation messages to the configured OpenAI model with `store: false`, validates the structured result against the buyer's price ceiling, and returns an editable draft. It never sends the model proposal to the seller without buyer confirmation. The endpoint remains unavailable when either setting is absent.
 

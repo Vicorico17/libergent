@@ -156,7 +156,7 @@ function getDirectFetchHeaderProfiles(url) {
 }
 
 function shouldRetryDirectFetchStatus(status) {
-  return [403, 406, 408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524].includes(status);
+  return [408, 425, 500, 502, 503, 504, 520, 521, 522, 523, 524].includes(status);
 }
 
 function isCloudflareChallengeResponse(response) {
@@ -164,11 +164,11 @@ function isCloudflareChallengeResponse(response) {
 }
 
 function buildDirectFetchError(response, url) {
-  if (isCloudflareChallengeResponse(response)) {
-    return new Error(`Direct fetch blocked by Cloudflare challenge (${response.status}) for ${url}`);
-  }
-
-  return new Error(`Direct fetch failed (${response.status}) for ${url}`);
+  const error = new Error(isCloudflareChallengeResponse(response)
+    ? `Direct fetch blocked by Cloudflare challenge (${response.status}) for ${url}`
+    : `Direct fetch failed (${response.status}) for ${url}`);
+  error.upstreamStatus = response.status;
+  return error;
 }
 
 export function detectSearchResponseFailure(requestedUrl, finalUrl, html) {
@@ -286,7 +286,9 @@ async function fetchJsonDirect({ url, refererUrl, timeoutMs = 15000, signal, bod
   });
 
   if (!response.ok) {
-    throw new Error(`Direct JSON fetch failed (${response.status}) for ${url}`);
+    const error = new Error(`Direct JSON fetch failed (${response.status}) for ${url}`);
+    error.upstreamStatus = response.status;
+    throw error;
   }
   if (!allowLegacyJson && !/application\/json/i.test(response.headers.get("content-type") || "")) {
     throw new Error(`Direct JSON fetch returned a non-JSON response for ${url}`);

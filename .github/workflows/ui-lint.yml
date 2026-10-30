@@ -32,6 +32,9 @@ jobs:
       - name: Run backend tests
         run: npm run check
 
+      - name: Check persistent integration runtime
+        run: npm run check:integration-runtime
+
       - name: Run deterministic UI lint
         run: npm run lint:ui:ci
 

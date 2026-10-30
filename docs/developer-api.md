@@ -34,7 +34,7 @@ Management routes are used by the first-party developer dashboard. A key cannot 
 
 Search requires `q` (1–120 characters, existing public-search policy). Optional parameters: `sites` (comma-separated supported domains, default `olx.ro`), `limit` (1–20, default 20), `details` (default false, requires `listings:details`). `category` and `material` are optional specialized filters documented in the [listing contract](storefront-integration-v1.md). Unknown and repeated parameters are rejected.
 
-Initial API sources are OLX, Publi24 and Okazii. These are general marketplaces, not a fur-specific source list. The broader website registry is not automatically advertised as supported by this API. Queries use the same direct engine as existing search. Each source gets one page, and at most 20 candidates across sources are inspected. This is a bounded sample, without pagination or a guarantee of complete inventory. Search query languages depend on the source; translation is not performed.
+Initial API sources are OLX, Publi24 and Okazii. These are general marketplaces, not a fur-specific source list. The broader website registry is not automatically advertised as supported by this API. Queries use the same direct engine as existing search. Each source gets one page, and at most 20 unique listing candidates across sources are inspected. Candidates are sampled in rounds across sources, preserving each source’s order so the first source cannot consume the entire budget. Duplicate listing URLs (ignoring fragments but preserving query parameters) are enriched once. This is a bounded sample, without pagination or a guarantee of complete inventory. Search query languages depend on the source; translation is not performed.
 
 The original `/api/integrations/v1/search` remains available with its original `details=true` default. New integrations should use `/api/v1/search`.
 
@@ -55,7 +55,7 @@ Use the [general Vercel Function](../examples/vercel/api/products.mjs) for a fix
 
 One API workspace per Libergent account; key names identify applications. Limits are shared by **all keys for the same account and mode**, so rotating or creating keys cannot reset quota. Up to 5 active keys per account across both modes; up to 20 creations in a rolling 24-hour period. Keys expire after 90 days. This release has no per-application billing, paid plans, automatic upgrade or multi-member organizations.
 
-Quota counters and 15-minute cache snapshots persist in a Durable Object per account/mode, across isolates and runtime restarts. Cache hits, coalesced requests, busy rejections, and source failures count. Viewing usage does not consume a search request. Daily reset is midnight UTC. HTTP 429 includes Retry-After. At most two distinct uncached searches run concurrently; identical requests coalesce. Cache capacity is bounded to 32 query variants and 120 KB per value. Failure to reach persistent storage fails closed.
+Quota counters and cache snapshots (up to 15 minutes for complete results, one minute for partial source/detail failures) persist in a Durable Object per account/mode, across isolates and runtime restarts. Cache hits, coalesced requests, busy rejections, and source failures count. Viewing usage does not consume a search request. Daily reset is midnight UTC. HTTP 429 includes Retry-After. At most two distinct uncached searches run concurrently; identical requests coalesce. Cache capacity is bounded to 32 query variants and 120 KB per value. Failure to reach persistent storage fails closed.
 
 API keys use a cryptographically random 256-bit secret. Supabase stores SHA-256 hashes, safe prefixes and metadata only. Creation is transactional and serialized per owner. Direct table/RPC access is denied to browser `anon` and `authenticated` roles. Every request rechecks revocation, expiry, account suspension and verified-email status; authorization results are not cached. Key lookup failures cannot fall back to unauthenticated search. Already-running requests may finish when a key is revoked.
 
@@ -84,6 +84,54 @@ Production settings and schemas remain unchanged. A separate scoped acceptance p
 7. Configure production request/error/latency and cost monitoring, appropriate ingress abuse controls, and a support process for account suspension and higher quotas. The starter quotas are finite, but are not a replacement for fleet-wide monitoring or multi-account abuse controls.
 
 Rollback: set `LIBERGENT_DEVELOPER_API_ENABLED=0` to stop self-service and database-backed keys; operator-managed compatibility keys can still work. Set `LIBERGENT_INTEGRATIONS_ENABLED=0` to stop all integration search. Keep the migration and namespace; public Free search and MCP behavior do not depend on the new API flags.
+
+## Staging account acceptance checklist
+
+The existing `libergent-integration-preview` Worker exposes only integration
+routes. Its account management and `/api/developer/config` routes intentionally
+return 404; use a full-app staging target for this test.
+
+Prepare these once, when ready to test:
+
+1. **An isolated Supabase test project.** Apply `supabase/developer-api.sql` there.
+   Use this project's URL and server secret on the staging Worker, and its URL
+   and publishable key in the staging UI build. Do not reuse production data or
+   copy production billing, outreach or operator API-key secrets.
+2. **A staging website.** `wrangler.staging.toml` defines `libergent-staging`, with
+   its own Durable Object namespace and no scheduled jobs or Browser Run binding.
+   Build with the staging `NEXT_PUBLIC_SUPABASE_URL` and
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; run `npm run verify:ui-auth-config`.
+   Configure Worker secrets `SUPABASE_URL` and `SUPABASE_SECRET_KEY` using
+   `wrangler secret put ... --config wrangler.staging.toml`, then deploy explicitly
+   with `wrangler deploy --config wrangler.staging.toml`. The normal production
+   workflow does not deploy this file. Set the staging origin as the Supabase
+   Auth site URL and allow its `/confirm` callback; verify your login provider
+   configuration before testing Google login.
+3. **Two email-verified test accounts** in that project. Sign into each in separate
+   browser profiles. Two sessions belonging to the same account are not sufficient
+   for ownership testing.
+4. **Temporary local session credentials** for the automated check. Configure
+   `LIBERGENT_ACCEPTANCE_SESSION_TOKEN` for account A and
+   `LIBERGENT_ACCEPTANCE_SECOND_SESSION_TOKEN` for account B in the local shell.
+   These are Supabase session access tokens, not database secrets or API keys.
+   Do not paste them into chat, command arguments, source files, or PRs. Clear them
+   from the shell after testing. They expire; repeat sign-in if necessary.
+
+Run `npm run check:developer-api -- https://YOUR-STAGING-HOST`. The script creates
+one `acceptance-*` **test** key, verifies that account B cannot list or revoke it,
+checks simulated search/cache reuse, rejects unauthorized listing enrichment,
+checks usage, revokes the key, and confirms cached access is denied. It attempts
+cleanup on failure and gives a manual dashboard instruction if cleanup fails.
+Omitting account B explicitly reports isolation as **not tested**. Responses and
+credentials are never printed. This check does not contact marketplaces, apply
+migrations, send messages, or change subscriptions.
+
+Then manually test `/developers/` on mobile and desktop: sign in, create a test
+key, copy the one-time secret, reload, inspect usage, revoke, sign out, and confirm
+that switching accounts shows only the signed-in account's keys. Repeat with
+expired login and failed network requests. Real-source checks with a live key
+are a separate, bounded test; passing simulated acceptance does not establish
+marketplace availability.
 
 ## Local testing
 

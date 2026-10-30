@@ -1,3 +1,4 @@
+import { getFreeSearchProvider, getFreeSearchSiteKeys } from "./free-search-policy.js";
 import { adultGateResponse, hasAdultConfirmation, needsAdultConfirmation } from "./adult-access.js";
 import http from "node:http";
 import fs from "node:fs";
@@ -9,7 +10,7 @@ import { extractImageSearchIntent, validateImageSearchRequest } from "./image-se
 import { searchAcrossSites } from "./app.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildHistoryPayload, logSearchEvent } from "./history.js";
-import { PREMIUM_SITE_KEYS, getDefaultSiteKeys, getPremiumSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { PREMIUM_SITE_KEYS, getDefaultSiteKeys, getPremiumSiteKeys, getSiteKeysForAllSearch } from "./sites.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
@@ -351,14 +352,11 @@ const server = http.createServer(async (req, res) => {
         name: "pages",
         max: MAX_API_SEARCH_PAGES
       });
-      const siteKeys = site === "all"
-        ? getSiteKeysForAllSearch(query)
-        : site === "default"
-          ? getDefaultSiteKeys()
-          : [getSite(site).key];
+      const siteKeys = getFreeSearchSiteKeys(site, query);
+      const freeProvider = getFreeSearchProvider(provider);
       const maxPriceRon = parseMaxPriceRon(url.searchParams.get("maxPriceRon"));
-      const payload = await searchAcrossSites({ allowAdult, query, condition, provider, limit, maxPages, siteKeys, viewerLocation, maxPriceRon });
-      if (!adultSearch) await logSearchEvent({ query, condition, provider, siteKeys, payload });
+      const payload = await searchAcrossSites({ allowAdult, query, condition, provider: freeProvider, limit, maxPages, siteKeys, viewerLocation, maxPriceRon });
+      if (!adultSearch) await logSearchEvent({ query, condition, provider: freeProvider, siteKeys, payload });
       sendJson(res, 200, payload);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

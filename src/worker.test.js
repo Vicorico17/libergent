@@ -361,6 +361,7 @@ test("keeps deal records behind Agent and scopes reads to the authenticated owne
     seen.push(requestUrl);
     if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
     if (requestUrl.includes("/agent_entitlements")) return new Response(JSON.stringify(agent ? [{ status: "active" }] : []), { status: 200 });
+    if (requestUrl.includes("/whatsapp_contact_stops")) return Response.json([]);
     if (requestUrl.includes("/deal_cases")) return new Response(JSON.stringify([]), { status: 200 });
     throw new Error(`Unexpected fetch: ${requestUrl}`);
   };
@@ -389,6 +390,7 @@ test("deal call approval reserves one provider call across duplicate requests", 
     const target = String(url);
     if (target.endsWith("/auth/v1/user")) return Response.json({ id: "buyer-1", email: "premium@example.test" });
     if (target.includes("/agent_entitlements")) return Response.json([{ status: "active" }]);
+    if (String(url).includes("/whatsapp_contact_stops")) return Response.json([]);
     if (target.includes("/deal_cases")) return Response.json([{ id: dealId, user_id: "buyer-1", stage: "draft", paused_at: null, listing_url: listingUrl, listing_title: "Phone", listing_price: "1200 RON", brief: { maxPriceRon: 1500, openingOfferRon: 1100, questions: [] } }]);
     if (target.includes("/deal_calls")) {
       if (init.method === "POST") {
@@ -427,6 +429,7 @@ test("rejects a deal agreement above the buyer's ceiling before writing", async 
     const requestUrl = String(url);
     if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
     if (requestUrl.includes("/agent_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
+    if (requestUrl.includes("/whatsapp_contact_stops")) return Response.json([]);
     if (requestUrl.includes("/deal_cases")) {
       if (init.method === "PATCH") patches++;
       return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111", user_id: "buyer-1", stage: "negotiating", paused_at: null, brief: { maxPriceRon: 1800 } }]), { status: 200 });
@@ -456,6 +459,7 @@ test("a repeated deal reply returns its saved send attempt without calling the b
     const requestUrl = String(url);
     if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
     if (requestUrl.includes("/agent_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
+    if (requestUrl.includes("/whatsapp_contact_stops")) return Response.json([]);
     if (requestUrl.includes("/deal_cases")) return new Response(JSON.stringify([{ id: dealId, user_id: "buyer-1", listing_url: listingUrl, stage: "negotiating", brief: { maxPriceRon: 1800 } }]), { status: 200 });
     if (requestUrl.includes("/whatsapp_messages")) return new Response(JSON.stringify([row]), { status: 200 });
     if (requestUrl.includes("/deal_send_attempts")) {
@@ -484,6 +488,7 @@ test("AI deal proposal requires a configured model and never contacts the seller
     const requestUrl = String(url);
     if (requestUrl.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "buyer-1", email: "buyer@example.test" }), { status: 200 });
     if (requestUrl.includes("/agent_entitlements")) return new Response(JSON.stringify([{ plan: "premium", status: "active" }]), { status: 200 });
+    if (requestUrl.includes("/whatsapp_contact_stops")) return Response.json([]);
     if (requestUrl.includes("/deal_cases")) return new Response(JSON.stringify([{ id: dealId, user_id: "buyer-1", listing_url: listingUrl, listing_title: "Test", stage: "negotiating", brief: { maxPriceRon: 1800, openingOfferRon: 1500, questions: [] } }]), { status: 200 });
     if (requestUrl.includes("/whatsapp_messages")) return new Response(JSON.stringify([
       { message_id: "out", direction: "outbound", to_number: "+40722123456", text: "Salut", received_at: "2026-09-28T10:00:00Z", raw: { userId: "buyer-1", listing: { url: listingUrl } } },
@@ -516,6 +521,8 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
       return new Response(JSON.stringify({ id: "user-1", email: "buyer@example.test" }), { status: 200 });
     }
     if (requestUrl.includes("/agent_entitlements")) return Response.json([{ status: "active" }]);
+    if (requestUrl.includes("/whatsapp_contact_stops")) return Response.json([]);
+    if (requestUrl.includes("/deal_send_attempts")) return Response.json([JSON.parse(init.body)]);
     if (requestUrl.startsWith("https://supabase.example/rest/v1/whatsapp_messages")) {
       storedMessage = JSON.parse(init.body);
       return new Response(null, { status: 201 });
@@ -528,7 +535,7 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
     new Request("https://libergent.test/api/whatsapp/send", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer user-token" },
-      body: JSON.stringify({ target: "0722 123 456", message: "Salut", listing: { url: "https://www.olx.ro/d/oferta/test.html", title: "Test OLX" } })
+      body: JSON.stringify({ idempotencyKey: "22222222-2222-4222-8222-222222222222", target: "0722 123 456", message: "Salut", listing: { url: "https://www.olx.ro/d/oferta/test.html", title: "Test OLX" } })
     }),
     {
       OPENCLAW_BRIDGE_URL: "https://bridge.example/",
@@ -549,8 +556,10 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
   assert.match(payload.conversationId, /^wa_/);
   assert.equal(payload.historySaved, true);
   assert.equal(bridgeRequest.url, "https://bridge.example/whatsapp/send");
+  assert.equal(bridgeRequest.init.redirect, "error");
+  assert.ok(bridgeRequest.init.signal instanceof AbortSignal);
   assert.equal(bridgeRequest.init.headers.authorization, "Bearer secret");
-  assert.equal(bridgeRequest.init.body, JSON.stringify({ target: "+40722123456", message: "Salut" }));
+  assert.equal(bridgeRequest.init.body, JSON.stringify({ target: "+40722123456", message: "Salut", idempotencyKey: "22222222-2222-4222-8222-222222222222" }));
   assert.equal(storedMessage.raw.userId, "user-1");
   assert.equal(storedMessage.raw.listing.title, "Test OLX");
 });
@@ -788,15 +797,17 @@ test("does not report bridge application failures as successful delivery", async
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
   let writes = 0;
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, init = {}) => {
     if (String(url).endsWith("/auth/v1/user")) return Response.json({ id: "buyer" });
     if (String(url).includes("/agent_entitlements")) return Response.json([{ status: "active" }]);
+    if (String(url).includes("/whatsapp_contact_stops")) return Response.json([]);
+    if (String(url).includes("/deal_send_attempts")) return Response.json([JSON.parse(init.body)]);
     if (String(url).includes("/rest/")) writes++;
     return Response.json({ ok: true, result: { ok: false, error: "delivery rejected" } });
   };
   const response = await worker.fetch(new Request("https://libergent.test/api/whatsapp/send", {
     method: "POST", headers: { authorization: "Bearer token", "content-type": "application/json" },
-    body: JSON.stringify({ target: "+40722000000", message: "test" })
+    body: JSON.stringify({ idempotencyKey: "22222222-2222-4222-8222-222222222222", target: "+40722000000", message: "test" })
   }), { SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "test", OPENCLAW_BRIDGE_URL: "https://bridge.example", OPENCLAW_BRIDGE_TOKEN: "test" });
   assert.equal(response.status, 502);
   assert.equal((await response.json()).ok, false);

@@ -1,6 +1,6 @@
 # Premium, Product, and Launch TODO
 
-Last prioritized: 2026-10-19
+Last prioritized: 2026-10-30
 Implementation and production status audit: 2026-09-13 (unless noted below)
 
 See [the September launch audit](launch-audit-2026-09-13.md) for the comparison
@@ -12,6 +12,214 @@ paid Premium subscriptions, and tracking the next product work. A checked item
 is implemented or has been explicitly confirmed in the target environment;
 unchecked operational items must be completed before the corresponding test or
 launch.
+
+## Original review list — current status, 2026-10-30
+
+This reconciles the owner's project review list. PR #38 supplied the canonical
+Developer API; follow-up work is on PR #39. A pushed change is not a deployment.
+Live staging/account acceptance is deferred until the owner is ready.
+
+For the separate verification list, owner preparation, expected results and
+release completion criteria, use [the release acceptance checklist](release-acceptance-checklist.md).
+
+### Continuation checkpoint
+
+Keep this file as the persistent task list between work sessions. Start with the
+current status table and recent implementation notes; do not treat historical
+checkmarks or a branch push as proof of deployment or live acceptance.
+
+- Current work is on `feat/storefront-integration-v1`, draft PR #39. Continue
+  verified fixes and push follow-ups; merging/deploying is a separate step.
+- Before deploying the Agent send changes, reapply `supabase/deals.sql` and
+  `supabase/whatsapp_messages.sql`, then
+  deploy the matching Worker/UI. Existing clients without UUID keys receive 400.
+- Reapply `supabase/selling.sql` before the VINDE status/recovery changes, and
+  deploy the revised inbound forwarder on its host. These deployment steps remain open.
+- Next Agent gaps: provider receipt callbacks, reconciliation of unknown sends
+  and ambiguous replies, verified opt-in recovery,
+  follow-ups and notifications. Do not lose the separate VINDE recovery work.
+- Owner will configure staging when ready: isolated Supabase/staging origin,
+  two verified accounts and local acceptance-session credentials. Do not ask for
+  secrets in chat or repeatedly block independent work on this setup.
+- Live payments and final Agent terms remain unresolved. Source access still
+  needs production validation: latest local OLX/Okazii checks were blocked.
+- Browser journeys, monitoring/global quotas, account lifecycle/support, image
+  search, documentation and maintainability remain in the table below; deferred
+  product expansion remains listed after it.
+
+| Priority | Workstream | Current status | What remains |
+| --- | --- | --- | --- |
+| P0 | MCP regressions | Fixed and tested in PR #39 | Merge/deploy and hosted-client acceptance. |
+| P0 | Developer API backend | Implemented, with SQL/Worker/runtime tests and staging tooling | Staging migration/configuration, two verified accounts, browser acceptance and live-key check. |
+| P0 | Production payments | Stripe test flow exists; live keys remain blocked | Explicit live-mode support, configured products/webhooks, renewal/failure/cancellation acceptance. Do not enable charging before final policies. |
+| P0 | Product/service boundaries | Premium/Agent access checks exist | Finalize Agent duration, seller/product counts, Premium inclusion, completion, cancellation/refund terms and Agent checkout. |
+| P0 | Source reliability | Fair samples, deduplicated URLs and short partial caches implemented | Repair/revalidate advertised sources from production; local OLX/Okazii failures remain unresolved. |
+| P1 | Agent outreach/completion | Deal workflow and buyer-approved drafts exist | Apply/deploy one-off idempotency migration; provider receipts, reliable reply attribution, follow-ups, notifications and controlled end-to-end pilot. |
+| P1 | VINDE | Drafts, OLX receipt recovery/status mapping and paginated Okazii feeds implemented locally | Deploy migration/UI, real seller connections and recovery acceptance, sold synchronization and cross-platform withdrawal. |
+| P1 | ChatGPT/Claude connectors | Separate Free trial and API-key MCP implementations exist | Actual owner conversations, OAuth for hosted clients, paid-call identity/metering/limits and release acceptance. |
+| P1 | Browser journeys | Backend, protocol, SQL and local Worker acceptance coverage expanded | Automated browser login/search/checkout/alerts/selling journeys, mobile and account switching. CLI acceptance is not browser coverage. |
+| P1 | Operations and cost controls | Durable API quotas, source probes, Free-provider boundary and local-tested edge burst limits exist | Deploy/tune edge limits; strict worldwide quotas, production dashboards/alerts, cost measurements, provider outage acceptance and rollback exercises. |
+| P1 | Account/support lifecycle | Authentication and private account features exist | Account deletion/export, retention execution, concrete support route and product-policy reconciliation. |
+| P2 | Image search | Validation stub only | Integrate a provider, validate results and complete UI/API flow before advertising. |
+| P2 | Documentation | API and this backlog reconciled | Continue correcting older Premium-vs-Agent and implementation-vs-production claims. |
+| P2 | Maintainability | Large search page and Worker remain | Gradual extraction around tested responsibilities; no broad refactor completed. |
+
+Deferred expansion: passkeys, verified adult-product retailers, services search,
+and location-based property/land search. These do not block the current API tests.
+
+## Free search ingress protection — 2026-10-30
+
+- [x] Add Worker burst limits shared across public Free aliases and forced refreshes,
+  before cache reads, history writes or marketplace requests.
+- [x] Configure 60 requests/minute per IP and 300/minute shared across clients;
+  staging has separate namespaces. Shared networks share the IP allowance.
+- [x] Return uncached 429 with retry guidance on denial; fail closed with 503
+  when enabled bindings are missing, malformed or unavailable.
+- [x] Test cross-alias/client accounting, no work after denial, failure handling
+  and successful Free searches. Local Node development is outside this edge guard.
+- [ ] Deploy and tune with actual traffic; Cloudflare limits are approximate and
+  per location. Strict worldwide quotas, dashboards and cost caps remain open.
+
+## Free search cost boundary — 2026-10-30
+
+- [x] Restrict `/api/search` and `/api/search/free` to `auto`/`direct`, resolving
+  both to direct retrieval, in the Worker and Node server.
+- [x] Restrict explicit source selection to the registered Free sources; paid or
+  experimental sources require the authenticated Premium workflow.
+- [x] Reject disallowed requests before cache lookup or any network/browser use;
+  retain separate CLI/admin provider controls.
+- [x] Regression tests plus a localhost HTTP check cover both public aliases.
+- [ ] Deploy and verify the public boundary. Global website ingress quotas and
+  cost/error monitoring remain separate operational work.
+
+## Repository reconciliation and checks — 2026-10-30
+
+- [x] Preserve the developer API, authenticated MCP, Durable Object quotas and
+  canonical `supabase/developer-api.sql` migration merged through PR #38.
+  The competing local SQL-quota implementation was superseded before pushing.
+- [x] Reject explicit Premium requests in the separate Free-only MCP trial instead
+  of silently downgrading; preserve the adult-confirmation error.
+- [x] Cover missing/broken trial quotas, search denial and isolated routing.
+- [x] Check developer key-management availability before displaying controls.
+- [x] Include existing statistics tests in `npm run check`; expose runtime and
+  staging acceptance commands.
+- [x] Add full-app staging configuration and two-account acceptance checker,
+  with PostgreSQL/Worker tests for ownership and cleanup/error-redaction tests.
+- [ ] Run self-service acceptance against a configured staging Supabase project;
+  no staging account credential is available in this session.
+- [ ] Production acceptance remains separate from local checks and a branch push.
+
+## Developer search reliability — 2026-10-30
+
+- [x] Share the 20-candidate sample across sources instead of letting the first
+  source consume it; preserve per-source order and deduplicate listing URLs.
+- [x] Treat malformed source collections as failures while retaining useful
+  results from other sources.
+- [x] Cache partial source/detail failures for at most one minute, including
+  older snapshots with longer expiry. Complete results retain the 15-minute TTL.
+- [x] Regression coverage for source fairness, duplicate enrichment, malformed
+  responses and recovery from partial snapshots.
+- [ ] Verify multi-source sampling and outage recovery on the deployed API.
+
+## Direct source retry behavior — 2026-10-30
+
+- [x] Recheck OLX and Okazii from local Node: `iphone 15` still returns HTTP
+  403 from OLX and a Cloudflare challenge from Okazii, before parser execution.
+  This is not evidence of production recovery or a parser defect.
+- [x] Stop repeating direct HTML requests rejected with permanent 4xx or 429
+  across header-profile and whole-search retry layers; JSON failures also retain
+  their upstream status and avoid immediate retry on these responses.
+- [x] Preserve bounded recovery for temporary errors (including 408/425/5xx)
+  and the existing Vinted challenge behavior, except when throttled with 429.
+- [x] Regression coverage checks exact upstream request counts, returned status
+  metadata and successful recovery after temporary failures.
+- [ ] Restore/revalidate OLX and Okazii access from the production runtime.
+  Retry changes reduce wasted requests; they do not restore blocked sources.
+
+## Website search cache recovery — 2026-10-30
+
+- [x] Limit useful partial Free/Premium snapshots to 60 seconds when a source
+  fails or pagination is interrupted. Complete snapshots retain five minutes.
+- [x] Reject empty, failed-only and malformed payloads from search caching.
+- [x] Enforce snapshot age on reads as well as cache TTL; old partial entries
+  and legacy entries without a trustworthy cache timestamp trigger a new search.
+- [x] Verify cross-alias reuse, expiry/refetch and legacy-entry recovery through
+  Worker routes. Existing Premium authorization, forced-refresh, MCP and adult
+  cache isolation regression checks pass.
+- [ ] Deploy and measure recovery/cost with actual source outages. More frequent
+  refreshes of partial results can increase direct and Premium fallback requests.
+
+## Agent message acceptance evidence — 2026-10-30
+
+- [x] Require a valid provider message ID before reporting a send as accepted;
+  remove fabricated outbound IDs for missing or malformed bridge receipts.
+- [x] Treat unconfirmed/transport outcomes as unknown, explicit provider
+  rejections as failed, and support nested delivery-status receipts.
+- [x] Do not save successful outbound history for uncertain sends; retain deal
+  attempt reservations so replay cannot contact the bridge again.
+- [x] Test malformed responses, provider rejection, transport-error redaction,
+  nested receipts and unknown deal-attempt replay without real seller contact.
+- [x] Extend durable per-key reservations to one-off sends; verify concurrent
+  requests, owner/content isolation and unknown-attempt replay with PostgreSQL.
+- [x] Keep one-off UI attempt keys across retries/reloads in the same tab,
+  scoped by account and request content; do not send if storage is unavailable.
+- [ ] Reapply `supabase/deals.sql` before deploying the matching Worker/UI.
+  Old clients without keys receive 400; missing schema prevents provider sends.
+- [ ] Provider receipt callbacks, reconciliation of unknown attempts and the
+  controlled live pilot remain open. Separate tabs/sessions can create new keys;
+  this change does not deduplicate different keys with identical message content.
+
+## Inbound reply attribution — 2026-10-30
+
+- [x] Derive inbound account/listing assignment only from unambiguous stored
+  outbound history; discard bridge-supplied ownership/listing metadata.
+- [x] Return an error on ownership database failure instead of acknowledging
+  a reply with silently lost assignment. Missing database configuration is 503.
+- [x] Keep unlabelled replies separate when history contains multiple listings
+  for the seller; never infer a sold/unavailable listing from the latest thread.
+- [x] Worker and history tests cover forged metadata, multiple owners/listings,
+  database outage, repeated ambiguous replies and unchanged unique attribution.
+- [x] Match optional `replyToMessageId` against a stored outbound receipt and
+  the same seller number. Unknown/mismatched references never use a fallback owner.
+- [x] Require stable inbound IDs, preserve history on replay, serialize forwarder
+  polls and atomically save checkpoints; bound inbound/outbound transport waits.
+- [ ] Deploy the forwarder and verify whether real provider events supply reply
+  references. Operator reconciliation and historical misassignment repair remain open.
+- [x] Implement seller-wide WhatsApp stop enforcement even when a reply cannot
+  be assigned to a particular buyer/listing; deployment/live acceptance pending.
+
+## Seller-wide WhatsApp stops — 2026-10-30
+
+- [x] Persist recognized stop requests before account attribution in a separate
+  service-only table; retain stops across buyer accounts and history deletion.
+- [x] Check the seller number before every WhatsApp send; missing/unavailable
+  preference storage fails closed before attempt reservation or provider contact.
+- [x] Backfill recognized historical stop messages when reapplying
+  `supabase/whatsapp_messages.sql`; replaying the migration preserves stops.
+- [x] PostgreSQL/Worker tests cover ambiguous ownership, database failure,
+  cross-account/listing enforcement, ordinary replies, retention and privileges.
+- [ ] Apply the WhatsApp schema before deploying this Worker; verify live inbound
+  retry and outbound-denial behavior. No production migration has been run.
+- [x] Check the same stop table before new voice-call reservation/dialing.
+- [ ] Deploy and verify voice enforcement; implement reviewed opt-in recovery.
+  This guard cannot recall messages already accepted/in flight, and recognizes
+  explicit supported phrases rather than every possible natural-language request.
+
+## VINDE receipt recovery and feeds — 2026-10-30
+
+- [x] Distinguish active, pending, inactive and moderation-rejected OLX adverts;
+  validate provider IDs before accepting or refreshing a receipt.
+- [x] Recover unknown/sending submissions by exact external draft ID using a
+  bounded read-only lookup. Ambiguous/no matches never permit republishing.
+- [x] Prevent a late recovery response from overwriting a confirmed receipt.
+- [x] Page Okazii feed reads by owner and stable ID; fail instead of returning
+  truncated inventory on page errors, cursor loops or configured bounds.
+- [x] Verify PostgreSQL status-constraint upgrades and Worker/provider fixtures;
+  UI lint/build passes. Latest local baseline: 411 backend + 8 UI checks passed.
+- [ ] Reapply `supabase/selling.sql`, deploy matching backend/UI, and validate
+  with a connected seller account. No adverts were published by these tests.
+- [ ] Sold synchronization, cross-platform withdrawal, large-inventory scaling
+  and provider outage/receipt recovery against real accounts remain open.
 
 ## Current launch checklist — 2026-10-14
 
@@ -93,57 +301,55 @@ payments, seller conversations, or marketplace publication.
    Owner reaffirmed this task on **2026-10-19**. The connector must expose
    **Libergent's own search, decisions, explanations and workflows**; clients
    present those results rather than independently choosing replacement offers.
-   The local code already has a stateless MCP endpoint, `search_products`,
-   `get_listing_details`, and `list_sources`. Search passes Libergent's budget,
-   ranking, price intelligence and Jev decisions through; Premium requests use
-   the existing entitlement check when a bearer token is present. This is a local
-   prototype, not a connected or deployed product. Complete in this order:
-   1. [ ] **Set and document the first release scope.** Free users get public
-      search; linked Premium accounts get premium search and Jev decisions; the
-      separate Libergent Agent entitlement gates seller outreach and negotiation.
-      Decide which account tools ship first (alerts, saved offers, deal status,
-      selling drafts) and defer any action whose underlying service or safeguards
-      are not ready.
-   2. [ ] **Review and isolate the existing implementation.** Separate connector
-      files and required shared search changes from unrelated uncommitted product
-      work. Review tool schemas, outputs, search parity, listing URL restrictions,
-      pricing/filter behavior, error handling and deployment flags; then commit
-      this slice with its setup and test instructions.
-   3. [ ] **Implement account linking.** Add an OAuth authorization flow that
-      lets a user sign in to their existing Libergent account, approve the
-      requested access, and connect it from each client. Support authorization
-      code with PKCE, client registration as required, short-lived scoped access
-      tokens, refresh-token rotation, disconnect and immediate revocation. Never
-      ask users to paste session tokens into chat or tool arguments.
-   4. [ ] **Enforce scopes and product entitlements in every tool.** Keep free
-      search public. Check the connected user's Premium entitlement for premium
-      search and Jev; check the independent Agent entitlement for seller contact,
-      negotiation and calls. Scope every private read/write to the authenticated
-      user. Require explicit approval before sending a message, placing a call,
-      publishing a listing or taking another consequential action.
-   5. [ ] **Expand the tool set from existing Libergent services.** First add
-      account-scoped read tools for alerts/events, saved offers and deal status.
-      Then add supported Agent workflows and Vinde draft/publication tools, each
-      using existing services, ownership checks, idempotency and confirmation.
-      Return Libergent's decision and state; do not recreate business logic in the
-      MCP adapter.
-   6. [ ] **Prepare for production load and failures.** Set per-account and
-      anonymous rate limits, search deadlines, bounded browser/cost budgets,
-      partial-result behavior and safe retries. Add metrics for latency, source
-      coverage, OAuth failures, tool errors and cost. Do not log tokens or private
-      listing/account data unnecessarily. Keep a feature flag and rollback path.
-   7. [ ] **Deploy an isolated staging endpoint.** Configure HTTPS, OAuth
-      metadata/callbacks, secret storage, database migrations and test accounts.
-      Verify connect/disconnect, revocation, expiry, plan changes, cross-account
-      isolation, source failures and every write-action confirmation.
-   8. [ ] **Run end-to-end tests in ChatGPT and Claude.** Connect a fresh account
-      in each client; test Free, Premium and Agent permissions, Romanian prompts,
-      Libergent's exact recommendations, empty/partial results and expired access.
-      Confirm each client supports the chosen auth flow and MCP transport.
-   9. [ ] **Release and support the connector.** Prepare setup/onboarding guides,
-      support contact, privacy and terms disclosures, reviewer test cases and
-      platform-specific packages/listings. Submit for public distribution, address
-      review feedback, publish, and monitor connection success and tool quality.
+   The MCP implementation is committed in the repository. It exposes
+   `search_products`, `get_listing_details`, and `list_sources`; search uses
+   Libergent's ranking, price analysis and Jev decisions. The endpoint remains
+   disabled in production. The owner's immediate goal is to call Libergent from
+   their own ChatGPT and Claude accounts, inspect actual search behavior, then
+   decide the Premium per-call rate. Connector Free stays free; connector Premium
+   is charged per call. Do not charge during the owner's initial trial. Complete
+   in this order:
+   1. [x] **Prepare a limited test release.** Keep Free searches free. The first
+      public connector trial is Free-only: Premium is unavailable until customer
+      identity and per-call charging are in place. Keep account features and write
+      actions unavailable. The isolated MCP-only worker and kill switch are
+      implemented locally; request and search quotas are configured. Confirm the
+      search timeout and source/cost ceilings before broader live traffic.
+   2. [ ] **Record Free test usage without charging.** Meter each call with a
+      request ID, query, duration, cache state, source coverage, result count and
+      outcome. Avoid caller IPs, tokens and unnecessary personal account data;
+      set log retention. Use the owner's test traffic to learn which searches the
+      clients send and estimate cost per call. Structured logging is implemented
+      locally; verify Workers Logs retention and access in Cloudflare.
+   3. [x] **Deploy the isolated test endpoint over HTTPS.** The `/mcp` endpoint
+      is live at `https://libergent-mcp-test.vic-cazacu.workers.dev/mcp`; a remote
+      MCP handshake confirmed all three tools and 12 Free sources. All other
+      paths return 404 and the test environment has no scheduled jobs. See the
+      [owner connection and usage guide](connector-test.md).
+   4. [ ] **Connect the owner's ChatGPT and Claude accounts.** Add the remote
+      endpoint from the guide and confirm each client can discover the tools.
+   5. [ ] **Run the owner's live search trial.** Try representative Romanian and
+      English prompts, filters and follow-up questions in both clients. Compare
+      the query sent, sources actually searched, Libergent's selected offers and
+      explanation, response time, failures and cache behavior. Fix issues in
+      Libergent's search or the MCP input/output mapping based on those results.
+   6. [ ] **Turn on Premium pay-per-call from observed usage.** Set the Premium
+      price per call and define when a call is billable, how cache hits and
+      failed/partial searches are handled, customer confirmation, usage display,
+      refunds and spend limits. Add customer identity, a metering ledger, payment
+      integration and receipts. Premium stays unavailable in the connector until
+      this work is complete. Free searches must never incur a connector fee.
+   7. [ ] **Add account-linked and paid features after the trial.** Implement
+      OAuth, token revocation and per-user scopes when private or paid access is
+      needed. Premium search must check Premium entitlement; outreach,
+      negotiation and calls must independently check Libergent Agent. Require
+      approval for messages, calls, purchases or publishing. Add alerts, saved
+      offers, deal status and Vinde tools only as their underlying workflows are
+      ready.
+   8. [ ] **Harden and release broadly.** Verify quotas, cost ceilings, privacy,
+      monitoring, failure handling, account isolation and rollback. Prepare
+      onboarding, support/privacy information and platform-specific public
+      distribution materials only when broader access is intended.
 
 ### Adult product search with age confirmation — 2026-10-26
 
