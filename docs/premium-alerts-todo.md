@@ -24,6 +24,8 @@ launch.
 - [x] Check developer key-management availability before displaying controls.
 - [x] Include existing statistics tests in `npm run check`; expose runtime and
   staging acceptance commands.
+- [x] Add full-app staging configuration and two-account acceptance checker,
+  with PostgreSQL/Worker tests for ownership and cleanup/error-redaction tests.
 - [ ] Run self-service acceptance against a configured staging Supabase project;
   no staging account credential is available in this session.
 - [ ] Production acceptance remains separate from local checks and a branch push.

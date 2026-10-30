@@ -1,0 +1,30 @@
+# Isolated full-app staging target for account acceptance. Deploy explicitly;
+# the production workflow continues to use wrangler.toml.
+name = "libergent-staging"
+main = "src/worker.js"
+compatibility_date = "2026-03-13"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[assets]
+directory = "./ui/out"
+binding = "ASSETS"
+
+[vars]
+LIBERGENT_INTEGRATIONS_ENABLED = "1"
+LIBERGENT_DEVELOPER_API_ENABLED = "1"
+LIBERGENT_AGENT_MCP_ENABLED = "1"
+LIBERGENT_MCP_ENABLED = "0"
+PREMIUM_JEV_ENABLED = "0"
+
+# No scheduled probes, outreach configuration, billing secrets or Browser Run.
+[triggers]
+crons = []
+
+[[durable_objects.bindings]]
+name = "INTEGRATION_GATEWAY"
+class_name = "IntegrationGateway"
+
+[[migrations]]
+tag = "integration-gateway-v1"
+new_sqlite_classes = ["IntegrationGateway"]

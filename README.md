@@ -94,8 +94,11 @@ Run `npm run check:integration-runtime` to verify authentication, persistent quo
 and cache restoration in local workerd. Run `npm run check:developer-api -- https://YOUR-STAGING-HOST`
 with `LIBERGENT_ACCEPTANCE_SESSION_TOKEN` set to a verified test account's Supabase
 session token to check real key creation, simulated search, usage and revocation.
-The check creates one test key and revokes it in cleanup; it never prints keys or
-contacts marketplaces. Run it against staging before production activation.
+Set `LIBERGENT_ACCEPTANCE_SECOND_SESSION_TOKEN` for another test account to verify
+ownership isolation. The check creates one test key and revokes it in cleanup;
+it never prints keys or contacts marketplaces. Use `wrangler.staging.toml` and
+the [staging checklist](docs/developer-api.md#staging-account-acceptance-checklist)
+when ready; the existing integration-only preview cannot test account management.
 
 ### Search healthcheck
 

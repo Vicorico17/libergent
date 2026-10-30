@@ -85,6 +85,54 @@ Production settings and schemas remain unchanged. A separate scoped acceptance p
 
 Rollback: set `LIBERGENT_DEVELOPER_API_ENABLED=0` to stop self-service and database-backed keys; operator-managed compatibility keys can still work. Set `LIBERGENT_INTEGRATIONS_ENABLED=0` to stop all integration search. Keep the migration and namespace; public Free search and MCP behavior do not depend on the new API flags.
 
+## Staging account acceptance checklist
+
+The existing `libergent-integration-preview` Worker exposes only integration
+routes. Its account management and `/api/developer/config` routes intentionally
+return 404; use a full-app staging target for this test.
+
+Prepare these once, when ready to test:
+
+1. **An isolated Supabase test project.** Apply `supabase/developer-api.sql` there.
+   Use this project's URL and server secret on the staging Worker, and its URL
+   and publishable key in the staging UI build. Do not reuse production data or
+   copy production billing, outreach or operator API-key secrets.
+2. **A staging website.** `wrangler.staging.toml` defines `libergent-staging`, with
+   its own Durable Object namespace and no scheduled jobs or Browser Run binding.
+   Build with the staging `NEXT_PUBLIC_SUPABASE_URL` and
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; run `npm run verify:ui-auth-config`.
+   Configure Worker secrets `SUPABASE_URL` and `SUPABASE_SECRET_KEY` using
+   `wrangler secret put ... --config wrangler.staging.toml`, then deploy explicitly
+   with `wrangler deploy --config wrangler.staging.toml`. The normal production
+   workflow does not deploy this file. Set the staging origin as the Supabase
+   Auth site URL and allow its `/confirm` callback; verify your login provider
+   configuration before testing Google login.
+3. **Two email-verified test accounts** in that project. Sign into each in separate
+   browser profiles. Two sessions belonging to the same account are not sufficient
+   for ownership testing.
+4. **Temporary local session credentials** for the automated check. Configure
+   `LIBERGENT_ACCEPTANCE_SESSION_TOKEN` for account A and
+   `LIBERGENT_ACCEPTANCE_SECOND_SESSION_TOKEN` for account B in the local shell.
+   These are Supabase session access tokens, not database secrets or API keys.
+   Do not paste them into chat, command arguments, source files, or PRs. Clear them
+   from the shell after testing. They expire; repeat sign-in if necessary.
+
+Run `npm run check:developer-api -- https://YOUR-STAGING-HOST`. The script creates
+one `acceptance-*` **test** key, verifies that account B cannot list or revoke it,
+checks simulated search/cache reuse, rejects unauthorized listing enrichment,
+checks usage, revokes the key, and confirms cached access is denied. It attempts
+cleanup on failure and gives a manual dashboard instruction if cleanup fails.
+Omitting account B explicitly reports isolation as **not tested**. Responses and
+credentials are never printed. This check does not contact marketplaces, apply
+migrations, send messages, or change subscriptions.
+
+Then manually test `/developers/` on mobile and desktop: sign in, create a test
+key, copy the one-time secret, reload, inspect usage, revoke, sign out, and confirm
+that switching accounts shows only the signed-in account's keys. Repeat with
+expired login and failed network requests. Real-source checks with a live key
+are a separate, bounded test; passing simulated acceptance does not establish
+marketplace availability.
+
 ## Local testing
 
 ```bash
