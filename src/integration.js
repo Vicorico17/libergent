@@ -7,6 +7,7 @@ import { normalizeIntegrationListing } from './integration-listings.js';
 
 export const INTEGRATION_SOURCES = API_SOURCES;
 const TTL = 900000;
+const PARTIAL_TTL = 60000;
 const json = (body, status = 200, headers = {}) => Response.json(body, { status, headers: { 'cache-control': 'no-store', ...headers } });
 const failure = (code, status, headers) => json({ apiVersion: '1', error: { code } }, status, headers);
 export async function keyHash(token) {
@@ -91,6 +92,40 @@ export async function fetchIntegrationDetail(url, signal, fetcher = fetch) {
   if (!detail.extraction.structuredData || !detail.title) throw Error('detail_unverified');
   return { ...detail, status: 'verified' };
 }
+// Preserve each source's own order while sharing the finite enrichment budget.
+// URL fragments do not identify separate listings; query parameters may do so.
+function sampleCandidates(sources, limit = 20) {
+  const positions = sources.map(() => 0);
+  const seen = new Set();
+  const candidates = [];
+  let added;
+  do {
+    added = false;
+    for (let index = 0; index < sources.length && candidates.length < limit; index++) {
+      const source = sources[index];
+      while (positions[index] < source.items.length) {
+        const item = source.items[positions[index]++];
+        if (!item || typeof item !== 'object' || Array.isArray(item) || isAdultProductQuery(item.title)) continue;
+        let identity;
+        if (typeof item.url === 'string' && item.url) {
+          try { const url = new URL(item.url); url.hash = ''; identity = url.href; }
+          catch { identity = item.url; }
+        }
+        if (identity && seen.has(identity)) continue;
+        if (identity) seen.add(identity);
+        candidates.push({ item, source: source.source });
+        added = true;
+        break;
+      }
+    }
+  } while (added && candidates.length < limit);
+  return candidates;
+}
+
+function cacheExpiry(payload) {
+  return Math.min(Date.parse(payload.expiresAt), Date.parse(payload.searchedAt) + (payload.partial ? PARTIAL_TTL : TTL));
+}
+
 export async function searchIntegration(params, deps = {}) {
   const search = deps.search || runSearch;
   const details = deps.details || fetchIntegrationDetail;
@@ -98,11 +133,12 @@ export async function searchIntegration(params, deps = {}) {
   const sources = await Promise.all(params.sites.map(async site => {
     try {
       const result = await bounded(signal => search({ provider: 'direct', site: getSite(site), query: params.query, limit: 20, maxPages: 1, signal }), deps.searchTimeoutMs || 8000);
-      return { source: site, status: 'ok', items: result.items || [] };
+      if (!Array.isArray(result?.items)) throw Error('malformed_source_response');
+      return { source: site, status: 'ok', items: result.items };
     } catch (e) { return { source: site, status: 'failed', error: e.message === 'timeout' ? 'timeout' : 'source_unavailable', items: [] }; }
   }));
   // Bounded candidates and concurrency; filtering after enrichment avoids inventing missing facts.
-  const candidates = sources.flatMap(s => s.items.filter(item => !isAdultProductQuery(item.title)).map(item => ({ item, source: s.source }))).slice(0, 20);
+  const candidates = sampleCandidates(sources);
   const listings = new Array(candidates.length); let cursor = 0;
   const deadline = Date.now() + 12000;
   await Promise.all(Array.from({ length: Math.min(3, candidates.length) }, async () => {
@@ -121,8 +157,9 @@ export async function searchIntegration(params, deps = {}) {
   }));
   const items = listings.filter(item => (params.category === 'any' || item.classification.category === params.category)
     && (params.material === 'any' || item.classification.material === params.material)).slice(0, params.limit);
-  return { apiVersion: '1', mode: 'live', searchedAt, expiresAt: new Date(Date.parse(searchedAt) + TTL).toISOString(),
-    partial: sources.some(s => s.status !== 'ok') || listings.some(i => i.detailStatus === 'unavailable'),
+  const partial = sources.some(s => s.status !== 'ok') || listings.some(i => i.detailStatus === 'unavailable');
+  return { apiVersion: '1', mode: 'live', searchedAt, expiresAt: new Date(Date.parse(searchedAt) + (partial ? PARTIAL_TTL : TTL)).toISOString(),
+    partial,
     sources: sources.map(({ items, ...s }) => ({ ...s, candidateCount: items.length })),
     inspectedCount: listings.length, items };
 }
@@ -171,14 +208,17 @@ export class IntegrationGateway {
     if (retryAfter) return failure('quota_exceeded', 429, { 'retry-after': String(retryAfter) });
     const key = `cache:${await keyHash(JSON.stringify(params))}`;
     const cached = await this.state.storage.get(key);
-    if (cached && Date.parse(cached.expiresAt) > now) return json({ ...cached, cache: { status: 'hit', ageSeconds: Math.floor((now - Date.parse(cached.searchedAt)) / 1000) } });
+    if (cached && cacheExpiry(cached) > now) return json({ ...cached, expiresAt: new Date(cacheExpiry(cached)).toISOString(), cache: { status: 'hit', ageSeconds: Math.floor((now - Date.parse(cached.searchedAt)) / 1000) } });
     let pending = this.inflight.get(key);
     const coalesced = Boolean(pending);
     if (!pending) {
       if (this.inflight.size >= 2) return failure('busy', 429, { 'retry-after': '20' });
       pending = (auth.config.mode === 'test' ? Promise.resolve(buildSandboxSearch(params)) : this.search(params)).then(async payload => {
+        // Clamp older/custom search payloads too; partial outages should be retried soon.
+        const expiresAt = cacheExpiry(payload);
+        if (Number.isFinite(expiresAt)) payload = { ...payload, expiresAt: new Date(expiresAt).toISOString() };
         // No success-shaped cache entry when every source fails. Retry is still quota-bound.
-        if (payload.sources.some(s => s.status === 'ok') && new TextEncoder().encode(JSON.stringify(payload)).length <= 120000) {
+        if (expiresAt > Date.now() && payload.sources.some(s => s.status === 'ok') && new TextEncoder().encode(JSON.stringify(payload)).length <= 120000) {
           await this.state.storage.transaction(async tx => {
             const entries = await tx.list({ prefix: 'cache:' });
             const expired = [...entries].filter(([, v]) => Date.parse(v.expiresAt) <= Date.now()).map(([k]) => k);

@@ -30,6 +30,18 @@ launch.
   no staging account credential is available in this session.
 - [ ] Production acceptance remains separate from local checks and a branch push.
 
+## Developer search reliability — 2026-10-30
+
+- [x] Share the 20-candidate sample across sources instead of letting the first
+  source consume it; preserve per-source order and deduplicate listing URLs.
+- [x] Treat malformed source collections as failures while retaining useful
+  results from other sources.
+- [x] Cache partial source/detail failures for at most one minute, including
+  older snapshots with longer expiry. Complete results retain the 15-minute TTL.
+- [x] Regression coverage for source fairness, duplicate enrichment, malformed
+  responses and recovery from partial snapshots.
+- [ ] Verify multi-source sampling and outage recovery on the deployed API.
+
 ## Current launch checklist — 2026-10-14
 
 This is the active owner-requested to-do list. It supersedes the older execution
