@@ -1,4 +1,5 @@
 import { checkFreeSearchLimits } from "./free-search-limits.js";
+import { searchCacheLifetimeSeconds, isSearchCacheFresh } from "./search-cache-policy.js";
 import { getFreeSearchProvider, getFreeSearchSiteKeys } from "./free-search-policy.js";
 import { handleAgentMcp } from './agent-mcp.js';
 import { handleDeveloper } from './developer-api.js';
@@ -49,7 +50,6 @@ import {
 } from "./api-params.js";
 
 const LEAD_API_PATHS = new Set(["/api/leads", "/api/lead", "/api/email-leads", "/api/email_leads", "/api/waitlist"]);
-const SEARCH_CACHE_SECONDS = 300;
 const MARKETPLACE_CONTACT_CACHE_SECONDS = 900;
 const MARKETPLACE_DETAILS_CACHE_SECONDS = 1800;
 const MAX_MARKETPLACE_DETAILS_HTML_BYTES = 6 * 1024 * 1024;
@@ -172,20 +172,22 @@ async function readSearchCache(cacheRequest) {
   const response = await cache.match(cacheRequest).catch(() => null);
   if (!response) return null;
   const payload = await response.json().catch(() => null);
-  if (!payload || isAdultProductQuery(JSON.stringify(payload))) return null;
+  if (!isSearchCacheFresh(payload, response.headers.get("x-libergent-cached-at"))
+    || isAdultProductQuery(JSON.stringify(payload))) return null;
   payload.summary = { ...payload.summary, cacheHit: true, browserSessionsUsed: 0 };
   return json(payload, 200);
 }
 
 function writeSearchCache(cacheRequest, payload, context) {
   const cache = globalThis.caches?.default;
-  // Do not pin a transport failure or an empty search for the next five minutes.
-  if (!cache || !payload.results?.some((result) => result.ok && result.items?.length)) return;
+  const lifetime = searchCacheLifetimeSeconds(payload);
+  if (!cache || !lifetime) return;
   const response = new Response(JSON.stringify(payload), {
     status: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": `public, max-age=${SEARCH_CACHE_SECONDS}`
+      "cache-control": `public, max-age=${lifetime}`,
+      "x-libergent-cached-at": String(Date.now())
     }
   });
   const operation = cache.put(cacheRequest, response).catch(() => {});

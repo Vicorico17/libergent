@@ -171,6 +171,12 @@ MCP and developer API routes retain their own controls. To disable this guard fo
 rollback, set `LIBERGENT_FREE_SEARCH_LIMITS_ENABLED=0` and redeploy; this removes
 burst protection. Deployment and traffic tuning remain pending.
 
+Website search snapshots last five minutes when complete, or one minute when a
+source fails or later result pages cannot be retrieved. Empty and failed-only
+searches are not cached. Snapshot age is checked on reads, so old partial results
+and legacy entries without timestamps trigger a fresh search. This policy applies
+to both Free and Premium; Premium authorization still runs before cache access.
+
 ### Premium test
 
 Premium includes the query-routed Free sources, seven general retail/price-benchmark adapters, and seven fashion retailers for fashion-related searches:

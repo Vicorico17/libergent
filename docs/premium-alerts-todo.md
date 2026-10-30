@@ -108,6 +108,19 @@ and location-based property/land search. These do not block the current API test
 - [ ] Restore/revalidate OLX and Okazii access from the production runtime.
   Retry changes reduce wasted requests; they do not restore blocked sources.
 
+## Website search cache recovery — 2026-10-30
+
+- [x] Limit useful partial Free/Premium snapshots to 60 seconds when a source
+  fails or pagination is interrupted. Complete snapshots retain five minutes.
+- [x] Reject empty, failed-only and malformed payloads from search caching.
+- [x] Enforce snapshot age on reads as well as cache TTL; old partial entries
+  and legacy entries without a trustworthy cache timestamp trigger a new search.
+- [x] Verify cross-alias reuse, expiry/refetch and legacy-entry recovery through
+  Worker routes. Existing Premium authorization, forced-refresh, MCP and adult
+  cache isolation regression checks pass.
+- [ ] Deploy and measure recovery/cost with actual source outages. More frequent
+  refreshes of partial results can increase direct and Premium fallback requests.
+
 ## Current launch checklist — 2026-10-14
 
 This is the active owner-requested to-do list. It supersedes the older execution
