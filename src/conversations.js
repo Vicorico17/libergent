@@ -94,13 +94,13 @@ export function buildConversationHistory(rows = [], { userId = "" } = {}) {
         conversationsByPhone.set(phone, phoneConversations);
       }
     } else {
-      const phoneConversations = conversationsByPhone.get(phone) || [];
-      conversation = phoneConversations[phoneConversations.length - 1];
+      const phoneConversations = (conversationsByPhone.get(phone) || []).filter(item => item.listingUrl);
+      // A bare reply cannot identify which of several listings it refers to.
+      conversation = phoneConversations.length === 1 ? phoneConversations[0] : null;
       if (!conversation) {
         const key = conversationKey(phone, "");
         conversation = conversations.get(key) || createConversation(phone, {}, getMessageTime(row));
         conversations.set(key, conversation);
-        conversationsByPhone.set(phone, [conversation]);
       }
     }
 

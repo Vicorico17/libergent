@@ -1060,11 +1060,16 @@ async function handleApi(request, env, context) {
     }
 
     if (!isSupabaseConfigured(env)) {
-      return json({ ok: false, error: "Supabase is not configured." }, 200);
+      return json({ ok: false, error: "Supabase is not configured." }, 503);
     }
 
     try {
-      const owner = await findWhatsAppConversationOwner(inbound.from, env).catch(() => null);
+      const owner = await findWhatsAppConversationOwner(inbound.from, env);
+      // Ownership comes only from our outbound history, never bridge metadata.
+      inbound.raw = inbound.raw && typeof inbound.raw === "object" && !Array.isArray(inbound.raw)
+        ? { ...inbound.raw } : {};
+      delete inbound.raw.userId;
+      delete inbound.raw.listing;
       if (owner?.userId) {
         inbound.raw = {
           ...(inbound.raw || {}),

@@ -1,6 +1,6 @@
 # Premium, Product, and Launch TODO
 
-Last prioritized: 2026-10-19
+Last prioritized: 2026-10-30
 Implementation and production status audit: 2026-09-13 (unless noted below)
 
 See [the September launch audit](launch-audit-2026-09-13.md) for the comparison
@@ -18,6 +18,28 @@ launch.
 This reconciles the owner's project review list. PR #38 supplied the canonical
 Developer API; follow-up work is on PR #39. A pushed change is not a deployment.
 Live staging/account acceptance is deferred until the owner is ready.
+
+### Continuation checkpoint
+
+Keep this file as the persistent task list between work sessions. Start with the
+current status table and recent implementation notes; do not treat historical
+checkmarks or a branch push as proof of deployment or live acceptance.
+
+- Current work is on `feat/storefront-integration-v1`, draft PR #39. Continue
+  verified fixes and push follow-ups; merging/deploying is a separate step.
+- Before deploying the Agent send changes, reapply `supabase/deals.sql`, then
+  deploy the matching Worker/UI. Existing clients without UUID keys receive 400.
+- Next Agent gaps: provider receipt callbacks, reconciliation of unknown sends
+  and ambiguous replies, seller-wide stop handling across listings/accounts,
+  follow-ups and notifications. Do not lose the separate VINDE recovery work.
+- Owner will configure staging when ready: isolated Supabase/staging origin,
+  two verified accounts and local acceptance-session credentials. Do not ask for
+  secrets in chat or repeatedly block independent work on this setup.
+- Live payments and final Agent terms remain unresolved. Source access still
+  needs production validation: latest local OLX/Okazii checks were blocked.
+- Browser journeys, monitoring/global quotas, account lifecycle/support, image
+  search, documentation and maintainability remain in the table below; deferred
+  product expansion remains listed after it.
 
 | Priority | Workstream | Current status | What remains |
 | --- | --- | --- | --- |
@@ -140,6 +162,22 @@ and location-based property/land search. These do not block the current API test
 - [ ] Provider receipt callbacks, reconciliation of unknown attempts and the
   controlled live pilot remain open. Separate tabs/sessions can create new keys;
   this change does not deduplicate different keys with identical message content.
+
+## Inbound reply attribution — 2026-10-30
+
+- [x] Derive inbound account/listing assignment only from unambiguous stored
+  outbound history; discard bridge-supplied ownership/listing metadata.
+- [x] Return an error on ownership database failure instead of acknowledging
+  a reply with silently lost assignment. Missing database configuration is 503.
+- [x] Keep unlabelled replies separate when history contains multiple listings
+  for the seller; never infer a sold/unavailable listing from the latest thread.
+- [x] Worker and history tests cover forged metadata, multiple owners/listings,
+  database outage, repeated ambiguous replies and unchanged unique attribution.
+- [ ] Add provider reply-reference correlation and operator reconciliation for
+  unassigned replies; validate real webhook retries in staging. Historical
+  misassignments are not repaired by this code change.
+- [ ] Apply seller-wide stop handling even when a reply cannot be assigned to a
+  particular buyer/listing, before the controlled live Agent pilot.
 
 ## Current launch checklist — 2026-10-14
 
