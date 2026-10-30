@@ -152,7 +152,11 @@ The [September 28 Discovery audit](docs/source-availability-2026-09-28.md) check
 | Flip | Refurbished technology | Relevant technology queries only | Direct |
 | Klap | Refurbished technology | Relevant technology queries only | Direct |
 
-Free API requests resolve `provider=auto` to direct access and never start automatic Browser Run sessions.
+Free API requests accept only `provider=auto` or `provider=direct`; both resolve
+to direct access and never start automatic Browser Run sessions. Explicit paid
+providers or non-Free source IDs return HTTP 400 before any cache or upstream
+request. The Worker and Node development server share this policy. CLI and
+authenticated administrative diagnostics retain their separate provider controls.
 
 ### Premium test
 

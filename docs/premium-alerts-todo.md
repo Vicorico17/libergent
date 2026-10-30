@@ -13,6 +13,44 @@ is implemented or has been explicitly confirmed in the target environment;
 unchecked operational items must be completed before the corresponding test or
 launch.
 
+## Original review list — current status, 2026-10-30
+
+This reconciles the owner's project review list. PR #38 supplied the canonical
+Developer API; follow-up work is on PR #39. A pushed change is not a deployment.
+Live staging/account acceptance is deferred until the owner is ready.
+
+| Priority | Workstream | Current status | What remains |
+| --- | --- | --- | --- |
+| P0 | MCP regressions | Fixed and tested in PR #39 | Merge/deploy and hosted-client acceptance. |
+| P0 | Developer API backend | Implemented, with SQL/Worker/runtime tests and staging tooling | Staging migration/configuration, two verified accounts, browser acceptance and live-key check. |
+| P0 | Production payments | Stripe test flow exists; live keys remain blocked | Explicit live-mode support, configured products/webhooks, renewal/failure/cancellation acceptance. Do not enable charging before final policies. |
+| P0 | Product/service boundaries | Premium/Agent access checks exist | Finalize Agent duration, seller/product counts, Premium inclusion, completion, cancellation/refund terms and Agent checkout. |
+| P0 | Source reliability | Fair samples, deduplicated URLs and short partial caches implemented | Repair/revalidate advertised sources from production; local OLX/Okazii failures remain unresolved. |
+| P1 | Agent outreach/completion | Deal workflow and buyer-approved drafts exist | Provider receipts, reliable reply attribution, one-off send idempotency, follow-ups, notifications and controlled end-to-end pilot. |
+| P1 | VINDE | Drafts, images, OLX/Okazii/assisted workflows exist | Real seller connections/publication acceptance, ambiguous-failure recovery, sold synchronization and cross-platform withdrawal. |
+| P1 | ChatGPT/Claude connectors | Separate Free trial and API-key MCP implementations exist | Actual owner conversations, OAuth for hosted clients, paid-call identity/metering/limits and release acceptance. |
+| P1 | Browser journeys | Backend, protocol, SQL and local Worker acceptance coverage expanded | Automated browser login/search/checkout/alerts/selling journeys, mobile and account switching. CLI acceptance is not browser coverage. |
+| P1 | Operations and cost controls | Durable API quotas, source probes and Free-provider boundary exist | Production dashboards/alerts, website ingress quotas, cost measurements, provider outage acceptance and rollback exercises. |
+| P1 | Account/support lifecycle | Authentication and private account features exist | Account deletion/export, retention execution, concrete support route and product-policy reconciliation. |
+| P2 | Image search | Validation stub only | Integrate a provider, validate results and complete UI/API flow before advertising. |
+| P2 | Documentation | API and this backlog reconciled | Continue correcting older Premium-vs-Agent and implementation-vs-production claims. |
+| P2 | Maintainability | Large search page and Worker remain | Gradual extraction around tested responsibilities; no broad refactor completed. |
+
+Deferred expansion: passkeys, verified adult-product retailers, services search,
+and location-based property/land search. These do not block the current API tests.
+
+## Free search cost boundary — 2026-10-30
+
+- [x] Restrict `/api/search` and `/api/search/free` to `auto`/`direct`, resolving
+  both to direct retrieval, in the Worker and Node server.
+- [x] Restrict explicit source selection to the registered Free sources; paid or
+  experimental sources require the authenticated Premium workflow.
+- [x] Reject disallowed requests before cache lookup or any network/browser use;
+  retain separate CLI/admin provider controls.
+- [x] Regression tests plus a localhost HTTP check cover both public aliases.
+- [ ] Deploy and verify the public boundary. Global website ingress quotas and
+  cost/error monitoring remain separate operational work.
+
 ## Repository reconciliation and checks — 2026-10-30
 
 - [x] Preserve the developer API, authenticated MCP, Durable Object quotas and

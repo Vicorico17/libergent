@@ -1,3 +1,4 @@
+import { getFreeSearchProvider, getFreeSearchSiteKeys } from "./free-search-policy.js";
 import { handleAgentMcp } from './agent-mcp.js';
 import { handleDeveloper } from './developer-api.js';
 import { handleApiReference } from './developer-reference.js';
@@ -26,7 +27,7 @@ import { assertConfiguredPrice, configuredPriceIds, createCheckoutSession, creat
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { normalizeOfferFeedbackPayload } from "./feedback.js";
 import { buildSourceCatalog } from "./source-catalog.js";
-import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getDefaultSiteKeys, getPremiumSiteKeys, getSite, getSiteKeysForAllSearch } from "./sites.js";
+import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getPremiumSiteKeys, getSite } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
 import { extractPhonesFromListing, extractRomanianMobilePhones, normalizeRomanianMobilePhone } from "./phone-numbers.js";
@@ -364,13 +365,6 @@ function getSearchRequestParams(url) {
   };
 }
 
-function getFreeSearchSiteKeys(site, query) {
-  return site === "all"
-    ? getSiteKeysForAllSearch(query)
-    : site === "default"
-      ? getDefaultSiteKeys()
-      : [getSite(site).key];
-}
 
 async function searchPremiumBrowserSites(env, { query, limit, siteKeys, engine = "chromium" }) {
   if (!siteKeys.length) return [];
@@ -1141,7 +1135,7 @@ async function handleApi(request, env, context) {
         overrideCity: url.searchParams.get("near") || url.searchParams.get("requesterLocation") || url.searchParams.get("location") || ""
       });
       const siteKeys = getFreeSearchSiteKeys(site, query);
-      const freeProvider = provider === "auto" ? "direct" : provider;
+      const freeProvider = getFreeSearchProvider(provider);
       const cacheRequest = buildSearchCacheRequest(request, {
         query, condition, provider: freeProvider, site, limit, maxPages, maxPriceRon
       }, viewerLocation, "free");
