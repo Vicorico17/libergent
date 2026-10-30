@@ -33,8 +33,10 @@ checkmarks or a branch push as proof of deployment or live acceptance.
 - Before deploying the Agent send changes, reapply `supabase/deals.sql` and
   `supabase/whatsapp_messages.sql`, then
   deploy the matching Worker/UI. Existing clients without UUID keys receive 400.
+- Reapply `supabase/selling.sql` before the VINDE status/recovery changes, and
+  deploy the revised inbound forwarder on its host. These deployment steps remain open.
 - Next Agent gaps: provider receipt callbacks, reconciliation of unknown sends
-  and ambiguous replies, voice-call stop enforcement and verified opt-in recovery,
+  and ambiguous replies, verified opt-in recovery,
   follow-ups and notifications. Do not lose the separate VINDE recovery work.
 - Owner will configure staging when ready: isolated Supabase/staging origin,
   two verified accounts and local acceptance-session credentials. Do not ask for
@@ -53,7 +55,7 @@ checkmarks or a branch push as proof of deployment or live acceptance.
 | P0 | Product/service boundaries | Premium/Agent access checks exist | Finalize Agent duration, seller/product counts, Premium inclusion, completion, cancellation/refund terms and Agent checkout. |
 | P0 | Source reliability | Fair samples, deduplicated URLs and short partial caches implemented | Repair/revalidate advertised sources from production; local OLX/Okazii failures remain unresolved. |
 | P1 | Agent outreach/completion | Deal workflow and buyer-approved drafts exist | Apply/deploy one-off idempotency migration; provider receipts, reliable reply attribution, follow-ups, notifications and controlled end-to-end pilot. |
-| P1 | VINDE | Drafts, images, OLX/Okazii/assisted workflows exist | Real seller connections/publication acceptance, ambiguous-failure recovery, sold synchronization and cross-platform withdrawal. |
+| P1 | VINDE | Drafts, OLX receipt recovery/status mapping and paginated Okazii feeds implemented locally | Deploy migration/UI, real seller connections and recovery acceptance, sold synchronization and cross-platform withdrawal. |
 | P1 | ChatGPT/Claude connectors | Separate Free trial and API-key MCP implementations exist | Actual owner conversations, OAuth for hosted clients, paid-call identity/metering/limits and release acceptance. |
 | P1 | Browser journeys | Backend, protocol, SQL and local Worker acceptance coverage expanded | Automated browser login/search/checkout/alerts/selling journeys, mobile and account switching. CLI acceptance is not browser coverage. |
 | P1 | Operations and cost controls | Durable API quotas, source probes, Free-provider boundary and local-tested edge burst limits exist | Deploy/tune edge limits; strict worldwide quotas, production dashboards/alerts, cost measurements, provider outage acceptance and rollback exercises. |
@@ -177,9 +179,12 @@ and location-based property/land search. These do not block the current API test
   for the seller; never infer a sold/unavailable listing from the latest thread.
 - [x] Worker and history tests cover forged metadata, multiple owners/listings,
   database outage, repeated ambiguous replies and unchanged unique attribution.
-- [ ] Add provider reply-reference correlation and operator reconciliation for
-  unassigned replies; validate real webhook retries in staging. Historical
-  misassignments are not repaired by this code change.
+- [x] Match optional `replyToMessageId` against a stored outbound receipt and
+  the same seller number. Unknown/mismatched references never use a fallback owner.
+- [x] Require stable inbound IDs, preserve history on replay, serialize forwarder
+  polls and atomically save checkpoints; bound inbound/outbound transport waits.
+- [ ] Deploy the forwarder and verify whether real provider events supply reply
+  references. Operator reconciliation and historical misassignment repair remain open.
 - [x] Implement seller-wide WhatsApp stop enforcement even when a reply cannot
   be assigned to a particular buyer/listing; deployment/live acceptance pending.
 
@@ -195,9 +200,26 @@ and location-based property/land search. These do not block the current API test
   cross-account/listing enforcement, ordinary replies, retention and privileges.
 - [ ] Apply the WhatsApp schema before deploying this Worker; verify live inbound
   retry and outbound-denial behavior. No production migration has been run.
-- [ ] Extend enforcement to voice calls and implement reviewed opt-in recovery.
+- [x] Check the same stop table before new voice-call reservation/dialing.
+- [ ] Deploy and verify voice enforcement; implement reviewed opt-in recovery.
   This guard cannot recall messages already accepted/in flight, and recognizes
   explicit supported phrases rather than every possible natural-language request.
+
+## VINDE receipt recovery and feeds — 2026-10-30
+
+- [x] Distinguish active, pending, inactive and moderation-rejected OLX adverts;
+  validate provider IDs before accepting or refreshing a receipt.
+- [x] Recover unknown/sending submissions by exact external draft ID using a
+  bounded read-only lookup. Ambiguous/no matches never permit republishing.
+- [x] Prevent a late recovery response from overwriting a confirmed receipt.
+- [x] Page Okazii feed reads by owner and stable ID; fail instead of returning
+  truncated inventory on page errors, cursor loops or configured bounds.
+- [x] Verify PostgreSQL status-constraint upgrades and Worker/provider fixtures;
+  UI lint/build passes. Latest local baseline: 411 backend + 8 UI checks passed.
+- [ ] Reapply `supabase/selling.sql`, deploy matching backend/UI, and validate
+  with a connected seller account. No adverts were published by these tests.
+- [ ] Sold synchronization, cross-platform withdrawal, large-inventory scaling
+  and provider outage/receipt recovery against real accounts remain open.
 
 ## Current launch checklist — 2026-10-14
 

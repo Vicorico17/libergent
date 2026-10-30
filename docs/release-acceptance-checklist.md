@@ -2,8 +2,8 @@
 
 Updated: 2026-10-30. Companion to [the implementation backlog](premium-alerts-todo.md).
 This file describes what to check; unchecked items have **not passed live acceptance**.
-Latest local baseline: 395 backend tests + 8 UI helper/data checks passed; Worker
-dry-run passed. UI lint/build passed on the one-off messaging change. These do
+Latest local baseline: 411 backend tests + 8 UI helper/data checks passed; Worker
+dry-run and UI lint/build are checked for the current reliability batch. These do
 not establish staging or production readiness. PR #39 is still a draft.
 
 ## 1. What you need to prepare
@@ -31,6 +31,8 @@ live charging or real outreach just to test login and developer keys.
 - [ ] For Agent tests, apply relevant account/Agent schemas and reapply both
   `supabase/deals.sql` and `supabase/whatsapp_messages.sql` before the matching
   Worker/UI. Record which migrations actually ran and where.
+- [ ] Reapply `supabase/selling.sql` before VINDE status/recovery deployment;
+  deploy the revised inbound forwarder and verify its real message ID fields.
 - [ ] Configure only the additional test services required for the chosen feature.
   Default `wrangler.staging.toml` has no Browser Run, scheduled jobs, billing or
   outreach secrets; it cannot prove those features work until configured.
@@ -72,11 +74,11 @@ An unfinished feature is **Blocked**, not Passed or silently skipped.
 | Agent access | Try outreach with Free, Premium-only and Agent accounts | Outreach requires Agent access; Premium search alone does not authorize it |
 | Agent acceptance/duplicates | With the controlled recipient, submit once, retry same key, double-click and reload/retry | At most one provider submission for that key; accepted response has a provider ID; unknown outcome stays unknown. Separate tabs may create different keys |
 | Agent uncertain outcome | Simulate malformed receipt, provider timeout and failed history/ledger write | No fabricated delivery success and no automatic resend; operator can identify what needs reconciliation. Full reconciliation tooling remains open |
-| Reply ownership | Test one seller with multiple listings and multiple buyers; send an unlabelled reply | Ambiguous replies are not assigned to the latest listing or another buyer; provider metadata cannot set account ownership |
-| Seller stop | Controlled recipient sends STOP; try new messages from different accounts/listings | WhatsApp sends are blocked before provider contact; later ordinary replies and history deletion do not clear the stop. Voice calls and opt-in recovery remain open |
+| Reply ownership | Test one seller with multiple listings/buyers, unlabelled replies and quoted replies with known/unknown original IDs | Ambiguous replies stay separate; only an exact stored outbound ID and seller match routes a quoted reply; replay cannot overwrite ownership |
+| Seller stop | Controlled recipient sends STOP; try new messages and pilot calls from different accounts/listings | WhatsApp sends and new calls are blocked before provider contact; ordinary replies/history deletion do not clear the stop. Opt-in recovery remains open |
 | Agent completion | Follow the approved workflow through terms, buyer approval and completion | Buyer approves commitments; seller wording alone does not mark a completed deal; promised service limits match behavior |
 | Alerts | Create, trigger, deduplicate, pause and expire an alert | Correct recipient, no repeated notifications, inactive entitlement prevents scheduled work |
-| VINDE — controlled pilot | Create/edit draft and images, publish approved test listing, simulate uncertain publish, mark sold and withdraw | Provider receipt confirms publication; retries do not duplicate listings; status matches source and withdrawal is confirmed. Several recovery/sync flows remain unfinished |
+| VINDE — controlled pilot | Create/edit draft and images, publish approved test listing, simulate uncertain publish, refresh by external ID, remove/moderate a test advert, check a multipage Okazii feed | Only one exact receipt confirms recovery, no resend; inactive/rejected states stay distinct; feed errors never produce partial XML. Sold sync and withdrawal still require implementation/acceptance |
 | Account/support lifecycle — blocked until ready | Export/delete the test account, exercise retention and contact support | Documented data behavior actually occurs; no cross-account data; support route works; stop preferences are not accidentally erased |
 | Mobile and errors | Run key journeys on phone/desktop with slow/offline network; use keyboard; check landing ticker across two loops/resizes | No stuck send/loading states, duplicate action or hidden error; forms remain usable; no page overflow or ticker jump |
 | Image search — blocked | Test only after provider/UI implementation exists | Correct intent/results or clear failure; do not advertise the current validation stub as working search |
