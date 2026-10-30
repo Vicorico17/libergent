@@ -31,9 +31,10 @@ test('ambiguous bridge responses never create successful outbound history', asyn
     OPENCLAW_BRIDGE_URL: 'https://bridge.example', OPENCLAW_BRIDGE_TOKEN: 'test' };
   for (const body of ['', 'not json', 'null', '{}', '{"ok":true}', '{"messageId":{}}', 'network-error']) {
     let sends = 0; let historyWrites = 0;
-    const mock = t.mock.method(globalThis, 'fetch', async url => {
+    const mock = t.mock.method(globalThis, 'fetch', async (url, init = {}) => {
       if (String(url).endsWith('/auth/v1/user')) return Response.json({ id: 'buyer' });
       if (String(url).includes('/agent_entitlements')) return Response.json([{ status: 'active' }]);
+      if (String(url).includes('/deal_send_attempts')) return Response.json([JSON.parse(init.body)]);
       if (String(url).includes('/rest/')) { historyWrites++; return Response.json([]); }
       sends++;
       if (body === 'network-error') throw Error('private-bridge-detail');
@@ -41,7 +42,7 @@ test('ambiguous bridge responses never create successful outbound history', asyn
     });
     const response = await worker.fetch(new Request('https://libergent.test/api/whatsapp/send', {
       method: 'POST', headers: { authorization: 'Bearer token', 'content-type': 'application/json' },
-      body: JSON.stringify({ target: '+40722000000', message: 'test' })
+      body: JSON.stringify({ idempotencyKey: '22222222-2222-4222-8222-222222222222', target: '+40722000000', message: 'test' })
     }), env);
     assert.equal(response.status, 502);
     const payload = await response.json();

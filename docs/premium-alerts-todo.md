@@ -26,7 +26,7 @@ Live staging/account acceptance is deferred until the owner is ready.
 | P0 | Production payments | Stripe test flow exists; live keys remain blocked | Explicit live-mode support, configured products/webhooks, renewal/failure/cancellation acceptance. Do not enable charging before final policies. |
 | P0 | Product/service boundaries | Premium/Agent access checks exist | Finalize Agent duration, seller/product counts, Premium inclusion, completion, cancellation/refund terms and Agent checkout. |
 | P0 | Source reliability | Fair samples, deduplicated URLs and short partial caches implemented | Repair/revalidate advertised sources from production; local OLX/Okazii failures remain unresolved. |
-| P1 | Agent outreach/completion | Deal workflow and buyer-approved drafts exist | Provider receipts, reliable reply attribution, one-off send idempotency, follow-ups, notifications and controlled end-to-end pilot. |
+| P1 | Agent outreach/completion | Deal workflow and buyer-approved drafts exist | Apply/deploy one-off idempotency migration; provider receipts, reliable reply attribution, follow-ups, notifications and controlled end-to-end pilot. |
 | P1 | VINDE | Drafts, images, OLX/Okazii/assisted workflows exist | Real seller connections/publication acceptance, ambiguous-failure recovery, sold synchronization and cross-platform withdrawal. |
 | P1 | ChatGPT/Claude connectors | Separate Free trial and API-key MCP implementations exist | Actual owner conversations, OAuth for hosted clients, paid-call identity/metering/limits and release acceptance. |
 | P1 | Browser journeys | Backend, protocol, SQL and local Worker acceptance coverage expanded | Automated browser login/search/checkout/alerts/selling journeys, mobile and account switching. CLI acceptance is not browser coverage. |
@@ -131,8 +131,15 @@ and location-based property/land search. These do not block the current API test
   attempt reservations so replay cannot contact the bridge again.
 - [x] Test malformed responses, provider rejection, transport-error redaction,
   nested receipts and unknown deal-attempt replay without real seller contact.
-- [ ] One-off sends still need durable idempotency. Provider receipt callbacks,
-  reconciliation of unknown attempts and the controlled live pilot remain open.
+- [x] Extend durable per-key reservations to one-off sends; verify concurrent
+  requests, owner/content isolation and unknown-attempt replay with PostgreSQL.
+- [x] Keep one-off UI attempt keys across retries/reloads in the same tab,
+  scoped by account and request content; do not send if storage is unavailable.
+- [ ] Reapply `supabase/deals.sql` before deploying the matching Worker/UI.
+  Old clients without keys receive 400; missing schema prevents provider sends.
+- [ ] Provider receipt callbacks, reconciliation of unknown attempts and the
+  controlled live pilot remain open. Separate tabs/sessions can create new keys;
+  this change does not deduplicate different keys with identical message content.
 
 ## Current launch checklist — 2026-10-14
 

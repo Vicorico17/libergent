@@ -516,6 +516,7 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
       return new Response(JSON.stringify({ id: "user-1", email: "buyer@example.test" }), { status: 200 });
     }
     if (requestUrl.includes("/agent_entitlements")) return Response.json([{ status: "active" }]);
+    if (requestUrl.includes("/deal_send_attempts")) return Response.json([JSON.parse(init.body)]);
     if (requestUrl.startsWith("https://supabase.example/rest/v1/whatsapp_messages")) {
       storedMessage = JSON.parse(init.body);
       return new Response(null, { status: 201 });
@@ -528,7 +529,7 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
     new Request("https://libergent.test/api/whatsapp/send", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer user-token" },
-      body: JSON.stringify({ target: "0722 123 456", message: "Salut", listing: { url: "https://www.olx.ro/d/oferta/test.html", title: "Test OLX" } })
+      body: JSON.stringify({ idempotencyKey: "22222222-2222-4222-8222-222222222222", target: "0722 123 456", message: "Salut", listing: { url: "https://www.olx.ro/d/oferta/test.html", title: "Test OLX" } })
     }),
     {
       OPENCLAW_BRIDGE_URL: "https://bridge.example/",
@@ -550,7 +551,7 @@ test("posts WhatsApp messages to the configured OpenClaw bridge", async (t) => {
   assert.equal(payload.historySaved, true);
   assert.equal(bridgeRequest.url, "https://bridge.example/whatsapp/send");
   assert.equal(bridgeRequest.init.headers.authorization, "Bearer secret");
-  assert.equal(bridgeRequest.init.body, JSON.stringify({ target: "+40722123456", message: "Salut" }));
+  assert.equal(bridgeRequest.init.body, JSON.stringify({ target: "+40722123456", message: "Salut", idempotencyKey: "22222222-2222-4222-8222-222222222222" }));
   assert.equal(storedMessage.raw.userId, "user-1");
   assert.equal(storedMessage.raw.listing.title, "Test OLX");
 });
@@ -788,15 +789,16 @@ test("does not report bridge application failures as successful delivery", async
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
   let writes = 0;
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, init = {}) => {
     if (String(url).endsWith("/auth/v1/user")) return Response.json({ id: "buyer" });
     if (String(url).includes("/agent_entitlements")) return Response.json([{ status: "active" }]);
+    if (String(url).includes("/deal_send_attempts")) return Response.json([JSON.parse(init.body)]);
     if (String(url).includes("/rest/")) writes++;
     return Response.json({ ok: true, result: { ok: false, error: "delivery rejected" } });
   };
   const response = await worker.fetch(new Request("https://libergent.test/api/whatsapp/send", {
     method: "POST", headers: { authorization: "Bearer token", "content-type": "application/json" },
-    body: JSON.stringify({ target: "+40722000000", message: "test" })
+    body: JSON.stringify({ idempotencyKey: "22222222-2222-4222-8222-222222222222", target: "+40722000000", message: "test" })
   }), { SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "test", OPENCLAW_BRIDGE_URL: "https://bridge.example", OPENCLAW_BRIDGE_TOKEN: "test" });
   assert.equal(response.status, 502);
   assert.equal((await response.json()).ok, false);

@@ -21,7 +21,7 @@
     "dev:ui": "npm --prefix ui run dev",
     "dev:worker": "wrangler dev",
     "deploy": "npm run build:ui && npm run verify:ui-auth-config && wrangler deploy",
-    "test:ui-data": "node --experimental-strip-types --test ui/src/app/stats/stats-data.test.mjs",
+    "test:ui-data": "node --experimental-strip-types --test ui/src/app/stats/stats-data.test.mjs ui/src/lib/message-attempt.test.mjs",
     "check:integration-runtime": "node scripts/check-integration-runtime.js",
     "check:developer-api": "node scripts/check-developer-api.js"
   },

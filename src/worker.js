@@ -1714,13 +1714,12 @@ async function handleApi(request, env, context) {
       return json({ ok: false, error: "Message cannot be empty." }, 400);
     }
 
-    let dealAttemptKey = "";
+    const sendAttemptKey = String(body.idempotencyKey || "");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sendAttemptKey)) {
+      return json({ error: "A valid idempotency key is required for messages." }, 400);
+    }
     if (body.dealId) {
       if (!body.conversationId) return json({ error: "Deal replies require an existing conversation." }, 400);
-      dealAttemptKey = String(body.idempotencyKey || "");
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(dealAttemptKey)) {
-        return json({ error: "A valid idempotency key is required for deal messages." }, 400);
-      }
       try {
         const deal = await getDealCaseFromSupabase(String(body.dealId), auth.user.id, env);
         if (!deal || deal.listing_url !== listing.url) return json({ error: "Deal not found for this listing." }, 404);
@@ -1746,14 +1745,16 @@ async function handleApi(request, env, context) {
       }
     }
 
-    if (dealAttemptKey) {
+    if (sendAttemptKey) {
       try {
         const { created, attempt } = await reserveDealSendAttempt({
-          idempotency_key: dealAttemptKey, deal_id: String(body.dealId), user_id: auth.user.id,
-          seller_phone: target, message
+          idempotency_key: sendAttemptKey, deal_id: body.dealId ? String(body.dealId) : null, user_id: auth.user.id,
+          seller_phone: target, message, listing_url: listing.url || ""
         }, env);
         if (!created) {
-          if (!attempt || attempt.deal_id !== String(body.dealId) || attempt.seller_phone !== target || attempt.message !== message) {
+          if (!attempt || attempt.deal_id !== (body.dealId ? String(body.dealId) : null)
+            || (!body.dealId && attempt.listing_url !== (listing.url || ""))
+            || attempt.seller_phone !== target || attempt.message !== message) {
             return json({ error: "Idempotency key belongs to another request." }, 409);
           }
           if (attempt.status === "accepted") return json({ ok: true, deduplicated: true, target, messageId: attempt.provider_message_id,
@@ -1773,13 +1774,13 @@ async function handleApi(request, env, context) {
           "content-type": "application/json",
           authorization: `Bearer ${env.OPENCLAW_BRIDGE_TOKEN}`
         },
-        body: JSON.stringify({ target, message, ...(dealAttemptKey ? { idempotencyKey: dealAttemptKey } : {}) })
+        body: JSON.stringify({ target, message, ...(sendAttemptKey ? { idempotencyKey: sendAttemptKey } : {}) })
       });
       const payload = await response.json().catch(() => ({}));
       const receipt = parseWhatsAppSendReceipt(payload);
       if (!response.ok || !receipt.accepted) {
         const outcome = receipt.status === "failed" ? "failed" : "unknown";
-        if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
+        if (sendAttemptKey) await updateDealSendAttempt(sendAttemptKey, auth.user.id, {
           status: outcome, error: `Bridge returned ${response.status}; send outcome ${outcome}.`
         }, env).catch(() => null);
         return json({ ok: false, code: outcome === "unknown" ? "send_outcome_unknown" : "send_rejected",
@@ -1804,7 +1805,7 @@ async function handleApi(request, env, context) {
       } catch (error) {
         historyError = error instanceof Error ? error.message : String(error);
       }
-      if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
+      if (sendAttemptKey) await updateDealSendAttempt(sendAttemptKey, auth.user.id, {
         status: "accepted", provider_message_id: messageId, delivery_status: deliveryStatus, history_saved: historySaved,
         error: historyError.slice(0, 500)
       }, env);
@@ -1827,7 +1828,7 @@ async function handleApi(request, env, context) {
         historyError: historyError || null
       }, 200);
     } catch (error) {
-      if (dealAttemptKey) await updateDealSendAttempt(dealAttemptKey, auth.user.id, {
+      if (sendAttemptKey) await updateDealSendAttempt(sendAttemptKey, auth.user.id, {
         status: "unknown", error: (error instanceof Error ? error.message : String(error)).slice(0, 500)
       }, env).catch(() => null);
       return json({ ok: false, code: "send_outcome_unknown", deliveryStatus: "unknown",
