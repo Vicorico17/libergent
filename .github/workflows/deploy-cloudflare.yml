@@ -30,7 +30,7 @@ jobs:
             ui/package-lock.json
 
       - name: Install root dependencies
-        run: npm ci
+        run: npm ci --include=dev
 
       - name: Run backend checks
         run: npm run check

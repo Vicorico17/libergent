@@ -27,10 +27,13 @@ jobs:
             ui/package-lock.json
 
       - name: Install root dependencies
-        run: npm ci
+        run: npm ci --include=dev
 
       - name: Run backend tests
         run: npm run check
+
+      - name: Check persistent integration runtime
+        run: npm run check:integration-runtime
 
       - name: Run deterministic UI lint
         run: npm run lint:ui:ci

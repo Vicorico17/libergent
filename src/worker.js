@@ -1,4 +1,8 @@
-import { handleDeveloperApi } from "./developer-api.js";
+import { handleAgentMcp } from './agent-mcp.js';
+import { handleDeveloper } from './developer-api.js';
+import { handleApiReference } from './developer-reference.js';
+import { handleIntegration } from './integration.js';
+export { IntegrationGateway } from './integration.js';
 import { adultGateResponse, hasAdultConfirmation, issueAdultConfirmation, needsAdultConfirmation } from "./adult-access.js";
 import { searchAcrossSites } from "./app.js";
 import { handleMcp } from "./mcp.js";
@@ -945,8 +949,6 @@ async function handleApi(request, env, context) {
   const adultSearch = needsAdultConfirmation(url);
   const allowAdult = adultSearch && await hasAdultConfirmation(request, env);
   if (["/api/search", "/api/search/free", "/api/search/premium"].includes(apiPath) && adultSearch && !allowAdult) return adultGateResponse();
-
-  if (apiPath.startsWith("/api/developer/") || apiPath.startsWith("/api/v1/")) return handleDeveloperApi(request, env, authenticateSupabaseUser);
 
   if (apiPath.startsWith("/api/selling/")) return handleSelling(request, env, authenticateSupabaseUser);
 
@@ -1984,10 +1986,16 @@ export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
 
-    // The owner test deployment is an isolated MCP-only worker. Never expose
-    // the website, API, cron-backed actions, or account routes from that host.
+    // Keep the owner trial isolated from website, account and developer routes.
     if (env.LIBERGENT_MCP_TEST_MODE === "1" && normalizeApiPathname(url.pathname) !== "/mcp") {
       return json({ error: "Not found" }, 404);
+    }
+
+    if (url.pathname === '/api/v1/mcp') return handleAgentMcp(request, env);
+    if (url.pathname.startsWith('/api/developer/')) return handleDeveloper(request, env);
+    if (['/api/v1/demo', '/api/v1/sources', '/api/v1/openapi.json'].includes(url.pathname)) return handleApiReference(request);
+    if (url.pathname === "/api/v1/search" || url.pathname === "/api/integrations/v1/search") {
+      return handleIntegration(request, env);
     }
 
     if (normalizeApiPathname(url.pathname) === "/mcp") {

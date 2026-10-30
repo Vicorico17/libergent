@@ -100,7 +100,7 @@ console.log(data.summary, data.results);`}</code></pre>
         <div className="mt-6 flex flex-col gap-4 border-2 border-[#111111] bg-white p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div>
             <h3 className="font-bold">Need an API key or authenticated MCP?</h3>
-            <p className="mt-2 max-w-2xl text-sm leading-6">The versioned Developer API supports test/live search keys, usage reporting, and OpenAPI when enabled on the deployment. Check its status below. Authenticated MCP is not available yet.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6">The versioned Developer API supports test/live search keys, usage reporting, and OpenAPI when enabled on the deployment. Check its status below. API-key-authenticated MCP is available when separately enabled; OAuth account linking remains unfinished.</p>
           </div>
           <a className="shrink-0 border-2 border-[#111111] bg-[#FF4B8B] px-4 py-3 text-center text-xs font-bold uppercase tracking-wider" href="/developers">Developer API status ↗</a>
         </div>
@@ -126,7 +126,7 @@ console.log(data.summary, data.results);`}</code></pre>
           {[
             ["MCP connector", "Pilot public, read-only, Free. Sunt aplicate limite de utilizare; URL-ul poate fi schimbat înainte de lansarea generală."],
             ["REST API Free", "Căutare JSON publică la /api/search/free. Pentru integrare server-to-server; respectă limitele și termenii LiberGent."],
-            ["Developer API v1", "Chei test/live și limite per cont când integrarea este activată. Verifică disponibilitatea în /developers. MCP autentificat nu este încă disponibil."],
+            ["Developer API v1", "Chei test/live și limite per cont când integrarea este activată. Verifică disponibilitatea în /developers. MCP autentificat folosește aceeași cheie API, când este activat."],
             ["REST API Premium", "Necesită sesiune Libergent validă și drept Premium activ. Nu este o ofertă de plată per apel."],
             ["Premium prin MCP", "Nu este încă disponibil. Va necesita identitate de client, tarifare per apel și evidența utilizării."],
           ].map(([label, description], index, array) => <div key={label} className={`grid grid-cols-[minmax(100px,0.7fr)_minmax(0,2fr)] gap-3 px-4 py-4 text-xs leading-6 sm:px-5 sm:text-sm ${index < array.length - 1 ? "border-b border-[#D7D2C7]" : ""}`}>

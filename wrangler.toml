@@ -17,6 +17,17 @@ crons = ["* * * * *"]
 OPENCLAW_BRIDGE_URL = "https://bridge.srv1648069.hstgr.cloud"
 PREMIUM_JEV_ENABLED = "1"
 PREMIUM_JEV_MODEL = "jev-latest"
+LIBERGENT_INTEGRATIONS_ENABLED = "1"
+LIBERGENT_AGENT_MCP_ENABLED = "1"
+
+# Persistent integration cache and quota counters.
+[[durable_objects.bindings]]
+name = "INTEGRATION_GATEWAY"
+class_name = "IntegrationGateway"
+
+[[migrations]]
+tag = "integration-gateway-v1"
+new_sqlite_classes = ["IntegrationGateway"]
 
 # Dedicated owner trial endpoint. It exposes only /mcp and keeps public
 # Premium/account actions disabled. Do not copy these settings to production.

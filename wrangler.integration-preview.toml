@@ -1,0 +1,18 @@
+# Separate Worker and namespace. This never deploys libergent.com or its website.
+name = "libergent-integration-preview"
+main = "src/integration-preview-worker.js"
+compatibility_date = "2026-03-13"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[vars]
+LIBERGENT_INTEGRATIONS_ENABLED = "1"
+LIBERGENT_AGENT_MCP_ENABLED = "1"
+
+[[durable_objects.bindings]]
+name = "INTEGRATION_GATEWAY"
+class_name = "IntegrationGateway"
+
+[[migrations]]
+tag = "integration-gateway-v1"
+new_sqlite_classes = ["IntegrationGateway"]

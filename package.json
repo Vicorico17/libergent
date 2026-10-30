@@ -10,24 +10,26 @@
     "benchmark:kitesurf": "node scripts/benchmark-kitesurf.js",
     "check:cli": "node src/cli.js --help",
     "test": "node --test src/*.test.js src/parsers/*.test.js src/providers/*.test.js",
-    "test:ui-data": "node --experimental-strip-types --test ui/src/app/stats/stats-data.test.mjs",
     "test:mcp": "node --test src/mcp.test.js",
     "check:mcp": "node scripts/check-mcp.js",
     "check": "npm run check:cli && npm run test && npm run test:ui-data",
-    "build:ui": "npm --prefix ui ci && npm --prefix ui run build",
+    "build:ui": "npm --prefix ui ci --include=dev && npm --prefix ui run build",
     "verify:ui-auth-config": "node scripts/verify-ui-auth-config.js",
     "lint:ui:ci": "npm --prefix ui ci --include=dev && npm --prefix ui run lint:ci",
     "dev": "node src/dev.js",
     "dev:api": "node src/server.js",
     "dev:ui": "npm --prefix ui run dev",
     "dev:worker": "wrangler dev",
-    "deploy": "npm run build:ui && npm run verify:ui-auth-config && wrangler deploy"
+    "deploy": "npm run build:ui && npm run verify:ui-auth-config && wrangler deploy",
+    "test:ui-data": "node --experimental-strip-types --test ui/src/app/stats/stats-data.test.mjs",
+    "check:integration-runtime": "node scripts/check-integration-runtime.js",
+    "check:developer-api": "node scripts/check-developer-api.js"
   },
   "engines": {
     "node": ">=22"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.13",
+    "@electric-sql/pglite": "^0.5.12",
     "wrangler": "4.93.1"
   },
   "dependencies": {

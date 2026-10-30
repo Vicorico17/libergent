@@ -14,6 +14,7 @@ const NAV_LINKS = {
     { label: "Premium", href: "/pricing" },
     { label: "Trenduri", href: "/trenduri" },
     { label: "Statistici live", href: "/stats" },
+    { label: "Developer API", href: "/developers" },
   ],
   Legal: [
     { label: "Politică de confidențialitate", href: "/confidentialitate" },

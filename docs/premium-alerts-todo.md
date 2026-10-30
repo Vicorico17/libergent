@@ -13,34 +13,20 @@ is implemented or has been explicitly confirmed in the target environment;
 unchecked operational items must be completed before the corresponding test or
 launch.
 
-## Repository fixes — 2026-10-30
+## Repository reconciliation and checks — 2026-10-30
 
-- [x] Reject explicit Premium MCP requests instead of silently downgrading to Free;
-  preserve the age-confirmation error without exposing blocked listing details.
-- [x] Replace outdated Premium connector tests with Free-only contract checks;
-  cover missing/broken trial quotas, search quota denial and isolated routing.
-- [x] Gate the unfinished Developer API portal behind an honest status page.
-  Its draft component is preserved; key management and `/api/v1/*` backend
-  implementation remain open. Development-page claims now match availability.
-- [x] Include the existing UI statistics data tests in `npm run check` and CI.
-- [ ] Deploy and verify this batch in the target environment.
-
-## Developer API implementation — 2026-10-30
-
-- [x] Add opt-in key management, read-only v1 search/sources, simulated demo,
-  OpenAPI, and shared Node/Worker routing.
-- [x] Add private SQL tables and atomic functions for key creation limits,
-  per-account quotas, expiry, revocation and account disablement.
-- [x] Connect the portal to runtime availability and implemented capabilities;
-  remove draft claims for unsupported enrichment, material filters and API-key MCP.
-- [x] Add API/security regression tests and ephemeral Postgres migration tests to CI.
-- [ ] Apply `supabase/developer_api.sql` in staging and verify multi-session
-  contention, real authentication, browser key management, marketplace results
-  and latency. Set `LIBERGENT_DEVELOPER_API_ENABLED=1` only after configuration.
-- [x] Local live smoke: `iphone 15` returned four offers from Publi24, with OLX
-  and Okazii reported unavailable. This single local query is not production
-  coverage acceptance.
-- [ ] Production deployment and acceptance. No database or deployment changed locally.
+- [x] Preserve the developer API, authenticated MCP, Durable Object quotas and
+  canonical `supabase/developer-api.sql` migration merged through PR #38.
+  The competing local SQL-quota implementation was superseded before pushing.
+- [x] Reject explicit Premium requests in the separate Free-only MCP trial instead
+  of silently downgrading; preserve the adult-confirmation error.
+- [x] Cover missing/broken trial quotas, search denial and isolated routing.
+- [x] Check developer key-management availability before displaying controls.
+- [x] Include existing statistics tests in `npm run check`; expose runtime and
+  staging acceptance commands.
+- [ ] Run self-service acceptance against a configured staging Supabase project;
+  no staging account credential is available in this session.
+- [ ] Production acceptance remains separate from local checks and a branch push.
 
 ## Current launch checklist — 2026-10-14
 

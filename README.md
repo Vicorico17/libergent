@@ -6,6 +6,13 @@ Production: [libergent.com](https://libergent.com)
 
 ### ChatGPT and Claude connector prototype
 
+For developer-key agent integrations, use the new opt-in `/api/v1/mcp` adapter
+documented in [Agent integrations](docs/agent-integrations.md). It shares the
+versioned API’s credentials, search quotas and cache. The older `/mcp` below
+remains a separate prototype. Production enablement is unchanged; a scoped
+[BLANĂ acceptance preview](docs/fau-blana-agent-handoff.md) is available.
+
+
 The shared Streamable HTTP MCP endpoint is `/mcp`. It is disabled by default;
 set `LIBERGENT_MCP_ENABLED=1` to enable it in a development environment.
 The first milestone exposes three read-only tools: `search_products`,
@@ -72,56 +79,23 @@ and [Claude custom connectors](https://support.claude.com/en/articles/11175166-g
 
 ### Developer API v1
 
-The `/developers/` portal checks `/api/developer/config` at runtime and stays
-unavailable until `LIBERGENT_DEVELOPER_API_ENABLED=1` and server-side Supabase
-credentials are configured. Apply `supabase/developer_api.sql` first. This
-migration creates private key/account/usage tables and service-role-only RPCs;
-never expose the Supabase secret to API consumers. In local development set
-`LIBERGENT_PUBLIC_URL=http://localhost:3000` so browser Origin checks match the UI.
-Both the Node development server and Worker route these APIs through the same handler.
+The implementation merged from PR #38 is the canonical developer API. See
+[Developer API setup](docs/developer-api.md) and [authenticated MCP](docs/agent-integrations.md).
+Apply `supabase/developer-api.sql` (hyphenated filename); there is no second
+underscore-named migration. Keys live in Supabase; shared quota counters and
+search caches live in the `IntegrationGateway` Durable Object.
 
-Confirmed Libergent accounts can create test/live keys, list metadata, revoke
-keys, and inspect shared account usage. Keys contain 256 random bits, expire in
-90 days, and are stored only as SHA-256 hashes. The plaintext appears once in the
-creation response. There are at most five active keys and twenty creations per
-UTC day per account. Revocation and account disablement are checked before each
-request, including cache hits. Disable a developer account using the trusted
-administrative database path: set `developer_accounts.disabled=true` for its user.
+The portal checks `/api/developer/config` at runtime before showing key controls.
+The public demo and integration reference stay accessible when self-service keys
+are disabled. The legacy Free-only `/mcp` owner trial is separate from the
+API-key-authenticated `/api/v1/mcp` integration.
 
-- `GET /api/v1/demo`: fixed simulated search, no account or marketplace request.
-- `GET /api/v1/openapi.json`: supported API contract.
-- `GET /api/v1/sources`: allowed domains, authenticated with a developer bearer key.
-- `GET /api/v1/search?q=iphone%2015&sites=olx,publi24&limit=10`: authenticated search.
-  Optional filters are `condition=any|used|new` and positive `maxPriceRon`.
-  Unknown parameters are rejected.
-- `/api/developer/keys` (GET/POST), `/api/developer/keys/:id` (DELETE), and
-  `/api/developer/usage` (GET): account management using the existing Supabase
-  session bearer credential, not a developer key.
-
-Live keys allow 200 requests/day and 10/minute; test keys allow 1,000/day and
-60/minute. These fixed limits are enforced atomically in Postgres across all keys
-owned by an account, with separate counters per mode. Source-list calls, cached
-searches, and searches that fail after quota reservation count. Invalid inputs and
-invalid credentials do not consume quota. HTTP 429 includes `Retry-After`.
-There is no billing, automatic upgrade, or paid-provider fallback.
-
-Search uses the shared direct parsers and ranking engine with one page and up to
-20 candidates per source, across OLX, Publi24 and Okazii (all three by default). Up to 20 ranked offers
-are returned along with Libergent's decisions. Marketplace work has a 25-second
-deadline and abort signal; database validation can add up to eight seconds.
-Use a 45-second client timeout. Complete live responses may be cached for fifteen
-minutes; partial failures are not cached. `searchedAt` remains the original fetch
-time on cache hits, and availability remains unknown. Test mode is explicitly
-simulated and never calls a marketplace; it never shares live cache entries.
-Adult-product access, specialized material filters, listing enrichment, authenticated
-MCP and OAuth linking are not part of this API release.
-
-Validation: `npm run check` includes API regression tests and an ephemeral PGlite
-Postgres migration test. The latter validates actual SQL, caps, reset behavior,
-revocation and permissions, but serializes database sessions. Before production
-activation, verify multi-session contention in staging, Supabase authentication,
-key creation/revocation in the browser, real source coverage and response latency.
-No production migration or enablement is performed by these tests.
+Run `npm run check:integration-runtime` to verify authentication, persistent quotas
+and cache restoration in local workerd. Run `npm run check:developer-api -- https://YOUR-STAGING-HOST`
+with `LIBERGENT_ACCEPTANCE_SESSION_TOKEN` set to a verified test account's Supabase
+session token to check real key creation, simulated search, usage and revocation.
+The check creates one test key and revokes it in cleanup; it never prints keys or
+contacts marketplaces. Run it against staging before production activation.
 
 ### Search healthcheck
 
@@ -626,3 +600,21 @@ Production deployment is also automated by [.github/workflows/deploy-cloudflare.
 - Browser Run cannot solve CAPTCHA or override marketplace access policy.
 - Kitesurf is a beta, non-pixel-perfect browser and cannot negotiate bot challenges with real Chromium TLS fingerprints; incompatible sources fall back only where Chromium is explicitly allowed.
 - Search-by-image remains an unfinished integration and should not be advertised as active.
+
+### Developer API
+
+Open `/developers` to try a no-key demo, create test/live API keys, see usage,
+and copy curl, JavaScript or Python requests. `GET /api/v1/search` is the general
+product-search API; fur-coat filters are optional. BLANĂ is an example consumer.
+
+- `GET /api/v1/demo` — simulated response, no account or marketplace requests
+- `GET /api/v1/sources` — supported API sources
+- `GET /api/v1/openapi.json` — downloadable OpenAPI 3.1 contract
+- `GET /api/v1/search?q=iphone%2015` — scoped API key required
+- `/api/v1/mcp` — authenticated Streamable HTTP tools for agent hosts, separately enabled
+
+See [developer quickstart and setup](docs/developer-api.md) and the
+[detailed listing/filter contract](docs/storefront-integration-v1.md).
+Self-service needs the developer SQL migration and explicit feature flags; public
+Free search and MCP enablement are unchanged. No personal session or admin key
+should be shared with an API consumer.
