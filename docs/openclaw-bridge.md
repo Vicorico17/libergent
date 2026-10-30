@@ -36,3 +36,12 @@ All `/api/whatsapp/send` requests require a UUID `idempotencyKey`, pass it to th
 The same key cannot be reused by another account or for another seller, message, listing or deal. Accepted attempts return their saved receipt; pending, failed and unknown attempts return 409 without another bridge call. A timed-out or unknown attempt must be reconciled against the provider before starting a new attempt. This is per-key protection, not semantic deduplication of independently created requests.
 
 The search UI keeps one-off attempt keys in session storage, scoped by a hash of account, seller, listing and message. Retries and reloads in the same tab reuse them. Initial-contact keys remain for the tab session; reply keys clear after confirmed acceptance with saved history so a later intentional reply can start a new attempt. No message text or credentials are stored there. Separate tabs/new sessions can create different keys; provider reconciliation and cross-session duplicate safeguards remain open. Storage-disabled browsers cannot initiate an untracked send.
+
+Reapply `supabase/whatsapp_messages.sql` before deploying the seller-stop guard.
+It creates service-only `whatsapp_contact_stops` and backfills recognized stop
+requests from existing inbound history. Authenticated inbound stop requests are
+saved before ownership lookup; sends from any buyer/listing to that number return
+409. Missing or failing preference storage returns 503 before provider contact.
+An ordinary reply never clears the stop, and deleting history does not remove it.
+Voice-call enforcement and verified opt-in recovery remain pending. The guard
+cannot cancel an already in-flight or accepted send; no live seller test has run.

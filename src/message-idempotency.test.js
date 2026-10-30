@@ -33,6 +33,7 @@ test('one-off sends reserve atomically in PostgreSQL and isolate owners and requ
     assert.equal(url.origin, 'https://db.test');
     if (url.pathname === '/auth/v1/user') return Response.json({ id: init.headers.authorization === 'Bearer other' ? other : owner });
     if (url.pathname.endsWith('/agent_entitlements')) return Response.json([{ status: 'active' }]);
+    if (url.pathname.endsWith('/whatsapp_contact_stops')) return Response.json([]);
     if (url.pathname.endsWith('/whatsapp_messages')) return new Response(null, { status: 201 });
     assert.ok(url.pathname.endsWith('/deal_send_attempts'));
     if (unavailable) return Response.json({ message: 'missing migration' }, { status: 503 });

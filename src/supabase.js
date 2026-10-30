@@ -672,6 +672,22 @@ export async function findWhatsAppConversationOwner(sellerPhone, env = process.e
   return matchingOutbound[0]?.raw || null;
 }
 
+export async function stopWhatsAppContact(sellerPhone, env = process.env) {
+  if (!getSupabaseConfig(env)) throw new Error("Supabase is not configured.");
+  await requestSupabase("whatsapp_contact_stops?on_conflict=seller_phone", {
+    method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify({ seller_phone: sellerPhone })
+  }, env);
+}
+
+export async function isWhatsAppContactStopped(sellerPhone, env = process.env) {
+  if (!getSupabaseConfig(env)) throw new Error("Supabase is not configured.");
+  const query = new URLSearchParams({ select: "seller_phone", seller_phone: `eq.${sellerPhone}`, limit: "1" });
+  const rows = await requestSupabase(`whatsapp_contact_stops?${query}`, { method: "GET" }, env);
+  if (!Array.isArray(rows)) throw new Error("Contact preferences unavailable.");
+  return rows.length > 0;
+}
+
 export async function listDealCasesFromSupabase(userId, env = process.env) {
   const config = getSupabaseConfig(env);
   if (!config) throw new Error("Supabase is not configured.");

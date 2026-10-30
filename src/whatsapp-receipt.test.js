@@ -34,6 +34,7 @@ test('ambiguous bridge responses never create successful outbound history', asyn
     const mock = t.mock.method(globalThis, 'fetch', async (url, init = {}) => {
       if (String(url).endsWith('/auth/v1/user')) return Response.json({ id: 'buyer' });
       if (String(url).includes('/agent_entitlements')) return Response.json([{ status: 'active' }]);
+      if (String(url).includes("/whatsapp_contact_stops")) return Response.json([]);
       if (String(url).includes('/deal_send_attempts')) return Response.json([JSON.parse(init.body)]);
       if (String(url).includes('/rest/')) { historyWrites++; return Response.json([]); }
       sends++;
@@ -73,6 +74,7 @@ test('an uncertain deal send remains reserved and replay cannot send it twice', 
     const path = new URL(url).pathname;
     if (path.endsWith('/auth/v1/user')) return Response.json({ id: 'buyer' });
     if (path.endsWith('/agent_entitlements')) return Response.json([{ status: 'active' }]);
+    if (path.endsWith('/whatsapp_contact_stops')) return Response.json([]);
     if (path.endsWith('/deal_cases')) return Response.json([{ id: dealId, listing_url: listing.url, stage: 'negotiating' }]);
     if (path.endsWith('/whatsapp_messages')) {
       if (init.method === 'POST') historyWrites++;

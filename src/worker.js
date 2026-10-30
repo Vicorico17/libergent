@@ -1,4 +1,6 @@
 import { checkFreeSearchLimits } from "./free-search-limits.js";
+import { isSellerStopRequest } from "./contact-stop.js";
+import { stopWhatsAppContact, isWhatsAppContactStopped } from "./supabase.js";
 import { parseWhatsAppSendReceipt } from "./whatsapp-receipt.js";
 import { searchCacheLifetimeSeconds, isSearchCacheFresh } from "./search-cache-policy.js";
 import { getFreeSearchProvider, getFreeSearchSiteKeys } from "./free-search-policy.js";
@@ -1064,6 +1066,8 @@ async function handleApi(request, env, context) {
     }
 
     try {
+      // Persist a seller-wide stop before attempting account/listing attribution.
+      if (isSellerStopRequest(inbound.text)) await stopWhatsAppContact(inbound.from, env);
       const owner = await findWhatsAppConversationOwner(inbound.from, env);
       // Ownership comes only from our outbound history, never bridge metadata.
       inbound.raw = inbound.raw && typeof inbound.raw === "object" && !Array.isArray(inbound.raw)
@@ -1722,6 +1726,13 @@ async function handleApi(request, env, context) {
     const sendAttemptKey = String(body.idempotencyKey || "");
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sendAttemptKey)) {
       return json({ error: "A valid idempotency key is required for messages." }, 400);
+    }
+    try {
+      if (await isWhatsAppContactStopped(target, env)) {
+        return json({ ok: false, code: "seller_contact_stopped", error: "Seller contact has stopped for this number." }, 409);
+      }
+    } catch {
+      return json({ ok: false, code: "contact_preferences_unavailable", error: "Contact preferences are temporarily unavailable." }, 503);
     }
     if (body.dealId) {
       if (!body.conversationId) return json({ error: "Deal replies require an existing conversation." }, 400);

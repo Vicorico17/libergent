@@ -27,10 +27,11 @@ checkmarks or a branch push as proof of deployment or live acceptance.
 
 - Current work is on `feat/storefront-integration-v1`, draft PR #39. Continue
   verified fixes and push follow-ups; merging/deploying is a separate step.
-- Before deploying the Agent send changes, reapply `supabase/deals.sql`, then
+- Before deploying the Agent send changes, reapply `supabase/deals.sql` and
+  `supabase/whatsapp_messages.sql`, then
   deploy the matching Worker/UI. Existing clients without UUID keys receive 400.
 - Next Agent gaps: provider receipt callbacks, reconciliation of unknown sends
-  and ambiguous replies, seller-wide stop handling across listings/accounts,
+  and ambiguous replies, voice-call stop enforcement and verified opt-in recovery,
   follow-ups and notifications. Do not lose the separate VINDE recovery work.
 - Owner will configure staging when ready: isolated Supabase/staging origin,
   two verified accounts and local acceptance-session credentials. Do not ask for
@@ -176,8 +177,24 @@ and location-based property/land search. These do not block the current API test
 - [ ] Add provider reply-reference correlation and operator reconciliation for
   unassigned replies; validate real webhook retries in staging. Historical
   misassignments are not repaired by this code change.
-- [ ] Apply seller-wide stop handling even when a reply cannot be assigned to a
-  particular buyer/listing, before the controlled live Agent pilot.
+- [x] Implement seller-wide WhatsApp stop enforcement even when a reply cannot
+  be assigned to a particular buyer/listing; deployment/live acceptance pending.
+
+## Seller-wide WhatsApp stops — 2026-10-30
+
+- [x] Persist recognized stop requests before account attribution in a separate
+  service-only table; retain stops across buyer accounts and history deletion.
+- [x] Check the seller number before every WhatsApp send; missing/unavailable
+  preference storage fails closed before attempt reservation or provider contact.
+- [x] Backfill recognized historical stop messages when reapplying
+  `supabase/whatsapp_messages.sql`; replaying the migration preserves stops.
+- [x] PostgreSQL/Worker tests cover ambiguous ownership, database failure,
+  cross-account/listing enforcement, ordinary replies, retention and privileges.
+- [ ] Apply the WhatsApp schema before deploying this Worker; verify live inbound
+  retry and outbound-denial behavior. No production migration has been run.
+- [ ] Extend enforcement to voice calls and implement reviewed opt-in recovery.
+  This guard cannot recall messages already accepted/in flight, and recognizes
+  explicit supported phrases rather than every possible natural-language request.
 
 ## Current launch checklist — 2026-10-14
 
