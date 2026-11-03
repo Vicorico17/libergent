@@ -145,44 +145,45 @@ test("MCP search returns the same Libergent decisions as the website API", async
   }
 });
 
-test("Premium connector uses the existing user and entitlement checks", async (t) => {
+test("Free-only connector rejects Premium instead of silently downgrading it", async (t) => {
+  const client = await connect(t);
   const original = globalThis.fetch;
-  let entitled = false;
-  globalThis.fetch = async (url, options) => {
-    if (String(url) === "https://api.typesafe.ai/v1/systemone") {
-      return Response.json({ answers: { best_used: { type: "choice", choice: "u02", confidence: 0.9 } } });
-    }
-    if (String(url).endsWith("/auth/v1/user")) {
-      assert.equal(options.headers.authorization, "Bearer connected-user");
-      return Response.json({ id: "connector-user", email: "connector@example.test" });
-    }
-    if (String(url).includes("user_entitlements")) return Response.json(entitled ? [{ status: "active", plan: "premium", expires_at: null }] : []);
-    return Response.json([]);
-  };
+  globalThis.fetch = () => { throw new Error("Premium rejection must not contact external services"); };
   t.after(() => { globalThis.fetch = original; });
-  const env = { LIBERGENT_MCP_ENABLED: "1", LIBERGENT_MOCK_SEARCH: "1", SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "test", BROWSER: {}, PREMIUM_JEV_ENABLED: "1", JEV_API_KEY: "test" };
-  const anonymous = await connect(t, env);
-  assert.equal((await anonymous.callTool({ name: "search_products", arguments: { query: "iphone", tier: "premium" } })).isError, true);
-  const connected = await connect(t, {}, (url, init) => {
-    const request = new Request(url, init);
-    request.headers.set("authorization", "Bearer connected-user");
-    return worker.fetch(request, env);
+  for (const name of ["search_products", "list_sources"]) {
+    const result = await client.callTool({ name, arguments: { query: "iphone", tier: "premium" } });
+    assert.equal(result.isError, true);
+    assert.equal(result.structuredContent, undefined);
+  }
+  const result = await client.callTool({ name: "search_products", arguments: { query: "iphone", tier: "free" } });
+  assert.equal(result.structuredContent.data.searchTier, "free");
+  assert.deepEqual(result.structuredContent.data.usage, { tier: "free", feeRon: 0, billable: false });
+});
+
+test("isolated MCP trial fails closed without quotas and hides other routes", async () => {
+  const env = { LIBERGENT_MCP_ENABLED: "1", LIBERGENT_MCP_TEST_MODE: "1" };
+  assert.equal((await worker.fetch(new Request("https://libergent.test/mcp"), env)).status, 503);
+  for (const path of ["/", "/api/search/free?q=iphone", "/api/billing/status", "/developers/"]) {
+    assert.equal((await worker.fetch(new Request(`https://libergent.test${path}`), env)).status, 404);
+  }
+  const broken = { limit: async () => { throw new Error("Quota service down"); } };
+  assert.equal((await worker.fetch(new Request("https://libergent.test/mcp"), {
+    ...env, MCP_RATE_LIMITER: broken, MCP_SEARCH_LIMITER: broken
+  })).status, 503);
+});
+
+test("trial search quota prevents execution while source discovery remains available", async (t) => {
+  const client = await connect(t, {
+    LIBERGENT_MCP_TEST_MODE: "1",
+    MCP_RATE_LIMITER: { limit: async () => ({ success: true }) },
+    MCP_SEARCH_LIMITER: { limit: async () => ({ success: false }) }
   });
-  const args = { query: "iphone", tier: "premium", maxPriceRon: 3000 };
-  assert.equal((await connected.callTool({ name: "search_products", arguments: args })).isError, true);
-  entitled = true;
-  const result = await connected.callTool({ name: "search_products", arguments: args });
-  assert.notEqual(result.isError, true);
-  assert.equal(result.structuredContent.data.searchTier, "premium");
-  assert.equal(result.structuredContent.data.jevDecision.status, "selected");
-  assert.equal(result.structuredContent.data.bestUsedOffer.jevDecision.confidence, 0.9);
-  assert.ok(result.structuredContent.data.offers.every((offer) => offer.priceRon <= 3000));
-  const params = new URLSearchParams({ q: "iphone", condition: "any", maxPriceRon: "3000", provider: "direct", site: "all", limit: "80", pages: "1" });
-  const direct = await (await worker.fetch(new Request(`https://libergent.test/api/search/premium?${params}`, { headers: { authorization: "Bearer connected-user" } }), env)).json();
-  assert.deepEqual(result.structuredContent.data.bestUsedOffer, compactOffer(direct.summary.bestUsedOffer));
-  assert.deepEqual(result.structuredContent.data.priceIntelligence, direct.summary.priceIntelligence);
-  entitled = false;
-  assert.equal((await connected.callTool({ name: "search_products", arguments: args })).isError, true);
+  const result = await client.callTool({ name: "search_products", arguments: { query: "iphone" } });
+  assert.equal(result.isError, true);
+  assert.match(JSON.stringify(result.content), /search limit reached/);
+  assert.equal(result.structuredContent, undefined);
+  const sources = await client.callTool({ name: "list_sources", arguments: {} });
+  assert.equal(sources.structuredContent.data.tier, "free");
 });
 
 test("MCP listing details enforce the same adult-content gate as the website", async (t) => {

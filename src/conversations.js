@@ -30,7 +30,7 @@ function conversationId(phone, listingUrl = "") {
 
 export function normalizeDeliveryStatus(payload = {}, fallback = "unknown") {
   if (payload.ok === false || payload.result?.ok === false) return "failed";
-  const status = String(payload.deliveryStatus || payload.status || payload.result?.status || "").toLowerCase();
+  const status = String(payload.deliveryStatus || payload.status || payload.result?.deliveryStatus || payload.result?.status || "").toLowerCase();
   if (["queued", "sent", "delivered", "failed", "unavailable"].includes(status)) return status;
   if (status === "read") return "delivered";
   return fallback;
@@ -94,13 +94,13 @@ export function buildConversationHistory(rows = [], { userId = "" } = {}) {
         conversationsByPhone.set(phone, phoneConversations);
       }
     } else {
-      const phoneConversations = conversationsByPhone.get(phone) || [];
-      conversation = phoneConversations[phoneConversations.length - 1];
+      const phoneConversations = (conversationsByPhone.get(phone) || []).filter(item => item.listingUrl);
+      // A bare reply cannot identify which of several listings it refers to.
+      conversation = phoneConversations.length === 1 ? phoneConversations[0] : null;
       if (!conversation) {
         const key = conversationKey(phone, "");
         conversation = conversations.get(key) || createConversation(phone, {}, getMessageTime(row));
         conversations.set(key, conversation);
-        conversationsByPhone.set(phone, [conversation]);
       }
     }
 

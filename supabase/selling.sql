@@ -36,6 +36,9 @@ create table if not exists public.selling_publications (
   primary key (user_id, listing_id, platform),
   foreign key (user_id, listing_id) references public.selling_drafts(user_id, id) on delete cascade
 );
+alter table public.selling_publications drop constraint if exists selling_publications_status_check;
+alter table public.selling_publications add constraint selling_publications_status_check
+  check (status in ('sending', 'published', 'pending', 'failed', 'unknown', 'feed_ready', 'inactive', 'rejected'));
 alter table public.selling_drafts enable row level security;
 alter table public.selling_connections enable row level security;
 alter table public.selling_oauth_states enable row level security;

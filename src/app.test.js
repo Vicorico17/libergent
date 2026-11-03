@@ -155,7 +155,7 @@ test("auto provider falls back to a configured remote provider when direct searc
   }
 });
 
-test("direct search retries with an alternate browser profile before remote fallback", async () => {
+test("temporary direct server failures retry before remote fallback", async () => {
   const envKeys = [
     "LIBERGENT_MOCK_SEARCH",
     "LIBERGENT_MOCK_PROVIDER",
@@ -186,7 +186,7 @@ test("direct search retries with an alternate browser profile before remote fall
 
       directCalls += 1;
       if (directCalls === 1) {
-        return new Response("blocked", { status: 403 });
+        return new Response("temporarily unavailable", { status: 503 });
       }
 
       return new Response(`

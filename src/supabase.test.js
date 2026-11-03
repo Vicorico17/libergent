@@ -77,6 +77,7 @@ test("insertWhatsAppInboundToSupabase upserts inbound WhatsApp messages", async 
   let capturedUrl = "";
   let capturedBody = null;
   globalThis.fetch = async (url, init) => {
+    assert.equal(init.headers.Prefer, "resolution=ignore-duplicates,return=minimal");
     capturedUrl = String(url);
     capturedBody = JSON.parse(init.body);
     return new Response(null, { status: 201 });

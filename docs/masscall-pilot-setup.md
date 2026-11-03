@@ -4,7 +4,7 @@ This code connects a Premium deal to one recorded call through a separate Massca
 
 ## Prepare the two runtimes
 
-1. Apply `supabase/deals.sql` to the Libergent Supabase project. The new `deal_calls` table is service-role only and stores buyer approval, contact permission acknowledgement, call state, and recording metadata.
+1. Apply `supabase/deals.sql` and `supabase/whatsapp_messages.sql` to the target Supabase project. The `deal_calls` table is service-role only and stores buyer approval, contact permission acknowledgement, call state, and recording metadata. New calls check the shared seller-stop table before reservation or dialing; a missing/unavailable table returns 503. Existing calls are not automatically cancelled by a later stop request.
 2. Run a separate Masscall deployment and bridge with a dedicated Twilio subaccount, a number owned by that subaccount, a distinct bridge secret and model key, and no owner dashboard token. Restrict access to its `/v1/calls` service route.
 3. Set the same random 32+ character service token as `MASSCALL_SERVICE_TOKEN` in Libergent and `LIBERGENT_SERVICE_TOKEN` in the dedicated Masscall instance. Set `MASSCALL_SERVICE_URL` to that instance's HTTPS origin, and use the same dedicated number for `MASSCALL_CALLER_ID` and `LIBERGENT_CALLER_ID`.
 4. Set matching comma-separated `LIBERGENT_ALLOWED_DESTINATIONS` to internal recipients who have authorized the call and recording. Set `LIBERGENT_RECORDING_RETENTION_DAYS` to an integer from 1 to 30. The hourly Libergent cron deletes provider recordings older than this many days; the buyer can delete a finished recording sooner.

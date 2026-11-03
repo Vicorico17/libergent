@@ -42,6 +42,11 @@ export function validateKeyInput(body) {
   return { name, mode, scopes: [...new Set(scopes)] };
 }
 export async function handleDeveloper(request, env, deps = {}) {
+  if (new URL(request.url).pathname.replace(/\/$/, '') === '/api/developer/config') {
+    if (request.method !== 'GET') return fail('method_not_allowed', 405);
+    return json({ available: developerStoreEnabled(env) && env.LIBERGENT_INTEGRATIONS_ENABLED === '1'
+      && Boolean(env.SUPABASE_URL && (env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY) && env.INTEGRATION_GATEWAY) });
+  }
   if (!developerStoreEnabled(env) || env.LIBERGENT_INTEGRATIONS_ENABLED !== '1') return fail('developer_api_unavailable', 503);
   const path = new URL(request.url).pathname.replace(/\/$/, '');
   const isKeys = path === '/api/developer/keys';

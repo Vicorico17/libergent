@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleSelling, normalizeSellingListing, publishOlx, safeOlxUrl } from './selling.js';
+import { handleSelling, normalizeSellingListing, publishOlx, safeOlxUrl, olxPublicationReceipt } from './selling.js';
 import { seal, unseal, digest } from './selling-store.js';
 import { olxPayload, okaziiFeed, olxRequest, olxAuthorizeUrl } from './selling-providers.js';
 
@@ -13,11 +13,16 @@ const request = (path, body, method = body ? 'POST' : 'GET') => new Request(`htt
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
 function mockDatabase(t, options = {}) {
-  const jobs = []; const drafts = [{ id, user_id: userId, listing }]; const sent = [];
+  const jobs = []; const drafts = [{ id, user_id: userId, listing }]; const sent = []; const reads = [];
   const realFetch = globalThis.fetch; t.after(() => { globalThis.fetch = realFetch; });
   globalThis.fetch = async (input, init = {}) => {
     const url = new URL(input); const method = init.method || 'GET'; const body = init.body ? JSON.parse(init.body) : undefined;
     if (url.hostname === 'www.olx.ro') {
+      if (method === 'GET') {
+        reads.push(url);
+        if (options.beforeRead) options.beforeRead(jobs);
+        return reply({ data: url.pathname.endsWith('/adverts') ? options.lookup ?? [] : options.single ?? { id: 123, status: options.providerStatus || 'active' } });
+      }
       if (url.pathname.endsWith('/adverts')) {
         sent.push(body);
         if (options.timeout) throw new Error('timeout');
@@ -50,7 +55,7 @@ function mockDatabase(t, options = {}) {
     }
     throw new Error(`Unexpected URL: ${url}`);
   };
-  return { jobs, drafts, sent };
+  return { jobs, drafts, sent, reads };
 }
 
 test('credentials are encrypted and bound to the owner', async () => {
@@ -83,6 +88,48 @@ test('Okazii feed escapes XML, safely splits CDATA and keeps a stable product ID
   assert.ok(xml.includes(']]]]><![CDATA[>')); assert.ok(xml.includes('<UNIQUEID>' + id));
   assert.ok(xml.includes('&amp;c=2')); assert.ok(xml.includes('<REPOST>0</REPOST>'));
   assert.ok(!xml.includes('<PROMOTIONS>'));
+});
+
+test('Okazii feed reads all pages even when the database returns fewer than requested', async t => {
+  const rows = [1, 2, 3].map(number => ({ id: `22222222-2222-4222-8222-${String(number).padStart(12, '0')}`, listing }));
+  let pages = 0;
+  t.mock.method(globalThis, 'fetch', async input => {
+    const url = new URL(input);
+    if (url.pathname.endsWith('/selling_feeds')) return reply([{ user_id: userId }]);
+    assert.equal(url.searchParams.get('user_id'), `eq.${userId}`);
+    assert.equal(url.searchParams.get('okazii_enabled'), 'eq.true');
+    assert.equal(url.searchParams.get('order'), 'id.asc');
+    const cursor = url.searchParams.get('id')?.slice(3) || '';
+    pages++;
+    return reply(rows.filter(row => row.id > cursor).slice(0, 1));
+  });
+  const response = await handleSelling(request(`/feeds/${id}.xml`), env, () => assert.fail('Token-scoped feed does not use account auth'));
+  assert.equal(response.status, 200);
+  const xml = await response.text();
+  for (const row of rows) assert.ok(xml.includes(`<UNIQUEID>${row.id}</UNIQUEID>`));
+  assert.equal(pages, 4);
+});
+
+test('Okazii feed fails rather than returning partial inventory on a broken later page', async t => {
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async input => {
+    if (new URL(input).pathname.endsWith('/selling_feeds')) return reply([{ user_id: userId }]);
+    calls++;
+    return calls === 1 ? reply([{ id, listing }]) : reply({ error: 'unavailable' }, 503);
+  });
+  const response = await handleSelling(request(`/feeds/${id}.xml`), env, auth);
+  assert.equal(response.status, 503);
+  assert.ok(!response.headers.get('content-type').includes('xml'));
+});
+
+test('Okazii feed rejects non-progressing pages instead of looping or duplicating inventory', async t => {
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async input => {
+    if (new URL(input).pathname.endsWith('/selling_feeds')) return reply([{ user_id: userId }]);
+    calls++; return reply([{ id, listing }]);
+  });
+  assert.equal((await handleSelling(request(`/feeds/${id}.xml`), env, auth)).status, 503);
+  assert.equal(calls, 2);
 });
 
 test('provider calls use the fixed OLX host, user token and required version', async (t) => {
@@ -138,6 +185,68 @@ test('definitive validation failure can be corrected and retried', async (t) => 
 test('OLX moderation/unpaid states are not reported as published', async (t) => {
   mockDatabase(t, { providerStatus: 'unpaid' });
   const result = await publishOlx({ userId, draft: { id, listing }, env }); assert.equal(result.status, 'pending'); assert.equal(result.provider_status, 'unpaid');
+});
+
+test('OLX receipts distinguish inactive and moderated adverts without enabling republishing', async t => {
+  for (const status of ['removed_by_user', 'outdated', 'blocked', 'disabled']) assert.equal(olxPublicationReceipt({ id: 123, status }).status, 'inactive');
+  for (const status of ['moderated', 'removed_by_moderator']) assert.equal(olxPublicationReceipt({ id: 123, status }).status, 'rejected');
+  assert.equal(olxPublicationReceipt({ id: 123, status: 'future-status' }).status, 'unknown');
+  for (const badId of [undefined, {}, 0, -1, 1.5, 'undefined', '1/other']) assert.throws(() => olxPublicationReceipt({ id: badId, status: 'active' }));
+  assert.throws(() => olxPublicationReceipt({ id: 456, status: 'active' }, '123'));
+  const { sent } = mockDatabase(t, { providerStatus: 'moderated' });
+  const args = { userId, draft: { id, listing }, env };
+  assert.equal((await publishOlx(args)).status, 'rejected');
+  assert.equal((await publishOlx(args)).status, 'rejected');
+  assert.equal(sent.length, 1);
+});
+
+test('refresh recovers an uncertain publication by exact external ID without another POST', async t => {
+  const { jobs, sent, reads } = mockDatabase(t, { timeout: true, lookup: [{ id: 123, external_id: id, status: 'active' }] });
+  const args = { userId, draft: { id, listing }, env };
+  assert.equal((await publishOlx(args)).status, 'unknown');
+  const response = await handleSelling(request('/refresh', { id }), env, auth);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).publications[0].status, 'published');
+  assert.equal(reads[0].searchParams.get('external_id'), id);
+  assert.equal(reads[0].searchParams.get('limit'), '2');
+  assert.equal(jobs[0].provider_id, '123');
+  assert.equal((await publishOlx(args)).status, 'published');
+  assert.equal(sent.length, 1);
+});
+
+test('missing, multiple or mismatched recovery results never authorize another publication', async t => {
+  const options = { timeout: true, lookup: [] };
+  const { jobs, sent } = mockDatabase(t, options);
+  for (const lookup of [[], [{ id: 123, external_id: 'other', status: 'active' }],
+    [{ id: 123, external_id: id }, { id: 456, external_id: id }], { unexpected: true }]) {
+    options.lookup = lookup; jobs.length = 0; sent.length = 0;
+    const args = { userId, draft: { id, listing }, env };
+    await publishOlx(args);
+    const response = await handleSelling(request('/refresh', { id }), env, auth);
+    assert.equal(response.status, Array.isArray(lookup) ? 200 : 502);
+    assert.equal(jobs[0].status, 'unknown');
+    await publishOlx(args);
+    assert.equal(sent.length, 1);
+  }
+});
+
+test('recovery cannot overwrite a receipt saved while its read was in flight', async t => {
+  const { jobs } = mockDatabase(t, { timeout: true, lookup: [], beforeRead: entries => Object.assign(entries[0], { status: 'published', provider_id: '123' }) });
+  await publishOlx({ userId, draft: { id, listing }, env });
+  const response = await handleSelling(request('/refresh', { id }), env, auth);
+  assert.equal(response.status, 200);
+  assert.equal(jobs[0].status, 'published');
+});
+
+test('refresh maps a removed existing advert to inactive and rejects a mismatched receipt', async t => {
+  const options = { single: { id: 123, status: 'removed_by_user' } };
+  const { jobs } = mockDatabase(t, options);
+  await publishOlx({ userId, draft: { id, listing }, env });
+  assert.equal((await handleSelling(request('/refresh', { id }), env, auth)).status, 200);
+  assert.equal(jobs[0].status, 'inactive');
+  options.single = { id: 999, status: 'active' };
+  assert.equal((await handleSelling(request('/refresh', { id }), env, auth)).status, 502);
+  assert.equal(jobs[0].status, 'inactive');
 });
 
 test('partial failure does not prevent another platform receiving the announcement', async (t) => {

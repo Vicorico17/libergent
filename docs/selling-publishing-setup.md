@@ -27,12 +27,14 @@ Facebook Marketplace, Publi24, LaJumate, Vinted, Autovit and Anunțul.ro use the
 - Authentication protects all private routes. Every private database query includes the authenticated owner; no anonymous/direct browser policies grant table access.
 - OAuth state is random, expires in ten minutes, is bound to an HttpOnly browser cookie, and is consumed once before exchanging a code.
 - One durable publication record per owner, announcement and platform prevents double-click/reload/concurrent-request duplicates.
-- Definitive OLX rejection allows a corrected retry. Timeout, malformed receipt, 5xx or a lost local receipt remains unknown/sending; never blindly resend. Operators must reconcile with the seller's OLX account before changing that record.
+- Definitive HTTP validation rejection allows a corrected retry. A moderation rejection is a confirmed provider record, not permission to publish a duplicate. Timeout, malformed receipt, 5xx or a lost local receipt remains unknown/sending; never blindly resend.
+- Refresh now looks up an unknown/sending submission without a provider ID using its exact `external_id` (the draft UUID), limited to two matches. One matching valid receipt can recover publication; absent, multiple, mismatched or malformed results do not permit a resend. This is read-only and uses the connected seller's OLX token. A late refresh cannot overwrite a concurrently confirmed receipt.
+- Provider statuses distinguish published, pending, inactive and moderation-rejected adverts. Reapply `supabase/selling.sql` before the matching backend/UI deployment; it upgrades the status constraint without deleting publication records. Status mapping and external-ID lookup follow the [official OLX Partner API](https://developer.olx.ro/api/doc); live seller-account acceptance is still required.
 - Provider failures are isolated: OLX failing does not prevent Okazii feed inclusion.
 - Once sent to OLX, that announcement's saved snapshot cannot be overwritten by the draft-save endpoint. Edits do not update a live OLX listing; use OLX to edit or withdraw it. “Alt produs / anunț nou” creates a new identity for another product.
 - There is no sold/inventory synchronization or automatic cross-platform delisting yet.
 - Public image objects currently remain until removed through storage administration. Periodically clean unreferenced images and expired `selling_oauth_states` rows. Do not delete images referenced by active listings or feed entries.
-- The Okazii feed currently relies on the project's PostgREST row limit; raise it or paginate before using inventories beyond that limit (normally 1,000).
+- Okazii feed reads use owner-scoped keyset pagination, tolerating database page caps below the requested 200 rows. The current bound is 2,000 drafts and 21 database pages. Broken/non-progressing pages or limits return 503, never a partial XML inventory. Very large inventories and concurrent edits during feed generation still need separate acceptance/scaling work.
 
 ## Verification
 

@@ -40,6 +40,9 @@ create table if not exists public.deal_send_attempts (
 );
 
 create index if not exists deal_send_attempts_user_deal_idx on public.deal_send_attempts (user_id, deal_id, created_at desc);
+-- Upgrade existing installations to protect one-off messages in the same ledger.
+alter table public.deal_send_attempts alter column deal_id drop not null;
+alter table public.deal_send_attempts add column if not exists listing_url text not null default '';
 alter table public.deal_send_attempts enable row level security;
 revoke all on table public.deal_send_attempts from anon, authenticated;
 grant all on table public.deal_send_attempts to service_role;

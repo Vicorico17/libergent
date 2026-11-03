@@ -31,4 +31,36 @@ The POST endpoint expects an `Authorization: Bearer ...` header and:
 
 The LiberGent backend then uses `OPENCLAW_BRIDGE_URL` and `OPENCLAW_BRIDGE_TOKEN` to call the bridge. The repository includes `scripts/openclaw-inbound-forwarder.js`, which polls OpenClaw session files and posts messages to the token-protected `/api/openclaw/inbound` endpoint. Its deployment and reliable receipt behavior still need production acceptance; use a supported provider event or webhook integration when available.
 
-Deal-linked replies pass a stable `idempotencyKey` to the bridge and reserve the attempt in `deal_send_attempts` before delivery. Apply `supabase/deals.sql` before enabling the Premium deal pilot. A timed-out or `unknown` attempt must be reconciled against the provider before starting a new attempt; the same key is never sent again by the API.
+All `/api/whatsapp/send` requests require a UUID `idempotencyKey`, pass it to the bridge and reserve it in `deal_send_attempts` before delivery. Reapply `supabase/deals.sql` **before deploying this Worker/UI change**: it allows a null `deal_id` for one-off messages and adds `listing_url`. Missing schema or storage fails closed before a bridge call; older clients without keys receive 400. The route requires Agent access.
+
+The same key cannot be reused by another account or for another seller, message, listing or deal. Accepted attempts return their saved receipt; pending, failed and unknown attempts return 409 without another bridge call. A timed-out or unknown attempt must be reconciled against the provider before starting a new attempt. This is per-key protection, not semantic deduplication of independently created requests.
+
+The search UI keeps one-off attempt keys in session storage, scoped by a hash of account, seller, listing and message. Retries and reloads in the same tab reuse them. Initial-contact keys remain for the tab session; reply keys clear after confirmed acceptance with saved history so a later intentional reply can start a new attempt. No message text or credentials are stored there. Separate tabs/new sessions can create different keys; provider reconciliation and cross-session duplicate safeguards remain open. Storage-disabled browsers cannot initiate an untracked send.
+
+Reapply `supabase/whatsapp_messages.sql` before deploying the seller-stop guard.
+It creates service-only `whatsapp_contact_stops` and backfills recognized stop
+requests from existing inbound history. Authenticated inbound stop requests are
+saved before ownership lookup; sends from any buyer/listing to that number return
+409. Missing or failing preference storage returns 503 before provider contact.
+An ordinary reply never clears the stop, and deleting history does not remove it.
+New voice-call submissions also check this stop table before reservation/dialing.
+Verified opt-in recovery remains pending. The guard
+cannot cancel an already in-flight or accepted send; no live seller test has run.
+
+Inbound webhook messages now require a stable, non-empty string `messageId`
+(maximum 512 characters). Replays preserve the original stored message instead
+of rewriting ownership. The optional `replyToMessageId` identifies the outbound
+provider message being quoted. It is accepted only when our stored outbound
+receipt matches that ID **and** the inbound seller number; an unknown or mismatched
+reference stays unassigned without falling back to another listing. Without a
+reference, the existing unambiguous-owner/listing rule applies. Forwarder records
+with no stable ID are skipped; inspect provider data before enabling a new source.
+
+Deploy the updated `scripts/openclaw-inbound-forwarder.js` on the bridge host:
+polls no longer overlap, webhook requests have a 15-second timeout and reject
+redirects, and checkpoint writes use an atomic rename. It forwards an explicit
+`message.replyToMessageId` when present; whether the deployed OpenClaw channel
+supplies that field still needs a real fixture. The Worker bounds outbound sends
+at 35 seconds and rejects redirects; a timeout stays unknown and cannot be
+resent with the same reserved key. Receipt callbacks/operator reconciliation
+remain separate work, not implied by these transport checks.

@@ -140,3 +140,64 @@ test('BLANĂ adapter owns the query, keeps key server-side, hides removed listin
     if (previousKey === undefined) delete process.env.LIBERGENT_INTEGRATION_KEY; else process.env.LIBERGENT_INTEGRATION_KEY = previousKey;
   }
 });
+
+test('multi-source sampling shares the 20-item budget instead of starving later sources', async () => {
+  const params = { query: 'iphone', sites: ['olx.ro', 'publi24.ro', 'okazii.ro'], details: false, category: 'any', material: 'any', limit: 20 };
+  const result = await searchIntegration(params, { search: async ({ site }) => ({ items: Array.from({ length: 20 }, (_, index) => ({ title: `iphone ${index}`, url: `https://${site.key}/item-${index}` })) }) });
+  assert.equal(result.inspectedCount, 20);
+  assert.deepEqual(result.items.slice(0, 3).map(item => item.source), params.sites);
+  assert.deepEqual(params.sites.map(source => result.items.filter(item => item.source === source).length), [7, 7, 6]);
+  for (const source of params.sites) {
+    assert.deepEqual(result.items.filter(item => item.source === source).map(item => +item.title.split(' ')[1]), Array.from({ length: result.items.filter(item => item.source === source).length }, (_, index) => index));
+  }
+  assert.equal(Date.parse(result.expiresAt) - Date.parse(result.searchedAt), 900000);
+});
+
+test('duplicate URLs consume one detail request and do not waste the candidate budget', async () => {
+  const urls = [];
+  const result = await searchIntegration({ query: 'phone', sites: ['olx.ro'], details: true, category: 'any', material: 'any', limit: 20 }, {
+    search: async () => ({ items: [null, { title: 'phone', url: 'https://olx.ro/item#photo1' }, { title: 'phone', url: 'https://olx.ro/item#photo2' },
+      { title: 'phone', url: 'https://olx.ro/item?id=2' }, { title: 'phone', url: 'https://olx.ro/item?id=3' }] }),
+    details: async url => { urls.push(url); return { status: 'verified' }; }
+  });
+  assert.equal(result.items.length, 3); assert.equal(result.inspectedCount, 3); assert.equal(urls.length, 3);
+  assert.ok(urls.includes('https://olx.ro/item?id=2')); assert.ok(urls.includes('https://olx.ro/item?id=3'));
+});
+
+test('empty, blocked and malformed sources do not suppress a working source', async () => {
+  const params = { query: 'iphone', sites: ['olx.ro', 'publi24.ro', 'okazii.ro'], details: false, category: 'any', material: 'any', limit: 20 };
+  const result = await searchIntegration(params, { search: async ({ site }) => {
+    if (site.key === 'olx.ro') return { items: [] };
+    if (site.key === 'okazii.ro') return { items: { error: 'private response' } };
+    return { items: [{ title: 'iphone', url: 'https://publi24.ro/item' }] };
+  } });
+  assert.equal(result.items.length, 1); assert.equal(result.partial, true);
+  assert.equal(result.sources[0].status, 'ok'); assert.equal(result.sources[2].status, 'failed');
+  assert.equal(result.sources[2].error, 'source_unavailable');
+  assert.equal(Date.parse(result.expiresAt) - Date.parse(result.searchedAt), 60000);
+});
+
+test('detail failures shorten freshness even when every search source succeeds', async () => {
+  const result = await searchIntegration({ query: 'phone', sites: ['olx.ro'], details: true, category: 'any', material: 'any', limit: 20 }, {
+    search: async () => ({ items: [{ title: 'phone', url: 'https://olx.ro/item' }] }), details: async () => { throw Error('unavailable'); }
+  });
+  assert.equal(result.partial, true); assert.equal(result.items[0].detailStatus, 'unavailable');
+  assert.equal(Date.parse(result.expiresAt) - Date.parse(result.searchedAt), 60000);
+});
+
+test('partial cache refreshes after a minute, including snapshots written before the shorter TTL', async t => {
+  const start = Date.parse('2026-10-30T12:00:00Z'); let now = start;
+  t.mock.method(Date, 'now', () => now);
+  const state = { storage: storage() }; const gateway = new IntegrationGateway(state, await env()); let calls = 0;
+  const params = parseIntegrationQuery(new URL(request().url), config);
+  const key = `cache:${await keyHash(JSON.stringify(params))}`;
+  await state.storage.put(key, { searchedAt: new Date(start).toISOString(), expiresAt: new Date(start + 900000).toISOString(), partial: true, sources: [{ status: 'ok' }, { status: 'failed' }], items: [] });
+  gateway.search = async () => { calls++; return { searchedAt: new Date(now).toISOString(), expiresAt: new Date(now + 900000).toISOString(), partial: false, sources: [{ status: 'ok' }], items: [] }; };
+  const cached = await (await gateway.fetch(request())).json();
+  assert.equal(cached.cache.status, 'hit'); assert.equal(Date.parse(cached.expiresAt), start + 60000);
+  now += 60001;
+  const recovered = await (await gateway.fetch(request())).json();
+  assert.equal(recovered.cache.status, 'miss'); assert.equal(recovered.partial, false); assert.equal(calls, 1);
+  now += 60001;
+  assert.equal((await (await gateway.fetch(request())).json()).cache.status, 'hit'); assert.equal(calls, 1);
+});

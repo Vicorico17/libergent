@@ -21,13 +21,14 @@ export default { fetch: handleIntegration };
 `, resolveDir: fileURLToPath(new URL('..', import.meta.url)) }, bundle: true, write: false, format: 'esm', platform: 'node', target: 'es2022' });
 const directory = await mkdtemp(join(tmpdir(), 'libergent-integration-'));
 const token = `lg_runtime01.${randomBytes(32).toString('base64url')}`;
+const concurrentToken = `lg_concurrent01.${randomBytes(32).toString('base64url')}`;
 const options = {
   modules: true, script: output.outputFiles[0].text, compatibilityDate: '2026-03-13', compatibilityFlags: ['nodejs_compat'],
   durableObjects: { INTEGRATION_GATEWAY: { className: 'IntegrationGateway', useSQLite: true } },
   durableObjectsPersist: directory,
   bindings: { LIBERGENT_INTEGRATIONS_ENABLED: '1', LIBERGENT_INTEGRATION_KEYS: JSON.stringify([{
     id: 'runtime', keyHash: createHash('sha256').update(token).digest('hex'), expiresAt: '2099-01-01T00:00:00Z', scopes: ['search:read'], sites: ['olx.ro'], perMinute: 100, perDay: 3
-  }]) }
+  }, { id: 'concurrent', keyHash: createHash('sha256').update(concurrentToken).digest('hex'), expiresAt: '2099-01-01T00:00:00Z', scopes: ['search:read'], sites: ['olx.ro'], perMinute: 100, perDay: 3 }]) }
 };
 let runtime;
 try {
@@ -44,7 +45,10 @@ try {
   const restored = await runtime.dispatchFetch(url, init);
   assert.equal((await restored.json()).cache.status, 'hit');
   assert.equal((await runtime.dispatchFetch(url, init)).status, 429);
-  console.log('PASS: workerd authentication, SQLite transactions, cache persistence, and quota across restart. Search is a fixture; no marketplace request was made.');
+  const concurrent = await Promise.all(Array.from({ length: 8 }, () => runtime.dispatchFetch(url, { headers: { authorization: `Bearer ${concurrentToken}` } })));
+  assert.equal(concurrent.filter(response => response.status === 200).length, 3);
+  assert.equal(concurrent.filter(response => response.status === 429).length, 5);
+  console.log('PASS: concurrent quota enforcement,  workerd authentication, SQLite transactions, cache persistence, and quota across restart. Search is a fixture; no marketplace request was made.');
 } finally {
   if (runtime) await runtime.dispose();
   await rm(directory, { recursive: true, force: true });
