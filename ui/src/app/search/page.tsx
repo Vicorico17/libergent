@@ -23,7 +23,9 @@ import { SNAPSHOT_MAX_AGE_MS, searchSnapshotKey, readSearchSnapshot, writeSearch
 import { useAccountSession } from "@/lib/use-account-session"
 import { rememberRecentSearch } from "@/lib/recent-searches"
 import { getMessageAttempt, finishMessageAttempt } from "@/lib/message-attempt"
-import { canCompareRetailOffers, mapOffer, mapSearchResults, type ListingDetails, type SearchPayload, type SearchResultItem } from "./search-data"
+import { BuyingComparison } from "./BuyingComparison"
+import { buyingKind } from "./buying-comparison"
+import { mapOffer, mapSearchResults, type ListingDetails, type SearchPayload, type SearchResultItem } from "./search-data"
 
 // — Constants —
 const CREAM  = "#F5F3EE"
@@ -54,7 +56,7 @@ const PREMIUM_SOURCE_GROUPS = [
 const SOURCES_LIST = [...FREE_SOURCES_LIST, ...PREMIUM_FILTER_SOURCES]
 const SORT_OPTIONS = ["relevanță", "potrivire cuvinte cheie", "preț crescător", "preț descrescător", "cel mai recent", "scor agent"]
 const SOURCE_TYPE_OPTIONS = [
-  { value: "classifieds", label: "second-hand" },
+  { value: "classifieds", label: "marketplace-uri" },
   { value: "price_aggregator", label: "agregatoare" },
   { value: "retailer", label: "retaileri" },
 ]
@@ -67,7 +69,6 @@ type MarketplaceStatus = {
   blocked: string[]
 }
 
-type PriceBenchmark = NonNullable<NonNullable<SearchPayload["summary"]>["priceIntelligence"]>
 type VehiclePriceHistory = {
   firstObservedAt: string
   lastObservedAt: string
@@ -118,7 +119,7 @@ const PREMIUM_SOURCE_TIMING = [
 const PREMIUM_SOURCES = PREMIUM_SOURCE_TIMING.map(({ name }) => name)
 const LOADER_STATUS = ["scanez...", "verific...", "indexez...", "compar..."]
 const PREMIUM_WAITING_INSIGHTS = [
-  "Comparăm ofertele second-hand cu prețurile produselor noi.",
+  "Comparăm ofertele de pe marketplace-uri cu prețurile din magazine.",
   "Pentru căutările de fashion, verificăm și retaileri de sneakers, încălțăminte și îmbrăcăminte.",
   "Pentru casă, DIY și sport, alegem retaileri potriviți categoriei căutate.",
   "Pentru foto, muzică și cărți, comparăm ofertele noi cu anunțurile relevante din marketplace-uri.",
@@ -2165,60 +2166,6 @@ function ClosestDealCard({ item, viewerCity, isBestOverall, onInspect }: { item:
   )
 }
 
-function BenchmarkCard({ item, usedItem, priceBenchmark, onInspect }: { item: SearchResultItem; usedItem: SearchResultItem | null; priceBenchmark?: PriceBenchmark; onInspect: (item: SearchResultItem) => void }) {
-  const usedPrice = usedItem?.price ?? null
-  const comparable = canCompareRetailOffers(usedItem, item)
-  const difference = comparable && usedPrice !== null && item.price !== null && usedPrice > 0 && item.price > 0
-    ? item.price - usedPrice : null
-  const savings = difference !== null && item.price ? Math.round(difference / item.price * 100) : null
-
-  return (
-    <article className="flex h-full flex-col overflow-hidden" style={{ border: `2px solid ${INK}`, background: "white", boxShadow: `5px 5px 0 ${PINK}`, fontFamily: MONO }}>
-      <PanelHeader title="Nou din magazin sau second-hand?" />
-      <SpecialResultImage item={item} />
-      <div className="flex flex-1 flex-col p-5 sm:p-6" style={{ background: "white" }}>
-        <div className="min-w-0 flex-1">
-          <div className="mb-3 flex flex-wrap gap-2">
-            <MetaChip tone="dark">preț nou</MetaChip>
-            <MetaChip>{item.source}</MetaChip>
-            <MetaChip tone="muted">{item.sourceKindLabel}</MetaChip>
-          </div>
-          <h3 className="mb-2 text-[17px] font-bold uppercase leading-snug sm:text-[20px]">{item.title}</h3>
-          <p className="text-[24px] font-bold" style={{ color: PINK }}>{item.priceLabel}</p>
-          <div className="mt-4 grid grid-cols-1 gap-2 text-[9px] font-bold uppercase sm:grid-cols-2">
-            <span className="p-3" style={{ border: `1px solid ${INK}22`, background: CREAM }}>Oferta second-hand afișată<br />{formatRon(usedPrice)}{usedItem && <span className="mt-1 block normal-case">{usedItem.title} · {usedItem.source}</span>}</span>
-            <span className="p-3" style={{ border: `1px solid ${INK}22`, background: CREAM }}>Cel mai mic preț nou {comparable ? "pentru varianta comparată" : "găsit în sursele selectate"}<br />{formatRon(item.price)}<span className="mt-1 block normal-case">{item.source}</span></span>
-          </div>
-          {usedItem && !comparable && <p className="mt-3 text-[11px]">Modelul sau configurația nu sunt confirmate ca identice. Nu calculăm o economie între aceste oferte.</p>}
-          {savings !== null && difference !== null && (
-            <p className="mt-3 text-[11px] font-bold uppercase" style={{ color: savings > 0 ? GREEN : PINK }}>
-              {difference > 0 ? `Second-hand este cu ${formatRon(difference)} (${Math.abs(savings)}%) mai ieftin.`
-                : difference < 0 ? `Oferta nouă este cu ${formatRon(-difference)} mai ieftină decât cea second-hand.`
-                : "Același preț pentru ofertele afișate."}
-            </p>
-          )}
-          <p className="mt-3 text-[10px] leading-relaxed" style={{ color: `${INK}99` }}>
-            Comparație orientativă între prețurile afișate. Verifică același model, capacitatea de stocare, starea, garanția și costul livrării.
-            {difference !== null && difference <= 0 ? " Oferta nouă merită verificată înainte să alegi second-hand." : " Cântărește economia față de starea produsului și garanția oferită de magazin."}
-          </p>
-          {priceBenchmark?.newPricedListingsRon ? <p className="mt-2 text-[9px]" style={{ color: `${INK}77` }}>Prețuri noi găsite în căutare: {priceBenchmark.newPricedListingsRon}. Confirmă stocul și prețul final la magazin.</p> : null}
-        </div>
-        <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => onInspect(item)}
-            className="flex min-h-10 items-center justify-center px-3 py-2 text-[10px] font-bold uppercase"
-            style={{ border: "1px solid " + INK, background: "white", color: INK, fontFamily: MONO }}
-          >
-            Analiză Libergent
-          </button>
-          <MarketplaceVisitButton item={item} compact />
-        </div>
-      </div>
-    </article>
-  )
-}
-
 function DetailMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 p-3" style={{ border: `1px solid ${INK}22`, background: CREAM }}>
@@ -2777,7 +2724,6 @@ function SearchResultsContent() {
   const [jevDecision, setJevDecision] = useState<NonNullable<NonNullable<SearchPayload["summary"]>["jevDecision"]> | null>(null)
   const [viewerLocation, setViewerLocation] = useState<{ city: string; source: string } | null>(null)
   const [duplicateListings, setDuplicateListings] = useState(0)
-  const [priceBenchmark, setPriceBenchmark] = useState<PriceBenchmark | undefined>()
   const [queryUnderstanding, setQueryUnderstanding] = useState<QueryUnderstanding | null>(null)
   const [error, setError]           = useState("")
   const [searchedAt, setSearchedAt] = useState("")
@@ -3009,7 +2955,6 @@ function SearchResultsContent() {
         setJevDecision(null)
         setViewerLocation(null)
         setDuplicateListings(0)
-        setPriceBenchmark(undefined)
         setQueryUnderstanding(null)
         setError("")
         setSearchedAt("")
@@ -3117,7 +3062,6 @@ function SearchResultsContent() {
             ? { city: payload.summary.viewerLocation.city, source: payload.summary.viewerLocation.source || "edge" }
             : null)
           setDuplicateListings(payload.summary?.duplicateListings ?? 0)
-          setPriceBenchmark(payload.summary?.priceIntelligence)
           setQueryUnderstanding(payload.summary?.queryUnderstanding || null)
           setSearchedAt(payload.summary?.searchedAt || "")
           setTotalListings(payload.summary?.totalListings ?? mapped.length)
@@ -3157,7 +3101,6 @@ function SearchResultsContent() {
           setBestNewBenchmark(null)
           setViewerLocation(null)
           setDuplicateListings(0)
-          setPriceBenchmark(undefined)
           setSearchedAt("")
           setTotalListings(0)
           setParsedListings(0)
@@ -3292,6 +3235,15 @@ function SearchResultsContent() {
     return bestNewBenchmark
   }, [bestNewBenchmark, feedbackExclusions, sources])
 
+  const comparisonCandidates = useMemo(() => {
+    const pool = shownNewBenchmark ? [...results, shownNewBenchmark] : results
+    return pool.filter((item) =>
+      !feedbackExclusions.some((exclusion) => isExcludedByFeedback(item, exclusion)) &&
+      !(sources.size > 0 && SOURCES_LIST.includes(item.source) && !sources.has(item.source))
+    )
+  }, [results, shownNewBenchmark, feedbackExclusions, sources])
+  const comparisonReference = shownBestOffer || filteredResults.find((item) => buyingKind(item) === "used") || filteredResults[0]
+
   const shownClosestOffer = useMemo(() => {
     if (!closestUsedOffer) return null
     return filteredResults.find((item) => item.id === closestUsedOffer.id) || null
@@ -3300,10 +3252,9 @@ function SearchResultsContent() {
   const regularResults = useMemo(() => {
     return filteredResults.filter((item) =>
       item.id !== shownBestOffer?.id &&
-      item.id !== shownClosestOffer?.id &&
-      item.id !== shownNewBenchmark?.id
+      item.id !== shownClosestOffer?.id
     )
-  }, [filteredResults, shownBestOffer, shownClosestOffer, shownNewBenchmark])
+  }, [filteredResults, shownBestOffer, shownClosestOffer])
 
   const usedRegularResults = regularResults.filter((item) => item.sourceKind === "used")
   const newBenchmarkResults = regularResults.filter((item) => item.sourceKind === "new")
@@ -3348,7 +3299,7 @@ function SearchResultsContent() {
     { text: duplicateListings ? `${duplicateListings} duplicate eliminate` : "deduplicare cross-source aplicată", pulse: false },
     { text: excludedListings ? `${excludedListings} accesorii, piese sau anunțuri nepotrivite excluse` : "niciun produs potrivit exclus de clasificare", pulse: false },
     { text: savedVisibleCount ? `${savedVisibleCount} rezultate salvate local` : "niciun rezultat salvat local", pulse: false },
-    { text: "focus: second-hand + benchmark de preț nou", pulse: false },
+    { text: "focus: marketplace-uri + prețuri din magazine", pulse: false },
     { text: shownBestOffer ? `${shownBestOffer.recommendation.strong ? "Best used deal" : "Top used match"} on ${shownBestOffer.source}` : "Top used match în așteptare", pulse: false },
     { text: shownNewBenchmark ? `New benchmark on ${shownNewBenchmark.source}` : "New benchmark în așteptare", pulse: false },
     { text: isLoading ? "Actualizăm recomandarea" : "Recomandare din rezultatele colectate", pulse: isLoading },
@@ -3680,12 +3631,10 @@ function SearchResultsContent() {
           )}
 
           {shownBestOffer && <RecommendationCard item={shownBestOffer} query={query} searchTier={effectiveSearchTier} isLoggedIn={isLoggedIn} conversationStatus={shownBestOffer.url ? conversationStatuses[shownBestOffer.url] : undefined} onInspect={setSelectedListing} onFeedback={handleOfferFeedback} />}
-          {shownBestOffer && !shownNewBenchmark && (
-            <p className="p-4 text-[11px] leading-relaxed" style={{ border: `1px solid ${INK}33`, background: "white" }}>
-              Nu am găsit un preț nou pentru comparație în sursele selectate. Nu putem confirma economia față de retail pentru această ofertă second-hand.
-            </p>
+          {!isLoading && comparisonReference && !isLikelyVehicleSearch(query) && (
+            <BuyingComparison reference={comparisonReference} candidates={comparisonCandidates} onInspect={setSelectedListing} />
           )}
-          {((shownClosestOffer && viewerLocation) || shownNewBenchmark) && (
+          {shownClosestOffer && viewerLocation && (
             <section className="flex flex-col gap-4">
               <div className="flex flex-col gap-1 px-1">
                 <span className="text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: PINK }}>Selecții în afara listei obișnuite</span>
@@ -3700,7 +3649,6 @@ function SearchResultsContent() {
                     onInspect={setSelectedListing}
                   />
                 )}
-                {shownNewBenchmark && <BenchmarkCard item={shownNewBenchmark} usedItem={shownBestOffer} priceBenchmark={priceBenchmark} onInspect={setSelectedListing} />}
               </div>
             </section>
           )}
@@ -3711,7 +3659,7 @@ function SearchResultsContent() {
           <div className="flex flex-col xl:flex-row gap-6 items-start">
             <div className="flex-1 w-full min-w-0">
               <div className="flex justify-between items-end mb-4 px-1">
-                <h2 className="text-[14px] font-bold uppercase">Second-hand și recondiționate</h2>
+                <h2 className="text-[14px] font-bold uppercase">Oferte de pe marketplace-uri și produse recondiționate</h2>
                 <div className="flex items-center gap-2 text-[11px]">
                   <span style={{ color: INK + "66" }}>Sortare după:</span>
                   <button className="font-bold uppercase flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity" style={{ color: INK }}>
@@ -3742,7 +3690,7 @@ function SearchResultsContent() {
                 </>
               ) : (
                 <div className="p-6 text-[12px] uppercase font-bold" style={{ border: "1px solid " + INK, background: "white", color: INK + "99" }}>
-                  {query ? "Nu există rezultate second-hand pentru filtrele curente." : "Caută un produs ca să vezi rezultate live."}
+                  {query ? "Nu există oferte de pe marketplace-uri pentru filtrele curente." : "Caută un produs ca să vezi rezultate live."}
                 </div>
               )}
 
