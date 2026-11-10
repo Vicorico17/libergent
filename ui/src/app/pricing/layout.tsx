@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "LiberGent Premium | Agentul tău personal",
   description:
-    "Caută cu Premium: 49 RON pe lună, cu 40 de credite incluse. Adaugă credite oricând sau cumpără un pachet fără abonament.",
+    "Caută cu Premium: 49 RON pe săptămână, cu 40 de credite incluse. Adaugă credite oricând sau cumpără un pachet fără abonament.",
   alternates: {
     canonical: "/pricing",
   },

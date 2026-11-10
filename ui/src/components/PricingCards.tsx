@@ -5,7 +5,7 @@ import styles from "./PricingCards.module.css";
 import Link from "next/link";
 import { LogoIcon } from "@/components/LogoIcon";
 import { BillingPlanPicker } from "@/components/BillingAction";
-import { AGENT_PRICE_RON, PREMIUM_MONTHLY_PRICE_RON, PREMIUM_MONTHLY_CREDITS } from "@/lib/pricing";
+import { AGENT_PRICE_RON, PREMIUM_WEEKLY_PRICE_RON, PREMIUM_WEEKLY_CREDITS } from "@/lib/pricing";
 
 const plans = [
   {
@@ -14,9 +14,9 @@ const plans = [
     features: ["Căutare pe mai multe marketplace-uri", "Rezultate normalizate și comparabile", "Filtre și sortare rapidă", "Scor agent și recomandări de bază"],
   },
   {
-    id: "premium", name: "Premium", label: "Pachet de căutări", price: PREMIUM_MONTHLY_PRICE_RON, period: "/ lună",
+    id: "premium", name: "Premium", label: "Pachet de căutări", price: PREMIUM_WEEKLY_PRICE_RON, period: "/ săptămână",
     description: "Căutare Premium: mai multe surse, comparații extinse și alerte. Contactul cu vânzătorii și negocierea sunt incluse separat în Libergent Agent.",
-    features: ["40 de credite de căutare în fiecare lună", "Căutări în magazine și marketplace-uri verificate", "Comparație între produse noi și second-hand", "Până la 5 monitorizări active cu alerte", "Recomandări în funcție de bugetul tău"],
+    features: ["40 de credite de căutare în fiecare săptămână", "Căutări în magazine și marketplace-uri verificate", "Comparație între produse noi și second-hand", "Până la 5 monitorizări active cu alerte", "Recomandări în funcție de bugetul tău"],
   },
   {
     id: "agent", name: "Libergent Agent", label: "Negociază pentru tine", price: AGENT_PRICE_RON, period: "",
@@ -44,7 +44,7 @@ export function PricingCards({ checkout = false, fit = false }: { checkout?: boo
         <article key={plan.id} data-active={activePlan === plan.id} className={`${fit ? styles.card : ""} relative flex min-w-0 flex-col border-2 border-[#111] p-6 text-[#111] sm:p-8 ${plan.id === "agent" ? "bg-[#FCE7F3] shadow-[6px_6px_0_#FF4B8B]" : "bg-[#F3F0E7] shadow-[6px_6px_0_#111]"}`}>
           <div className="mb-6 flex min-h-16 items-start justify-between gap-3">
             <p className="pt-2 text-[10px] font-bold uppercase tracking-widest text-[#111]/70">{plan.label}</p>
-            {plan.id === "premium" && <span className={styles.trialBadge}>{PREMIUM_MONTHLY_CREDITS} credite / lună</span>}
+            {plan.id === "premium" && <span className={styles.trialBadge}>{PREMIUM_WEEKLY_CREDITS} credite / săptămână</span>}
             {plan.id === "agent" && <span className={styles.mascot}><LogoIcon size={64} /></span>}
           </div>
           <h3 className="mb-4 text-3xl font-bold tracking-tight">{plan.name}</h3>

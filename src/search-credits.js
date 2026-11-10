@@ -1,7 +1,7 @@
 import { searchCreditWallet } from './supabase.js';
 
 export const PREMIUM_SEARCH_COST = 1;
-export const MONTHLY_SEARCH_CREDITS = 40;
+export const WEEKLY_SEARCH_CREDITS = 40;
 export const CREDIT_PACKS = Object.freeze({
   credits10: { priceEnv: 'STRIPE_CREDITS_10_PRICE_ID', amount: 1900, credits: 10 },
   credits30: { priceEnv: 'STRIPE_CREDITS_30_PRICE_ID', amount: 3900, credits: 30 }
