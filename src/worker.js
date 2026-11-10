@@ -1,3 +1,4 @@
+import { handleAgentDiscovery } from "./agent-discovery.js";
 import { needsBrowserFallback, preferBrowserFallback } from "./scrape-fallback.js";
 export { ScrapeCoordinator } from "./scrape-coordinator.js";
 import { configureScrapeCoordinator } from "./scrape-transport.js";
@@ -2062,6 +2063,9 @@ export default {
     if (env.LIBERGENT_MCP_TEST_MODE === "1" && normalizeApiPathname(url.pathname) !== "/mcp") {
       return json({ error: "Not found" }, 404);
     }
+
+    const discovery = handleAgentDiscovery(request, env);
+    if (discovery) return discovery;
 
     if (url.pathname === '/api/v1/mcp') return handleAgentMcp(request, env);
     if (url.pathname.startsWith('/api/developer/')) return handleDeveloper(request, env);
