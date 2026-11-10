@@ -301,7 +301,7 @@ test("Premium search skips Browser Run when direct marketplace results are usabl
   assert.deepEqual(payload.summary.browserDiagnostics, []);
 });
 
-test("Premium search attempts Kitesurf for every empty selected source before bounded Chromium recovery", async (t) => {
+test("Premium search attempts recovery for ambiguous failures but skips confirmed empty sources", async (t) => {
   const originalMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
@@ -345,10 +345,14 @@ test("Premium search attempts Kitesurf for every empty selected source before bo
   const chromiumDiagnostics = payload.summary.browserDiagnostics.filter((entry) => entry.engine === "chromium");
 
   assert.equal(response.status, 200);
-  assert.equal(payload.summary.kitesurfFallbackMarketplaces.length, payload.summary.browserEligibleMarketplaces);
-  assert.equal(kitesurfDiagnostics.length, payload.summary.browserEligibleMarketplaces);
-  assert.equal(chromiumDiagnostics.length, 7);
-  assert.deepEqual(payload.summary.chromiumFallbackMarketplaces, ["okazii.ro", "compari.ro", "pcgarage.ro", "flanco.ro", "altex.ro", "shopmania.ro", "evomag.ro"]);
+  const confirmedEmpty = payload.results.filter(result => result.outcome === "empty").length;
+  assert.ok(confirmedEmpty > 0);
+  assert.equal(payload.summary.kitesurfFallbackMarketplaces.length, payload.summary.browserEligibleMarketplaces - confirmedEmpty);
+  assert.equal(kitesurfDiagnostics.length, payload.summary.browserEligibleMarketplaces - confirmedEmpty);
+  const emptySites = new Set(payload.results.filter(result => result.outcome === "empty").map(result => result.site));
+  const expectedChromium = ["okazii.ro", "compari.ro", "pcgarage.ro", "flanco.ro", "altex.ro", "shopmania.ro", "evomag.ro"].filter(site => !emptySites.has(site));
+  assert.equal(chromiumDiagnostics.length, expectedChromium.length);
+  assert.deepEqual(payload.summary.chromiumFallbackMarketplaces, expectedChromium);
   assert.equal(kitesurfDiagnostics.every((entry) => entry.ok === false), true);
 });
 

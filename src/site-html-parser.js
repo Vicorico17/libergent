@@ -1,3 +1,4 @@
+import { hasEmptySearchState } from "./scrape-outcome.js";
 import { parseSculeHtml } from "./parsers/scule.js";
 import { parseEpantofiHtml } from "./parsers/epantofi.js";
 import { parseOlxHtml } from "./parsers/olx.js";
@@ -99,7 +100,7 @@ export function parseSiteHtml({ site, html, url, limit, query = "" }) {
 
   return {
     items: Array.isArray(parsed.items) ? parsed.items : [],
-    totalResults: parsed.totalResults ?? null,
+    totalResults: parsed.totalResults ?? ((!parsed.items?.length && !parsed.rawItemCount && hasEmptySearchState(html)) ? 0 : null),
     rawItemCount: Number.isFinite(parsed.rawItemCount) ? parsed.rawItemCount : parsed.items?.length || 0,
     hasNextPage: parsed.hasNextPage ?? null
   };

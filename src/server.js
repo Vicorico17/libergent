@@ -1,4 +1,6 @@
 import { applyJevProductDecision } from "./jev.js";
+import { creditsEnabled } from "./credit-billing.js";
+import { runCreditSearch } from "./search-credits.js";
 import { getFreeSearchProvider, getFreeSearchSiteKeys } from "./free-search-policy.js";
 import { adultGateResponse, hasAdultConfirmation, needsAdultConfirmation } from "./adult-access.js";
 import http from "node:http";
@@ -288,7 +290,7 @@ const server = http.createServer(async (req, res) => {
       },
       ...(req.method === "POST" ? { body: Buffer.concat(chunks) } : {})
     }), process.env, {});
-    res.writeHead(response.status, { "Content-Type": response.headers.get("content-type") || "application/json" });
+    res.writeHead(response.status, { "Content-Type": response.headers.get("content-type") || "application/json", "Cache-Control": "no-store" });
     res.end(await response.text());
     return;
   }
@@ -301,7 +303,7 @@ const server = http.createServer(async (req, res) => {
       headers: { authorization: String(req.headers.authorization || ""), "content-type": "application/json" },
       ...(parsed ? { body: JSON.stringify(parsed.data) } : {})
     }), process.env, {});
-    res.writeHead(response.status, { "Content-Type": response.headers.get("content-type") || "application/json" });
+    res.writeHead(response.status, { "Content-Type": response.headers.get("content-type") || "application/json", "Cache-Control": "no-store" });
     res.end(await response.text());
     return;
   }
@@ -374,7 +376,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (apiPath === "/api/search/premium") {
-    const premium = await authenticatePremiumUser(req);
+    const premium = creditsEnabled(process.env) ? await authenticateSupabaseUser(req) : await authenticatePremiumUser(req);
+    if (creditsEnabled(process.env) && req.method !== "POST") { sendJson(res, 405, { error: "Premium searches require POST." }); return; }
     if (!premium.user) {
       sendJson(res, premium.status, { error: premium.error, ...(premium.code ? { code: premium.code } : {}) });
       return;
@@ -413,27 +416,32 @@ const server = http.createServer(async (req, res) => {
       const maxPriceRon = parseMaxPriceRon(url.searchParams.get("maxPriceRon"));
       const freeSiteKeys = (site === "all" ? getSiteKeysForAllSearch(query) : getDefaultSiteKeys())
         .filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey));
-      const [freePayload, premiumPayload] = await Promise.all([
-        searchAcrossSites({ allowAdult, query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages, siteKeys: freeSiteKeys }),
-        searchAcrossSites({ allowAdult, query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages: 1, siteKeys: premiumSiteKeys })
-      ]);
-      const payload = aggregateMarketplaceResults([...freePayload.results, ...premiumPayload.results], {
-        condition,
-        maxPriceRon,
-        creditBudget: freePayload.summary?.creditBudget || 0,
-        creditsUsed: freePayload.summary?.creditsUsed || 0,
-        viewerLocation,
-        allowAdult
-      });
-      payload.searchTier = "premium";
-      payload.summary.premiumMarketplaces = premiumSiteKeys.length;
-      payload.summary.browserSessionsUsed = 0;
-      payload.summary.browserFallbackMarketplaces = [];
-      if (!adultSearch) await logSearchEvent({ query, condition, provider: "premium-direct", siteKeys: [...freeSiteKeys, ...premiumSiteKeys], payload });
+      const execute = async () => {
+        const [freePayload, premiumPayload] = await Promise.all([
+          searchAcrossSites({ allowAdult, query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages, siteKeys: freeSiteKeys }),
+          searchAcrossSites({ allowAdult, query, condition, provider: provider === "auto" ? "direct" : provider, limit, maxPages: 1, siteKeys: premiumSiteKeys })
+        ]);
+        const payload = aggregateMarketplaceResults([...freePayload.results, ...premiumPayload.results], {
+          condition,
+          maxPriceRon,
+          creditBudget: freePayload.summary?.creditBudget || 0,
+          creditsUsed: freePayload.summary?.creditsUsed || 0,
+          viewerLocation,
+          allowAdult
+        });
+        payload.searchTier = "premium";
+        payload.summary.premiumMarketplaces = premiumSiteKeys.length;
+        payload.summary.browserSessionsUsed = 0;
+        payload.summary.browserFallbackMarketplaces = [];
+        if (!adultSearch) await logSearchEvent({ query, condition, provider: "premium-direct", siteKeys: [...freeSiteKeys, ...premiumSiteKeys], payload });
+        return payload;
+      };
+      const payload = creditsEnabled(process.env) ? await runCreditSearch({ userId: premium.user.id,
+        requestId: req.headers["x-search-request-id"], fingerprint: JSON.stringify({ query, condition, provider, site, limit, maxPages, maxPriceRon, viewerLocation, allowAdult }), execute, env: process.env }) : await execute();
       sendJson(res, 200, payload);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      sendJson(res, message.startsWith("Expected ") || message.startsWith("Unsupported ") ? 400 : 500, { error: message });
+      sendJson(res, error.status || (message.startsWith("Expected ") || message.startsWith("Unsupported ") ? 400 : 500), { error: message, code: error.code, credits: error.wallet });
     }
     return;
   }

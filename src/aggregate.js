@@ -1,3 +1,4 @@
+import { listingIdentity } from "./listing-identity.js";
 import { productCondition } from "./product-condition.js";
 
 import { isAdultProductQuery, isPornographicQuery } from "./search-policy.js";
@@ -863,7 +864,7 @@ function getCandidateDuplicateKey(item = {}) {
     return dedupeCandidateKey(item);
   }
 
-  return item.url ? "url:" + item.url : dedupeCandidateKey(item);
+  return item.url ? listingIdentity(item, item.site) : dedupeCandidateKey(item);
 }
 
 function dedupeNormalizedResults(results) {
@@ -1054,6 +1055,21 @@ function isBlockedMarketplaceResult(result) {
   return /cloudflare challenge|anti-bot|blocked/i.test(messages);
 }
 
+// Collection uses the same eligibility rules as final aggregation, while
+// retaining secondary matches for the accessory/repair sections.
+export function classifyCollectedListing(item, query) {
+  const normalized = normalizeListing(item);
+  return classifyListingIntent({ ...normalized, marketType: classifyMarketSegment(normalized), offerKind: classifyOfferKind(normalized) }, query);
+}
+
+export function isCollectionCandidate(item, query, condition = "any", allowAdult = false) {
+  const text = JSON.stringify(item);
+  if (isPornographicQuery(text) || (!allowAdult && isAdultProductQuery(text))) return false;
+  const classified = classifyCollectedListing(item, query);
+  return classified.isRecommendedCandidate &&
+    (matchesCondition(classified, condition) || (condition === "used" && isNewProductSource(classified)));
+}
+
 export function aggregateMarketplaceResults(results, { condition = "any", maxPriceRon, creditBudget = null, creditsUsed = null, viewerLocation = null, requesterLocation = "", allowAdult = false } = {}) {
   const queryUnderstanding = understandMarketplaceQuery(results.find((result) => result?.query)?.query || "");
   viewerLocation ||= resolveViewerLocation({ overrideCity: requesterLocation });
@@ -1070,9 +1086,7 @@ export function aggregateMarketplaceResults(results, { condition = "any", maxPri
     const classifiedItems = sortItemsByFreshness(
       result.items
         .filter((item) => !isPornographicQuery(JSON.stringify(item)) && (allowAdult || !isAdultProductQuery(JSON.stringify(item))))
-        .map(normalizeListing)
-        .map((item) => ({ ...item, marketType: classifyMarketSegment(item), offerKind: classifyOfferKind(item) }))
-        .map((item) => classifyListingIntent(item, result.query))
+        .map((item) => classifyCollectedListing(item, result.query))
         .filter((item) => matchesCondition(item, condition) || (condition === "used" && isNewProductSource(item)))
     );
     const {

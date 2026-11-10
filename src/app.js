@@ -1,3 +1,5 @@
+import { buildAbortSignal } from "./abort.js";
+import { errorOutcome } from "./scrape-outcome.js";
 import { getDefaultSiteKeys, getSite } from "./sites.js";
 import { isAdultProductQuery, isPornographicQuery } from "./search-policy.js";
 import { runSearch } from "./search.js";
@@ -34,8 +36,14 @@ function isMockSearchEnabled() {
   return process.env.LIBERGENT_MOCK_SEARCH === "1";
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delay(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const finish = () => { signal?.removeEventListener("abort", abort); resolve(); };
+    const timer = setTimeout(finish, ms);
+    const abort = () => { clearTimeout(timer); signal.removeEventListener("abort", abort); reject(signal.reason); };
+    signal?.addEventListener("abort", abort, { once: true });
+  });
 }
 
 function withTimeout(operation, timeoutMs, message) {
@@ -68,6 +76,7 @@ function buildSiteFailureResult({ siteKey, query, condition, provider, error, at
 
   return {
     ok: false,
+    outcome: errorOutcome(error),
     site: siteKey,
     query,
     condition,
@@ -155,12 +164,13 @@ function getDefaultLimit(site, pages, provider) {
   return site.defaultLimit ?? site.pageSize ?? 20;
 }
 
-async function searchSiteOnce({ siteKey, query, condition, provider, limit, maxPages, attempt }) {
+async function searchSiteOnce({ siteKey, query, condition, provider, limit, maxPages, attempt, signal: searchSignal }) {
   let site;
   let searchProvider = normalizeSearchProvider(provider);
   let resolvedProvider = searchProvider;
 
   try {
+    searchSignal?.throwIfAborted();
     site = getSite(siteKey);
     resolvedProvider = searchProvider === "auto" ? site.provider : searchProvider;
     const affordablePages = getMaxAffordablePages(site, searchProvider);
@@ -180,7 +190,9 @@ async function searchSiteOnce({ siteKey, query, condition, provider, limit, maxP
         query,
         limit: affordableLimit,
         maxPages: desiredPages,
-        signal
+        condition,
+        allowAdult: isAdultProductQuery(query),
+        signal: buildAbortSignal({ signal: searchSignal ? AbortSignal.any([signal, searchSignal]) : signal })
       }),
       getSiteTimeoutMs(site, desiredPages),
       `${site.label} a depășit timpul maxim de răspuns.`
@@ -200,6 +212,7 @@ async function searchSiteOnce({ siteKey, query, condition, provider, limit, maxP
 
 function isRetryableResult(result) {
   if (!result.ok) {
+    if (["parser_failure", "invalid_response", "blocked", "rate_limited"].includes(result.outcome)) return false;
     // Never immediately repeat a rate-limited request, even a challenge response.
     if (result.upstreamStatus === 429) return false;
     if (/Cloudflare challenge/i.test(result.error || "")) {
@@ -225,6 +238,7 @@ function shouldTryNextProvider(result, providerIndex, providerCandidates, reques
     return !/Unsupported site|Unsupported provider/i.test(result.error || "");
   }
 
+  if (result.outcome === "empty") return false;
   const rawItemCount = Number.isFinite(result.rawItemCount) ? result.rawItemCount : result.itemCount || 0;
   return result.itemCount === 0 && rawItemCount === 0;
 }
@@ -246,11 +260,11 @@ function attachProviderFallbacks(result, providerFallbacks) {
     : result;
 }
 
-async function searchSiteWithProvider({ siteKey, query, condition, provider, limit, maxPages }) {
+async function searchSiteWithProvider({ siteKey, query, condition, provider, limit, maxPages, signal }) {
   const errors = [];
 
   for (let attempt = 1; attempt <= SITE_SEARCH_ATTEMPTS; attempt += 1) {
-    const result = await searchSiteOnce({ siteKey, query, condition, provider, limit, maxPages, attempt });
+    const result = await searchSiteOnce({ siteKey, query, condition, provider, limit, maxPages, attempt, signal });
 
     if (!isRetryableResult(result) || attempt === SITE_SEARCH_ATTEMPTS) {
       return errors.length ? { ...result, previousErrors: errors } : result;
@@ -265,7 +279,7 @@ async function searchSiteWithProvider({ siteKey, query, condition, provider, lim
     const retryDelayMs = result.site === "vinted.ro" && /Cloudflare challenge/i.test(result.error || "")
       ? 1200
       : SITE_RETRY_DELAY_MS * attempt;
-    await delay(retryDelayMs);
+    await delay(retryDelayMs, signal);
   }
 
   return buildSiteFailureResult({
@@ -278,7 +292,7 @@ async function searchSiteWithProvider({ siteKey, query, condition, provider, lim
   });
 }
 
-async function searchSite({ siteKey, query, condition, provider, limit, maxPages }) {
+async function searchSite({ siteKey, query, condition, provider, limit, maxPages, signal }) {
   let site;
   let requestedProvider;
 
@@ -308,7 +322,8 @@ async function searchSite({ siteKey, query, condition, provider, limit, maxPages
       condition,
       provider: providerCandidate,
       limit,
-      maxPages
+      maxPages,
+      signal
     });
 
     lastResult = result;
@@ -363,11 +378,11 @@ async function settleWithConcurrency(items, concurrency, mapper) {
   return settled;
 }
 
-async function searchAllRequestedSites({ orderedSiteKeys, query, condition, provider, limit, maxPages }) {
+async function searchAllRequestedSites({ orderedSiteKeys, query, condition, provider, limit, maxPages, signal }) {
   const settled = await settleWithConcurrency(
     orderedSiteKeys,
     SITE_SEARCH_CONCURRENCY,
-    (siteKey) => searchSite({ siteKey, query, condition, provider, limit, maxPages })
+    (siteKey) => searchSite({ siteKey, query, condition, provider, limit, maxPages, signal })
   );
 
   return settled.map((entry, index) => {
@@ -397,8 +412,10 @@ export async function searchAcrossSites({
   requesterLocation = "",
   maxPriceRon,
   aggregate = true,
-  allowAdult = false
+  allowAdult = false,
+  signal
 }) {
+  signal = buildAbortSignal({ signal, timeoutMs: 60000 });
   if (isPornographicQuery(query)) throw new Error("Pornographic searches are not supported.");
   if (isAdultProductQuery(query) && !allowAdult) throw new Error("Adult confirmation required before searching.");
   const requestedProvider = normalizeSearchProvider(provider);
@@ -432,7 +449,8 @@ export async function searchAcrossSites({
     condition,
     provider: requestedProvider,
     limit,
-    maxPages
+    maxPages,
+    signal
   });
 
   if (!aggregate) {

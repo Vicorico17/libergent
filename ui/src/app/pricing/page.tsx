@@ -5,6 +5,7 @@ import styles from "./pricing.module.css";
 import { LogoIcon } from "@/components/LogoIcon";
 import { AccountNavLink } from "@/components/AccountNavLink";
 import { PremiumNavLink } from "@/components/PremiumNavLink";
+import { AccountCreditBalance } from "@/components/CreditBalance";
 import { PricingCards } from "@/components/PricingCards";
 import { BillingReturnNotice } from "@/components/BillingAction";
 
@@ -116,6 +117,7 @@ export default function PricingPage() {
         {/* Main */}
         <main className="flex-grow flex flex-col items-center px-3 pb-12 pt-9 sm:px-4 md:pb-24 md:pt-20 z-10 relative">
           <BillingReturnNotice />
+          <div className="mb-6"><AccountCreditBalance /></div>
 
           {/* Premium identity */}
           <div className={`${styles.intro} mb-8 flex flex-col items-center text-center md:mb-14`}>

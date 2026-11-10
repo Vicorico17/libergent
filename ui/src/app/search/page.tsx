@@ -1,5 +1,8 @@
 "use client"
 
+import { useCreditWallet } from "@/lib/use-credit-wallet";
+import { CreditBalance } from "@/components/CreditBalance";
+import { BillingReturnNotice } from "@/components/BillingAction";
 import { Fragment, Suspense, useState, useEffect, useMemo, useRef, type ReactNode } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
@@ -1227,7 +1230,7 @@ function LoadingOverlay({ progress, done, query, tier, isPremiumAccount }: { pro
 }
 
 // — SearchNav —
-function SearchNav({ query, tier, isLoggedIn }: { query: string; tier: SearchTier; isLoggedIn: boolean }) {
+function SearchNav({ query, tier, isLoggedIn, metered, needsCredits, onSearch }: { query: string; tier: SearchTier; isLoggedIn: boolean; metered: boolean; needsCredits: boolean; onSearch: (query: string) => void }) {
   const router = useRouter()
   const [val, setVal] = useState(query)
 
@@ -1239,7 +1242,11 @@ function SearchNav({ query, tier, isLoggedIn }: { query: string; tier: SearchTie
   function submit(e: React.FormEvent) {
     e.preventDefault()
     const q = val.trim()
-    if (q) router.push(`/search?q=${encodeURIComponent(q)}&tier=${tier}`)
+    if (q) {
+      if (!needsCredits) onSearch(q)
+      router.push(`/search?q=${encodeURIComponent(q)}&tier=${tier}`)
+      if (needsCredits) window.dispatchEvent(new Event("libergent:topup"))
+    }
   }
 
   return (
@@ -1271,13 +1278,13 @@ function SearchNav({ query, tier, isLoggedIn }: { query: string; tier: SearchTie
           onMouseEnter={(e) => (e.currentTarget.style.background = PINK)}
           onMouseLeave={(e) => (e.currentTarget.style.background = INK)}
         >
-          Caută <Arrow size={13} />
+          {needsCredits ? "Adaugă credite" : metered ? "Caută · 1 credit" : "Caută"} <Arrow size={13} />
         </button>
       </form>
 
       <div className="flex max-w-full flex-wrap items-center gap-3 text-[10px] sm:text-[12px] uppercase font-bold flex-none ml-auto">
         <Link href="/discovery" className="opacity-60 hover:opacity-100 transition-opacity" style={{ color: INK }}>Discovery</Link>
-        <PremiumNavLink />
+        {tier !== "premium" && <PremiumNavLink />}
         {isLoggedIn ? (
           <Link href={`/account?next=${encodeURIComponent(`/search?q=${query}&tier=${tier}`)}`} className="inline-flex items-center gap-1.5 px-3 py-2" style={{ color: GREEN, border: `1px solid ${GREEN}` }}><span className="h-2 w-2 rounded-full" style={{ background: GREEN }} /> Contul meu</Link>
         ) : (
@@ -2685,14 +2692,18 @@ function SearchResultsContent() {
   const router = useRouter()
   const account = useAccountSession()
   const isLoggedIn = account.status === "signed_in"
-  const [resolvedAccountPlan, setResolvedAccountPlan] = useState<{ userId: string; status: AccountPlanStatus }>({ userId: "", status: "checking" })
-  const accountPlan: AccountPlanStatus = account.status === "checking"
-    ? "checking"
-    : account.status !== "signed_in"
-      ? "free"
-      : resolvedAccountPlan.userId === account.userId
-        ? resolvedAccountPlan.status
-        : "checking"
+  const { wallet, error: walletError, reload: reloadWallet } = useCreditWallet()
+  const accountPlan: AccountPlanStatus = account.status === "checking" ? "checking"
+    : account.status !== "signed_in" ? "free"
+    : wallet ? (wallet.premium || wallet.hasCredits ? "premium" : "free")
+    : walletError ? "unknown" : "checking"
+  const metered = Boolean(wallet?.enabled && accountPlan === "premium")
+  const walletRef = useRef(wallet)
+  useEffect(() => { walletRef.current = wallet }, [wallet])
+  const searchIntent = useRef("")
+  const rotateCreditRequest = useRef(false)
+  const [needsStart, setNeedsStart] = useState(false)
+  const searchRequestIds = useRef(new Map<string, string>())
   const query = String(searchParams.get("q") || "").trim()
   useEffect(() => {
     rememberRecentSearch(query)
@@ -2711,11 +2722,7 @@ function SearchResultsContent() {
   const [conditions, setConditions] = useState<Set<string>>(() => readSearchFiltersStorage().conditions)
   const [priceMin, setPriceMin]     = useState(() => readSearchFiltersStorage().priceMin)
   const [priceMax, setPriceMax]     = useState(() => readSearchFiltersStorage().priceMax)
-  const [searchBudget, setSearchBudget] = useState(priceMax)
-  useEffect(() => {
-    const timer = setTimeout(() => setSearchBudget(priceMax), 500)
-    return () => clearTimeout(timer)
-  }, [priceMax])
+  const searchBudget = "" // Price filters operate on existing results without spending credits.
   const [time, setTime]             = useState("--:--")
   const [results, setResults]       = useState<SearchResultItem[]>([])
   const [bestUsedOffer, setBestUsedOffer] = useState<SearchResultItem | null>(null)
@@ -2752,32 +2759,6 @@ function SearchResultsContent() {
   const [loaderProgress, setLoaderProgress] = useState(0)
   const [loaderDone, setLoaderDone]       = useState(false)
   const loaderTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  useEffect(() => {
-    let active = true
-    async function loadAccountPlan() {
-      if (account.status !== "signed_in") return
-      const userId = account.userId
-      try {
-        const supabase = getSupabaseBrowserClient()
-        const session = supabase ? (await supabase.auth.getSession()).data.session : null
-        if (!session?.access_token) {
-          if (active) setResolvedAccountPlan({ userId, status: "unknown" })
-          return
-        }
-        const response = await fetch("/api/alerts", { headers: { authorization: `Bearer ${session.access_token}` } })
-        const payload = await response.json().catch(() => ({}))
-        if (!active) return
-        if (response.ok) setResolvedAccountPlan({ userId, status: "premium" })
-        else if (response.status === 403 && payload.code === "premium_required") setResolvedAccountPlan({ userId, status: "free" })
-        else setResolvedAccountPlan({ userId, status: "unknown" })
-      } catch {
-        if (active) setResolvedAccountPlan({ userId, status: "unknown" })
-      }
-    }
-    void loadAccountPlan()
-    return () => { active = false }
-  }, [account.status, account.userId])
 
   const isPremiumAccount = accountPlan === "premium"
   const effectiveSearchTier: SearchTier = isPremiumAccount ? "premium" : "free"
@@ -2973,8 +2954,19 @@ function SearchResultsContent() {
         return
       }
 
+      if (metered && !forceRefresh) {
+        let saved = null
+        try { saved = readSearchSnapshot(window.sessionStorage, snapshotKey) } catch { /* Storage unavailable. */ }
+        if (!saved && searchIntent.current !== query) {
+          setNeedsStart(true)
+          setIsLoading(false)
+          setShowLoader(false)
+          return
+        }
+      }
+      setNeedsStart(false)
       setIsLoading(true)
-      setShowLoader(true)
+      setShowLoader(false)
       setSearchReportOpen(false)
       setVisibleCount(INITIAL_VISIBLE_RESULTS)
       setLoaderProgress(8)
@@ -3015,22 +3007,39 @@ function SearchResultsContent() {
           restored = true
           return { payload: previousSnapshot.payload, snapshot: previousSnapshot }
         }
-        const headers: HeadersInit = {}
+        const headers: Record<string, string> = {}
+        if (metered) {
+          const storageKey = `libergent:search-request:${snapshotKey}`
+          const rotate = rotateCreditRequest.current
+          rotateCreditRequest.current = false
+          let requestId = rotate ? "" : searchRequestIds.current.get(snapshotKey) || ""
+          try { if (!requestId && !rotate) requestId = window.sessionStorage.getItem(storageKey) || "" } catch { /* Use the in-memory key. */ }
+          if (!requestId && (walletRef.current?.balance || 0) < 1) throw new Error("Adaugă credite pentru a continua căutarea Premium.")
+          if (!requestId) requestId = crypto.randomUUID()
+          searchRequestIds.current.set(snapshotKey, requestId)
+          try { window.sessionStorage.setItem(storageKey, requestId) } catch { /* The in-memory key still protects retries. */ }
+          headers["x-search-request-id"] = requestId
+        }
         if (effectiveSearchTier === "premium") {
           const supabase = getSupabaseBrowserClient()
           const session = supabase ? (await supabase.auth.getSession()).data.session : null
           if (!session?.access_token) {
-            setResolvedAccountPlan({ userId: account.userId, status: "unknown" })
             throw new Error("Sesiunea a expirat. Autentifică-te din nou pentru Premium.")
           }
           headers.authorization = `Bearer ${session.access_token}`
         }
-        const response = await fetch(`${searchEndpoint}?${params.toString()}`, { signal: controller.signal, headers })
+        setShowLoader(true)
+        const response = await fetch(`${searchEndpoint}?${params.toString()}`, { method: metered ? "POST" : "GET", signal: controller.signal, headers })
+        if (metered) window.dispatchEvent(new Event("libergent:credits"))
         const payload = await readJsonResponse(response)
         if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError")
         if (!response.ok || payload.error) {
+          if (metered && ["search_refunded", "request_expired"].includes(payload.code || "")) {
+            searchRequestIds.current.delete(snapshotKey)
+            try { window.sessionStorage.removeItem(`libergent:search-request:${snapshotKey}`) } catch { /* Storage unavailable. */ }
+          }
           if (response.status === 401 || (response.status === 403 && payload.code === "premium_required")) {
-            setResolvedAccountPlan({ userId: account.userId, status: response.status === 403 ? "free" : "unknown" })
+            window.dispatchEvent(new Event("libergent:credits"))
           }
           throw new Error(payload.error || "Căutarea nu a putut fi finalizată.")
         }
@@ -3050,7 +3059,7 @@ function SearchResultsContent() {
           let stored = false
           try { stored = writeSearchSnapshot(window.sessionStorage, snapshotKey, nextSnapshot) } catch { /* Storage may be disabled. */ }
           if (!stored) setSnapshotStorageWarning("Browserul nu poate păstra rezultatele. Reîncărcarea paginii poate porni o căutare nouă.")
-          setSnapshotNotice(restored ? "Rezultatele salvate au fost restaurate. Pentru date actualizate, verifică ofertele noi." : describeSnapshotChange(previousSnapshot, nextSnapshot))
+          setSnapshotNotice(restored ? "Rezultate redeschise · 0 credite folosite. Verifică ofertele noi pentru prețuri actualizate." : `${metered ? `${payload.credits?.spent ?? 1} credit folosit. ` : ""}${describeSnapshotChange(previousSnapshot, nextSnapshot)}`)
           setFeedbackExclusions(nextSnapshot.exclusions)
           setFeedbackNotice(null)
           setResults(mapped)
@@ -3115,6 +3124,11 @@ function SearchResultsContent() {
             clearInterval(loaderTimerRef.current)
             loaderTimerRef.current = null
           }
+          if (restored) {
+            setShowLoader(false)
+            setIsLoading(false)
+            return
+          }
           setLoaderProgress(100)
           finishTimer = setTimeout(() => {
             if (controller.signal.aborted) return
@@ -3136,7 +3150,7 @@ function SearchResultsContent() {
       controller.abort()
       if (loaderTimerRef.current) clearInterval(loaderTimerRef.current)
     }
-  }, [account.userId, accountPlan, effectiveSearchTier, near, query, refreshRequest, snapshotKey, searchBudget])
+  }, [account.userId, accountPlan, effectiveSearchTier, near, query, refreshRequest, snapshotKey, searchBudget, metered])
 
   useEffect(() => {
     const initial = setTimeout(() => setTime(formatSearchTime()), 0)
@@ -3279,7 +3293,7 @@ function SearchResultsContent() {
 
   const marketplaceValue = marketplaceStatus.total ? `${marketplaceStatus.successful}/${marketplaceStatus.total}` : "0/0"
   const updatedLabel = searchedAt ? formatDateTime(searchedAt) : "în timp real"
-  const statusLabel = !query ? "Introduceți o căutare" : isLoading ? "Search Session Running" : error ? "Search Session Failed" : "Search Session Complete"
+  const statusLabel = !query ? "Introduceți o căutare" : needsStart ? "Căutare pregătită" : isLoading ? "Search Session Running" : error ? "Search Session Failed" : "Search Session Complete"
   const canCloseFilters = Boolean(query) && !isLoading && !showLoader
   const blockedLabel = marketplaceStatus.blocked.length ? marketplaceStatus.blocked.join(", ") : ""
   const agentNotes = [
@@ -3319,10 +3333,20 @@ function SearchResultsContent() {
         bestOfferSource={shownBestOffer?.source}
       />
 
-      <SearchNav query={query} tier={effectiveSearchTier} isLoggedIn={isLoggedIn} />
+      <SearchNav query={query} tier={effectiveSearchTier} isLoggedIn={isLoggedIn} metered={metered} needsCredits={metered && !wallet?.balance} onSearch={nextQuery => { searchIntent.current = nextQuery; if (nextQuery === query) { rotateCreditRequest.current = true; setRefreshRequest(value => value + 1) } }} />
+      {wallet?.enabled && <div className="mx-4 mt-5 sm:mx-6"><CreditBalance wallet={wallet} onRefresh={() => void reloadWallet()} /></div>}
+      {walletError && <div role="alert" className="mx-6 mt-4 border border-black bg-white p-4 text-sm">{walletError} <button type="button" onClick={() => void reloadWallet()} className="min-h-11 underline">Încearcă din nou</button></div>}
+      <div className="mx-6 mt-4"><BillingReturnNotice /></div>
+      {needsStart && metered && query && <section className="mx-6 my-5 border-2 border-[#111] bg-[#FCE7F3] p-6">
+        <p className="text-xs font-bold uppercase">Pregătit pentru Premium</p>
+        <h2 className="mt-2 text-xl font-bold">Găsește ofertele pentru „{query}”</h2>
+        <p className="mt-3 text-sm">1 credit pentru o căutare nouă. Filtrarea și redeschiderea rezultatelor sunt gratuite.</p>
+        <button type="button" disabled={!wallet?.balance} onClick={() => { searchIntent.current = query; setRefreshRequest(value => value + 1) }} className="mt-5 min-h-12 border border-black bg-black px-5 text-sm font-bold text-white disabled:opacity-40">Caută Premium · 1 credit</button>
+        {!wallet?.balance && <p className="mt-3 text-sm">Adaugă credite folosind butonul de mai sus, apoi continuă aici.</p>}
+      </section>}
 
       {/* Session header */}
-      <header
+      {!needsStart && <header
         className="px-6 py-4 flex flex-col sm:flex-row justify-between sm:items-end gap-4"
         style={{ borderBottom: `1px solid ${INK}`, background: CREAM }}
       >
@@ -3367,9 +3391,9 @@ function SearchResultsContent() {
             <span title="Momentul colectării ofertelor. Folosește Verifică oferte noi pentru o nouă căutare.">Rezultate din <span className="mx-2">|</span> {updatedLabel === "în timp real" ? time : updatedLabel}</span>
           </div>
         </div>
-      </header>
-      {query && <section className="mx-6 mt-4 flex flex-wrap items-center gap-3 text-[11px]" aria-label="Actualizarea rezultatelor">
-        <button type="button" disabled={isLoading || accountPlan === "checking" || accountPlan === "unknown"} onClick={() => setRefreshRequest(value => value + 1)} className="min-h-11 border border-black px-4 py-2 font-bold disabled:opacity-50">Verifică oferte noi</button>
+      </header>}
+      {query && !needsStart && <section className="mx-6 mt-4 flex flex-wrap items-center gap-3 text-[11px]" aria-label="Actualizarea rezultatelor">
+        <button type="button" disabled={isLoading || accountPlan === "checking" || accountPlan === "unknown" || (metered && !wallet?.balance && !error)} onClick={() => { rotateCreditRequest.current = !error; setRefreshRequest(value => value + 1) }} className="min-h-11 border border-black px-4 py-2 font-bold disabled:opacity-50">{error ? "Reîncearcă această căutare" : "Verifică oferte noi"}{metered ? " · 1 credit" : ""}</button>
         <p>Reîncărcarea păstrează rezultatele în această filă până la 24 de ore. Prețurile și disponibilitatea se pot schimba.</p>
         {snapshotNotice && <p role="status" className="basis-full">{snapshotNotice}</p>}
         {snapshotStorageWarning && <p role="alert" className="basis-full">{snapshotStorageWarning}</p>}
@@ -3478,7 +3502,7 @@ function SearchResultsContent() {
       )}
 
       {/* Main */}
-      <main className="flex-1 w-full max-w-[1800px] mx-auto px-6 py-6 flex flex-col lg:flex-row gap-6">
+      {!needsStart && <main className="flex-1 w-full max-w-[1800px] mx-auto px-6 py-6 flex flex-col lg:flex-row gap-6">
 
         {filtersOpen ? (
           <FilterPanel
@@ -3767,9 +3791,9 @@ function SearchResultsContent() {
           </div>
 
         </div>
-      </main>
+      </main>}
 
-      <BottomBar />
+      {!needsStart && <BottomBar />}
     </div>
   )
 }

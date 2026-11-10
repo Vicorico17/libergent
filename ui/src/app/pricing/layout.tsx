@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "LiberGent Premium | Agentul tău personal",
   description:
-    "Cunoaște agentul tău personal LiberGent. Începe cu 3 zile gratuite la primul abonament, apoi alege plata săptămânală sau anuală. Apelurile sunt disponibile în pilot, cu aprobarea ta.",
+    "Caută cu Premium: 49 RON pe lună, cu 40 de credite incluse. Adaugă credite oricând sau cumpără un pachet fără abonament.",
   alternates: {
     canonical: "/pricing",
   },
