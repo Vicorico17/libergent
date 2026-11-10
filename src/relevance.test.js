@@ -685,3 +685,15 @@ test("hardware searches reject printed guides even when every model token matche
   const requestedBook = classifyListingIntent({ title: "Carte iPhone 15 128GB", priceRon: 1500 }, "carte iphone 15 128gb");
   assert.ok(!requestedBook.rejectionReasons.includes("irrelevant:printed_media_for_product"));
 });
+
+test("Apple TV requires the streaming device rather than an Apple keyword or compatibility mention", () => {
+  for (const title of ["Apple - carte biografie", "Apple parfum", "Apple iPhone 13", "Apple TV carte ghid", "Telecomanda pentru Apple TV", "Samsung Smart TV compatibil Apple TV"]) {
+    const result = classifyListingIntent({ title, description: "Apple TV", priceRon: 500 }, "apple tv");
+    assert.equal(result.isRecommendedCandidate, false, title);
+  }
+  for (const title of ["Apple TV 4K 64GB", "Vand Apple TV HD generatia 4", "Media player Apple TV 4K cu telecomanda"]) {
+    const result = classifyListingIntent({ title, priceRon: 500 }, "apple tv");
+    assert.equal(result.isRecommendedCandidate, true, title);
+    assert.equal(result.queryCategory, "streaming_device");
+  }
+});

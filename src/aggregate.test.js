@@ -851,3 +851,11 @@ test("shared search decisions enforce budget without biasing market comparisons"
   assert.deepEqual(empty.summary.recommendedOffers, []);
   assert.equal(empty.summary.bestNewBenchmark.priceRon, 4000);
 });
+
+test("Apple TV result grid excludes Apple keyword noise before recommendation ranking", () => {
+  const titles = ["Apple TV 4K 64GB", "Apple parfum", "Apple carte biografie", "Apple iPhone 13", "Samsung TV compatibil Apple TV"];
+  const payload = aggregateMarketplaceResults([makeResult("olx.ro", "apple tv", titles.map((title, index) => ({
+    title, price: "500 lei", url: `https://olx.ro/apple-test-${index}`, condition: "utilizat"
+  })))]);
+  assert.deepEqual(payload.results.flatMap(source => source.items).map(item => item.title), [titles[0]]);
+});

@@ -90,6 +90,7 @@ const PRODUCT_ENTITIES = [
 ];
 
 const PRODUCT_FAMILIES = [
+  { category: "streaming_device", patterns: ["apple tv", "chromecast", "fire tv stick"], label: "Dispozitiv de streaming", confidence: 0.96, refinements: ["Model", "Generație", "Stocare"] },
   { category: "collectible", patterns: ["macheta", "machete", "model auto"], label: "Machete și obiecte de colecție", confidence: 0.94, refinements: ["Scară", "Stare"] },
   { category: "apparel", patterns: ["haine", "tricou", "hanorac", "geaca", "adidasi", "pantofi"], label: "Îmbrăcăminte și încălțăminte", confidence: 0.94, refinements: ["Mărime", "Stare"] },
   { category: "tablet", patterns: ["ipad", "tableta"], label: "Tabletă", confidence: 0.95, refinements: ["Model", "Stocare"] },

@@ -818,7 +818,7 @@ function isStructuredModelToken(token) {
 
 function isStrictRequiredToken(token) {
   const normalized = normalizeText(token);
-  return normalized.length >= 4 ||
+  return normalized.length >= 4 || normalized === "tv" ||
     STRICT_VARIANT_TOKENS.has(normalized) ||
     isStructuredModelToken(normalized);
 }
@@ -1008,6 +1008,8 @@ function isPhoneBatteryHealthSignal(text, queryProfile, term) {
 function productIntentEvidence(text, title, queryProfile) {
   if (queryProfile.queryType !== "main_product") return text;
   const normalizedTitle = normalizeText(title);
+  const streamingTitle = /^(?:(?:vand|media player|player|dispozitiv)\s+)*apple tv\b/.test(normalizedTitle);
+  if (streamingTitle) return text.replace(/\b(?:cu|include|inclus|with) (?:telecomanda|remote)(?: siri)?\b/g, " ");
   const phoneTitle = /^(?:(?:vand|telefon|mobil|smartphone|apple)\s+)*(?:iphone\s*\d|(?:samsung\s*(?:galaxy\s*)?|galaxy\s*)[sa]\d)/.test(normalizedTitle);
   if (phoneTitle) {
     return text
@@ -1495,10 +1497,17 @@ export function classifyListingIntent(item, query) {
   const intentText = productIntentEvidence(text, title, queryProfile);
   let negativeMatches = findNegativeMatches(intentText, queryProfile);
   const printedMedia = /\b(book|books|carte|carti|ghid|guide|manual|manuale)\b/;
-  const hardwareCategories = new Set(["phone", "tablet", "computer", "tv", "console", "washing_machine", "kitchen"]);
+  const hardwareCategories = new Set(["phone", "tablet", "computer", "tv", "streaming_device", "console", "washing_machine", "kitchen"]);
   if (hardwareCategories.has(queryProfile.understanding.category) &&
     !printedMedia.test(normalizeText(query)) && printedMedia.test(normalizeText(title))) {
     negativeMatches.push({ intent: "irrelevant", term: "printed_media_for_product" });
+  }
+  if (/\bapple tv\b/.test(queryProfile.normalized) && queryProfile.queryType === "main_product") {
+    const titleText = normalizeText(title);
+    const productTitle = titleText.split(/\b(?:compatibil\w*|compatible|suporta|supports|pentru|for)\b/)[0];
+    if (!/\bapple tv\b/.test(productTitle)) {
+      negativeMatches.push({ intent: "irrelevant", term: "missing_product_identity" });
+    }
   }
   if (!hasVehicleListingEvidence(text, queryProfile)) {
     negativeMatches.push({ intent: "irrelevant", term: "missing_vehicle_evidence" });
