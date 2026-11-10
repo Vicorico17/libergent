@@ -1494,6 +1494,12 @@ export function classifyListingIntent(item, query) {
   ].filter(Boolean).join(" "));
   const intentText = productIntentEvidence(text, title, queryProfile);
   let negativeMatches = findNegativeMatches(intentText, queryProfile);
+  const printedMedia = /\b(book|books|carte|carti|ghid|guide|manual|manuale)\b/;
+  const hardwareCategories = new Set(["phone", "tablet", "computer", "tv", "console", "washing_machine", "kitchen"]);
+  if (hardwareCategories.has(queryProfile.understanding.category) &&
+    !printedMedia.test(normalizeText(query)) && printedMedia.test(normalizeText(title))) {
+    negativeMatches.push({ intent: "irrelevant", term: "printed_media_for_product" });
+  }
   if (!hasVehicleListingEvidence(text, queryProfile)) {
     negativeMatches.push({ intent: "irrelevant", term: "missing_vehicle_evidence" });
   }

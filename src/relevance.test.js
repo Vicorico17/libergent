@@ -674,3 +674,14 @@ test("use explicit description model variants when title omits the variant", () 
     assert.equal(result.isRecommendedCandidate, accepted, `${query}: ${description}: ${result.rejectionReasons}`);
   }
 });
+
+test("hardware searches reject printed guides even when every model token matches", () => {
+  for (const title of ["Carte iPhone 15 128GB ghid de utilizare", "iPhone 15 128GB - book", "Manual iPhone 15 128GB"]) {
+    const item = classifyListingIntent({ title, priceRon: 1500 }, "iphone 15 128gb");
+    assert.equal(item.isRecommendedCandidate, false, title);
+    assert.ok(item.rejectionReasons.includes("irrelevant:printed_media_for_product"));
+  }
+  assert.equal(classifyListingIntent({ title: "Apple iPhone 15 128GB", priceRon: 1500 }, "iphone 15 128gb").isRecommendedCandidate, true);
+  const requestedBook = classifyListingIntent({ title: "Carte iPhone 15 128GB", priceRon: 1500 }, "carte iphone 15 128gb");
+  assert.ok(!requestedBook.rejectionReasons.includes("irrelevant:printed_media_for_product"));
+});
