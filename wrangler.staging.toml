@@ -40,3 +40,12 @@ class_name = "IntegrationGateway"
 [[migrations]]
 tag = "integration-gateway-v1"
 new_sqlite_classes = ["IntegrationGateway"]
+
+# Staging has independent source budgets and persistent cooldowns.
+[[durable_objects.bindings]]
+name = "SCRAPE_COORDINATOR"
+class_name = "ScrapeCoordinator"
+
+[[migrations]]
+tag = "scrape-coordinator-v1"
+new_sqlite_classes = ["ScrapeCoordinator"]

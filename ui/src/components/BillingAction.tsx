@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useAccountSession } from "@/lib/use-account-session";
-import { PREMIUM_ANNUAL_PRICE_RON, PREMIUM_TRIAL_DAYS, PREMIUM_WEEKLY_PRICE_RON } from "@/lib/pricing";
+import { useCreditWallet } from "@/lib/use-credit-wallet";
 
-type BillingPlan = "weekly" | "annual";
+type BillingPlan = "monthly" | "credits10" | "credits30";
 
-export function BillingAction({ kind = "checkout", plan = "annual" }: { kind?: "checkout" | "portal"; plan?: BillingPlan }) {
+export function BillingAction({ kind = "checkout", plan = "monthly" }: { kind?: "checkout" | "portal"; plan?: BillingPlan }) {
   const account = useAccountSession();
   const router = useRouter();
+  const [testMode, setTestMode] = useState(false);
   const [available, setAvailable] = useState(false);
   const [checking, setChecking] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -25,11 +26,14 @@ export function BillingAction({ kind = "checkout", plan = "annual" }: { kind?: "
         headers: session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {}
       });
       const value = await response.json();
-      if (active) setAvailable(Boolean(value.available && (kind === "checkout" || value.hasCustomer)));
+      if (active) {
+        setAvailable(Boolean(value.available && (kind === "checkout" ? value.offers?.some((offer: { id: string; available: boolean }) => offer.id === plan && offer.available) : value.hasCustomer)));
+        setTestMode(Boolean(value.testMode));
+      }
     }
     check().catch(() => {}).finally(() => { if (active) setChecking(false); });
     return () => { active = false; };
-  }, [account.status, kind]);
+  }, [account.status, kind, plan]);
 
   async function start() {
     if (account.status !== "signed_in") {
@@ -44,7 +48,7 @@ export function BillingAction({ kind = "checkout", plan = "annual" }: { kind?: "
       const response = await fetch(`/api/billing/${kind}`, {
         method: "POST",
         headers: { authorization: `Bearer ${session.access_token}`, ...(kind === "checkout" ? { "content-type": "application/json" } : {}) },
-        ...(kind === "checkout" ? { body: JSON.stringify({ plan }) } : {})
+        ...(kind === "checkout" ? { body: JSON.stringify({ plan, returnTo: window.location.pathname + window.location.search }) } : {})
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Nu am putut deschide pagina de plată.");
@@ -56,36 +60,47 @@ export function BillingAction({ kind = "checkout", plan = "annual" }: { kind?: "
     }
   }
 
-  if (checking || !available) return kind === "checkout" ? <p className="mt-3 text-center text-[10px] uppercase text-[#6B7280]">Abonamentul nu este disponibil momentan.</p> : null;
+  if (checking || !available) return kind === "checkout" ? <p className="mt-3 text-center text-[10px] uppercase text-[#6B7280]">Plata nu este disponibilă momentan.</p> : null;
   return <div className="mt-3">
     <button type="button" disabled={busy || account.status === "checking"} onClick={start}
       className="flex min-h-12 w-full items-center justify-center border-2 border-[#111] bg-[#FF4B8B] px-4 py-3 text-[11px] font-bold uppercase tracking-widest text-[#111] shadow-[4px_4px_0_#111] disabled:opacity-60">
       {busy ? "Se deschide..." : kind === "portal" ? "Gestionează abonamentul" : "Continuă la checkout"}
     </button>
-    {kind === "checkout" && <p className="mt-2 text-center text-[10px] uppercase text-[#6B7280]">Plată de test. Cardul nu va fi debitat.</p>}
+    {kind === "checkout" && testMode && <p className="mt-2 text-center text-[10px] uppercase text-[#6B7280]">Plată de test. Cardul nu va fi debitat.</p>}
     {error && <p role="alert" className="mt-3 text-xs text-red-700">{error}</p>}
   </div>;
 }
 
-export function BillingPlanPicker() {
-  const [plan, setPlan] = useState<BillingPlan>("weekly");
-  const plans = [
-    { id: "weekly" as const, title: "Săptămânal", price: PREMIUM_WEEKLY_PRICE_RON, period: "săptămână", note: "Flexibil, cu plată săptămânală" },
-    { id: "annual" as const, title: "Anual", price: PREMIUM_ANNUAL_PRICE_RON, period: "an", note: `Economisești ~80% față de 52 de plăți săptămânale · ~${Math.round(PREMIUM_ANNUAL_PRICE_RON / 12)} RON/lună` }
-  ];
+export function CreditPackPicker() {
+  const [plan, setPlan] = useState<BillingPlan>("credits10");
   return <div className="mt-4">
-    <p className="mb-3 text-[11px] font-bold uppercase tracking-widest">{PREMIUM_TRIAL_DAYS} zile gratuite la primul abonament · alege planul</p>
-    <div className="grid gap-3 sm:grid-cols-2">
-      {plans.map((option) => <button key={option.id} type="button" aria-pressed={plan === option.id} onClick={() => setPlan(option.id)}
-        className={`relative border-2 p-4 text-left transition-transform hover:-translate-y-0.5 ${plan === option.id ? "border-[#111] bg-[#FCE7F3] shadow-[4px_4px_0_#FF4B8B]" : "border-[#111]/40 bg-white"}`}>
-        {option.id === "annual" && <span className="mb-2 inline-block bg-[#FF4B8B] px-2 py-1 text-[9px] font-bold uppercase text-[#111]">~80% economie</span>}
-        <span className="block text-[12px] font-bold uppercase">{option.title}</span>
-        <span className="mt-1 block text-2xl font-bold">{option.price} RON<span className="text-xs font-normal"> / {option.period}</span></span>
-        <span className="mt-2 block text-[10px] leading-relaxed text-[#111]/65">{option.note}</span>
-      </button>)}
+    <div className="grid grid-cols-2 gap-3" role="group" aria-label="Pachete de credite">
+      {[{ id: "credits10" as const, credits: 10, price: 19 }, { id: "credits30" as const, credits: 30, price: 39 }].map(option =>
+        <button key={option.id} type="button" aria-pressed={plan === option.id} onClick={() => setPlan(option.id)}
+          className={`min-h-28 border-2 border-[#111] p-4 text-left ${plan === option.id ? "bg-[#FCE7F3] shadow-[3px_3px_0_#111]" : "bg-white"}`}>
+          <span className="block text-xl font-bold">{option.credits} credite</span>
+          <span className="mt-2 block text-sm">{option.price} RON · plată unică</span>
+          <span className="mt-1 block text-xs text-[#111]/65">{(option.price / option.credits).toFixed(2)} RON / credit</span>
+        </button>)}
     </div>
     <BillingAction plan={plan} />
-    <p className="mt-3 text-[10px] leading-relaxed text-[#111]/65">Pentru primul abonament, prima plată se face după {PREMIUM_TRIAL_DAYS} zile. Apoi abonamentul se reînnoiește automat la prețul planului ales. Poți anula din cont.</p>
+    <p className="mt-3 text-xs leading-relaxed text-[#111]/65">Creditele cumpărate nu expiră. Folosim întâi creditele incluse în abonament. Fără reîncărcare automată.</p>
+  </div>;
+}
+
+export function BillingPlanPicker() {
+  const { wallet } = useCreditWallet();
+  return <div className="mt-4">
+    {!wallet?.premium && <div className="border-2 border-[#111] bg-[#FCE7F3] p-5">
+      <p className="text-xs font-bold uppercase">Premium lunar</p>
+      <p className="mt-2 text-3xl font-bold">49 RON <span className="text-sm font-normal">/ lună</span></p>
+      <p className="mt-2 text-sm">40 de credite incluse în fiecare lună.</p>
+      <BillingAction plan="monthly" />
+      <p className="mt-3 text-xs leading-relaxed text-[#111]/65">Reînnoire automată. Anulezi din cont. Creditele lunare nefolosite expiră la sfârșitul perioadei.</p>
+    </div>}
+    <h3 className="mt-6 text-sm font-bold">{wallet?.premium ? "Adaugă credite Premium" : "Preferi fără abonament?"}</h3>
+    <CreditPackPicker />
+    <p className="mt-3 text-xs text-[#111]/65">O căutare Premium costă 1 credit. Filtrele și redeschiderea rezultatelor sunt gratuite. Căutările eșuate sunt rambursate.</p>
   </div>;
 }
 
@@ -94,7 +109,7 @@ export function BillingReturnNotice() {
   useEffect(() => {
     queueMicrotask(() => setResult(new URLSearchParams(window.location.search).get("checkout") || ""));
   }, []);
-  if (result === "success") return <p role="status" className="mb-6 border border-[#111] bg-white px-4 py-3 text-center text-xs">Checkout încheiat. Accesul Premium apare după confirmarea abonamentului; verifică pagina contului.</p>;
+  if (result === "success") return <p role="status" className="mb-6 border border-[#111] bg-white px-4 py-3 text-center text-xs">Checkout încheiat. Creditele apar după confirmarea plății. Soldul se actualizează automat; poți verifica din nou din cont.</p>;
   if (result === "cancelled") return <p role="status" className="mb-6 border border-[#111] bg-white px-4 py-3 text-center text-xs">Checkout anulat.</p>;
   return null;
 }

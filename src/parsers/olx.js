@@ -124,8 +124,7 @@ function extractEmbeddedOlxImages(html = "") {
 }
 
 function parsePrice(line = "") {
-  const match = line.match(/(\d[\d\s.]*)\s*(lei|ron|€|eur)?/i);
-  return match ? `${match[1].trim()} ${match[2] || ""}`.trim() : line.trim();
+  return line.trim();
 }
 
 function inferOlxCurrency(price = "") {

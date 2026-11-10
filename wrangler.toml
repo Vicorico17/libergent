@@ -48,6 +48,15 @@ class_name = "IntegrationGateway"
 tag = "integration-gateway-v1"
 new_sqlite_classes = ["IntegrationGateway"]
 
+# Shared marketplace traffic budgets across production Worker isolates.
+[[durable_objects.bindings]]
+name = "SCRAPE_COORDINATOR"
+class_name = "ScrapeCoordinator"
+
+[[migrations]]
+tag = "scrape-coordinator-v1"
+new_sqlite_classes = ["ScrapeCoordinator"]
+
 # Dedicated owner trial endpoint. It exposes only /mcp and keeps public
 # Premium/account actions disabled. Do not copy these settings to production.
 [env.mcp-test]

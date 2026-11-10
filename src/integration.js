@@ -1,3 +1,4 @@
+import { configureScrapeCoordinator } from "./scrape-transport.js";
 import { lookupDeveloperKey, API_SOURCES } from './developer-store.js';
 import { runSearch } from './search.js';
 import { getSite } from './sites.js';
@@ -237,7 +238,7 @@ export class IntegrationGateway {
     const payload = await pending;
     return json({ ...payload, cache: { status: coalesced ? 'coalesced' : 'miss', ageSeconds: 0 } }, payload.sources.every(s => s.status === 'failed') ? 502 : 200);
   }
-  search(params) { return searchIntegration(params); }
+  search(params) { configureScrapeCoordinator(this.env.SCRAPE_COORDINATOR); return searchIntegration(params); }
 }
 
 // Sandbox responses never execute a provider or fetch product images.

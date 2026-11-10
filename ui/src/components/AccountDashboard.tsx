@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, Bookmark, Clock3, Crown, ExternalLink, LayoutDashboard, LogOut, MessageSquare, Plus, Search, Trash2, UserRound } from "lucide-react";
 import { LogoIcon } from "@/components/LogoIcon";
+import { AccountCreditBalance } from "@/components/CreditBalance";
 import { BillingAction } from "@/components/BillingAction";
 import {
   readAccountActivity,
@@ -333,6 +334,7 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
         <section className="min-w-0 p-5 sm:p-8 lg:p-10">
           {section === "overview" && (
             <div className="flex flex-col gap-8">
+              <AccountCreditBalance />
               <SectionHeader eyebrow="Account control center" title={`Salut, ${account.displayName || "bine ai revenit"}`} description="Toate deciziile tale de cumpărare într-un singur loc: favorite, monitorizări, selleri și istoricul recomandărilor." />
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between" style={{ border: `2px solid ${INK}`, background: alertAccess === "premium" ? PINK : "white", boxShadow: `4px 4px 0 ${INK}` }}>
                 <div className="flex items-start gap-3"><Crown size={22} fill={alertAccess === "premium" ? INK : "none"} /><div><div className="text-[13px] font-bold uppercase">{alertAccess === "premium" ? "Premium activ" : alertAccess === "required" ? "Cont Free" : alertAccess === "loading" ? "Verificăm abonamentul" : "Statutul planului nu este disponibil"}</div><p className="mt-1 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}99` }}>{alertAccess === "premium" ? "Ai acces la monitorizări auto, alerte orare și inboxul Premium." : alertAccess === "required" ? "Căutarea rămâne disponibilă; alertele automate necesită Premium." : "Reîncarcă pagina dacă verificarea nu se finalizează."}</p></div></div>

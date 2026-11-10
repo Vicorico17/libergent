@@ -258,3 +258,75 @@ test("parses a page whose navigation times out after reaching the marketplace", 
   assert.equal(result.itemCount, 1);
   assert.equal(closed, true);
 });
+
+test('browser waits for result cards and collects another page after accessories', async () => {
+  const { SITES } = await import('../sites.js');
+  const calls = [];
+  const selectors = [];
+  let closed = 0;
+  const card = (id, title) => `<div data-cy="l-card" data-testid="l-card"><a href="/d/oferta/phone-ID${id}.html"><h4>${title}</h4></a><p data-testid="ad-price">2000 lei</p></div>`;
+  const launch = async () => ({
+    newPage: async () => {
+      let current;
+      return {
+        setViewport: async () => {},
+        goto: async url => { current = url; calls.push(url); return { status: () => 200 }; },
+        waitForSelector: async selector => { selectors.push(selector); },
+        content: async () => current.includes('page=2') ? card('2', 'iPhone 15 128GB') : card('1', 'Husa iPhone 15') + '<a rel="next" href="?page=2">Next</a>',
+        url: () => current,
+        close: async () => {}
+      };
+    },
+    close: async () => { closed++; }
+  });
+  const result = await searchMarketplaceWithBrowser({}, { site: SITES['olx.ro'], query: 'iphone 15', limit: 1 }, { launch });
+  assert.equal(result.eligibleItemCount, 1);
+  assert.equal(result.items[0].title, 'iPhone 15 128GB');
+  assert.equal(result.pagesUsed, 2);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(selectors, ['[data-testid="l-card"]', '[data-testid="l-card"]']);
+  assert.equal(closed, 1);
+});
+
+test('browser uses only the known search JSON endpoint for structured recovery', async () => {
+  let responseHandler;
+  const endpoint = 'https://retailer.test/api/search?q=iphone';
+  const launch = async () => ({
+    newPage: async () => ({
+      setViewport: async () => {},
+      on: (event, handler) => { if (event === 'response') responseHandler = handler; },
+      goto: async () => {
+        responseHandler({ url: () => 'https://retailer.test/account', status: () => 200, text: () => { throw new Error('Private response must not be read'); } });
+        responseHandler({ url: () => endpoint, status: () => 200, text: async () => JSON.stringify({ products: [{ name: 'iPhone 15 128GB', sku: 'ABC', url_key: 'iphone-15', price: 2000 }], meta: { items: 1, page: 1, total_pages: 1 } }) });
+        return { status: () => 200 };
+      },
+      content: async () => '<html><body>Application shell</body></html>',
+      url: () => 'https://retailer.test/search',
+      close: async () => {}
+    }),
+    close: async () => {}
+  });
+  const site = { key: 'retailer.test', strategy: 'direct-json-retail', searchUrl: () => endpoint, searchPageUrl: () => 'https://retailer.test/search', timeoutMs: 1000 };
+  const result = await searchMarketplaceWithBrowser({}, { site, query: 'iphone 15', limit: 5 }, { launch });
+  assert.equal(result.ok, true);
+  assert.equal(result.extractionMethod, 'browser-search-json');
+  assert.equal(result.eligibleItemCount, 1);
+});
+
+test('browser preserves useful first-page results when later navigation fails', async () => {
+  const { SITES } = await import('../sites.js');
+  const launch = async () => ({
+    newPage: async () => {
+      let url;
+      return { setViewport: async () => {}, goto: async next => { url = next; if (next.includes('page=2')) throw new Error('connection closed'); return { status: () => 200 }; },
+        url: () => url,
+        content: async () => '<div data-cy="l-card" data-testid="l-card"><a href="/d/oferta/phone-ID1.html"><h4>iPhone 15 128GB</h4></a><p data-testid="ad-price">2000 lei</p></div><a rel="next" href="?page=2">Next</a>',
+        close: async () => {} };
+    }, close: async () => {}
+  });
+  const result = await searchMarketplaceWithBrowser({}, { site: SITES['olx.ro'], query: 'iphone 15', limit: 10 }, { launch });
+  assert.equal(result.ok, true);
+  assert.equal(result.eligibleItemCount, 1);
+  assert.equal(result.exhaustedReason, 'page-error');
+  assert.match(result.pageError, /connection closed/);
+});

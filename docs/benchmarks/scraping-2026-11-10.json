@@ -1,0 +1,120 @@
+{
+  "checkedAt": "2026-11-10T19:51:55.095Z",
+  "environment": "local-node",
+  "cases": [
+    {
+      "query": "iphone 15",
+      "site": "olx.ro",
+      "durationMs": 121,
+      "sourceSucceeded": false,
+      "outcomes": [
+        "blocked"
+      ],
+      "uniqueListings": 0,
+      "pricedListings": 0,
+      "pagesUsed": 0,
+      "originRequests": null,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [],
+      "errors": [
+        "Direct fetch failed (403) for https://www.olx.ro/oferte/q-iphone-15/?search%5Border%5D=created_at%3Adesc"
+      ]
+    },
+    {
+      "query": "iphone 15",
+      "site": "lajumate.ro",
+      "durationMs": 799,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 1,
+      "pricedListings": 1,
+      "pagesUsed": 1,
+      "originRequests": 1,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [
+        {
+          "identity": "https://lajumate.ro/ad/vand-telefo-iphone-15-17041960",
+          "title": "Vand telefon Iphone 15",
+          "url": "https://lajumate.ro/ad/vand-telefo-iphone-15-17041960",
+          "price": "2500.00 lei",
+          "priceRon": 2500
+        }
+      ],
+      "errors": []
+    },
+    {
+      "query": "iphone 15",
+      "site": "publi24.ro",
+      "durationMs": 500,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 5,
+      "pricedListings": 5,
+      "pagesUsed": 2,
+      "originRequests": 2,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [
+        {
+          "identity": "https://publi24.ro/anunturi/electronice/telefoane-mobile/iphone/anunt/vind-iphone-15-128-gh/f21d161g14d2777728d275f428ge8eig.html",
+          "title": "vind iPhone 15 128 gh",
+          "url": "https://www.publi24.ro/anunturi/electronice/telefoane-mobile/iphone/anunt/vind-iphone-15-128-gh/f21d161g14d2777728d275f428ge8eig.html",
+          "price": "1,550 RON",
+          "priceRon": 1550
+        },
+        {
+          "identity": "https://publi24.ro/anunturi/electronice/telefoane-mobile/iphone/anunt/iphone-15-negociabil/hf4f448d58297gdee67d61187i2i1hgd.html",
+          "title": "iphone 15 negociabil",
+          "url": "https://www.publi24.ro/anunturi/electronice/telefoane-mobile/iphone/anunt/iphone-15-negociabil/hf4f448d58297gdee67d61187i2i1hgd.html",
+          "price": "1 800 RON",
+          "priceRon": 1800
+        },
+        {
+          "identity": "https://publi24.ro/anunturi/electronice/telefoane-mobile/iphone/anunt/vand-iphone-15-128gb/74402g4163657ei8ehf9gg76h974g028.html",
+          "title": "vand iphone 15 128gb",
+          "url": "https://www.publi24.ro/anunturi/electronice/telefoane-mobile/iphone/anunt/vand-iphone-15-128gb/74402g4163657ei8ehf9gg76h974g028.html",
+          "price": "2 000 RON",
+          "priceRon": 2000
+        },
+        {
+          "identity": "https://publi24.ro/anunturi/electronice/telefoane-mobile/iphone/anunt/iphone-15-black-128gb/71g85d0807df72i3edh45721hh1760hf.html",
+          "title": "iPhone 15 Black 128GB",
+          "url": "https://www.publi24.ro/anunturi/electronice/telefoane-mobile/iphone/anunt/iphone-15-black-128gb/71g85d0807df72i3edh45721hh1760hf.html",
+          "price": "2 200 RON",
+          "priceRon": 2200
+        },
+        {
+          "identity": "https://publi24.ro/anunturi/electronice/telefoane-mobile/iphone/anunt/iphone-15-ca-nou-garantie-128-gb-5g-liber-neverlocked-99-baterie-poze/he899e00102h70h6141g73e559gf9285.html",
+          "title": "iPhone 15 ca NOU Garantie 128 GB 5G Liber Neverlocked 99% Baterie Poze !",
+          "url": "https://www.publi24.ro/anunturi/electronice/telefoane-mobile/iphone/anunt/iphone-15-ca-nou-garantie-128-gb-5g-liber-neverlocked-99-baterie-poze/he899e00102h70h6141g73e559gf9285.html",
+          "price": "2,799 RON",
+          "priceRon": 2799
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "summary": {
+    "cases": 3,
+    "successfulSources": 2,
+    "uniqueListings": 6,
+    "p50Ms": 500,
+    "p95Ms": 799,
+    "fullyJudgedCases": 0
+  }
+}

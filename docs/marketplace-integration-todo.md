@@ -1,5 +1,40 @@
 # Marketplace Integration TODO
 
+## Scraping quality improvements — 2026-11-10
+
+Implementation is local; no production deployment or paid browser benchmark has been performed for this batch. Existing unrelated billing/UI work remains in the shared working tree.
+
+- [x] Remove the eight-match first-page cutoff and result-count-based page estimate. Continue within requested/source/runtime page budgets, preserving terminal-page handling and partial results on later failures.
+- [x] Count final product/condition eligibility toward the collection target using the same classification rules as aggregation. Prioritize eligible products in the bounded response; retain secondary matches where space remains.
+- [x] Classify confirmed empty, blocked/challenged, parser failure, timeout, rate-limited and usable results. Detect HTTP 200 challenge titles before parsing; cache Vinted HTML only after recognizable extraction or confirmed empty evidence. Ambiguous empty pages are failures, not evidence of absent inventory.
+- [x] Extract up to 250 candidates per page (at least 100 where available), then filter, deduplicate, and apply the response limit. This is bounded extraction, not an unlimited crawl.
+- [x] Browser collection defaults to DOM readiness, adds OLX/Vinted/Publi24 result-selector waits, captures the configured JSON search endpoint for direct-JSON retail adapters, and supports up to two pages when forward-pagination evidence exists. Later failures retain earlier results. Other adapters still use HTML/JSON-LD parsing; not every marketplace has a dedicated readiness selector or network adapter.
+- [x] Select browser fallbacks using eligible-result counts and extraction quality. Confirmed empty and rate-limited results do not immediately trigger another provider; keep the better eligible result instead of blindly replacing direct extraction.
+- [x] Coordinate source traffic: 2 concurrent leases and 30 acquisitions/minute per normalized hostname, persistent cooldowns with Retry-After handling, 45-second lease expiry, and 4 MiB direct response bounds. The new ScrapeCoordinator Durable Object shares these budgets across production isolates; identical direct requests coalesce within each isolate only. Node runs use local budgets.
+- [x] Bound direct search work to 60 seconds and each browser search to 45 seconds; Premium scraping phases share a 90-second deadline. These are scraping deadlines, not a bound on subsequent AI decisions or persistence. A coalesced origin fetch has its own 30-second lifetime so one subscriber cancelling does not cancel another.
+- [x] Preserve OLX decimal prices and deduplicate known OLX/Vinted listing IDs; strip only known tracking parameters elsewhere, preserving variant/seller parameters.
+- [x] Add repeatable local/production Free benchmark tooling, baseline comparisons, origin-request metrics when available, and optional human relevance/price labels. Unjudged accuracy remains null rather than inferred from extracted counts.
+- [ ] Deploy to staging with the new ScrapeCoordinator binding and migration, then exercise simultaneous searches, cooldown recovery, and the configured browser engines against representative sources. Tune the conservative source budgets using measured traffic before production rollout.
+- [ ] Run a broader production benchmark from the actual Worker environment. Label samples to measure precision and price accuracy, compare identical cases/settings before and after, and verify final UI behavior with partial/blocked sources.
+
+Verification: `npm run check` passed 445 backend tests and 13 UI/helper tests in the current shared workspace. `node scripts/check-scrape-runtime.js` passed real workerd concurrent lease/release, SQLite persistence, and cooldown recovery across restart. The existing integration runtime checks also passed. Production Worker bundling passed `wrangler deploy --dry-run --env ''`; this did not deploy resources.
+
+Live local smoke evidence: [scraping benchmark](benchmarks/scraping-2026-11-10.json). Three direct `iphone 15` cases: OLX blocked (403), Lajumate one final eligible listing / one origin request, Publi24 five final eligible listings / two origin requests. These are post-classification counts, unlike the earlier review's preliminary matches. No manual relevance or price labels were provided; no before/after quality gain is claimed.
+
+Repeat the same cases locally:
+
+```sh
+node scripts/benchmark-scraping.js --local --cases scripts/scrape-benchmark-cases.json --out /tmp/scraping-local.json
+```
+
+Test the deployed Free route (sequential, refreshed, up to two pages and 20 results per case):
+
+```sh
+node scripts/benchmark-scraping.js --base-url https://libergent.com --cases scripts/scrape-benchmark-cases.json --out /tmp/scraping-production.json
+```
+
+Use `--baseline path/to/earlier-report.json` only for comparable environments/settings. Optional `--labels labels.json` is keyed by query and each sample's `identity`, e.g. `{"iphone 15":{"https://example.test/product":{"relevant":true,"expectedPriceRon":2000}}}`. Precision is reported only when every returned top-ten item has a relevance label. Source success, price-field coverage, and manually judged accuracy are separate measurements. Paid browser benchmarking remains available through the existing owner-authenticated `benchmark:kitesurf` tool.
+
 ## Finalize VINDE and agent publishing — 2026-10-19
 
 Owner goal: write an announcement once, or tell an agent what to sell, and have LiberGent publish it to as many supported second-hand marketplaces as possible with minimal extra work.

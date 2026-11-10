@@ -123,6 +123,7 @@ export type ApiResult = {
 };
 
 export type SearchPayload = {
+  credits?: { balance: number; spent: number; replay?: boolean };
   code?: string;
   searchTier?: "free" | "premium";
   results?: ApiResult[];

@@ -1,3 +1,7 @@
+import { fetchScrape } from "./scrape-transport.js";
+import { isCollectionCandidate } from "./aggregate.js";
+import { uniqueListings } from "./listing-identity.js";
+import { isChallengeHtml, extractionOutcome, scrapeError } from "./scrape-outcome.js";
 import { buildListingSchema } from "./schema.js";
 import { crawlWithCloudflare, scrapeWithCloudflare } from "./providers/cloudflare.js";
 import { scrapeMarkdownWithFirecrawl, scrapeWithFirecrawl } from "./providers/firecrawl.js";
@@ -14,7 +18,6 @@ import { normalizeSearchProvider } from "./provider-options.js";
 const DESKTOP_BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 const MOBILE_BROWSER_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const VINTED_DIRECT_HTML_CACHE_SECONDS = 300;
-const MIN_FIRST_PAGE_MATCHES_BEFORE_EXPANSION = 8;
 
 function tokenize(value = "") {
   return normalizeCapacityTerms(normalizeModelTerms(value))
@@ -172,6 +175,7 @@ function buildDirectFetchError(response, url) {
 }
 
 export function detectSearchResponseFailure(requestedUrl, finalUrl, html) {
+  if (isChallengeHtml(html)) return "Search blocked by Cloudflare challenge or access denied page";
   const requested = new URL(requestedUrl);
   const final = new URL(finalUrl || requestedUrl);
   const title = String(html || "").match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
@@ -220,7 +224,7 @@ async function writeDirectHtmlCache(cacheRequest, html) {
   })).catch(() => {});
 }
 
-async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
+async function fetchHtmlDirect({ url, timeoutMs = 15000, signal, metrics }) {
   const cacheRequest = buildDirectHtmlCacheRequest(url);
   const cachedHtml = await readDirectHtmlCache(cacheRequest);
   if (cachedHtml) return cachedHtml;
@@ -231,14 +235,15 @@ async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
   for (const [index, headers] of headerProfiles.entries()) {
     let response;
     try {
-      response = await fetch(url, {
+      response = await fetchScrape(url, {
         signal: buildAbortSignal({ timeoutMs, signal }),
+        metrics,
         headers,
         redirect: "follow"
       });
     } catch (error) {
       lastError = error;
-      if (signal?.aborted || index === headerProfiles.length - 1) {
+      if (signal?.aborted || error?.outcome || index === headerProfiles.length - 1) {
         throw error;
       }
       continue;
@@ -247,8 +252,7 @@ async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
     if (response.ok) {
       const html = await response.text();
       const softFailure = detectSearchResponseFailure(url, response.url, html);
-      if (softFailure) throw new Error(softFailure);
-      await writeDirectHtmlCache(cacheRequest, html);
+      if (softFailure) throw scrapeError(softFailure, isChallengeHtml(html) ? "blocked" : "invalid_response");
       return html;
     }
 
@@ -264,11 +268,12 @@ async function fetchHtmlDirect({ url, timeoutMs = 15000, signal }) {
   throw lastError || new Error(`Direct fetch failed for ${url}`);
 }
 
-async function fetchJsonDirect({ url, refererUrl, timeoutMs = 15000, signal, body, allowLegacyJson = false }) {
+async function fetchJsonDirect({ url, refererUrl, timeoutMs = 15000, signal, metrics, body, allowLegacyJson = false }) {
   const referer = refererUrl || url;
   const origin = new URL(referer).origin;
-  const response = await fetch(url, {
+  const response = await fetchScrape(url, {
     signal: buildAbortSignal({ timeoutMs, signal }),
+        metrics,
     redirect: "follow",
     method: body ? "POST" : "GET",
     body,
@@ -296,31 +301,26 @@ async function fetchJsonDirect({ url, refererUrl, timeoutMs = 15000, signal, bod
   return response.json();
 }
 
-async function fetchNichidutaSearch({ url, limit, timeoutMs, signal }) {
-  const html = await fetchHtmlDirect({ url, timeoutMs, signal });
+async function fetchAndParseHtml({ site, url, limit, query, signal, metrics }) {
+  const html = await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs, signal, metrics });
+  const parsed = parseSiteHtml({ site, html, url, limit, query });
+  if (extractionOutcome(parsed) !== "parser_failure") {
+    await writeDirectHtmlCache(buildDirectHtmlCacheRequest(url), html);
+  }
+  return parsed;
+}
+
+async function fetchNichidutaSearch({ url, limit, timeoutMs, signal, metrics }) {
+  const html = await fetchHtmlDirect({ url, timeoutMs, signal, metrics });
   const cards = extractNichidutaCards(html).slice(0, 60);
   if (!cards.length) return { items: [], rawItemCount: 0, totalResults: null, hasNextPage: false };
   const body = new URLSearchParams(cards.map((card) => ["pid[]", card.id])).toString();
   const prices = await fetchJsonDirect({ url: "https://www.nichiduta.ro/ajax/load_prices",
-    refererUrl: url, body, timeoutMs, signal, allowLegacyJson: true });
+    refererUrl: url, body, timeoutMs, signal, metrics, allowLegacyJson: true });
   return parseNichidutaPrices(cards, prices, limit);
 }
 
-function dedupeItems(items) {
-  const seen = new Set();
-  const output = [];
-
-  for (const item of items) {
-    const key = item.url || `${item.title}::${item.price}::${item.location}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    output.push(item);
-  }
-
-  return output;
-}
+const dedupeItems = uniqueListings;
 
 function getRawItemCount(parsed, items) {
   return Number.isFinite(parsed.rawItemCount) ? parsed.rawItemCount : items.length;
@@ -359,7 +359,7 @@ function extractCloudflareCrawlItems(raw) {
   });
 }
 
-async function runSinglePageSearch({ provider, site, query, limit, page, signal }) {
+async function runSinglePageSearch({ provider, site, query, limit, page, signal, metrics }) {
   const resolvedProvider = resolveProvider(provider, site);
   const url = resolvedProvider !== "direct" && typeof site.searchPageUrl === "function"
     ? site.searchPageUrl(query, page)
@@ -372,6 +372,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
   let totalResults = null;
   let rawItemCount = 0;
   let hasNextPage = null;
+  let outcome = "results";
 
   if (resolvedProvider === "direct") {
     if (!["direct-html-local", "direct-html-retail", "direct-json-retail"].includes(site.strategy)) {
@@ -379,24 +380,20 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
     }
 
     const parsed = site.key === "nichiduta.ro"
-      ? await fetchNichidutaSearch({ url, limit, timeoutMs: site.timeoutMs, signal })
+      ? await fetchNichidutaSearch({ url, limit, timeoutMs: site.timeoutMs, signal, metrics })
       : site.strategy === "direct-json-retail"
       ? parseAltexSearchJson(await fetchJsonDirect({
         url,
         refererUrl: typeof site.searchPageUrl === "function" ? site.searchPageUrl(query, page) : undefined,
         timeoutMs: site.timeoutMs,
-        signal
+        signal, metrics
       }), limit, {
         origin: new URL(typeof site.searchPageUrl === "function" ? site.searchPageUrl(query, page) : url).origin,
         query
       })
-      : parseSiteHtml({
-        site,
-        html: await fetchHtmlDirect({ url, timeoutMs: site.timeoutMs, signal }),
-        url,
-        limit,
-        query
-      });
+      : await fetchAndParseHtml({ site, url, limit, query, signal, metrics });
+    outcome = extractionOutcome(parsed);
+    if (outcome === "parser_failure") throw scrapeError(`No recognizable listings or confirmed empty state for ${site.key}`, outcome);
     items = parsed.items;
     totalResults = parsed.totalResults;
     rawItemCount = getRawItemCount(parsed, items);
@@ -410,7 +407,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
     });
     items = extractCloudflareCrawlItems(raw);
   } else if (resolvedProvider === "cloudflare") {
-    raw = await scrapeWithCloudflare({ url, prompt, schema, timeoutMs: site.timeoutMs, signal });
+    raw = await scrapeWithCloudflare({ url, prompt, schema, timeoutMs: site.timeoutMs, signal, metrics });
     items = Array.isArray(raw?.items) ? raw.items : [];
   } else if (resolvedProvider === "firecrawl" && site.strategy === "firecrawl-markdown-local") {
     raw = await scrapeMarkdownWithFirecrawl({
@@ -448,6 +445,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
   rawItemCount = rawItemCount || unfilteredItems.length || items.length;
 
   return {
+    outcome,
     provider: resolvedProvider,
     strategy: site.strategy,
     site: site.key,
@@ -459,14 +457,6 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal 
     totalResults,
     hasNextPage
   };
-}
-
-function estimateTotalPages(firstPage, pageSize, effectiveLimit) {
-  if (firstPage.totalResults) {
-    return Math.ceil(firstPage.totalResults / Math.max(pageSize, firstPage.rawItemCount || firstPage.itemCount || 1, 1));
-  }
-
-  return Math.ceil(effectiveLimit / pageSize);
 }
 
 function shouldStopAfterPage(pageResult, nextItems, currentItems, pageSize) {
@@ -489,12 +479,14 @@ function shouldStopAfterPage(pageResult, nextItems, currentItems, pageSize) {
   return (pageResult.rawItemCount || pageResult.itemCount) < Math.max(5, Math.floor(pageSize / 3));
 }
 
-export async function runSearch({ provider, site, query, limit, maxPages, signal }) {
+export async function runSearch({ provider, site, query, limit, maxPages, signal, condition = "any", allowAdult = false }) {
+  const startedAt = Date.now();
+  const metrics = { originRequests: 0, coalescedRequests: 0 };
   const marketplaceQuery = normalizeMarketplaceQuery(query);
   const requestedProvider = normalizeSearchProvider(provider);
 
   if (site.strategy === "crawl-seed") {
-    const result = await runSinglePageSearch({ provider: requestedProvider, site, query: marketplaceQuery, limit, page: 1, signal });
+    const result = await runSinglePageSearch({ provider: requestedProvider, site, query: marketplaceQuery, limit, page: 1, signal, metrics });
     return {
       ...result,
       pagesUsed: 1,
@@ -506,12 +498,20 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
   const pageSize = site.pageSize || Math.max(10, Math.min(effectiveLimit, 50));
   const cappedMaxPages = Math.min(maxPages ?? site.defaultMaxPages ?? site.maxPages ?? 1, site.maxPages ?? 1);
 
+  const candidateLimit = Math.min(250, Math.max(pageSize, effectiveLimit, 100));
+  const eligibility = new WeakMap();
+  const qualifies = item => {
+    if (!eligibility.has(item)) eligibility.set(item, isCollectionCandidate(item, marketplaceQuery, condition, allowAdult));
+    return eligibility.get(item);
+  };
+  const qualifiedCount = items => items.filter(qualifies).length;
   const firstPage = await runSinglePageSearch({
     provider: requestedProvider,
     site,
     query: marketplaceQuery,
-    limit: Math.min(pageSize, effectiveLimit),
+    limit: candidateLimit,
     page: 1,
+    metrics,
     signal
   });
 
@@ -519,23 +519,17 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
   let items = dedupeItems(firstPage.items);
   let exhaustedReason = firstPage.rawItemCount === 0 ? "empty-first-page" : "limit";
   let pageError = null;
-  const estimatedTotalPages = estimateTotalPages(firstPage, pageSize, effectiveLimit);
-  const requestedTargetPages = Math.max(1, Math.min(cappedMaxPages, estimatedTotalPages));
-  const hasMorePages = firstPage.hasNextPage !== false && (
-    firstPage.hasNextPage === true ||
-    (Number.isFinite(firstPage.totalResults) && firstPage.totalResults > 0) ||
-    (firstPage.rawItemCount || firstPage.itemCount) > 0
-  );
-  const firstPageIsUnderfilled = firstPage.itemCount < MIN_FIRST_PAGE_MATCHES_BEFORE_EXPANSION
-    && hasMorePages;
-  const targetPages = requestedTargetPages > 1 && firstPageIsUnderfilled
-    ? requestedTargetPages
-    : 1;
+  // A result limit counts unique matches, not raw marketplace cards. A full
+  // first page (or an estimated source total) cannot tell us how many pages
+  // will be needed after filtering and deduplication. Keep the page budget
+  // available while the source reports more results.
+  const hasMorePages = firstPage.hasNextPage !== false && firstPage.rawItemCount > 0;
+  const targetPages = hasMorePages ? Math.max(1, cappedMaxPages) : 1;
 
   if (firstPage.hasNextPage === false) exhaustedReason = "no-next-page";
 
   for (let page = 2; page <= targetPages; page += 1) {
-    if (items.length >= effectiveLimit) {
+    if (qualifiedCount(items) >= effectiveLimit) {
       exhaustedReason = "limit";
       break;
     }
@@ -546,8 +540,9 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
         provider: requestedProvider,
         site,
         query: marketplaceQuery,
-        limit: Math.min(pageSize, effectiveLimit),
+        limit: candidateLimit,
         page,
+        metrics,
         signal
       });
     } catch (error) {
@@ -572,11 +567,15 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
     exhaustedReason = page >= targetPages ? "page-window" : exhaustedReason;
   }
 
-  items = items.slice(0, effectiveLimit);
-  if (items.length >= effectiveLimit) {
+  // Prefer final eligible products before spending the response limit on
+  // secondary matches; retain the latter when space remains.
+  const qualified = items.filter(qualifies);
+  const secondary = items.filter(item => !qualifies(item));
+  items = [...qualified, ...secondary].slice(0, effectiveLimit);
+  if (qualifiedCount(items) >= effectiveLimit) {
     exhaustedReason = "limit";
   } else if (results.length >= targetPages && exhaustedReason === "limit") {
-    exhaustedReason = targetPages >= estimatedTotalPages ? "estimated-total" : "page-window";
+    exhaustedReason = "page-window";
   }
 
   return {
@@ -586,6 +585,10 @@ export async function runSearch({ provider, site, query, limit, maxPages, signal
     url: site.searchUrl(marketplaceQuery),
     query: marketplaceQuery,
     itemCount: items.length,
+    eligibleItemCount: qualifiedCount(items),
+    durationMs: Date.now() - startedAt,
+    fetchMetrics: requestedProvider === "direct" || firstPage.provider === "direct" ? metrics : null,
+    outcome: items.length ? "results" : firstPage.outcome,
     rawItemCount: results.reduce((sum, result) => sum + (
       Number.isFinite(result.rawItemCount) ? result.rawItemCount : result.itemCount || 0
     ), 0),

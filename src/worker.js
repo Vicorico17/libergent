@@ -1,3 +1,9 @@
+import { needsBrowserFallback, preferBrowserFallback } from "./scrape-fallback.js";
+export { ScrapeCoordinator } from "./scrape-coordinator.js";
+import { configureScrapeCoordinator } from "./scrape-transport.js";
+import { creditsEnabled, creditOffers, CREDIT_OFFERS, createCreditCheckout, fulfillCreditPack, fulfillMonthlyCredits } from "./credit-billing.js";
+import { runCreditSearch, PREMIUM_SEARCH_COST } from "./search-credits.js";
+import { searchCreditWallet } from "./supabase.js";
 import { checkFreeSearchLimits } from "./free-search-limits.js";
 import { isSellerStopRequest } from "./contact-stop.js";
 import { stopWhatsAppContact, isWhatsAppContactStopped } from "./supabase.js";
@@ -80,6 +86,7 @@ function normalizeApiPathname(pathname = "") {
 }
 
 function applyEnv(env = {}) {
+  configureScrapeCoordinator(env.SCRAPE_COORDINATOR);
   if (!globalThis.process) {
     globalThis.process = { env: {} };
   } else if (!globalThis.process.env) {
@@ -133,26 +140,11 @@ function getPremiumKitesurfConcurrency(env = {}) {
   return Math.max(1, Math.min(configured, 8));
 }
 
-function needsBrowserFallback(result) {
-  if (!result?.ok) return true;
-  const usableCount = result.itemCount ?? result.includedItemCount ?? result.items?.length ?? result.parsedItemCount ?? result.rawItemCount ?? 0;
-  return usableCount === 0;
-}
-
 function canTryChromiumAfterKitesurf(directResult, kitesurfResult) {
   if (kitesurfResult?.challengeDetected) return false;
   if (!needsBrowserFallback(preferBrowserFallback(directResult, kitesurfResult))) return false;
   if (!directResult?.ok && /\b404\b|Search returned an error page|Search redirected/i.test(directResult?.error || "")) return false;
   return true;
-}
-
-function preferBrowserFallback(directResult, browserResult) {
-  if (!browserResult) return directResult;
-
-  const browserItemCount = browserResult.itemCount ?? browserResult.items?.length ?? browserResult.parsedItemCount ?? browserResult.rawItemCount ?? 0;
-  if (browserResult.ok && browserItemCount > 0) return browserResult;
-  if (directResult?.ok) return directResult;
-  return browserResult;
 }
 
 function buildSearchCacheRequest(request, params, viewerLocation = null, tier = "premium") {
@@ -373,13 +365,13 @@ function getSearchRequestParams(url) {
 }
 
 
-async function searchPremiumBrowserSites(env, { query, limit, siteKeys, engine = "chromium" }) {
+async function searchPremiumBrowserSites(env, { query, limit, siteKeys, engine = "chromium", signal, condition = "any", allowAdult = false }) {
   if (!siteKeys.length) return [];
   const browserLimit = Math.min(limit ?? 20, 30);
   try {
     const results = await searchMarketplacesWithBrowser(
       env.BROWSER,
-      siteKeys.map((siteKey) => ({ site: getSite(siteKey), query, limit: browserLimit })),
+      siteKeys.map((siteKey) => ({ site: getSite(siteKey), query, limit: browserLimit, signal, condition, allowAdult })),
       {
         includeBodyText: true,
         concurrency: engine === "kitesurf" ? getPremiumKitesurfConcurrency(env) : getPremiumBrowserConcurrency(env),
@@ -965,7 +957,20 @@ async function handleApi(request, env, context) {
 
   if (apiPath === "/api/billing/config") {
     if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
-    return json({ available: isCheckoutConfigured(env) });
+    return json({ available: isCheckoutConfigured(env) || (isBillingConfigured(env) && creditsEnabled(env)), offers: creditOffers(env), testMode: String(env.STRIPE_SECRET_KEY || "").startsWith("sk_test_") });
+  }
+
+  if (apiPath === "/api/billing/credits") {
+    if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+    const auth = await authenticateSupabaseUser(request, env);
+    if (!auth.user) return json({ error: auth.error }, auth.status);
+    try {
+      const entitlement = await readPremiumEntitlement(auth.user.id, auth.user.email || "", env);
+      const wallet = creditsEnabled(env) ? await searchCreditWallet(auth.user.id, "status", {}, env) : null;
+      return json({ enabled: creditsEnabled(env), premium: entitlement.active, searchCost: PREMIUM_SEARCH_COST, ...wallet });
+    } catch {
+      return json({ error: "Nu am putut încărca soldul. Încearcă din nou." }, 503);
+    }
   }
 
   if (apiPath === "/api/billing/status") {
@@ -988,10 +993,11 @@ async function handleApi(request, env, context) {
     if (rawBody.length > 65536) return json({ error: "Webhook too large." }, 413);
     const event = await verifyStripeEvent(rawBody, request.headers.get("stripe-signature"), env.STRIPE_WEBHOOK_SECRET);
     if (!event?.id || !event?.type || !Number.isSafeInteger(event.created)) return json({ error: "Invalid Stripe signature or event." }, 400);
-    const relevant = new Set(["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted", "invoice.paid", "invoice.payment_failed"]);
+    const relevant = new Set(["checkout.session.completed", "checkout.session.async_payment_succeeded", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted", "invoice.paid", "invoice.payment_failed"]);
     if (!relevant.has(event.type)) return json({ ok: true, ignored: true });
     try {
       const object = event.data?.object || {};
+      if (creditsEnabled(env) && event.type.startsWith("checkout.session.") && await fulfillCreditPack(object, env)) return json({ ok: true });
       const subscriptionId = event.type === "checkout.session.completed" ? object.subscription
         : event.type.startsWith("invoice.") ? (object.parent?.subscription_details?.subscription || object.subscription)
         : object.id;
@@ -1012,6 +1018,7 @@ async function handleApi(request, env, context) {
       const entitlement = entitlementFromSubscription(subscription);
       await applyBillingSubscription({ userId, customerId, subscriptionId, status: entitlement.status,
         expiresAt: entitlement.expires_at, eventCreated: event.created }, env);
+      if (creditsEnabled(env)) await fulfillMonthlyCredits(event, subscription, userId, env);
       return json({ ok: true });
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : String(error) }, 500);
@@ -1021,7 +1028,7 @@ async function handleApi(request, env, context) {
   if (apiPath === "/api/billing/checkout" || apiPath === "/api/billing/portal") {
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
     if (!isBillingConfigured(env)) return json({ error: "Billing is not configured." }, 503);
-    if (apiPath.endsWith("/checkout") && !isCheckoutConfigured(env)) return json({ error: "Checkout plans are not configured." }, 503);
+    if (apiPath.endsWith("/checkout") && !isCheckoutConfigured(env) && !creditsEnabled(env)) return json({ error: "Checkout plans are not configured." }, 503);
     const auth = await authenticateSupabaseUser(request, env);
     if (!auth.user) return json({ error: auth.error }, auth.status);
     try {
@@ -1031,15 +1038,26 @@ async function handleApi(request, env, context) {
         const session = await createPortalSession({ customerId: mapped.stripe_customer_id, requestUrl: request.url, env });
         return json({ url: session.url });
       }
+      const parsedBody = await parseJsonRequest(request);
+      if (parsedBody.error) return json({ error: parsedBody.error }, parsedBody.error.includes("large") ? 413 : 400);
+      const plan = parsedBody.data?.plan;
+      if (creditsEnabled(env) && Object.hasOwn(CREDIT_OFFERS, plan)) {
+        if (plan === "monthly" && mapped?.stripe_subscription_id) {
+          const current = await stripeGet(`/subscriptions/${mapped.stripe_subscription_id}`, env);
+          if (["active", "trialing", "past_due", "unpaid", "incomplete"].includes(current.status)) return json({ error: "Gestionează abonamentul existent din cont.", code: "subscription_exists" }, 409);
+        }
+        const session = await createCreditCheckout({ user: auth.user, customerId: mapped?.stripe_customer_id,
+          plan, returnTo: parsedBody.data?.returnTo, requestUrl: request.url, env });
+        return json({ url: session.url });
+      }
+      if (creditsEnabled(env)) return json({ error: "Choose monthly, credits10 or credits30." }, 400);
       if (mapped?.stripe_subscription_id) {
         const subscription = await stripeGet(`/subscriptions/${mapped.stripe_subscription_id}`, env);
         if (["active", "trialing", "past_due", "unpaid"].includes(subscription.status)) {
           return json({ error: "A subscription already exists. Manage it in the billing portal.", code: "subscription_exists" }, 409);
         }
       }
-      const parsedBody = await parseJsonRequest(request);
-      if (parsedBody.error) return json({ error: parsedBody.error }, parsedBody.error.includes("large") ? 413 : 400);
-      const plan = parsedBody.data?.plan;
+
       if (plan !== "weekly" && plan !== "annual") return json({ error: "Choose a valid billing plan." }, 400);
       const priceId = await assertConfiguredPrice(plan, env);
       const session = await createCheckoutSession({ user: auth.user, customerId: mapped?.stripe_customer_id,
@@ -1202,8 +1220,10 @@ async function handleApi(request, env, context) {
   }
 
   if (apiPath === "/api/search/premium") {
-    const premium = await authenticatePremiumUser(request, env);
+    const premium = creditsEnabled(env) ? await authenticateSupabaseUser(request, env) : await authenticatePremiumUser(request, env);
     if (premium.response) return premium.response;
+    if (!premium.user) return json({ error: premium.error }, premium.status);
+    if (creditsEnabled(env) && request.method !== "POST") return json({ error: "Premium searches require POST." }, 405);
 
     if (!env.BROWSER) {
       return json({ error: "Cloudflare Browser Run is not configured." }, 503);
@@ -1221,94 +1241,102 @@ async function handleApi(request, env, context) {
         return json({ error: "Premium search currently supports site=all or site=default." }, 400);
       }
 
-      const cacheRequest = buildSearchCacheRequest(request, params, viewerLocation);
-      const cachedResponse = adultSearch || url.searchParams.get("refresh") === "1" ? null : await readSearchCache(cacheRequest);
-      if (cachedResponse) return cachedResponse;
+      const execute = async () => {
+        const searchSignal = AbortSignal.timeout(90000);
+        const cacheRequest = buildSearchCacheRequest(request, params, viewerLocation);
+        const cachedResponse = adultSearch || url.searchParams.get("refresh") === "1" ? null : await readSearchCache(cacheRequest);
+        if (cachedResponse) return cachedResponse.json();
 
-      const premiumSiteKeys = [...new Set(getPremiumSiteKeys(query))];
-      const freeSiteKeys = [...new Set(getFreeSearchSiteKeys(site, query).filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey)))];
-      const eligibleSiteKeys = [...new Set([...freeSiteKeys, ...premiumSiteKeys])];
-      const [freePayload, directPremiumPayload] = await Promise.all([
-        searchAcrossSites({ allowAdult, query, condition, provider: "direct", limit, maxPages, siteKeys: freeSiteKeys, aggregate: false }),
-        searchAcrossSites({ allowAdult, query, condition, provider: "direct", limit, maxPages: 1, siteKeys: premiumSiteKeys, aggregate: false })
-      ]);
-      const directResults = [...freePayload.results, ...directPremiumPayload.results];
-      const directBySite = new Map(directResults.map((result) => [result.site, result]));
-      const kitesurfFallbackLimit = getPremiumKitesurfFallbackLimit(env, eligibleSiteKeys.length);
-      const kitesurfSiteKeys = isPremiumKitesurfEnabled(env)
-        ? eligibleSiteKeys
-          .filter((siteKey) => needsBrowserFallback(directBySite.get(siteKey)))
-          .slice(0, kitesurfFallbackLimit)
-        : [];
-      const kitesurfResults = await searchPremiumBrowserSites(env, {
-        query,
-        limit,
-        siteKeys: kitesurfSiteKeys,
-        engine: "kitesurf"
-      });
-      const kitesurfBySite = new Map(kitesurfResults.map((result) => [result.site, result]));
-      const resultAfterKitesurf = (siteKey) => preferBrowserFallback(directBySite.get(siteKey), kitesurfBySite.get(siteKey));
+        const premiumSiteKeys = [...new Set(getPremiumSiteKeys(query))];
+        const freeSiteKeys = [...new Set(getFreeSearchSiteKeys(site, query).filter((siteKey) => !PREMIUM_SITE_KEYS.includes(siteKey)))];
+        const eligibleSiteKeys = [...new Set([...freeSiteKeys, ...premiumSiteKeys])];
+        const [freePayload, directPremiumPayload] = await Promise.all([
+          searchAcrossSites({ allowAdult, query, condition, provider: "direct", limit, maxPages, siteKeys: freeSiteKeys, aggregate: false, signal: searchSignal }),
+          searchAcrossSites({ allowAdult, query, condition, provider: "direct", limit, maxPages: 1, siteKeys: premiumSiteKeys, aggregate: false, signal: searchSignal })
+        ]);
+        const directResults = [...freePayload.results, ...directPremiumPayload.results];
+        const directBySite = new Map(directResults.map((result) => [result.site, result]));
+        const kitesurfFallbackLimit = getPremiumKitesurfFallbackLimit(env, eligibleSiteKeys.length);
+        const kitesurfSiteKeys = isPremiumKitesurfEnabled(env)
+          ? eligibleSiteKeys
+            .filter((siteKey) => needsBrowserFallback(directBySite.get(siteKey)))
+            .slice(0, kitesurfFallbackLimit)
+          : [];
+        const kitesurfResults = await searchPremiumBrowserSites(env, {
+          query,
+          limit,
+          siteKeys: kitesurfSiteKeys,
+          signal: searchSignal, condition, allowAdult,
+          engine: "kitesurf"
+        });
+        const kitesurfBySite = new Map(kitesurfResults.map((result) => [result.site, result]));
+        const resultAfterKitesurf = (siteKey) => preferBrowserFallback(directBySite.get(siteKey), kitesurfBySite.get(siteKey));
 
-      const chromiumFallbackLimit = getPremiumBrowserFallbackLimit(env);
-      const chromiumSiteKeys = PREMIUM_BROWSER_FALLBACK_PRIORITY
-        .filter((siteKey) => eligibleSiteKeys.includes(siteKey)
-          && canTryChromiumAfterKitesurf(directBySite.get(siteKey), kitesurfBySite.get(siteKey)))
-        .slice(0, chromiumFallbackLimit);
-      const chromiumResults = await searchPremiumBrowserSites(env, {
-        query,
-        limit,
-        siteKeys: chromiumSiteKeys,
-        engine: "chromium"
-      });
-      const chromiumBySite = new Map(chromiumResults.map((result) => [result.site, result]));
-      const bestResultForSite = (siteKey) => preferBrowserFallback(resultAfterKitesurf(siteKey), chromiumBySite.get(siteKey));
-      const freeResults = freeSiteKeys.map(bestResultForSite);
-      const premiumResults = premiumSiteKeys.map(bestResultForSite);
-      const payload = aggregateMarketplaceResults(
-        [...freeResults, ...premiumResults],
-        {
-          condition,
-          creditBudget: freePayload.summary?.creditBudget || 0,
-          maxPriceRon,
-          creditsUsed: freePayload.summary?.creditsUsed || 0,
-          viewerLocation,
-          allowAdult
-        }
-      );
-      payload.summary.jevDecision = await applyJevProductDecision(payload, { env, query, condition });
-      payload.searchTier = "premium";
-      payload.summary.premiumMarketplaces = premiumSiteKeys.length;
-      payload.summary.browserEligibleMarketplaces = eligibleSiteKeys.length;
-      payload.summary.browserFallbackLimit = kitesurfFallbackLimit;
-      payload.summary.browserConcurrency = getPremiumKitesurfConcurrency(env);
-      payload.summary.browserFallbackMarketplaces = [...new Set([...kitesurfSiteKeys, ...chromiumSiteKeys])];
-      payload.summary.browserMarketplaces = kitesurfResults.length + chromiumResults.length;
-      payload.summary.successfulBrowserMarketplaces = [...kitesurfResults, ...chromiumResults].filter((result) => result?.ok).length;
-      payload.summary.browserSessionsUsed = [...kitesurfResults, ...chromiumResults]
-        .reduce((sum, result) => sum + (result?.browserSessionsUsed || 0), 0);
-      payload.summary.kitesurfEnabled = isPremiumKitesurfEnabled(env);
-      payload.summary.kitesurfFallbackLimit = kitesurfFallbackLimit;
-      payload.summary.kitesurfConcurrency = getPremiumKitesurfConcurrency(env);
-      payload.summary.kitesurfFallbackMarketplaces = kitesurfSiteKeys;
-      payload.summary.successfulKitesurfMarketplaces = kitesurfResults.filter((result) => result?.ok).length;
-      payload.summary.chromiumFallbackLimit = chromiumFallbackLimit;
-      payload.summary.chromiumConcurrency = getPremiumBrowserConcurrency(env);
-      payload.summary.chromiumFallbackMarketplaces = chromiumSiteKeys;
-      payload.summary.browserDiagnostics = [...kitesurfResults, ...chromiumResults].map((result) => ({
-        site: result.site,
-        engine: result.browserEngine || "chromium",
-        ok: Boolean(result.ok),
-        itemCount: result.itemCount ?? result.items?.length ?? 0,
-        rawItemCount: result.rawItemCount ?? result.parsedItemCount ?? 0,
-        durationMs: result.durationMs ?? null,
-        challengeDetected: Boolean(result.challengeDetected),
-        error: result.ok ? "" : result.error || "Browser search failed."
-      }));
-      payload.summary.cacheHit = false;
+        const chromiumFallbackLimit = getPremiumBrowserFallbackLimit(env);
+        const chromiumSiteKeys = PREMIUM_BROWSER_FALLBACK_PRIORITY
+          .filter((siteKey) => eligibleSiteKeys.includes(siteKey)
+            && canTryChromiumAfterKitesurf(directBySite.get(siteKey), kitesurfBySite.get(siteKey)))
+          .slice(0, chromiumFallbackLimit);
+        const chromiumResults = await searchPremiumBrowserSites(env, {
+          query,
+          limit,
+          siteKeys: chromiumSiteKeys,
+          signal: searchSignal, condition, allowAdult,
+          engine: "chromium"
+        });
+        const chromiumBySite = new Map(chromiumResults.map((result) => [result.site, result]));
+        const bestResultForSite = (siteKey) => preferBrowserFallback(resultAfterKitesurf(siteKey), chromiumBySite.get(siteKey));
+        const freeResults = freeSiteKeys.map(bestResultForSite);
+        const premiumResults = premiumSiteKeys.map(bestResultForSite);
+        const payload = aggregateMarketplaceResults(
+          [...freeResults, ...premiumResults],
+          {
+            condition,
+            creditBudget: freePayload.summary?.creditBudget || 0,
+            maxPriceRon,
+            creditsUsed: freePayload.summary?.creditsUsed || 0,
+            viewerLocation,
+            allowAdult
+          }
+        );
+        payload.summary.jevDecision = await applyJevProductDecision(payload, { env, query, condition });
+        payload.searchTier = "premium";
+        payload.summary.premiumMarketplaces = premiumSiteKeys.length;
+        payload.summary.browserEligibleMarketplaces = eligibleSiteKeys.length;
+        payload.summary.browserFallbackLimit = kitesurfFallbackLimit;
+        payload.summary.browserConcurrency = getPremiumKitesurfConcurrency(env);
+        payload.summary.browserFallbackMarketplaces = [...new Set([...kitesurfSiteKeys, ...chromiumSiteKeys])];
+        payload.summary.browserMarketplaces = kitesurfResults.length + chromiumResults.length;
+        payload.summary.successfulBrowserMarketplaces = [...kitesurfResults, ...chromiumResults].filter((result) => result?.ok).length;
+        payload.summary.browserSessionsUsed = [...kitesurfResults, ...chromiumResults]
+          .reduce((sum, result) => sum + (result?.browserSessionsUsed || 0), 0);
+        payload.summary.kitesurfEnabled = isPremiumKitesurfEnabled(env);
+        payload.summary.kitesurfFallbackLimit = kitesurfFallbackLimit;
+        payload.summary.kitesurfConcurrency = getPremiumKitesurfConcurrency(env);
+        payload.summary.kitesurfFallbackMarketplaces = kitesurfSiteKeys;
+        payload.summary.successfulKitesurfMarketplaces = kitesurfResults.filter((result) => result?.ok).length;
+        payload.summary.chromiumFallbackLimit = chromiumFallbackLimit;
+        payload.summary.chromiumConcurrency = getPremiumBrowserConcurrency(env);
+        payload.summary.chromiumFallbackMarketplaces = chromiumSiteKeys;
+        payload.summary.browserDiagnostics = [...kitesurfResults, ...chromiumResults].map((result) => ({
+          site: result.site,
+          engine: result.browserEngine || "chromium",
+          ok: Boolean(result.ok),
+          itemCount: result.itemCount ?? result.items?.length ?? 0,
+          rawItemCount: result.rawItemCount ?? result.parsedItemCount ?? 0,
+          durationMs: result.durationMs ?? null,
+          challengeDetected: Boolean(result.challengeDetected),
+          error: result.ok ? "" : result.error || "Browser search failed."
+        }));
+        payload.summary.cacheHit = false;
 
-      if (!adultSearch) await persistSearchEvent(buildHistoryEntry({ query, condition, provider: "premium-kitesurf", siteKeys: eligibleSiteKeys, payload }), env);
-      if (!adultSearch) await persistVehiclePriceHistory([...freeResults, ...premiumResults], env);
-      if (!adultSearch) writeSearchCache(cacheRequest, payload, context);
+        if (!adultSearch) await persistSearchEvent(buildHistoryEntry({ query, condition, provider: "premium-kitesurf", siteKeys: eligibleSiteKeys, payload }), env);
+        if (!adultSearch) await persistVehiclePriceHistory([...freeResults, ...premiumResults], env);
+        if (!adultSearch) writeSearchCache(cacheRequest, payload, context);
+        return payload;
+      };
+      const payload = creditsEnabled(env) ? await runCreditSearch({ userId: premium.user.id,
+        requestId: request.headers.get("x-search-request-id"), fingerprint: JSON.stringify({ params, viewerLocation, allowAdult }), execute, env }) : await execute();
       return json(payload, 200);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1317,7 +1345,7 @@ async function handleApi(request, env, context) {
         message.startsWith("Unsupported provider")
         ? 400
         : 500;
-      return json({ error: message }, statusCode);
+      return json({ error: message, ...(error.code ? { code: error.code } : {}), ...(error.wallet ? { credits: error.wallet } : {}) }, error.status || statusCode);
     }
   }
 

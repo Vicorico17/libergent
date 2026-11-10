@@ -1029,3 +1029,9 @@ export async function readSupabaseHistoryPayload(env = process.env) {
   const entries = await readSearchEventsFromSupabase({}, env);
   return { ...buildHistoryPayloadFromEntries(entries), scope: "recent-public-events" };
 }
+
+export async function searchCreditWallet(userId, action, fields = {}, env = process.env) {
+  return requestSupabase("rpc/search_credit_wallet", {
+    method: "POST", body: JSON.stringify({ p_user_id: userId, p_action: action, ...fields })
+  }, env);
+}

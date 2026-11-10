@@ -341,7 +341,7 @@ test("reuses successful Vinted HTML briefly instead of repeating the origin requ
   }
 });
 
-test("retries one intermittent Vinted challenge before returning a failure", async () => {
+test("does not immediately retry a blocked Vinted source", async () => {
   const envKeys = ["LIBERGENT_MOCK_SEARCH", "LIBERGENT_MOCK_PROVIDER"];
   const previousEnv = new Map(envKeys.map((key) => [key, process.env[key]]));
   const previousFetch = globalThis.fetch;
@@ -376,9 +376,10 @@ test("retries one intermittent Vinted challenge before returning a failure", asy
       maxPages: 1
     });
 
-    assert.equal(payload.results[0].ok, true);
-    assert.equal(payload.results[0].attempts, 2);
-    assert.equal(fetchCalls, 2);
+    assert.equal(payload.results[0].ok, false);
+    assert.equal(payload.results[0].outcome, "blocked");
+    assert.equal(payload.results[0].attempts, 1);
+    assert.equal(fetchCalls, 1);
   } finally {
     globalThis.fetch = previousFetch;
     if (previousCaches === undefined) delete globalThis.caches;
@@ -391,7 +392,7 @@ test("retries one intermittent Vinted challenge before returning a failure", asy
   }
 });
 
-test("Cloudflare Worker runtime caps marketplace searches to one page", async () => {
+test("Cloudflare Worker runtime caps marketplace searches to two pages", async () => {
   const previousRuntime = process.env.LIBERGENT_RUNTIME;
   const previousMockSearch = process.env.LIBERGENT_MOCK_SEARCH;
   const previousFetch = globalThis.fetch;
@@ -428,9 +429,9 @@ test("Cloudflare Worker runtime caps marketplace searches to one page", async ()
     });
 
     assert.equal(payload.results[0].ok, true);
-    assert.equal(payload.results[0].pagesUsed, 1);
-    assert.equal(fetchedUrls.length, 1);
-    assert.equal(fetchedUrls[0].includes("page=2"), false);
+    assert.equal(payload.results[0].pagesUsed, 2);
+    assert.equal(fetchedUrls.length, 2);
+    assert.equal(fetchedUrls[1].includes("page=2"), true);
   } finally {
     if (previousRuntime === undefined) {
       delete process.env.LIBERGENT_RUNTIME;
@@ -447,7 +448,7 @@ test("Cloudflare Worker runtime caps marketplace searches to one page", async ()
 });
 
 
-test("auto provider keeps an empty direct success when a remote fallback fails", async () => {
+test("confirmed empty results do not spend requests on remote fallback", async () => {
   const envKeys = [
     "LIBERGENT_MOCK_SEARCH",
     "LIBERGENT_MOCK_PROVIDER",
@@ -499,9 +500,8 @@ test("auto provider keeps an empty direct success when a remote fallback fails",
     assert.equal(result.itemCount, 0);
     assert.equal(payload.summary.failedMarketplaces.length, 0);
     assert.equal(payload.summary.successfulMarketplaces, 1);
-    assert.equal(cloudflareCalls, 2);
-    assert.equal(result.providerFallbacks.at(-1).provider, "cloudflare");
-    assert.match(result.providerFallbacks.at(-1).reason, /Authentication error/);
+    assert.equal(cloudflareCalls, 0);
+    assert.equal(result.outcome, "empty");
   } finally {
     globalThis.fetch = previousFetch;
     for (const key of envKeys) {
