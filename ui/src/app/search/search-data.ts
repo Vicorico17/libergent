@@ -488,7 +488,7 @@ function getSourceKindLabel(sourceKind: "used" | "new" | "mixed", sourceGroup: s
   if (sourceKind === "mixed") return "marketplace · tip neconfirmat";
   if (/recondi|refurb|renewed/i.test(condition)) return "recondiționat";
   if (/resigil|open.box/i.test(condition)) return "resigilat";
-  if (sourceKind === "used") return sourceGroup === "retailer" ? "second-hand · magazin" : "second-hand";
+  if (sourceKind === "used") return sourceGroup === "retailer" ? "produs folosit · magazin" : "ofertă marketplace";
   if (sourceGroup === "price_aggregator") return "preț nou · agregator";
   return "preț nou · retailer";
 }
