@@ -13,7 +13,14 @@ binding = "BROWSER"
 [triggers]
 crons = ["* * * * *"]
 
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = false
+
 [vars]
+FREE_JEV_ENABLED = "1"
+FREE_JEV_MODEL = "jev-latest"
 OPENCLAW_BRIDGE_URL = "https://bridge.srv1648069.hstgr.cloud"
 PREMIUM_JEV_ENABLED = "1"
 PREMIUM_JEV_MODEL = "jev-latest"
@@ -48,6 +55,7 @@ name = "libergent-mcp-test"
 workers_dev = true
 
 [env.mcp-test.vars]
+FREE_JEV_ENABLED = "0"
 LIBERGENT_MCP_ENABLED = "1"
 LIBERGENT_MCP_TEST_MODE = "1"
 PREMIUM_JEV_ENABLED = "0"

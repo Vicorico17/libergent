@@ -3112,7 +3112,7 @@ function SearchResultsContent() {
           setBestUsedOffer(mapOffer(payload.summary?.bestUsedOffer, mapped))
           setClosestUsedOffer(mapOffer(payload.summary?.closestUsedOffer, mapped))
           setBestNewBenchmark(mapOffer(payload.summary?.bestNewBenchmark, mapped))
-          setJevDecision(effectiveSearchTier === "premium" ? payload.summary?.jevDecision || { status: "missing" } : null)
+          setJevDecision(payload.summary?.jevDecision || null)
           setViewerLocation(payload.summary?.viewerLocation?.city
             ? { city: payload.summary.viewerLocation.city, source: payload.summary.viewerLocation.source || "edge" }
             : null)
@@ -3672,7 +3672,7 @@ function SearchResultsContent() {
             </section>
           )}
 
-          {effectiveSearchTier === "premium" && jevDecision && (
+          {jevDecision && (
             <section className="flex flex-wrap items-center justify-between gap-2 p-3 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: jevDecision.status === "selected" ? "#E7F7EC" : "white" }}>
               <span>JEV · {jevDecision.status === "selected" ? "decizie aplicată" : jevDecision.status === "insufficient_candidates" ? "prea puține oferte eligibile" : jevDecision.status === "low_confidence" ? "încredere redusă; s-a păstrat scorul LiberGent" : jevDecision.status === "unavailable" ? "indisponibil; s-a păstrat scorul LiberGent" : jevDecision.status === "disabled" ? "dezactivat" : jevDecision.status === "missing" ? "status absent din răspunsul API" : jevDecision.status}</span>
               <span style={{ color: `${INK}77` }}>{jevDecision.model || "jev-latest"}{typeof jevDecision.selections === "number" ? ` · ${jevDecision.selections} selecții` : ""}{typeof jevDecision.inputTokens === "number" ? ` · ${jevDecision.inputTokens} tokeni input` : ""}</span>

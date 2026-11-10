@@ -854,3 +854,58 @@ test("explicit refresh bypasses and replaces search cache for both tiers without
   }
   assert.equal((await run("premium", true, false)).status, 401);
 });
+
+test("free JEV selects once per snapshot and configuration changes bypass cached decisions", async (t) => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const originalMock = process.env.LIBERGENT_MOCK_SEARCH;
+  const originalInfo = console.info;
+  const logs = [];
+  console.info = (line) => logs.push(JSON.parse(line));
+  t.after(() => {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+    console.info = originalInfo;
+    if (originalMock === undefined) delete process.env.LIBERGENT_MOCK_SEARCH;
+    else process.env.LIBERGENT_MOCK_SEARCH = originalMock;
+  });
+  const entries = new Map();
+  globalThis.caches = { default: {
+    match: async request => entries.get(request.url)?.clone(),
+    put: async (request, response) => { entries.set(request.url, response.clone()); }
+  } };
+  let calls = 0;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "https://api.typesafe.ai/v1/systemone");
+    calls++;
+    const { questions } = JSON.parse(options.body);
+    return Response.json({ answers: Object.fromEntries(Object.entries(questions).map(([key, question]) =>
+      [key, { type: "choice", choice: Object.keys(question.criteria)[0], confidence: 0.9 }])), usage: { input_tokens: 1500 } });
+  };
+  const search = async (suffix = "", overrides = {}, path = "free") => {
+    const writes = [];
+    const response = await worker.fetch(new Request(`https://libergent.test/api/search${path ? `/${path}` : ""}?q=iphone&site=all${suffix}`),
+      { LIBERGENT_MOCK_SEARCH: "1", JEV_API_KEY: "test", FREE_JEV_ENABLED: "1", ...overrides },
+      { waitUntil: operation => writes.push(operation) });
+    await Promise.all(writes);
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  const first = await search();
+  assert.equal(first.summary.jevDecision.status, "selected");
+  assert.equal(calls, 1);
+  const repeated = await search();
+  assert.equal(repeated.summary.cacheHit, true);
+  assert.deepEqual(repeated.summary.jevDecision, first.summary.jevDecision);
+  assert.equal(calls, 1);
+  assert.equal((await search("", { FREE_JEV_ENABLED: "0" })).summary.jevDecision.status, "disabled");
+  assert.equal(calls, 1);
+  await search("&refresh=1");
+  assert.equal(calls, 2);
+  await search("", { FREE_JEV_MODEL: "different-model" });
+  assert.equal(calls, 3);
+  const alias = await search("&refresh=1", {}, "");
+  assert.equal(alias.summary.jevDecision.status, "selected");
+  assert.equal(calls, 4);
+  assert.equal(logs.filter(log => log.event === "jev_usage").length, calls);
+});

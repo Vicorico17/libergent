@@ -40,7 +40,7 @@ import { benchmarkMarketplaceWithBrowser, normalizeBrowserEngine, revealOlxPhone
 import { parseListingDetailsHtml } from "./listing-details.js";
 import { resolveViewerLocation, viewerLocationCacheKey } from "./location-intelligence.js";
 import { getSearchQueryError, isAdultProductQuery, isPublicSearchQuery, SEARCH_QUERY_LENGTH_MESSAGE, SEARCH_QUERY_REJECTION_MESSAGE } from "./search-policy.js";
-import { applyJevProductDecision } from "./jev.js";
+import { applyJevProductDecision, getJevConfiguration } from "./jev.js";
 import { buildProbeSuggestions, chooseProbeSource, chooseScheduledProbeTerm, discoveryProbeSeeds, probeQueryNiche, probeRecoveryAttempt, shouldTryProbeBrowser, mergeProbeRecovery, diagnoseProbeRun, discoveryRepairQueue, describeProbeError, discoverySourceStates, isEligibleProbeTerm, discoveryProbeFailure, isEligibleProbeQuery, serializeProbeRun } from "./discovery-probes.js";
 import {
   IMAGE_PROXY_TIMEOUT_MS,
@@ -157,6 +157,7 @@ function preferBrowserFallback(directResult, browserResult) {
 
 function buildSearchCacheRequest(request, params, viewerLocation = null, tier = "premium") {
   const cacheUrl = new URL(`/api/search/${tier}-cache/v11`, request.url);
+  if (tier === "free") cacheUrl.searchParams.set("jev", params.jevConfiguration || "");
   cacheUrl.searchParams.set("q", params.query.trim().toLocaleLowerCase("ro-RO"));
   cacheUrl.searchParams.set("condition", params.condition);
   cacheUrl.searchParams.set("maxPriceRon", String(params.maxPriceRon ?? ""));
@@ -1160,7 +1161,8 @@ async function handleApi(request, env, context) {
       const siteKeys = getFreeSearchSiteKeys(site, query);
       const freeProvider = getFreeSearchProvider(provider);
       const cacheRequest = buildSearchCacheRequest(request, {
-        query, condition, provider: freeProvider, site, limit, maxPages, maxPriceRon
+        query, condition, provider: freeProvider, site, limit, maxPages, maxPriceRon,
+        jevConfiguration: JSON.stringify({ ...getJevConfiguration(env, "free"), available: Boolean(String(env.JEV_API_KEY || "").trim()) })
       }, viewerLocation, "free");
       const cachedResponse = adultSearch || url.searchParams.get("refresh") === "1" ? null : await readSearchCache(cacheRequest);
       if (cachedResponse) {
@@ -1181,6 +1183,7 @@ async function handleApi(request, env, context) {
         viewerLocation
       });
 
+      payload.summary.jevDecision = await applyJevProductDecision(payload, { env, query, condition, tier: "free" });
       if (!adultSearch) await persistSearchEvent(buildHistoryEntry({ query, condition, provider: freeProvider, siteKeys, payload }), env);
       if (!adultSearch) await persistVehiclePriceHistory(payload.results || [], env);
       payload.searchTier = "free";

@@ -1,3 +1,4 @@
+import { applyJevProductDecision } from "./jev.js";
 import { getFreeSearchProvider, getFreeSearchSiteKeys } from "./free-search-policy.js";
 import { adultGateResponse, hasAdultConfirmation, needsAdultConfirmation } from "./adult-access.js";
 import http from "node:http";
@@ -356,6 +357,8 @@ const server = http.createServer(async (req, res) => {
       const freeProvider = getFreeSearchProvider(provider);
       const maxPriceRon = parseMaxPriceRon(url.searchParams.get("maxPriceRon"));
       const payload = await searchAcrossSites({ allowAdult, query, condition, provider: freeProvider, limit, maxPages, siteKeys, viewerLocation, maxPriceRon });
+      payload.summary.jevDecision = await applyJevProductDecision(payload, { env: process.env, query, condition, tier: "free" });
+      payload.searchTier = "free";
       if (!adultSearch) await logSearchEvent({ query, condition, provider: freeProvider, siteKeys, payload });
       sendJson(res, 200, payload);
     } catch (error) {
