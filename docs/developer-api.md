@@ -167,3 +167,24 @@ Later work: wider validated source coverage, async jobs/webhooks, scheduled refr
 ### Isolated BLANĂ acceptance preview
 
 A separate `libergent-integration-preview` Worker was provisioned on October 27, 2026 using `wrangler.integration-preview.toml`. It has its own Durable Object namespace and a scoped, expiring operator-managed BLANĂ key; it has no website/account/cron/production bindings. The stable production API and self-service database migration remain undeployed. The preview supports REST and authenticated MCP. See the [FAU agent handoff](fau-blana-agent-handoff.md) for the endpoint, verified live results and integration steps. Do not reuse the preview configuration to deploy production.
+
+## Agent-native page discovery and evidence
+
+Every exported UI page now gets a Markdown snapshot at `<page>/index.md` and a scoped `<page>/llms.txt`. `/llms.txt` indexes all pages, and `/llms-full.txt` combines their text. HTML alternate/describedby links expose these files to readers without requiring JavaScript. The UI build generates and verifies the artifacts automatically; new exported routes are included without maintaining a second page list. Account/authentication/deals/VINDE/developer-portal snapshots intentionally provide access guidance instead of private state.
+
+`/.well-known/agent.json` is a **LiberGent-specific** runtime discovery document. It reports configured read-only API/MCP routes and their authentication requirements; it is not an A2A declaration, OAuth discovery document, cryptographic agent identity or proof of marketplace uptime. Existing `/api/v1/openapi.json`, `/api/v1/demo`, `/api/v1/sources`, `/api/v1/search`, and `/api/v1/mcp` remain the contracts. Hosted OAuth is still unfinished; use clients that support securely configured developer bearer keys. Never expose a session or server secret in documents or URLs.
+
+`/.well-known/site-evidence.json` records build time, Git revision (when available), dirty-tree status, page coverage, and SHA-256 digests for text artifacts. It verifies same-origin artifact consistency, **not** independent authenticity. Search-result evidence is separate: original URL/source, test/live mode, timestamps/expiry, cache age, partial source failures, and detail verification status. Seller claims remain unverified. These interfaces do not authorize purchases, seller contact or publication.
+
+Verification:
+
+```sh
+npm run build:ui
+npm run check:agent-docs
+# After deployment, check the actual host without private credentials or source searches:
+npm run check:agent-docs -- https://libergent.com
+```
+
+The live checker reads public documentation, the runtime manifest and simulated demo only. It does not execute marketplace searches, bill credits, send messages or publish adverts. An integrity mismatch can indicate stale deployment/CDN content; investigate rather than treating a stale page as current. Node static serving and Cloudflare assets both support the text files; generated `_headers` preserves MIME types on Cloudflare. Local Next development mode does not generate these snapshots; use the production export and Node/Worker preview for acceptance.
+
+Remaining acceptance: deploy this build, run the public checker on the deployed origin, then validate a developer test key and a separately approved bounded live key in the intended agent client. Successful documentation checks alone do not certify full client compatibility or live-source quality.

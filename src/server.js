@@ -1,3 +1,5 @@
+import { handleApiReference } from "./developer-reference.js";
+import { handleAgentDiscovery } from "./agent-discovery.js";
 import { applyJevProductDecision } from "./jev.js";
 import { creditsEnabled } from "./credit-billing.js";
 import { runCreditSearch } from "./search-credits.js";
@@ -185,7 +187,9 @@ function sendFile(res, filePath) {
     ".js": "application/javascript; charset=utf-8",
     ".svg": "image/svg+xml",
     ".ico": "image/x-icon",
-    ".txt": "text/plain; charset=utf-8"
+    ".txt": "text/plain; charset=utf-8",
+    ".md": "text/markdown; charset=utf-8",
+    ".json": "application/json; charset=utf-8"
   };
 
   try {
@@ -231,6 +235,18 @@ function readJsonBody(req, maxBytes = MAX_JSON_BODY_BYTES) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${PORT}`}`);
   const apiPath = normalizeApiPathname(url.pathname);
+  const discovery = handleAgentDiscovery(new Request(url, { method: req.method }), process.env);
+  if (['/api/v1/demo', '/api/v1/sources', '/api/v1/openapi.json'].includes(url.pathname)) {
+    const response = handleApiReference(new Request(url, { method: req.method }));
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(await response.text());
+    return;
+  }
+  if (discovery) {
+    res.writeHead(discovery.status, Object.fromEntries(discovery.headers));
+    res.end(await discovery.text());
+    return;
+  }
   const accessRequest = new Request(url, { headers: req.headers });
   const adultSearch = needsAdultConfirmation(url);
   const allowAdult = adultSearch && await hasAdultConfirmation(accessRequest, process.env);

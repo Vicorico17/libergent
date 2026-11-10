@@ -75,7 +75,7 @@ test('persistent quota applies atomically including cache hits across restarts',
   const search = async () => { calls++; return { searchedAt: new Date().toISOString(), expiresAt: new Date(Date.now()+900000).toISOString(), sources: [{ status: 'ok' }], items: [] }; };
   const gateway = new IntegrationGateway(state, e); gateway.search = search;
   const responses = await Promise.all([gateway.fetch(request()), gateway.fetch(request()), gateway.fetch(request())]);
-  assert.deepEqual(responses.map(r => r.status), [200,200,429]); assert.equal(calls, 1);
+  assert.deepEqual(responses.map(r => r.status).sort((a, b) => a - b), [200,200,429]); assert.equal(calls, 1);
   const restarted = new IntegrationGateway(state, e); restarted.search = search;
   assert.equal((await restarted.fetch(request())).status, 429);
 });

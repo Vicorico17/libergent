@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node ../scripts/build-agent-docs.js && node ../scripts/check-agent-docs.js",
     "start": "next start",
     "lint": "eslint .",
     "lint:ci": "eslint ."
