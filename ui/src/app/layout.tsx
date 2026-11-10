@@ -1,46 +1,50 @@
 import type { Metadata, Viewport } from "next";
-import { Press_Start_2P, Inter, Caveat, Space_Mono, DotGothic16, VT323, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
-const pixel = Press_Start_2P({
+const pixel = localFont({
+  src: "./fonts/pressstart2p/PressStart2P-Regular.ttf",
   weight: "400",
-  subsets: ["latin"],
   variable: "--font-pixel-var",
   display: "swap",
 });
 
-const inter = Inter({
-  subsets: ["latin"],
+const inter = localFont({
+  src: "./fonts/inter/Inter[opsz,wght].ttf",
+  weight: "100 900",
   variable: "--font-sans-var",
   display: "swap",
 });
 
-const caveat = Caveat({
-  subsets: ["latin"],
+const caveat = localFont({
+  src: "./fonts/caveat/Caveat[wght].ttf",
+  weight: "400 700",
   variable: "--font-handwritten-var",
   display: "swap",
 });
 
-const spaceMono = Space_Mono({
-  weight: ["400", "700"],
-  subsets: ["latin"],
+const spaceMono = localFont({
+  src: [
+    { path: "./fonts/spacemono/SpaceMono-Regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/spacemono/SpaceMono-Bold.ttf", weight: "700", style: "normal" },
+  ],
   variable: "--font-mono-var",
   display: "swap",
 });
 
-const dotGothic = DotGothic16({
+const dotGothic = localFont({
+  src: "./fonts/dotgothic16/DotGothic16-Regular.ttf",
   weight: "400",
-  subsets: ["latin"],
   variable: "--font-dotgothic-var",
+  preload: false,
   display: "swap",
 });
 
-const vt323 = VT323({
+const vt323 = localFont({
+  src: "./fonts/vt323/VT323-Regular.ttf",
   weight: "400",
-  subsets: ["latin"],
   variable: "--font-vt323-var",
   display: "swap",
 });
@@ -53,8 +57,9 @@ const jetbrains = localFont({
   display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
+const geistMono = localFont({
+  src: "./fonts/geistmono/GeistMono[wght].ttf",
+  weight: "100 900",
   variable: "--font-geist-mono",
   display: "swap",
 });
