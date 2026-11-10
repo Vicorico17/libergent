@@ -2030,7 +2030,6 @@ function RecommendationCard({ item, query, searchTier, isLoggedIn, conversationS
               <div className="mb-6 flex flex-wrap gap-2">
                 <MetaChip>{item.source}</MetaChip>
                 <MetaChip icon={<MapPin size={10} strokeWidth={2.2} />}>{item.city}</MetaChip>
-                {item.jevDecision && <MetaChip>Jev a ales · {Math.round(item.jevDecision.confidence * 100)}% · {item.jevDecision.candidateCount} oferte</MetaChip>}
               </div>
               <ConversationStatusBadge status={conversationStatus} />
               <div className="text-[22px] font-bold mb-8" style={{ color: PINK }}>{item.priceLabel}</div>
@@ -2728,7 +2727,6 @@ function SearchResultsContent() {
   const [bestUsedOffer, setBestUsedOffer] = useState<SearchResultItem | null>(null)
   const [closestUsedOffer, setClosestUsedOffer] = useState<SearchResultItem | null>(null)
   const [bestNewBenchmark, setBestNewBenchmark] = useState<SearchResultItem | null>(null)
-  const [jevDecision, setJevDecision] = useState<NonNullable<NonNullable<SearchPayload["summary"]>["jevDecision"]> | null>(null)
   const [viewerLocation, setViewerLocation] = useState<{ city: string; source: string } | null>(null)
   const [duplicateListings, setDuplicateListings] = useState(0)
   const [queryUnderstanding, setQueryUnderstanding] = useState<QueryUnderstanding | null>(null)
@@ -2933,7 +2931,6 @@ function SearchResultsContent() {
         setBestUsedOffer(null)
         setClosestUsedOffer(null)
         setBestNewBenchmark(null)
-        setJevDecision(null)
         setViewerLocation(null)
         setDuplicateListings(0)
         setQueryUnderstanding(null)
@@ -3066,7 +3063,6 @@ function SearchResultsContent() {
           setBestUsedOffer(mapOffer(payload.summary?.bestUsedOffer, mapped))
           setClosestUsedOffer(mapOffer(payload.summary?.closestUsedOffer, mapped))
           setBestNewBenchmark(mapOffer(payload.summary?.bestNewBenchmark, mapped))
-          setJevDecision(payload.summary?.jevDecision || null)
           setViewerLocation(payload.summary?.viewerLocation?.city
             ? { city: payload.summary.viewerLocation.city, source: payload.summary.viewerLocation.source || "edge" }
             : null)
@@ -3644,13 +3640,6 @@ function SearchResultsContent() {
           {error && (
             <section className="p-4 text-[12px] uppercase font-bold" style={{ border: `1px solid ${INK}`, background: "white", color: PINK }}>
               <span>&gt; {error}</span>
-            </section>
-          )}
-
-          {jevDecision && (
-            <section className="flex flex-wrap items-center justify-between gap-2 p-3 text-[10px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: jevDecision.status === "selected" ? "#E7F7EC" : "white" }}>
-              <span>JEV · {jevDecision.status === "selected" ? "decizie aplicată" : jevDecision.status === "insufficient_candidates" ? "prea puține oferte eligibile" : jevDecision.status === "low_confidence" ? "încredere redusă; s-a păstrat scorul LiberGent" : jevDecision.status === "unavailable" ? "indisponibil; s-a păstrat scorul LiberGent" : jevDecision.status === "disabled" ? "dezactivat" : jevDecision.status === "missing" ? "status absent din răspunsul API" : jevDecision.status}</span>
-              <span style={{ color: `${INK}77` }}>{jevDecision.model || "jev-latest"}{typeof jevDecision.selections === "number" ? ` · ${jevDecision.selections} selecții` : ""}{typeof jevDecision.inputTokens === "number" ? ` · ${jevDecision.inputTokens} tokeni input` : ""}</span>
             </section>
           )}
 
