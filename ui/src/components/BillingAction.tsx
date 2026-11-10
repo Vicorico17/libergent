@@ -6,9 +6,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useAccountSession } from "@/lib/use-account-session";
 import { useCreditWallet } from "@/lib/use-credit-wallet";
 
-type BillingPlan = "monthly" | "credits10" | "credits30";
+type BillingPlan = "weekly" | "credits10" | "credits30";
 
-export function BillingAction({ kind = "checkout", plan = "monthly" }: { kind?: "checkout" | "portal"; plan?: BillingPlan }) {
+export function BillingAction({ kind = "checkout", plan = "weekly" }: { kind?: "checkout" | "portal"; plan?: BillingPlan }) {
   const account = useAccountSession();
   const router = useRouter();
   const [testMode, setTestMode] = useState(false);
@@ -92,11 +92,11 @@ export function BillingPlanPicker() {
   const { wallet } = useCreditWallet();
   return <div className="mt-4">
     {!wallet?.premium && <div className="border-2 border-[#111] bg-[#FCE7F3] p-5">
-      <p className="text-xs font-bold uppercase">Premium lunar</p>
-      <p className="mt-2 text-3xl font-bold">49 RON <span className="text-sm font-normal">/ lună</span></p>
-      <p className="mt-2 text-sm">40 de credite incluse în fiecare lună.</p>
-      <BillingAction plan="monthly" />
-      <p className="mt-3 text-xs leading-relaxed text-[#111]/65">Reînnoire automată. Anulezi din cont. Creditele lunare nefolosite expiră la sfârșitul perioadei.</p>
+      <p className="text-xs font-bold uppercase">Premium săptămânal</p>
+      <p className="mt-2 text-3xl font-bold">49 RON <span className="text-sm font-normal">/ săptămână</span></p>
+      <p className="mt-2 text-sm">40 de credite incluse în fiecare săptămână.</p>
+      <BillingAction plan="weekly" />
+      <p className="mt-3 text-xs leading-relaxed text-[#111]/65">Reînnoire automată. Anulezi din cont. Creditele săptămânale nefolosite expiră la sfârșitul perioadei.</p>
     </div>}
     <h3 className="mt-6 text-sm font-bold">{wallet?.premium ? "Adaugă credite Premium" : "Preferi fără abonament?"}</h3>
     <CreditPackPicker />

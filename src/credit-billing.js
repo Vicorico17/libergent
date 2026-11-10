@@ -1,10 +1,10 @@
 import { billingReturnUrl, stripeGet, stripeRequest } from './billing.js';
-import { CREDIT_PACKS, MONTHLY_SEARCH_CREDITS } from './search-credits.js';
+import { CREDIT_PACKS, WEEKLY_SEARCH_CREDITS } from './search-credits.js';
 import { searchCreditWallet } from './supabase.js';
 
 export const creditsEnabled = env => String(env.SEARCH_CREDITS_ENABLED || '') === '1';
 export const CREDIT_OFFERS = Object.freeze({
-  monthly: { priceEnv: 'STRIPE_MONTHLY_PRICE_ID', amount: 4900, credits: MONTHLY_SEARCH_CREDITS, interval: 'month' },
+  weekly: { priceEnv: 'STRIPE_WEEKLY_PRICE_ID', amount: 4900, credits: WEEKLY_SEARCH_CREDITS, interval: 'week' },
   ...CREDIT_PACKS
 });
 export function creditOffers(env) {
@@ -55,18 +55,18 @@ export async function fulfillCreditPack(object, env) {
   return true;
 }
 
-export async function fulfillMonthlyCredits(event, subscription, userId, env) {
-  if (event.type !== 'invoice.paid' || !env.STRIPE_MONTHLY_PRICE_ID) return;
+export async function fulfillWeeklyCredits(event, subscription, userId, env) {
+  if (event.type !== 'invoice.paid' || !env.STRIPE_WEEKLY_PRICE_ID) return;
   const invoiceId = event.data?.object?.id;
   if (!/^in_[a-zA-Z0-9]+$/.test(invoiceId || '')) throw new Error('Invalid invoice.');
   const invoice = await stripeGet(`/invoices/${invoiceId}`, env);
   const ownerSubscription = invoice.parent?.subscription_details?.subscription || invoice.subscription;
   if (invoice.status !== 'paid' || ownerSubscription !== subscription.id ||
     !['subscription_create', 'subscription_cycle'].includes(invoice.billing_reason)) return;
-  const line = invoice.lines?.data?.find(item => (item.pricing?.price_details?.price || item.price?.id) === env.STRIPE_MONTHLY_PRICE_ID);
+  const line = invoice.lines?.data?.find(item => (item.pricing?.price_details?.price || item.price?.id) === env.STRIPE_WEEKLY_PRICE_ID);
   if (!line || line.quantity !== 1 || !Number.isSafeInteger(line.period?.end)) return;
   await searchCreditWallet(userId, 'grant', {
-    p_reference: `invoice:${invoice.id}`, p_amount: MONTHLY_SEARCH_CREDITS,
+    p_reference: `invoice:${invoice.id}`, p_amount: WEEKLY_SEARCH_CREDITS,
     p_expires_at: new Date(line.period.end * 1000).toISOString()
   }, env);
 }

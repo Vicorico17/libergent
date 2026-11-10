@@ -7,7 +7,7 @@ export const BILLING_PLANS = Object.freeze({
 });
 
 export function isBillingConfigured(env = {}) {
-  return Boolean(String(env.STRIPE_SECRET_KEY || "").startsWith("sk_test_") && (env.STRIPE_PRICE_ID || env.STRIPE_WEEKLY_PRICE_ID || env.STRIPE_ANNUAL_PRICE_ID || env.STRIPE_MONTHLY_PRICE_ID || env.STRIPE_CREDITS_10_PRICE_ID || env.STRIPE_CREDITS_30_PRICE_ID) && env.STRIPE_WEBHOOK_SECRET && env.LIBERGENT_PUBLIC_URL && env.SUPABASE_URL && (env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY));
+  return Boolean(String(env.STRIPE_SECRET_KEY || "").startsWith("sk_test_") && (env.STRIPE_PRICE_ID || env.STRIPE_WEEKLY_PRICE_ID || env.STRIPE_ANNUAL_PRICE_ID || env.STRIPE_CREDITS_10_PRICE_ID || env.STRIPE_CREDITS_30_PRICE_ID) && env.STRIPE_WEBHOOK_SECRET && env.LIBERGENT_PUBLIC_URL && env.SUPABASE_URL && (env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY));
 }
 
 export function isCheckoutConfigured(env = {}) {
@@ -15,7 +15,7 @@ export function isCheckoutConfigured(env = {}) {
 }
 
 export function configuredPriceIds(env = {}) {
-  return [env.STRIPE_PRICE_ID, env.STRIPE_MONTHLY_PRICE_ID, ...Object.values(BILLING_PLANS).map(({ priceEnv }) => env[priceEnv])].filter(Boolean);
+  return [env.STRIPE_PRICE_ID, ...Object.values(BILLING_PLANS).map(({ priceEnv }) => env[priceEnv])].filter(Boolean);
 }
 
 export async function stripeRequest(path, fields, env, idempotencyKey) {

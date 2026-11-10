@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { runCreditSearch } from './search-credits.js';
-import { createCreditCheckout, fulfillCreditPack, fulfillMonthlyCredits } from './credit-billing.js';
+import { createCreditCheckout, fulfillCreditPack, fulfillWeeklyCredits } from './credit-billing.js';
 import worker from './worker.js';
 
 const user = '11111111-1111-4111-8111-111111111111';
 const other = '22222222-2222-4222-8222-222222222222';
 const env = { SEARCH_CREDITS_ENABLED: '1', SUPABASE_URL: 'https://db.test', SUPABASE_SECRET_KEY: 'secret',
   STRIPE_SECRET_KEY: 'sk_test_test', STRIPE_WEBHOOK_SECRET: 'whsec_test', LIBERGENT_PUBLIC_URL: 'https://app.test',
-  STRIPE_MONTHLY_PRICE_ID: 'price_monthly', STRIPE_CREDITS_10_PRICE_ID: 'price_ten', STRIPE_CREDITS_30_PRICE_ID: 'price_thirty' };
+  STRIPE_WEEKLY_PRICE_ID: 'price_weekly', STRIPE_CREDITS_10_PRICE_ID: 'price_ten', STRIPE_CREDITS_30_PRICE_ID: 'price_thirty' };
 async function database(t) {
   const db = new PGlite();
   t.after(() => db.close());
@@ -28,7 +28,7 @@ function stubFetch(t, callback) {
   const original = globalThis.fetch; t.after(() => { globalThis.fetch = original; }); globalThis.fetch = callback;
 }
 
-test('wallet grants are idempotent, expire correctly, spend monthly first, and cannot be mutated by clients', async t => {
+test('wallet grants are idempotent, expire correctly, spend weekly first, and cannot be mutated by clients', async t => {
   const { db, wallet, sql } = await database(t);
   assert.equal((await wallet('status')).balance, 0);
   await wallet('grant', { p_reference: 'checkout:one', p_amount: 10 });
@@ -91,15 +91,15 @@ test('search execution refunds outages, charges usable empty results, and replay
   await assert.rejects(runCreditSearch({ ...next, requestId: '', execute: () => {} }), /request ID/);
 });
 
-test('checkout validates prices and creates monthly or one-time sessions without a trial', async t => {
+test('checkout validates prices and creates weekly or one-time sessions without a trial', async t => {
   const created = [];
   stubFetch(t, async (url, init) => {
-    if (String(url).endsWith('/prices/price_monthly')) return Response.json({ active: true, currency: 'ron', unit_amount: 4900, recurring: { interval: 'month', interval_count: 1 } });
+    if (String(url).endsWith('/prices/price_weekly')) return Response.json({ active: true, currency: 'ron', unit_amount: 4900, recurring: { interval: 'week', interval_count: 1 } });
     if (String(url).endsWith('/prices/price_ten')) return Response.json({ active: true, currency: 'ron', unit_amount: 1900 });
     if (String(url).endsWith('/checkout/sessions')) { created.push(new URLSearchParams(init.body)); return Response.json({ url: 'https://checkout.stripe.com/session' }); }
     throw new Error(`Unexpected ${url}`);
   });
-  for (const plan of ['monthly', 'credits10']) await createCreditCheckout({ user: { id: user }, plan, requestUrl: 'https://app.test', returnTo: '/search?q=bike', env });
+  for (const plan of ['weekly', 'credits10']) await createCreditCheckout({ user: { id: user }, plan, requestUrl: 'https://app.test', returnTo: '/search?q=bike', env });
   assert.equal(created[0].get('mode'), 'subscription'); assert.equal(created[1].get('mode'), 'payment');
   assert.equal(created[0].has('subscription_data[trial_period_days]'), false);
   assert.match(created[1].get('success_url'), /\/search\?q=bike&checkout=success/);
@@ -124,21 +124,21 @@ test('paid top-ups validate ownership, amount and price, and duplicate events on
   session.amount_total = 1900; session.metadata.user_id = other; await assert.rejects(fulfillCreditPack(session, env), /Invalid paid/);
 });
 
-test('only a paid monthly cycle grants 40 expiring credits; duplicate invoices and proration do not add extra credits', async t => {
+test('only a paid weekly cycle grants 40 expiring credits; duplicate invoices and proration do not add extra credits', async t => {
   const { wallet } = await database(t);
   const invoice = { id: 'in_one', status: 'paid', subscription: 'sub_one', billing_reason: 'subscription_cycle',
-    lines: { data: [{ price: { id: 'price_monthly' }, quantity: 1, period: { end: Math.floor(Date.now()/1000) + 3600 } }] } };
+    lines: { data: [{ price: { id: 'price_weekly' }, quantity: 1, period: { end: Math.floor(Date.now()/1000) + 3600 } }] } };
   stubFetch(t, async (url, init) => {
     if (String(url).includes('/invoices/')) return Response.json(invoice);
     const { p_user_id, p_action, ...fields } = JSON.parse(init.body);
     return Response.json(await wallet(p_action, fields, p_user_id));
   });
   const event = { type: 'invoice.paid', data: { object: { id: invoice.id } } };
-  await fulfillMonthlyCredits(event, { id: 'sub_one' }, user, env);
-  await fulfillMonthlyCredits(event, { id: 'sub_one' }, user, env);
+  await fulfillWeeklyCredits(event, { id: 'sub_one' }, user, env);
+  await fulfillWeeklyCredits(event, { id: 'sub_one' }, user, env);
   assert.equal((await wallet('status')).included, 40);
   invoice.id = 'in_two'; invoice.billing_reason = 'subscription_update';
-  await fulfillMonthlyCredits({ ...event, data: { object: { id: invoice.id } } }, { id: 'sub_one' }, user, env);
+  await fulfillWeeklyCredits({ ...event, data: { object: { id: invoice.id } } }, { id: 'sub_one' }, user, env);
   assert.equal((await wallet('status')).included, 40);
 });
 

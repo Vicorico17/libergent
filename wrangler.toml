@@ -19,6 +19,11 @@ head_sampling_rate = 1
 invocation_logs = false
 
 [vars]
+SEARCH_CREDITS_ENABLED = "1"
+LIBERGENT_PUBLIC_URL = "https://libergent.com"
+STRIPE_WEEKLY_PRICE_ID = "price_1UaLYFBGLerz2o1wCLZHFcMB"
+STRIPE_CREDITS_10_PRICE_ID = "price_1UaLYbBGLerz2o1wTxYpkrbI"
+STRIPE_CREDITS_30_PRICE_ID = "price_1UaLYuBGLerz2o1wEtrxEkim"
 FREE_JEV_ENABLED = "1"
 FREE_JEV_MODEL = "jev-latest"
 OPENCLAW_BRIDGE_URL = "https://bridge.srv1648069.hstgr.cloud"

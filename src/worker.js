@@ -1,7 +1,7 @@
 import { needsBrowserFallback, preferBrowserFallback } from "./scrape-fallback.js";
 export { ScrapeCoordinator } from "./scrape-coordinator.js";
 import { configureScrapeCoordinator } from "./scrape-transport.js";
-import { creditsEnabled, creditOffers, CREDIT_OFFERS, createCreditCheckout, fulfillCreditPack, fulfillMonthlyCredits } from "./credit-billing.js";
+import { creditsEnabled, creditOffers, CREDIT_OFFERS, createCreditCheckout, fulfillCreditPack, fulfillWeeklyCredits } from "./credit-billing.js";
 import { runCreditSearch, PREMIUM_SEARCH_COST } from "./search-credits.js";
 import { searchCreditWallet } from "./supabase.js";
 import { checkFreeSearchLimits } from "./free-search-limits.js";
@@ -1018,7 +1018,7 @@ async function handleApi(request, env, context) {
       const entitlement = entitlementFromSubscription(subscription);
       await applyBillingSubscription({ userId, customerId, subscriptionId, status: entitlement.status,
         expiresAt: entitlement.expires_at, eventCreated: event.created }, env);
-      if (creditsEnabled(env)) await fulfillMonthlyCredits(event, subscription, userId, env);
+      if (creditsEnabled(env)) await fulfillWeeklyCredits(event, subscription, userId, env);
       return json({ ok: true });
     } catch (error) {
       return json({ error: error instanceof Error ? error.message : String(error) }, 500);
@@ -1042,7 +1042,7 @@ async function handleApi(request, env, context) {
       if (parsedBody.error) return json({ error: parsedBody.error }, parsedBody.error.includes("large") ? 413 : 400);
       const plan = parsedBody.data?.plan;
       if (creditsEnabled(env) && Object.hasOwn(CREDIT_OFFERS, plan)) {
-        if (plan === "monthly" && mapped?.stripe_subscription_id) {
+        if (plan === "weekly" && mapped?.stripe_subscription_id) {
           const current = await stripeGet(`/subscriptions/${mapped.stripe_subscription_id}`, env);
           if (["active", "trialing", "past_due", "unpaid", "incomplete"].includes(current.status)) return json({ error: "Gestionează abonamentul existent din cont.", code: "subscription_exists" }, 409);
         }
@@ -1050,7 +1050,7 @@ async function handleApi(request, env, context) {
           plan, returnTo: parsedBody.data?.returnTo, requestUrl: request.url, env });
         return json({ url: session.url });
       }
-      if (creditsEnabled(env)) return json({ error: "Choose monthly, credits10 or credits30." }, 400);
+      if (creditsEnabled(env)) return json({ error: "Choose weekly, credits10 or credits30." }, 400);
       if (mapped?.stripe_subscription_id) {
         const subscription = await stripeGet(`/subscriptions/${mapped.stripe_subscription_id}`, env);
         if (["active", "trialing", "past_due", "unpaid"].includes(subscription.status)) {
