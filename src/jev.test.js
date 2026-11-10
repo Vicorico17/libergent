@@ -58,3 +58,48 @@ test("Jev cannot select an over-budget used offer while retail benchmarks remain
   assert.equal(payload.summary.bestUsedOffer.url, used[1].url);
   assert.equal(payload.summary.bestUsedOffer.jevDecision.confidence, 0.9);
 });
+
+test("free JEV uses independent configuration and preserves picks on rejected or failed decisions", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalInfo = console.info;
+  const logs = [];
+  console.info = (message) => logs.push(JSON.parse(message));
+  t.after(() => { globalThis.fetch = originalFetch; console.info = originalInfo; });
+  const items = [1, 2].map(id => ({ title: "Phone", url: `https://example.com/${id}`,
+    condition: "Folosit", marketType: "secondary", priceRon: 1000,
+    isRecommendedCandidate: true, relevanceScore: 99, recommendationScore: 90 }));
+  const payload = { results: [{ items }], summary: { bestUsedOffer: items[0] } };
+  let calls = 0;
+  let answer = { type: "choice", choice: "u02", confidence: 0.54 };
+  let failure = false;
+  globalThis.fetch = async (_url, options) => {
+    calls++;
+    assert.equal(JSON.parse(options.body).model, "free-model");
+    assert.ok(options.signal instanceof AbortSignal);
+    if (failure) throw new DOMException("Timed out", "TimeoutError");
+    return Response.json({ answers: { best_used: answer }, usage: { input_tokens: 1234 } });
+  };
+  const options = { env: { JEV_API_KEY: "test", PREMIUM_JEV_ENABLED: "0", FREE_JEV_MODEL: "free-model" }, tier: "free", query: "private query" };
+  assert.equal((await applyJevProductDecision(payload, { ...options, env: { ...options.env, FREE_JEV_ENABLED: "0" } })).status, "disabled");
+  assert.equal((await applyJevProductDecision(payload, { ...options, env: { ...options.env, JEV_API_KEY: "" } })).status, "unavailable");
+  assert.equal((await applyJevProductDecision({ results: [], summary: {} }, options)).status, "insufficient_candidates");
+  assert.equal(calls, 0);
+  for (const invalid of [answer, { type: "choice", choice: "invented", confidence: 0.9 }, { type: "choice", choice: "u02", confidence: 1.1 }]) {
+    answer = invalid;
+    assert.equal((await applyJevProductDecision(payload, options)).status, "low_confidence");
+    assert.equal(payload.summary.bestUsedOffer, items[0]);
+  }
+  failure = true;
+  assert.equal((await applyJevProductDecision(payload, options)).status, "unavailable");
+  assert.equal(payload.summary.bestUsedOffer, items[0]);
+  assert.equal(logs.at(-1).inputTokens, null);
+  failure = false;
+  answer = { type: "choice", choice: "u02", confidence: 0.9 };
+  assert.equal((await applyJevProductDecision(payload, options)).status, "selected");
+  assert.equal(payload.summary.bestUsedOffer.url, items[1].url);
+  assert.equal(logs.length, calls);
+  assert.equal(logs.at(-1).inputTokens, 1234);
+  assert.equal(logs.at(-1).tier, "free");
+  assert.ok(!JSON.stringify(logs).includes("private query"));
+  assert.ok(!JSON.stringify(logs).includes("example.com"));
+});

@@ -82,10 +82,31 @@ function validateSelection(answer, choices) {
   return { item, confidence };
 }
 
-export async function applyJevProductDecision(payload, { env, query, condition }) {
-  const model = String(env.PREMIUM_JEV_MODEL || "jev-latest").trim();
+export function getJevConfiguration(env, tier = "premium") {
+  const prefix = tier === "free" ? "FREE" : "PREMIUM";
+  return {
+    enabled: String(env[`${prefix}_JEV_ENABLED`] || "1").trim() !== "0",
+    model: String(env[`${prefix}_JEV_MODEL`] || "jev-latest").trim()
+  };
+}
+
+export async function applyJevProductDecision(payload, options) {
+  const startedAt = Date.now();
+  const decision = await decideProduct(payload, options);
+  // Emit only for actual provider attempts; cached responses never reach here.
+  // Null tokens mean unknown usage, not a zero-cost request.
+  if (decision.requestAttempted) {
+    console.info(JSON.stringify({ event: "jev_usage", tier: options.tier || "premium",
+      status: decision.status, model: decision.model, selections: decision.selections || 0,
+      inputTokens: decision.inputTokens ?? null, durationMs: Date.now() - startedAt }));
+  }
+  return decision;
+}
+
+async function decideProduct(payload, { env, query, condition, tier = "premium" }) {
+  const { model, enabled } = getJevConfiguration(env, tier);
   const base = { status: "disabled", model };
-  if (String(env.PREMIUM_JEV_ENABLED || "1").trim() === "0") return { ...base, status: "disabled" };
+  if (!enabled) return { ...base, status: "disabled" };
   const apiKey = String(env.JEV_API_KEY || "").trim();
   if (!apiKey) return { ...base, status: "unavailable" };
 
@@ -119,6 +140,7 @@ export async function applyJevProductDecision(payload, { env, query, condition }
   }
   if (!Object.keys(questions).length) return { ...base, status: "insufficient_candidates" };
 
+  base.requestAttempted = true;
   const signal = buildAbortSignal({ timeoutMs: JEV_TIMEOUT_MS });
   try {
     const response = await fetch(JEV_ENDPOINT, {
