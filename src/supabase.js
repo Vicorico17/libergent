@@ -228,6 +228,36 @@ export async function insertSearchEventToSupabase(entry, env = process.env) {
   return true;
 }
 
+export async function listOfferFeedback({ userId, query, id } = {}, env = process.env) {
+  const config = getSupabaseConfig(env);
+  if (!config) throw new Error("Supabase is not configured.");
+  const params = new URLSearchParams({ select: "*", order: "created_at.desc,id.desc", limit: "201" });
+  if (userId) params.set("user_id", `eq.${userId}`);
+  if (id) params.set("id", `eq.${id}`);
+  if (query) params.set("query", `eq.${query}`);
+  return await requestSupabase(`${config.feedbackTable}?${params}`, {}, env) || [];
+}
+
+export async function updateOfferFeedbackReview(row, review, env = process.env) {
+  const config = getSupabaseConfig(env);
+  const params = new URLSearchParams({ id: `eq.${row.id}`, select: "id" });
+  const updated = await requestSupabase(`${config.feedbackTable}?${params}`, {
+    method: "PATCH", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ offer: { ...row.offer, review } })
+  }, env);
+  return Boolean(updated?.length);
+}
+
+export async function deleteOwnOfferFeedback(row, userId, env = process.env) {
+  const config = getSupabaseConfig(env);
+  const params = new URLSearchParams({ user_id: `eq.${userId}`, query: `eq.${row.query}` });
+  // Remove repeated reports for the same listing so an older dislike cannot
+  // reappear after the user restores it. Never use a caller-supplied owner.
+  if (row.listing_fingerprint) params.set("listing_fingerprint", `eq.${row.listing_fingerprint}`);
+  else params.set("id", `eq.${row.id}`);
+  await requestSupabase(`${config.feedbackTable}?${params}`, { method: "DELETE" }, env);
+}
+
 export async function insertOfferFeedbackToSupabase(entry, env = process.env) {
   const config = getSupabaseConfig(env);
   if (!config) {
@@ -256,55 +286,11 @@ export async function insertOfferFeedbackToSupabase(entry, env = process.env) {
     created_at: createdAt
   };
 
-  try {
-    await requestSupabase(config.feedbackTable, {
-      method: "POST",
-      headers: {
-        Prefer: "return=minimal"
-      },
-      body: JSON.stringify(feedbackRow)
-    }, env);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!message.includes("offer_feedback") && !message.includes("schema cache")) {
-      throw error;
-    }
-
-    await requestSupabase("rpc/log_search_event", {
-      method: "POST",
-      headers: {
-        Prefer: "return=minimal"
-      },
-      body: JSON.stringify(mapEntryToRpcPayload({
-        query: `feedback:${entry.query || ""}`,
-        condition: entry.feedback,
-        provider: "feedback",
-        siteKeys: entry.offer?.site ? [entry.offer.site] : [],
-        searchedAt: createdAt,
-        successfulMarketplaces: 0,
-        marketplaces: 0,
-        totalListings: 0,
-        creditsUsed: 0,
-        bestOffer: {
-          feedback: entry.feedback,
-          reason: entry.reason || "",
-          correctionText: entry.correctionText || "",
-          userId: entry.userId || "",
-          sessionId: entry.sessionId || "",
-          searchId: entry.searchId || "",
-          listingFingerprint: entry.listingFingerprint || "",
-          originalRank: entry.originalRank || null,
-          algorithmVersion: entry.algorithmVersion || "",
-          appliedAction: entry.appliedAction || "",
-          queryUnderstanding: entry.queryUnderstanding || {},
-          listingFeatures: entry.listingFeatures || {},
-          query: entry.query || "",
-          offer: entry.offer || null,
-          storageFallback: "search_events"
-        }
-      }))
-    }, env);
-  }
+  await requestSupabase(config.feedbackTable, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify(feedbackRow)
+  }, env);
 
   return true;
 }

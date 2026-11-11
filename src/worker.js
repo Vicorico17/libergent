@@ -38,6 +38,7 @@ import { applyBillingSubscription, readBillingCustomer, readBillingCustomerByStr
 import { assertConfiguredPrice, configuredPriceIds, createCheckoutSession, createPortalSession, entitlementFromSubscription, isBillingConfigured, isCheckoutConfigured, stripeGet, verifyStripeEvent } from "./billing.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { normalizeOfferFeedbackPayload } from "./feedback.js";
+import { handleFeedbackApp } from "./feedback-app.js";
 import { buildSourceCatalog } from "./source-catalog.js";
 import { PREMIUM_BROWSER_SITE_KEYS, PREMIUM_SITE_KEYS, SITES, getPremiumSiteKeys, getSite } from "./sites.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
@@ -2009,6 +2010,19 @@ async function handleApi(request, env, context) {
       return json(payload, 200);
     } catch (error) {
       return json({ ok: false, phones: [], error: error instanceof Error ? error.message : String(error) }, 502);
+    }
+  }
+
+  if ((apiPath === "/api/feedback" && ["GET", "DELETE"].includes(request.method)) || apiPath === "/api/feedback/review") {
+    const auth = await authenticateSupabaseUser(request, env);
+    if (!auth.user) return json({ error: auth.error }, auth.status);
+    const parsed = request.method === "GET" ? { data: {} } : await parseJsonRequest(request);
+    if (parsed.error) return json({ error: parsed.error }, parsed.error.includes("large") ? 413 : 400);
+    try {
+      const result = await handleFeedbackApp({ method: request.method, reviewMode: apiPath.endsWith("/review"), userId: auth.user.id, query: url.searchParams.get("query"), body: parsed.data }, env);
+      return json(result.payload, result.status);
+    } catch {
+      return json({ error: "Feedback service unavailable. Please try again." }, 503);
     }
   }
 

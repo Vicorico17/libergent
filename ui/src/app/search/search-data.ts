@@ -3,6 +3,7 @@ import { classifyOfferKind, canCompareRetailOffers } from "../../../../src/marke
 export { canCompareRetailOffers };
 
 export type ApiListing = {
+  description?: string;
   isComparableNewBenchmark?: boolean;
   title?: string;
   price?: number | string | null;
@@ -183,6 +184,7 @@ export type SearchPayload = {
 };
 
 export type SearchResultItem = {
+  feedbackEvidence?: { description: string; condition: string; sellerType: string; price: string; priceRon: number | null };
   isComparableNewBenchmark?: boolean;
   id: string;
   title: string;
@@ -424,6 +426,10 @@ function mapListing(item: ApiListing, source: string, index: number, idPrefix?: 
   return {
     id: url || `${idPrefix || platform}-${index}-${item.title || "listing"}`,
     title: item.title || "Anunț fără titlu",
+    feedbackEvidence: {
+      description: String(item.description || "").slice(0, 6000), condition: String(item.condition || ""),
+      sellerType, price: String(item.price ?? ""), priceRon: isFiniteNumber(priceRon) ? priceRon : null,
+    },
     price: isFiniteNumber(priceRon) ? priceRon : null,
     priceLabel: formatPriceLabel(item, priceRon),
     source: platform,

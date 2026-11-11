@@ -1,0 +1,7 @@
+[
+  { "id": "phone-exact", "reviewed": true, "origin": "synthetic baseline", "query": "Samsung Galaxy S24 Ultra 256GB", "listing": { "title": "Samsung Galaxy S24 Ultra 256GB", "priceRon": 3200, "price": "3200 lei" }, "expectedCandidate": true },
+  { "id": "phone-wrong-model", "reviewed": true, "origin": "synthetic baseline", "query": "Samsung Galaxy S24 Ultra 256GB", "listing": { "title": "Samsung Galaxy S23 Ultra 256GB", "priceRon": 2800, "price": "2800 lei" }, "expectedCandidate": false },
+  { "id": "vehicle-exact", "reviewed": true, "origin": "synthetic baseline", "query": "mustang", "listing": { "title": "Ford Mustang GT 5.0 V8 2019", "priceRon": 150000, "price": "150000 lei" }, "expectedCandidate": true },
+  { "id": "vehicle-toy", "reviewed": true, "origin": "synthetic baseline", "query": "mustang", "listing": { "title": "Machetă Ford Mustang 1:24", "priceRon": 120, "price": "120 lei" }, "expectedCandidate": false },
+  { "id": "toy-intent", "reviewed": true, "origin": "synthetic baseline", "query": "macheta mustang", "listing": { "title": "Machetă Ford Mustang 1967 1:24", "priceRon": 120, "price": "120 lei" }, "expectedCandidate": true }
+]
