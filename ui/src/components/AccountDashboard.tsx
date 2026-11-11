@@ -2,16 +2,15 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Bell, Bookmark, Clock3, Crown, ExternalLink, LayoutDashboard, LogOut, MessageSquare, Plus, Search, Trash2, UserRound } from "lucide-react";
 import { LogoIcon } from "@/components/LogoIcon";
 import { AccountCreditBalance } from "@/components/CreditBalance";
 import { BillingAction } from "@/components/BillingAction";
 import {
   readAccountActivity,
-  readAccountAlerts,
   readSavedListings,
   removeSavedListing,
   writeAccountAlerts,
@@ -55,7 +54,7 @@ type SellerConversation = {
 
 type AlertEvent = {
   id: string;
-  event_type: "new_strong_match" | "price_drop" | "better_than_shortlist";
+  event_type: "new_match" | "new_strong_match" | "price_drop" | "better_than_shortlist";
   listing_url: string;
   payload: { title?: string; priceRon?: number; reason?: string; source?: string };
   read_at?: string | null;
@@ -121,7 +120,8 @@ function PlanBadge({ status }: { status: AccountPlanStatus }) {
 
 export function AccountDashboard({ account, next }: { account: AccountSessionState; next: string }) {
   const router = useRouter();
-  const [section, setSection] = useState<AccountSection>("overview");
+  const params = useSearchParams();
+  const [section, setSection] = useState<AccountSection>(params.get("section") === "alerts" ? "alerts" : "overview");
   const [favorites, setFavorites] = useState<SavedListingRecord[]>([]);
   const [alerts, setAlerts] = useState<AccountAlertRecord[]>([]);
   const [activity, setActivity] = useState<AccountActivityRecord[]>([]);
@@ -129,7 +129,14 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
   const [selectedConversationId, setSelectedConversationId] = useState("");
   const [conversationStatus, setConversationStatus] = useState<"loading" | "ready" | "error">("loading");
   const [conversationError, setConversationError] = useState("");
-  const [alertQuery, setAlertQuery] = useState("");
+  const [alertQuery, setAlertQuery] = useState(params.get("q") || "");
+  const [alertMode, setAlertMode] = useState("products");
+  const [vehicleFilters, setVehicleFilters] = useState(false);
+  const [alertBusy, setAlertBusy] = useState(false);
+  const busy = useRef(false);
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [alertReload, setAlertReload] = useState(0);
+  const [planStatus, setPlanStatus] = useState<AccountPlanStatus>("loading");
   const [alertMessage, setAlertMessage] = useState("");
   const [alertPriceMax, setAlertPriceMax] = useState("");
   const [alertYearFrom, setAlertYearFrom] = useState("");
@@ -137,14 +144,13 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
   const [alertLocation, setAlertLocation] = useState("");
   const [alertFrequency, setAlertFrequency] = useState<"daily" | "immediate">("daily");
   const [alertEvents, setAlertEvents] = useState<AlertEvent[]>([]);
-  const [alertAccess, setAlertAccess] = useState<AccountPlanStatus>("loading");
+  const [alertAccess, setAlertAccess] = useState<"loading" | "ready" | "error">("loading");
   const [signingOut, setSigningOut] = useState(false);
   const selectedConversation = conversations.find((item) => item.id === selectedConversationId) || conversations[0] || null;
 
   useEffect(() => {
     queueMicrotask(() => {
       setFavorites(readSavedListings(account.userId));
-      setAlerts(readAccountAlerts(account.userId));
       setActivity(readAccountActivity(account.userId));
     });
   }, [account.userId]);
@@ -152,6 +158,7 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
   useEffect(() => {
     let active = true;
     async function loadAlerts() {
+      setAlertAccess("loading");
       const supabase = getSupabaseBrowserClient();
       const session = supabase ? (await supabase.auth.getSession()).data.session : null;
       if (!session?.access_token) {
@@ -162,10 +169,6 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
         const response = await fetch("/api/alerts", { headers: { authorization: `Bearer ${session.access_token}` } });
         const payload = await response.json().catch(() => ({}));
         if (!active) return;
-        if (response.status === 403 && payload.code === "premium_required") {
-          setAlertAccess("required");
-          return;
-        }
         if (!response.ok) throw new Error(payload.error || "Alertele nu au putut fi încărcate.");
         const mapped = (Array.isArray(payload.alerts) ? payload.alerts : []).map((alert: Record<string, unknown>) => ({
           id: String(alert.id || ""), query: String(alert.query || ""), email: String(alert.email || account.email || ""),
@@ -176,14 +179,30 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
         setAlerts(mapped);
         writeAccountAlerts(account.userId, mapped);
         setAlertEvents(Array.isArray(payload.events) ? payload.events : []);
-        setAlertAccess("premium");
+        setAlertAccess("ready");
+        setEmailEnabled(payload.emailEnabled === true);
       } catch {
         if (active) setAlertAccess("error");
       }
     }
     loadAlerts();
     return () => { active = false; };
-  }, [account.email, account.userId]);
+  }, [account.email, account.userId, alertReload]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadPlan() {
+      const session = (await getSupabaseBrowserClient()?.auth.getSession())?.data.session;
+      if (!session) return;
+      try {
+        const response = await fetch("/api/billing/credits", { headers: { authorization: `Bearer ${session.access_token}` } });
+        const payload = await response.json();
+        if (active) setPlanStatus(response.ok ? (payload.premium ? "premium" : "required") : "error");
+      } catch { if (active) setPlanStatus("error"); }
+    }
+    void loadPlan();
+    return () => { active = false; };
+  }, [account.userId]);
 
   useEffect(() => {
     let active = true;
@@ -241,8 +260,10 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
   async function createAlert(event: FormEvent) {
     event.preventDefault();
     const query = alertQuery.trim();
-    if (!query || !account.email || alertAccess !== "premium") return;
-    setAlertMessage("Salvăm monitorizarea Premium...");
+    if (!query || !account.email || alertAccess !== "ready") return;
+    if (busy.current) return;
+    busy.current = true; setAlertBusy(true);
+    setAlertMessage("Salvăm alerta...");
     try {
       const supabase = getSupabaseBrowserClient();
       const session = supabase ? (await supabase.auth.getSession()).data.session : null;
@@ -252,8 +273,8 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
         headers: { "Content-Type": "application/json", authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
           query,
-          criteria: { priceMaxRon: alertPriceMax, yearFrom: alertYearFrom, mileageMaxKm: alertMileageMax, location: alertLocation },
-          events: { newStrongMatch: true, priceDrop: true, betterThanShortlist: true },
+          criteria: { priceMaxRon: alertPriceMax, yearFrom: vehicleFilters ? alertYearFrom : "", mileageMaxKm: vehicleFilters ? alertMileageMax : "", location: alertLocation },
+          events: { newProducts: alertMode === "products", newStrongMatch: true, priceDrop: true, betterThanShortlist: true },
           frequency: alertFrequency
         }),
       });
@@ -266,29 +287,29 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
       };
       updateAlerts([created, ...alerts]);
       setAlertQuery(""); setAlertPriceMax(""); setAlertYearFrom(""); setAlertMileageMax(""); setAlertLocation("");
-      setAlertMessage("Alerta Premium este activă. Prima scanare stabilește baza; următoarele detectează schimbările.");
+      setAlertMessage("Alerta este activă. Prima scanare stabilește baza; următoarele detectează schimbările.");
     } catch (error) {
       setAlertMessage(error instanceof Error ? error.message : "Alerta nu a putut fi creată.");
-    }
+    } finally { busy.current = false; setAlertBusy(false); }
   }
 
-  async function mutateAlert(id: string, method: "PATCH" | "DELETE", body?: object) {
-    const supabase = getSupabaseBrowserClient();
-    const session = supabase ? (await supabase.auth.getSession()).data.session : null;
-    if (!session?.access_token) return;
-    const response = await fetch(`/api/alerts/${encodeURIComponent(id)}`, { method, headers: { authorization: `Bearer ${session.access_token}`, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
-    if (!response.ok) return;
-    if (method === "DELETE") updateAlerts(alerts.filter((entry) => entry.id !== id));
-    else updateAlerts(alerts.map((entry) => entry.id === id ? { ...entry, enabled: (body as { status?: string })?.status === "active" } : entry));
+  async function alertAction(path: string, method: string, body?: object) {
+    if (busy.current) return;
+    busy.current = true; setAlertBusy(true);
+    try {
+      const session = (await getSupabaseBrowserClient()?.auth.getSession())?.data.session;
+      if (!session?.access_token) throw new Error("Sesiunea a expirat. Reconectează-te.");
+      const response = await fetch(path, { method, headers: { authorization: `Bearer ${session.access_token}`, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Modificarea nu a fost salvată. Încearcă din nou.");
+      setAlertMessage("Modificarea a fost salvată.");
+      setAlertReload(value => value + 1);
+    } catch (error) { setAlertMessage(error instanceof Error ? error.message : "Serviciu indisponibil."); }
+    finally { busy.current = false; setAlertBusy(false); }
   }
 
-  async function markAlertEventRead(eventId: string) {
-    const supabase = getSupabaseBrowserClient();
-    const session = supabase ? (await supabase.auth.getSession()).data.session : null;
-    if (!session?.access_token) return;
-    await fetch(`/api/alerts/events/${encodeURIComponent(eventId)}`, { method: "PATCH", headers: { authorization: `Bearer ${session.access_token}` } });
-    setAlertEvents((current) => current.map((event) => event.id === eventId ? { ...event, read_at: new Date().toISOString() } : event));
-  }
+  const mutateAlert = (id: string, method: "PATCH" | "DELETE", body?: object) => alertAction(`/api/alerts/${encodeURIComponent(id)}`, method, body);
+  const markAlertEventRead = (id: string) => alertAction(`/api/alerts/events/${encodeURIComponent(id)}`, "PATCH", {});
 
   async function signOut() {
     const supabase = getSupabaseBrowserClient();
@@ -313,7 +334,7 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
         <aside className="flex flex-col border-b border-black bg-white lg:border-b-0 lg:border-r">
           <div className="flex items-center gap-3 p-5" style={{ borderBottom: `1px solid ${INK}` }}>
             <div className="flex h-11 w-11 items-center justify-center text-[16px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: PINK }}>{(account.displayName || account.email || "L").slice(0, 1)}</div>
-            <div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase">{account.displayName || "Cont LiberGent"}</div><div className="truncate text-[9px]" style={{ color: `${INK}88` }}>{account.email}</div><div className="mt-2"><PlanBadge status={alertAccess} /></div><BillingAction kind="portal" /></div>
+            <div className="min-w-0"><div className="truncate text-[11px] font-bold uppercase">{account.displayName || "Cont LiberGent"}</div><div className="truncate text-[9px]" style={{ color: `${INK}88` }}>{account.email}</div><div className="mt-2"><PlanBadge status={planStatus} /></div><BillingAction kind="portal" /></div>
           </div>
           <nav className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-1" aria-label="Meniu cont">
             {navItems.map((item) => {
@@ -336,9 +357,9 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
             <div className="flex flex-col gap-8">
               <AccountCreditBalance />
               <SectionHeader eyebrow="Account control center" title={`Salut, ${account.displayName || "bine ai revenit"}`} description="Toate deciziile tale de cumpărare într-un singur loc: favorite, monitorizări, selleri și istoricul recomandărilor." />
-              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between" style={{ border: `2px solid ${INK}`, background: alertAccess === "premium" ? PINK : "white", boxShadow: `4px 4px 0 ${INK}` }}>
-                <div className="flex items-start gap-3"><Crown size={22} fill={alertAccess === "premium" ? INK : "none"} /><div><div className="text-[13px] font-bold uppercase">{alertAccess === "premium" ? "Premium activ" : alertAccess === "required" ? "Cont Free" : alertAccess === "loading" ? "Verificăm abonamentul" : "Statutul planului nu este disponibil"}</div><p className="mt-1 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}99` }}>{alertAccess === "premium" ? "Ai acces la monitorizări auto, alerte orare și inboxul Premium." : alertAccess === "required" ? "Căutarea rămâne disponibilă; alertele automate necesită Premium." : "Reîncarcă pagina dacă verificarea nu se finalizează."}</p></div></div>
-                {alertAccess === "required" ? <Link href="/pricing" className="shrink-0 px-4 py-3 text-center text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Vezi Premium</Link> : <PlanBadge status={alertAccess} />}
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between" style={{ border: `2px solid ${INK}`, background: planStatus === "premium" ? PINK : "white", boxShadow: `4px 4px 0 ${INK}` }}>
+                <div className="flex items-start gap-3"><Crown size={22} fill={planStatus === "premium" ? INK : "none"} /><div><div className="text-[13px] font-bold uppercase">{planStatus === "premium" ? "Premium activ" : planStatus === "required" ? "Cont Free" : planStatus === "loading" ? "Verificăm abonamentul" : "Statutul planului nu este disponibil"}</div><p className="mt-1 text-[9px] uppercase leading-relaxed" style={{ color: `${INK}99` }}>{planStatus === "premium" ? "Ai acces la căutarea Premium. Alertele și inboxul sunt incluse în cont." : planStatus === "required" ? "Poți căuta produse și crea până la cinci alerte active, cu notificări în cont." : "Reîncarcă pagina dacă verificarea nu se finalizează."}</p></div></div>
+                {planStatus === "required" ? <Link href="/pricing" className="shrink-0 px-4 py-3 text-center text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Vezi Premium</Link> : <PlanBadge status={planStatus} />}
               </div>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard label="Anunțuri apreciate" value={favorites.length} note="Produse păstrate pentru comparație" onClick={() => setSection("favorites")} />
@@ -362,29 +383,30 @@ export function AccountDashboard({ account, next }: { account: AccountSessionSta
 
           {section === "alerts" && (
             <div className="flex flex-col gap-7">
-              <SectionHeader eyebrow="Premium monitoring" title="Alerte auto inteligente" description="Monitorizăm Autovit și BestAuto pentru potriviri noi, reduceri de preț și oferte mai bune decât cele deja urmărite." />
-              {alertAccess === "required" ? (
-                <EmptyState title="Funcție Premium" description="Alertele automate rulează căutări programate și sunt disponibile conturilor Premium." action={<Link href="/pricing" className="px-4 py-3 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Vezi Premium</Link>} />
-              ) : alertAccess === "loading" ? (
-                <EmptyState title="Verificăm accesul Premium" description="Încărcăm monitorizările și inboxul de alerte." />
+              <SectionHeader eyebrow="Căutările tale, urmărite" title="Alerte pentru produse" description="Spune-ne ce cauți. Te anunțăm când apar produse noi care se potrivesc sau oferte bune. Până la 5 alerte active, incluse în cont." action={<button type="button" disabled={alertBusy} onClick={() => setAlertReload(value => value + 1)} className="min-h-11 border border-black px-4 text-xs">Actualizează inboxul</button>} />
+              <p className="text-xs">{emailEnabled ? "Notificări în cont și prin email. Prima scanare reține produsele existente; apoi urmărim noutățile." : "Notificările apar în acest inbox. Livrarea prin email nu este activată momentan. Prima scanare reține produsele existente."}</p>
+              {alertAccess === "loading" ? (
+                <EmptyState title="Încărcăm alertele" description="Încărcăm monitorizările și inboxul de alerte." />
               ) : alertAccess === "error" ? (
                 <EmptyState title="Alertele nu pot fi încărcate" description={alertMessage || "Serviciul de alerte nu este disponibil momentan. Încearcă din nou mai târziu."} />
               ) : (
                 <>
                   <form onSubmit={createAlert} className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3" style={{ border: `1px solid ${INK}`, background: "white" }}>
-                    <label className="grid gap-2 text-[9px] font-bold uppercase sm:col-span-2 lg:col-span-3">Mașina urmărită<input value={alertQuery} onChange={(event) => setAlertQuery(event.target.value)} required maxLength={240} placeholder="ex: BMW 320d 2019 automat" className="min-h-11 px-3 text-[11px] outline-none" style={{ border: `1px solid ${INK}` }} /></label>
+                    <label className="grid gap-2 text-[9px] font-bold uppercase sm:col-span-2 lg:col-span-3">Ce produs cauți?<input value={alertQuery} onChange={(event) => setAlertQuery(event.target.value)} required maxLength={240} placeholder="ex: iPhone 15, bicicletă gravel, BMW 320d" className="min-h-11 px-3 text-[11px] outline-none" style={{ border: `1px solid ${INK}` }} /></label>
                     <label className="grid gap-2 text-[9px] font-bold uppercase">Preț maxim RON<input value={alertPriceMax} onChange={(event) => setAlertPriceMax(event.target.value)} inputMode="numeric" placeholder="90000" className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }} /></label>
-                    <label className="grid gap-2 text-[9px] font-bold uppercase">An minim<input value={alertYearFrom} onChange={(event) => setAlertYearFrom(event.target.value)} inputMode="numeric" placeholder="2018" className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }} /></label>
-                    <label className="grid gap-2 text-[9px] font-bold uppercase">Kilometri maximi<input value={alertMileageMax} onChange={(event) => setAlertMileageMax(event.target.value)} inputMode="numeric" placeholder="180000" className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }} /></label>
+                    {vehicleFilters && <label className="grid gap-2 text-[9px] font-bold uppercase">An minim (auto)<input value={alertYearFrom} onChange={(event) => setAlertYearFrom(event.target.value)} inputMode="numeric" placeholder="2018" className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }} /></label>}
+                    {vehicleFilters && <label className="grid gap-2 text-[9px] font-bold uppercase">Kilometri maximi (auto)<input value={alertMileageMax} onChange={(event) => setAlertMileageMax(event.target.value)} inputMode="numeric" placeholder="180000" className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }} /></label>}
                     <label className="grid gap-2 text-[9px] font-bold uppercase">Locație<input value={alertLocation} onChange={(event) => setAlertLocation(event.target.value)} placeholder="București" className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }} /></label>
                     <label className="grid gap-2 text-[9px] font-bold uppercase">Frecvență<select value={alertFrequency} onChange={(event) => setAlertFrequency(event.target.value === "immediate" ? "immediate" : "daily")} className="min-h-11 px-3 text-[11px]" style={{ border: `1px solid ${INK}` }}><option value="daily">Rezumat zilnic</option><option value="immediate">Verificare orară</option></select></label>
-                    <button type="submit" disabled={alertAccess !== "premium"} className="flex min-h-11 items-center justify-center gap-2 self-end px-4 text-[9px] font-bold uppercase disabled:opacity-50" style={{ border: `1px solid ${INK}`, background: PINK }}><Plus size={13} />Creează alertă</button>
+                    <label className="grid gap-2 text-[9px] font-bold uppercase">Ce vrei să afli?<select value={alertMode} onChange={event => setAlertMode(event.target.value)} className="min-h-11 border border-black px-3 text-[11px]"><option value="products">Produse noi și reduceri de preț</option><option value="deals">Doar oferte bune și reduceri de preț</option></select></label>
+                    <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={vehicleFilters} onChange={event => setVehicleFilters(event.target.checked)} />Adaugă filtre auto</label>
+                    <button type="submit" disabled={alertAccess !== "ready" || alertBusy || alerts.filter(alert => alert.enabled).length >= 5} className="flex min-h-11 items-center justify-center gap-2 self-end px-4 text-[9px] font-bold uppercase disabled:opacity-50" style={{ border: `1px solid ${INK}`, background: PINK }}><Plus size={13} />{alertBusy ? "Se salvează..." : "Creează alertă"}</button>
                     {alertMessage ? <p role="status" className="text-[9px] uppercase leading-relaxed sm:col-span-2 lg:col-span-3" style={{ color: `${INK}99` }}>{alertMessage}</p> : null}
                   </form>
 
-                  {alerts.length ? <div className="grid gap-3">{alerts.map((alert) => <article key={alert.id} className="grid items-center gap-4 p-4 sm:grid-cols-[1fr_auto_auto]" style={{ border: `1px solid ${INK}`, background: "white" }}><div><div className="text-[12px] font-bold uppercase">{alert.query}</div><div className="mt-1 text-[9px] uppercase" style={{ color: `${INK}77` }}>{alert.frequency === "immediate" ? "orar" : "zilnic"} · {alert.criteria?.priceMaxRon ? `max ${Number(alert.criteria.priceMaxRon).toLocaleString("ro-RO")} RON · ` : ""}{alert.lastCheckedAt ? `verificată ${formatDate(alert.lastCheckedAt)}` : "prima scanare în așteptare"}</div>{alert.lastError ? <div className="mt-2 text-[9px]" style={{ color: PINK }}>! {alert.lastError}</div> : null}</div><span className="w-fit px-2 py-1 text-[8px] font-bold uppercase" style={{ border: `1px solid ${alert.enabled ? GREEN : PINK}`, color: alert.enabled ? GREEN : PINK }}>{alert.enabled ? "Activă" : "Pauză"}</span><div className="flex gap-2"><button type="button" onClick={() => mutateAlert(alert.id, "PATCH", { status: alert.enabled ? "paused" : "active" })} className="px-3 py-2 text-[8px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: alert.enabled ? INK : "white", color: alert.enabled ? "white" : INK }}>{alert.enabled ? "Pauză" : "Activează"}</button><button type="button" onClick={() => mutateAlert(alert.id, "DELETE")} aria-label={`Șterge alerta ${alert.query}`} className="p-2" style={{ border: `1px solid ${INK}` }}><Trash2 size={12} /></button></div></article>)}</div> : <EmptyState title="Nicio alertă Premium" description="Creează prima monitorizare. Scanarea inițială stabilește ofertele existente fără să trimită notificări vechi." />}
+                  {alerts.length ? <div className="grid gap-3">{alerts.map((alert) => <article key={alert.id} className="grid items-center gap-4 p-4 sm:grid-cols-[1fr_auto_auto]" style={{ border: `1px solid ${INK}`, background: "white" }}><div><div className="text-[12px] font-bold uppercase">{alert.query}</div><div className="mt-1 text-[9px] uppercase" style={{ color: `${INK}77` }}>{alert.frequency === "immediate" ? "orar" : "zilnic"} · {alert.criteria?.priceMaxRon ? `max ${Number(alert.criteria.priceMaxRon).toLocaleString("ro-RO")} RON · ` : ""}{alert.lastCheckedAt ? `verificată ${formatDate(alert.lastCheckedAt)}` : "prima scanare în așteptare"}</div>{alert.lastError ? <div className="mt-2 text-[9px]" style={{ color: PINK }}>! {alert.lastError}</div> : null}</div><span className="w-fit px-2 py-1 text-[8px] font-bold uppercase" style={{ border: `1px solid ${alert.enabled ? GREEN : PINK}`, color: alert.enabled ? GREEN : PINK }}>{alert.enabled ? "Activă" : "Pauză"}</span><div className="flex gap-2"><button type="button" disabled={alertBusy} onClick={() => mutateAlert(alert.id, "PATCH", { status: alert.enabled ? "paused" : "active" })} className="px-3 py-2 text-[8px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: alert.enabled ? INK : "white", color: alert.enabled ? "white" : INK }}>{alert.enabled ? "Pauză" : "Activează"}</button><button type="button" disabled={alertBusy} onClick={() => mutateAlert(alert.id, "DELETE")} aria-label={`Șterge alerta ${alert.query}`} className="p-2" style={{ border: `1px solid ${INK}` }}><Trash2 size={12} /></button></div></article>)}</div> : <EmptyState title="Nicio alertă încă" description="Creează prima monitorizare. Scanarea inițială stabilește ofertele existente fără să trimită notificări vechi." />}
 
-                  <section className="grid gap-3"><div className="flex items-end justify-between border-b border-black pb-3"><div><div className="text-[9px] font-bold uppercase" style={{ color: PINK }}>Notification center</div><h2 className="text-[17px] font-bold uppercase">Inbox alerte</h2></div><span className="text-[9px] font-bold uppercase">{alertEvents.filter((event) => !event.read_at).length} necitite</span></div>{alertEvents.length ? alertEvents.map((event) => <article key={event.id} className="grid gap-3 p-4 sm:grid-cols-[1fr_auto]" style={{ border: `1px solid ${INK}`, background: event.read_at ? CREAM : "white", boxShadow: event.read_at ? "none" : `3px 3px 0 ${PINK}` }}><div><div className="text-[8px] font-bold uppercase" style={{ color: PINK }}>{event.event_type.replaceAll("_", " ")}</div><div className="mt-1 text-[12px] font-bold uppercase">{event.payload?.title || "Schimbare relevantă"}</div><div className="mt-2 text-[10px]">{event.payload?.reason}</div><div className="mt-2 text-[9px] uppercase" style={{ color: `${INK}77` }}>{event.payload?.source} · {event.payload?.priceRon ? `${Number(event.payload.priceRon).toLocaleString("ro-RO")} RON · ` : ""}{formatDate(event.created_at)}</div></div><div className="flex items-center gap-2">{!event.read_at ? <button type="button" onClick={() => markAlertEventRead(event.id)} className="px-3 py-2 text-[8px] font-bold uppercase" style={{ border: `1px solid ${INK}` }}>Marchează citită</button> : null}<a href={event.listing_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 text-[8px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Oferta <ExternalLink size={11} /></a></div></article>) : <p className="p-4 text-[10px] uppercase" style={{ border: `1px dashed ${INK}55`, color: `${INK}77` }}>Evenimentele noi, reducerile și ofertele mai bune vor apărea aici.</p>}</section>
+                  <section className="grid gap-3"><div className="flex items-end justify-between border-b border-black pb-3"><div><div className="text-[9px] font-bold uppercase" style={{ color: PINK }}>Notification center</div><h2 className="text-[17px] font-bold uppercase">Inbox alerte</h2></div><span className="text-[9px] font-bold uppercase">{alertEvents.filter((event) => !event.read_at).length} necitite</span></div>{alertEvents.length ? alertEvents.map((event) => <article key={event.id} className="grid gap-3 p-4 sm:grid-cols-[1fr_auto]" style={{ border: `1px solid ${INK}`, background: event.read_at ? CREAM : "white", boxShadow: event.read_at ? "none" : `3px 3px 0 ${PINK}` }}><div><div className="text-[8px] font-bold uppercase" style={{ color: PINK }}>{({ new_match: "Produs nou", new_strong_match: "Ofertă bună", price_drop: "Preț redus", better_than_shortlist: "Ofertă mai bună" })[event.event_type]}</div><div className="mt-1 text-[12px] font-bold uppercase">{event.payload?.title || "Schimbare relevantă"}</div><div className="mt-2 text-[10px]">{event.payload?.reason}</div><div className="mt-2 text-[9px] uppercase" style={{ color: `${INK}77` }}>{event.payload?.source} · {event.payload?.priceRon ? `${Number(event.payload.priceRon).toLocaleString("ro-RO")} RON · ` : ""}{formatDate(event.created_at)}</div></div><div className="flex items-center gap-2">{!event.read_at ? <button type="button" disabled={alertBusy} onClick={() => markAlertEventRead(event.id)} className="px-3 py-2 text-[8px] font-bold uppercase" style={{ border: `1px solid ${INK}` }}>Marchează citită</button> : null}<a href={event.listing_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 text-[8px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Oferta <ExternalLink size={11} /></a></div></article>) : <p className="p-4 text-[10px] uppercase" style={{ border: `1px dashed ${INK}55`, color: `${INK}77` }}>Evenimentele noi, reducerile și ofertele mai bune vor apărea aici.</p>}</section>
                 </>
               )}
             </div>

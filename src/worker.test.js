@@ -207,7 +207,7 @@ test("entitlement outages do not classify paying accounts as Free", async (t) =>
     }
     throw new Error(`Unexpected downstream request: ${requestUrl}`);
   };
-  for (const path of ["/api/alerts", "/api/search/premium?q=iphone&site=all"]) {
+  for (const path of ["/api/search/premium?q=iphone&site=all"]) {
     const response = await worker.fetch(new Request(`https://libergent.test${path}`, {
       headers: { authorization: "Bearer user-token" }
     }), { SUPABASE_URL: "https://supabase.example", SUPABASE_SECRET_KEY: "service-secret" });
@@ -216,7 +216,7 @@ test("entitlement outages do not classify paying accounts as Free", async (t) =>
   }
 });
 
-test("keeps automatic alerts behind Premium entitlement", async (t) => {
+test("allows automatic alerts for Free accounts", async (t) => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
     const requestUrl = String(url);
@@ -231,8 +231,8 @@ test("keeps automatic alerts behind Premium entitlement", async (t) => {
     SUPABASE_SECRET_KEY: "service-secret"
   });
   const payload = await response.json();
-  assert.equal(response.status, 403);
-  assert.equal(payload.code, "premium_required");
+  assert.equal(response.status, 200);
+  assert.equal(payload.maxActiveAlerts, 5);
 });
 
 test("returns Premium alert profiles and inbox events for entitled users", async (t) => {

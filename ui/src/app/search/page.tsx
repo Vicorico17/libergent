@@ -3398,6 +3398,7 @@ function SearchResultsContent() {
       </header>}
       {query && !needsStart && <section className="mx-6 mt-4 flex flex-wrap items-center gap-3 text-[11px]" aria-label="Actualizarea rezultatelor">
         <button type="button" disabled={isLoading || accountPlan === "checking" || accountPlan === "unknown" || (metered && !wallet?.balance && !error)} onClick={() => { rotateCreditRequest.current = !error; setRefreshRequest(value => value + 1) }} className="min-h-11 border border-black px-4 py-2 font-bold disabled:opacity-50">{error ? "Reîncearcă această căutare" : "Verifică oferte noi"}{metered ? " · 1 credit" : ""}</button>
+        <Link href={`/account?section=alerts&q=${encodeURIComponent(query)}`} className="min-h-11 border border-black px-4 py-3 font-bold">Creează o alertă</Link>
         <p>Reîncărcarea păstrează rezultatele în această filă până la 24 de ore. Prețurile și disponibilitatea se pot schimba.</p>
         {snapshotNotice && <p role="status" className="basis-full">{snapshotNotice}</p>}
         {snapshotStorageWarning && <p role="alert" className="basis-full">{snapshotStorageWarning}</p>}

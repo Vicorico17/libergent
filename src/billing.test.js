@@ -95,14 +95,17 @@ test("webhook verifies raw signature and maps current subscription state", async
     throw new Error(`Unexpected request: ${url}`);
   };
   const event = { id: "evt_123", type: "customer.subscription.updated", created: 1700000000, data: { object: { id: "sub_123" } } };
+  const premiumStatus = async () => (await (await worker.fetch(new Request("https://libergent.test/api/billing/credits", { headers: { authorization: "Bearer user-token" } }), env)).json()).premium;
+  assert.equal(await premiumStatus(), false);
   const alerts = () => worker.fetch(new Request("https://libergent.test/api/alerts", { headers: { authorization: "Bearer user-token" } }), env);
-  assert.equal((await alerts()).status, 403);
+  assert.equal((await alerts()).status, 200); // Alerts are included with every account.
   const invalid = await worker.fetch(await signedRequest(event, "wrong-secret"), env);
   assert.equal(invalid.status, 400);
   assert.equal(writes.length, 0);
   const active = await worker.fetch(await signedRequest(event), env);
   assert.equal(active.status, 200);
   assert.equal(writes[0].p_status, "active");
+  assert.equal(await premiumStatus(), true);
   assert.equal((await alerts()).status, 200);
   assert.equal(entitlementFromSubscription({ status: "trialing", current_period_end: 1800000000 }).status, "active");
   status = "past_due";
@@ -110,7 +113,8 @@ test("webhook verifies raw signature and maps current subscription state", async
     data: { object: { parent: { subscription_details: { subscription: "sub_123" } } } } }), env);
   assert.equal(failed.status, 200);
   assert.equal(writes[1].p_status, "past_due");
-  assert.equal((await alerts()).status, 403);
+  assert.equal(await premiumStatus(), false);
+  assert.equal((await alerts()).status, 200); // Alerts are included with every account.
   status = "canceled";
   const canceled = await worker.fetch(await signedRequest({ ...event, id: "evt_125", type: "customer.subscription.deleted", created: event.created + 2 }), env);
   assert.equal(canceled.status, 200);

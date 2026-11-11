@@ -568,16 +568,23 @@ Full Notes mapping and refresh investigation: [September 25 improvement plan](im
 
 ## Alert acceptance test
 
-- [ ] **P1** — A free account receives the Premium-required state and cannot create an alert.
-- [ ] **P1** — The Premium test account can create an alert with structured vehicle filters.
+Product update, 2026-11-11: alerts are now included with every authenticated
+account, across category-appropriate product marketplaces. Premium expiry no
+longer blocks alerts. The matching UI, atomic quota/scan/outbox persistence and
+acceptance tests are implemented locally; reapply `supabase/search_tracking.sql`
+before deploying. See [account alert behavior, setup and acceptance](alerts-acceptance.md).
+Earlier Premium-only vehicle-alert requirements in this document are historical.
+
+- [ ] **P1** — A signed-in Free account can create an alert; anonymous access is rejected.
+- [ ] **P1** — An account can create product alerts, choose new-products or deals-only mode, and optionally use vehicle filters.
 - [ ] **P1** — A sixth active alert is rejected.
 - [ ] **P1** — Pause, resume, and delete work only for the owning account.
 - [ ] **P1** — The first scheduled/manual scan stores listing state and creates no historical notifications.
 - [ ] **P1** — A later scan can create a deduplicated new-match or price-drop event.
 - [ ] **P1** — The event appears in the correct account inbox and can be marked read.
-- [ ] **P1** — Inbox-only mode records email delivery as `skipped` when no webhook is configured.
-- [ ] **P1** — Email mode records `sent` or a useful `failed` error without losing the in-account event.
-- [ ] **P1** — An inactive, expired, cancelled, or past-due entitlement blocks access and pauses scheduled alerts.
+- [ ] **P1** — Inbox-only mode records the email outbox batch as `skipped` when no webhook is configured.
+- [ ] **P1** — Email mode records accepted, rejected or unknown outcomes without losing the in-account event or blindly retrying uncertain submissions.
+- [ ] **P1** — An expired Premium subscription does not block account alerts; pause/delete controls stop future work.
 - [ ] **P1** — The hourly Cloudflare cron invokes the due-alert runner in the deployed environment.
 
 ## Premium billing backlog

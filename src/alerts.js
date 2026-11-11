@@ -28,9 +28,10 @@ export function normalizeAlertProfile(body = {}) {
       yearFrom: boundedNumber(criteria.yearFrom, { min: 1950, max: 2100 }),
       mileageMaxKm: boundedNumber(criteria.mileageMaxKm, { max: 5_000_000 }),
       location: String(criteria.location || "").trim().slice(0, 120),
-      radiusKm: boundedNumber(criteria.radiusKm, { max: 1000 })
+      radiusKm: null
     },
     events: {
+      newProducts: eventSettings.newProducts === true,
       newStrongMatch: eventSettings.newStrongMatch !== false,
       priceDrop: eventSettings.priceDrop !== false,
       betterThanShortlist: eventSettings.betterThanShortlist !== false
@@ -51,29 +52,35 @@ export function extractVehicleFacts(item = {}) {
 
 export function listingMatchesAlert(item, profile) {
   if (!item?.url || !Number.isFinite(Number(item.priceRon ?? item.numericPrice ?? item.price))) return false;
-  const priceRon = Number(item.priceRon ?? item.numericPrice ?? item.price);
+  const rawPrice = item.priceRon ?? item.numericPrice ?? item.price;
+  if (rawPrice === null || rawPrice === undefined || String(rawPrice).trim() === "" || Number(rawPrice) <= 0) return false;
+  try { if (!["http:", "https:"].includes(new URL(item.url).protocol)) return false; } catch { return false; }
+  const priceRon = Number(rawPrice);
   const { year, mileageKm } = extractVehicleFacts(item);
   const criteria = profile.criteria || {};
   if (criteria.priceMaxRon !== null && criteria.priceMaxRon !== undefined && priceRon > criteria.priceMaxRon) return false;
   if (criteria.yearFrom && (!year || year < criteria.yearFrom)) return false;
   if (criteria.mileageMaxKm && (!mileageKm || mileageKm > criteria.mileageMaxKm)) return false;
-  if (criteria.location && !String(item.location || "").toLocaleLowerCase("ro-RO").includes(criteria.location.toLocaleLowerCase("ro-RO"))) return false;
+  if (criteria.location && !normalizedLocation(item.location).includes(normalizedLocation(criteria.location))) return false;
   return true;
 }
 
 export function buildAlertEvents(profile, listings, previousStates = new Map()) {
   const events = [];
-  const matching = listings.filter((item) => listingMatchesAlert(item, profile));
-  const previousBestScore = Math.max(0, ...[...previousStates.values()].map((state) => Number(state.snapshot?.dealQuality?.score ?? state.snapshot?.recommendationScore ?? 0)));
+  const matching = [...new Map(listings.filter((item) => listingMatchesAlert(item, profile)).map(item => [item.url, item])).values()];
+  const previousBestScore = Math.max(0, ...[...previousStates.values()].map((state) => alertScore(state.snapshot)));
 
   for (const item of matching) {
     const priceRon = Math.round(Number(item.priceRon ?? item.numericPrice ?? item.price));
     const previous = previousStates.get(item.url);
-    const score = Number(item.recommendationScore ?? item.offerScore ?? item.dealQuality?.score ?? 0);
+    const score = alertScore(item);
     const confidence = Number(item.evidenceConfidence?.score ?? 0);
 
     const isBetterThanPrevious = !previous && previousStates.size > 0 && score >= 70 && score >= previousBestScore + 10;
-    if (isBetterThanPrevious && profile.events?.betterThanShortlist !== false) {
+    if (!previous && profile.events?.newProducts === true && Number(item.relevanceScore ?? 0) >= 70) {
+      events.push({ type: "new_match", eventKey: `new:${profile.id}:${item.url}`, listingUrl: item.url,
+        payload: alertPayload(item, priceRon, "Produs nou care corespunde căutării tale") });
+    } else if (isBetterThanPrevious && profile.events?.betterThanShortlist !== false) {
       events.push({
         type: "better_than_shortlist",
         eventKey: `better:${profile.id}:${item.url}`,
@@ -115,9 +122,25 @@ function alertPayload(item, priceRon, reason) {
     imageUrl: item.imageUrl || item.image || "",
     location: item.location || "",
     reason,
-    dealScore: Number(item.dealQuality?.score ?? item.recommendationScore ?? item.offerScore ?? 0),
+    dealScore: alertScore(item),
     riskFlags: Array.isArray(item.riskFlags) ? item.riskFlags.slice(0, 3) : []
   };
 }
 
 export { MAX_ACTIVE_ALERTS };
+
+function alertScore(item = {}) {
+  return Number(item.recommendationScore ?? item.offerScore ?? item.dealQuality?.score ?? 0);
+}
+
+// Incomplete sources cannot establish a baseline or produce notifications.
+export function validateAlertScan(payload) {
+  const successful = (Array.isArray(payload?.results) ? payload.results : []).filter(result =>
+    result?.ok === true && Array.isArray(result.items) && !result.pageError && result.exhaustedReason !== 'page-error');
+  if (!successful.length) throw new Error('No complete source results; retain baseline and retry.');
+  return successful;
+}
+
+function normalizedLocation(value = "") {
+  return String(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}

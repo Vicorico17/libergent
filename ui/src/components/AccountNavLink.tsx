@@ -23,8 +23,9 @@ export function AccountNavLink({ next = "/", compact = false }: { next?: string;
       const session = supabase ? (await supabase.auth.getSession()).data.session : null;
       if (!session?.access_token) return;
       try {
-        const response = await fetch("/api/alerts", { headers: { authorization: `Bearer ${session.access_token}` } });
-        if (active) setIsPremium(response.ok);
+        const response = await fetch("/api/billing/credits", { headers: { authorization: `Bearer ${session.access_token}` } });
+        const payload = await response.json();
+        if (active) setIsPremium(response.ok && payload.premium === true);
       } catch {
         if (active) setIsPremium(false);
       }
