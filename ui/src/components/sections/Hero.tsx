@@ -1,5 +1,6 @@
 "use client";
 
+import { ImageSearch } from "@/components/ImageSearch";
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { RecentSearches } from "@/components/RecentSearches";
@@ -136,10 +137,11 @@ export function Hero() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Caută iPhone, laptop, mobilă..."
-                  className="bg-transparent outline-none w-full text-lg font-semibold"
+                  className="bg-transparent outline-none min-w-0 w-full text-lg font-semibold"
                   style={{ fontFamily: MONO, color: INK }}
                   autoComplete="off"
                 />
+                <ImageSearch onSearch={q => { setQuery(q); router.push(`/search?q=${encodeURIComponent(q)}`); }} />
               </div>
               <button
                 type="submit"

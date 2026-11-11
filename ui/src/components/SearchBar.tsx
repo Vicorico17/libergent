@@ -1,5 +1,6 @@
 "use client";
 
+import { ImageSearch } from "@/components/ImageSearch";
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
@@ -50,6 +51,7 @@ export function SearchBar({ defaultValue = "", size = "hero", className = "" }: 
           }`}
           autoComplete="off"
         />
+        <ImageSearch onSearch={q => { setQuery(q); router.push(`/search?q=${encodeURIComponent(q)}`); }} />
       </div>
       <button
         type="submit"

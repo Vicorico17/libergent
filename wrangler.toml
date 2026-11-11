@@ -19,6 +19,8 @@ head_sampling_rate = 1
 invocation_logs = false
 
 [vars]
+IMAGE_SEARCH_LIMITS_ENABLED = "1"
+GROQ_VISION_MODEL = "qwen/qwen3.8-27b"
 SEARCH_CREDITS_ENABLED = "1"
 LIBERGENT_PUBLIC_URL = "https://libergent.com"
 STRIPE_WEEKLY_PRICE_ID = "price_1UaLYFBGLerz2o1wCLZHFcMB"
@@ -43,6 +45,17 @@ simple = { limit = 60, period = 60 }
 name = "FREE_SEARCH_TOTAL_LIMITER"
 namespace_id = "1102"
 simple = { limit = 300, period = 60 }
+
+# Photo recognition burst limits for the Groq free tier (per Cloudflare location).
+[[ratelimits]]
+name = "IMAGE_SEARCH_CLIENT_LIMITER"
+namespace_id = "1103"
+simple = { limit = 2, period = 60 }
+
+[[ratelimits]]
+name = "IMAGE_SEARCH_TOTAL_LIMITER"
+namespace_id = "1104"
+simple = { limit = 3, period = 60 }
 
 # Persistent integration cache and quota counters.
 [[durable_objects.bindings]]
