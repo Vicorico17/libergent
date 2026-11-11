@@ -23,6 +23,7 @@ import { MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
 import { createAlertProfileInSupabase, deleteAlertProfileInSupabase, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertShopSuggestionToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, readPremiumEntitlement, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase } from "./supabase.js";
 import { normalizeShopSuggestion, normalizeShopSuggestionStatus } from "./shop-suggestions.js";
 import { normalizeOfferFeedbackPayload } from "./feedback.js";
+import { handleFeedbackApp } from "./feedback-app.js";
 import { buildSourceCatalog } from "./source-catalog.js";
 import { getMarketplaceImageProxyTarget } from "./image-proxy.js";
 import { buildAbortSignal } from "./abort.js";
@@ -651,6 +652,20 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 200, { ok: true });
       } else sendJson(res, 405, { error: "Method not allowed" });
     } catch (error) { sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) }); }
+    return;
+  }
+
+  if ((apiPath === "/api/feedback" && ["GET", "DELETE"].includes(req.method)) || apiPath === "/api/feedback/review") {
+    const auth = await authenticateSupabaseUser(req);
+    if (!auth.user) { sendJson(res, auth.status, { error: auth.error }); return; }
+    const parsed = req.method === "GET" ? { data: {} } : await readJsonBody(req);
+    if (parsed.error) { sendJson(res, parsed.error.includes("large") ? 413 : 400, { error: parsed.error }); return; }
+    try {
+      const result = await handleFeedbackApp({ method: req.method, reviewMode: apiPath.endsWith("/review"), userId: auth.user.id, query: url.searchParams.get("query"), body: parsed.data });
+      sendJson(res, result.status, result.payload);
+    } catch {
+      sendJson(res, 503, { error: "Feedback service unavailable. Please try again." });
+    }
     return;
   }
 

@@ -24,6 +24,7 @@ import {
   writeSavedListingIds,
 } from "@/lib/account-data"
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser"
+import { personalFeedbackExclusions, type SavedFeedback } from "@/lib/personal-feedback"
 import { SNAPSHOT_MAX_AGE_MS, searchSnapshotKey, readSearchSnapshot, writeSearchSnapshot, describeSnapshotChange } from "@/lib/search-snapshot.mjs"
 import { useAccountSession } from "@/lib/use-account-session"
 import { rememberRecentSearch } from "@/lib/recent-searches"
@@ -148,6 +149,7 @@ type FeedbackExclusion = {
   reason: FeedbackReason
   listingType: string
   signatureTokens: string[]
+  exactOnly?: boolean
 }
 type SearchSnapshot = { id: string; savedAt: number; payload: SearchPayload; mapped: SearchResultItem[]; exclusions: FeedbackExclusion[] }
 
@@ -255,11 +257,13 @@ function buildFeedbackExclusion(item: SearchResultItem, query: string, reason: F
     reason,
     listingType: item.listingType,
     signatureTokens,
+    exactOnly: true,
   }
 }
 
 function isExcludedByFeedback(item: SearchResultItem, exclusion: FeedbackExclusion) {
-  if (item.id === exclusion.listingId) return true
+  if (item.id === exclusion.listingId || listingStorageId(item) === exclusion.listingId) return true
+  if (exclusion.exactOnly) return false
   if (!exclusion.signatureTokens.length && exclusion.reason === "part_or_accessory" && ["accessory", "spare_part"].includes(exclusion.listingType)) {
     return item.listingType === exclusion.listingType
   }
@@ -2757,8 +2761,43 @@ function SearchResultsContent() {
   const [savedListings, setSavedListings] = useState<Set<string>>(new Set())
   const [savedListingsOwnerId, setSavedListingsOwnerId] = useState("")
   const [feedbackExclusions, setFeedbackExclusions] = useState<FeedbackExclusion[]>([])
+  const [savedFeedback, setSavedFeedback] = useState<{ scope: string; rows: SavedFeedback[] }>({ scope: "", rows: [] })
+  const [feedbackLoadError, setFeedbackLoadError] = useState("")
+  const [feedbackRevision, setFeedbackRevision] = useState(0)
   const [feedbackNotice, setFeedbackNotice] = useState<{ message: string; exclusionId?: string; suggestedQuery?: string; error?: boolean } | null>(null)
   const feedbackSessionIdRef = useRef("")
+  const feedbackScope = `${account.userId || ""}:${query}`
+  const allFeedbackExclusions = useMemo(() => [
+    ...feedbackExclusions,
+    ...(savedFeedback.scope === feedbackScope ? personalFeedbackExclusions(savedFeedback.rows).map(row => ({
+      id: row.id, listingId: row.listingFingerprint || row.offer?.url || "", reason: row.reason as FeedbackReason,
+      listingType: "", signatureTokens: [], exactOnly: true,
+    })) : []),
+  ], [feedbackExclusions, savedFeedback, feedbackScope])
+
+  useEffect(() => {
+    if (!account.userId || !query.trim()) return
+    const controller = new AbortController()
+    async function loadFeedback() {
+      try {
+        const client = getSupabaseBrowserClient()
+        const session = client ? (await client.auth.getSession()).data.session : null
+        if (!session?.access_token) throw new Error("Autentifică-te pentru a încărca feedback-ul salvat.")
+        const response = await fetch(`/api/feedback?${new URLSearchParams({ query })}`, {
+          signal: controller.signal, headers: { authorization: `Bearer ${session.access_token}` },
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error("Feedback-ul salvat nu a putut fi încărcat. Reîncearcă.")
+        if (controller.signal.aborted) return
+        setSavedFeedback({ scope: feedbackScope, rows: data.rows })
+        setFeedbackLoadError(data.truncated ? "Sunt aplicate doar cele mai recente 200 de rapoarte pentru această căutare." : "")
+      } catch (failure) {
+        if (!controller.signal.aborted) setFeedbackLoadError(failure instanceof Error ? failure.message : "Feedback indisponibil.")
+      }
+    }
+    void loadFeedback()
+    return () => controller.abort()
+  }, [account.userId, query, feedbackScope, feedbackRevision])
 
   // Loader state
   const [showLoader, setShowLoader]       = useState(false)
@@ -2787,7 +2826,7 @@ function SearchResultsContent() {
       setFeedbackNotice({
         message: hiddenCount > 1
           ? `${hiddenCount} rezultate similare au fost eliminate și lista a fost rerankată.`
-          : "Rezultatul a fost eliminat și lista a fost rerankată.",
+          : "Rezultatul a fost ascuns în această sesiune.",
         exclusionId: exclusion.id,
         suggestedQuery: correctionText.trim(),
       })
@@ -2816,7 +2855,7 @@ function SearchResultsContent() {
         searchId: searchedAt || `${searchTier}:${query}`,
         listingFingerprint: listingStorageId(item),
         originalRank: item.rank,
-        appliedAction: exclusion ? (hiddenCount > 1 ? "hide_similar_and_rerank" : "hide_listing_and_rerank") : "confirm_relevant",
+        appliedAction: exclusion ? "hide_listing" : "confirm_relevant",
         queryUnderstanding,
         listingFeatures: {
           listingType: item.listingType,
@@ -2827,10 +2866,11 @@ function SearchResultsContent() {
           signatureTokens: exclusion?.signatureTokens || [],
         },
         offer: {
+          ...item.feedbackEvidence,
           title: item.title,
           url: item.url,
           site: item.source,
-          priceRon: item.price,
+          priceRon: item.feedbackEvidence?.priceRon ?? item.price,
           score: item.score,
           rank: item.rank,
           listingType: item.listingType,
@@ -2846,7 +2886,15 @@ function SearchResultsContent() {
     }
 
     trackSearchEvent("offer_feedback", { search_term: query, marketplace: item.source, feedback, reason, listing_title: item.title })
-    if (!exclusion) setFeedbackNotice({ message: "Mulțumim. Rezultatul a fost confirmat ca relevant." })
+    setSavedFeedback(current => ({ scope: feedbackScope, rows: [
+      { id: `local-${Date.now()}`, query, feedback, reason, listingFingerprint: listingStorageId(item), offer: { url: item.url } },
+      ...(current.scope === feedbackScope ? current.rows : []),
+    ] }))
+    setFeedbackRevision(value => value + 1)
+    if (exclusion && ["wrong_product", "wrong_model", "part_or_accessory"].includes(reason)) {
+      setFeedbackExclusions(current => current.filter(entry => entry.id !== exclusion.id))
+      setFeedbackNotice({ message: "Feedback salvat. Acest anunț va fi ascuns pentru tine la aceeași căutare. Raportul poate fi verificat pentru îmbunătățiri comune." })
+    } else if (!exclusion) setFeedbackNotice({ message: "Mulțumim. Rezultatul a fost confirmat ca relevant." })
     return { hiddenCount }
   }
 
@@ -2914,7 +2962,9 @@ function SearchResultsContent() {
   useEffect(() => {
     const snapshot = activeSnapshot.current
     if (!snapshot || snapshot.key !== snapshotKey || isLoading) return
-    snapshot.value.exclusions = feedbackExclusions
+    // Durable corrections come from the account API. Do not resurrect removed
+    // reports (or failed local saves) from a browser search snapshot.
+    snapshot.value.exclusions = []
     try { writeSearchSnapshot(window.sessionStorage, snapshot.key, snapshot.value) } catch { /* Storage may be disabled. */ }
   }, [feedbackExclusions, isLoading, snapshotKey])
 
@@ -3065,7 +3115,8 @@ function SearchResultsContent() {
           try { stored = writeSearchSnapshot(window.sessionStorage, snapshotKey, nextSnapshot) } catch { /* Storage may be disabled. */ }
           if (!stored) setSnapshotStorageWarning("Browserul nu poate păstra rezultatele. Reîncărcarea paginii poate porni o căutare nouă.")
           setSnapshotNotice(restored ? "Rezultate redeschise · 0 credite folosite. Verifică ofertele noi pentru prețuri actualizate." : `${metered ? `${payload.credits?.spent ?? 1} credit folosit. ` : ""}${describeSnapshotChange(previousSnapshot, nextSnapshot)}`)
-          setFeedbackExclusions(nextSnapshot.exclusions)
+          nextSnapshot.exclusions = []
+          setFeedbackExclusions([])
           setFeedbackNotice(null)
           setResults(mapped)
           setBestUsedOffer(mapOffer(payload.summary?.bestUsedOffer, mapped))
@@ -3219,7 +3270,7 @@ function SearchResultsContent() {
   }
   const filteredResults = useMemo(() => {
     const base = results.filter((item) => {
-      if (feedbackExclusions.some((exclusion) => isExcludedByFeedback(item, exclusion))) return false
+      if (allFeedbackExclusions.some((exclusion) => isExcludedByFeedback(item, exclusion))) return false
       // Newly added experimental sources remain visible by default, even before
       // they receive their own checkbox in the curated source list.
       if (sources.size > 0 && SOURCES_LIST.includes(item.source) && !sources.has(item.source)) return false
@@ -3238,7 +3289,7 @@ function SearchResultsContent() {
       if (sort === "potrivire cuvinte cheie") return getKeywordMatchScore(b, query) - getKeywordMatchScore(a, query) || compareByRank(a, b)
       return compareByRank(a, b)
     })
-  }, [conditions, feedbackExclusions, priceMax, priceMin, query, results, sort, sourceTypes, sources])
+  }, [conditions, allFeedbackExclusions, priceMax, priceMin, query, results, sort, sourceTypes, sources])
 
   const shownBestOffer = useMemo(() => {
     return bestUsedOffer && filteredResults.some((item) => item.id === bestUsedOffer.id) ? bestUsedOffer : null
@@ -3248,18 +3299,18 @@ function SearchResultsContent() {
     // A retail reference remains useful when shopping only for used products or
     // within a used-product budget. Honor explicit source exclusions and feedback.
     if (!bestNewBenchmark) return null
-    if (feedbackExclusions.some((exclusion) => isExcludedByFeedback(bestNewBenchmark, exclusion))) return null
+    if (allFeedbackExclusions.some((exclusion) => isExcludedByFeedback(bestNewBenchmark, exclusion))) return null
     if (sources.size > 0 && SOURCES_LIST.includes(bestNewBenchmark.source) && !sources.has(bestNewBenchmark.source)) return null
     return bestNewBenchmark
-  }, [bestNewBenchmark, feedbackExclusions, sources])
+  }, [bestNewBenchmark, allFeedbackExclusions, sources])
 
   const comparisonCandidates = useMemo(() => {
     const pool = shownNewBenchmark ? [...results, shownNewBenchmark] : results
     return pool.filter((item) =>
-      !feedbackExclusions.some((exclusion) => isExcludedByFeedback(item, exclusion)) &&
+      !allFeedbackExclusions.some((exclusion) => isExcludedByFeedback(item, exclusion)) &&
       !(sources.size > 0 && SOURCES_LIST.includes(item.source) && !sources.has(item.source))
     )
-  }, [results, shownNewBenchmark, feedbackExclusions, sources])
+  }, [results, shownNewBenchmark, allFeedbackExclusions, sources])
   const comparisonReference = shownBestOffer || filteredResults.find((item) => buyingKind(item) === "used") || filteredResults[0]
 
   const shownClosestOffer = useMemo(() => {
@@ -3470,6 +3521,13 @@ function SearchResultsContent() {
             <button type="button" onClick={() => setFeedbackNotice(null)} className="min-h-9 px-3 py-2 text-[9px] font-bold uppercase" style={{ border: `1px solid ${INK}`, background: INK, color: "white" }}>Închide</button>
           </div>
         </section>
+      )}
+
+      {account.userId && query && (
+        <div className="mx-6 mt-3 text-sm flex flex-wrap gap-3" aria-live="polite">
+          <Link href="/feedback" className="underline">Feedback-ul meu · gestionează anunțurile ascunse</Link>
+          {feedbackLoadError && <span role="status">{feedbackLoadError} <button type="button" className="underline" onClick={() => setFeedbackRevision(value => value + 1)}>Reîncearcă</button></span>}
+        </div>
       )}
 
       {premiumLocked && query && !isLoading && !showLoader && (
