@@ -27,6 +27,8 @@ import { parsePhotoSetupHtml } from "./parsers/photosetup.js";
 import { parseLibrisHtml } from "./parsers/libris.js";
 import { parseMcMusicHtml } from "./parsers/mcmusic.js";
 import { parseCelHtml } from "./parsers/cel.js";
+import { parseBonamiHtml } from "./parsers/bonami.js";
+import { parseThomannHtml } from "./parsers/thomann.js";
 
 export function parseSiteHtml({ site, html, url, limit, query = "" }) {
   let parsed;
@@ -92,6 +94,10 @@ export function parseSiteHtml({ site, html, url, limit, query = "" }) {
     parsed = parseFashionDaysHtml(html, limit);
   } else if (site.key === "playbike.ro") {
     parsed = parsePlaybikeHtml(html, limit);
+  } else if (site.key === "bonami.ro") {
+    parsed = parseBonamiHtml(html, limit);
+  } else if (site.key === "thomann.de") {
+    parsed = parseThomannHtml(html, limit);
   } else if (site.strategy === "direct-html-retail") {
     parsed = parseRetailHtml(html, limit, { origin: new URL(url).origin });
   } else {

@@ -108,6 +108,26 @@ test('response size enforcement also bounds streamed bodies without content-leng
   await assert.rejects(readBoundedResponse(new Response('12345'), 4), /size limit/);
 });
 
+test('large OLX pages parse while other origins and oversized OLX streams stay bounded', async t => {
+  const html = card('large') + '<!--' + ' '.repeat(4 * 1024 * 1024) + '-->';
+  t.mock.method(globalThis, 'fetch', async () => new Response(html));
+  const result = await search({ maxPages: 1 });
+  assert.equal(result.items[0].title, 'iPhone 15 128GB');
+
+  const transport = createScrapeTransport({ fetchImpl: async () => new Response(html) });
+  await assert.rejects(transport('https://example.test/search'), /size limit/);
+  await assert.rejects(transport('https://olx.ro.example.test/search'), /size limit/);
+  const redirected = createScrapeTransport({ fetchImpl: async () => {
+    const response = new Response(html);
+    Object.defineProperty(response, 'url', { value: 'https://example.test/search' });
+    return response;
+  } });
+  await assert.rejects(redirected('https://www.olx.ro/search'), /size limit/);
+
+  const oversized = createScrapeTransport({ fetchImpl: async () => new Response(' '.repeat(8 * 1024 * 1024 + 1)) });
+  await assert.rejects(oversized('https://www.olx.ro/search'), /size limit/);
+});
+
 test('shared coordinator serializes leases and retains cooldown in persistent storage', async () => {
   const map = new Map();
   let queue = Promise.resolve();

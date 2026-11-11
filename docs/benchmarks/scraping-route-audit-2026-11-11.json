@@ -1,0 +1,159 @@
+{
+  "recordedAt": "2026-11-11T10:47:18.048Z",
+  "environment": "local-node",
+  "note": "Homepage reachability is not search recovery. Search probes used published routes and existing parsers before repairs.",
+  "homepages": [
+    {
+      "domain": "mediagalaxy.ro",
+      "status": 200,
+      "url": "https://mediagalaxy.ro/",
+      "bytes": 1137893
+    },
+    {
+      "domain": "thomann.de",
+      "status": 200,
+      "url": "https://www.thomann.de/de/index.html",
+      "bytes": 1072224
+    },
+    {
+      "domain": "bricodepot.ro",
+      "status": 200,
+      "url": "https://bricostore.ro/",
+      "bytes": 774349
+    },
+    {
+      "domain": "farmec.ro",
+      "status": 200,
+      "url": "https://www.farmec.ro/",
+      "bytes": 181759
+    },
+    {
+      "domain": "zeedo.ro",
+      "status": 200,
+      "url": "https://www.zeedo.ro/",
+      "bytes": 131885
+    },
+    {
+      "domain": "esteto.ro",
+      "status": 200,
+      "url": "https://www.esteto.ro/",
+      "bytes": 112217
+    },
+    {
+      "domain": "pravaliacucarti.ro",
+      "status": 200,
+      "url": "https://pravaliacucarti.ro/",
+      "bytes": 208720
+    },
+    {
+      "domain": "miculmester.ro",
+      "status": 200,
+      "url": "https://www.miculmester.ro/",
+      "bytes": 752015
+    },
+    {
+      "domain": "autokarma.ro",
+      "status": 200,
+      "url": "https://www.autokarma.ro/",
+      "bytes": 445475
+    },
+    {
+      "domain": "douglas.ro",
+      "status": 200,
+      "url": "https://www.douglas.ro/ro",
+      "bytes": 2167881
+    },
+    {
+      "domain": "ferex.ro",
+      "status": 200,
+      "url": "https://ferex.ro/",
+      "bytes": 339220
+    },
+    {
+      "domain": "unixauto.ro",
+      "status": 200,
+      "url": "https://www.unixauto.ro/",
+      "bytes": 214703
+    },
+    {
+      "domain": "sephora.ro",
+      "status": 403,
+      "url": "https://www.sephora.ro/",
+      "bytes": 521
+    },
+    {
+      "domain": "jdsports.ro",
+      "status": 200,
+      "url": "https://www.jdsports.ro/",
+      "bytes": 1212554
+    },
+    {
+      "domain": "deichmann.com",
+      "status": 200,
+      "url": "https://www.deichmann.com/ro-ro/",
+      "bytes": 616008
+    }
+  ],
+  "searchProbes": [
+    {
+      "domain": "zeedo.ro",
+      "query": "chitara",
+      "url": "https://www.zeedo.ro/?s=chitara",
+      "status": 200,
+      "finalUrl": "https://www.zeedo.ro/?s=chitara",
+      "bytes": 123528,
+      "raw": 0,
+      "items": []
+    },
+    {
+      "domain": "miculmester.ro",
+      "query": "bosch",
+      "url": "https://www.miculmester.ro/cauta/bosch",
+      "status": 404,
+      "finalUrl": "https://www.miculmester.ro/cauta/bosch",
+      "bytes": 444015,
+      "raw": 0,
+      "items": []
+    },
+    {
+      "domain": "jdsports.ro",
+      "query": "adidas samba",
+      "url": "https://www.jdsports.ro/search?query%5Bmenu_item%5D=&query%5Bquerystring%5D=adidas%20samba",
+      "status": 500,
+      "finalUrl": "https://www.jdsports.ro/search?query%5Bmenu_item%5D=&query%5Bquerystring%5D=adidas%20samba",
+      "bytes": 11670,
+      "raw": 0,
+      "items": []
+    },
+    {
+      "domain": "thomann.de",
+      "query": "yamaha",
+      "url": "https://www.thomann.de/de/search.html?sw=yamaha",
+      "status": 200,
+      "finalUrl": "https://www.thomann.de/de/cat_BF_yamaha.html?_search_redirect=1",
+      "bytes": 1047997,
+      "raw": 0,
+      "items": []
+    },
+    {
+      "domain": "ferex.ro",
+      "query": "bosch",
+      "url": "https://ferex.ro/?s=bosch",
+      "status": 200,
+      "finalUrl": "https://ferex.ro/?s=bosch",
+      "bytes": 248215,
+      "raw": 0,
+      "items": []
+    },
+    {
+      "domain": "unixauto.ro",
+      "query": "bosch",
+      "url": "https://www.unixauto.ro/piese-auto?q=bosch",
+      "status": 200,
+      "finalUrl": "https://www.unixauto.ro/piese-auto?q=bosch",
+      "bytes": 1125778,
+      "raw": 0,
+      "items": []
+    }
+  ]
+}

@@ -30,6 +30,8 @@ const VERIFIED_RETAIL_SEARCH_URLS = {
 };
 
 const RECOVERED_EXPERIMENTAL_SEARCH_URLS = {
+  "thomann.de": (query) => `https://www.thomann.ro/search.html?sw=${encodeSearchText(query)}`,
+  "bonami.ro": (query) => `https://www.bonami.ro/cautati?q=${encodeSearchText(query)}`,
   "footshop.ro": (query) => `https://www.footshop.ro/ro/index.php?controller=search&search_query=${encodeSearchText(query)}`,
   "makeup.ro": (query) => `https://makeup.ro/search/?q=${encodeSearchText(query)}`,
   "playbike.ro": (query) => `https://www.playbike.ro/cautare?cautare=${encodeSearchText(query)}`,
@@ -363,10 +365,11 @@ export function getPremiumSiteKeys(query = "") {
   ];
 }
 
-function createCategoryRetailer({ key, label, priority, searchUrl, focus }) {
+function createCategoryRetailer({ key, label, priority, searchUrl, focus, listingHosts = [] }) {
   return {
     key,
     label,
+    listingHosts,
     priority,
     defaultEnabled: false,
     provider: "direct",
@@ -878,6 +881,23 @@ export const SITES = {
       return buildBasePrompt("Altex", query, limit, "This is a retailer search page. Keep only product cards with visible prices.");
     }
   },
+  "mediagalaxy.ro": {
+    ...createCategoryRetailer({
+      key: "mediagalaxy.ro", label: "MediaGalaxy", priority: 70, focus: "electronics",
+      searchUrl: (query) => `https://cerberus.mediagalaxy.ro/v2/catalog/search/${encodeSearchText(query)}?size=48`
+    }),
+    strategy: "direct-json-retail",
+    searchPageUrl: (query) => `https://mediagalaxy.ro/cauta/?q=${encodeSearchText(query)}`
+  },
+  "bricodepot.ro": {
+    ...createCategoryRetailer({
+      key: "bricodepot.ro", label: "Bricostore", priority: 71, focus: "home improvement",
+      listingHosts: ["bricostore.ro"],
+      searchUrl: (query) => `https://nix.bricostore.ro/v2/catalog/search/${encodeSearchText(query)}?size=48`
+    }),
+    strategy: "direct-json-retail",
+    searchPageUrl: (query) => `https://bricostore.ro/cauta/?q=${encodeSearchText(query)}`
+  },
   "flanco.ro": {
     key: "flanco.ro",
     label: "Flanco",
@@ -1209,11 +1229,12 @@ export const SITES = {
       key, label, focus, priority: 38 + index,
       searchUrl: VERIFIED_RETAIL_SEARCH_URLS[key] || ((query) => `https://www.${key}/catalogsearch/result/?q=${encodeSearchText(query)}`)
     })),
-    ...EXPERIMENTAL_EXPANSION_SITE_KEYS.filter((key) => !["altex.ro", "intersport.ro", "evomag.ro", "notino.ro", "animax.ro", "petmart.ro", "zooplus.ro", "mcmusic.ro", "soundcreation.ro", "forit.ro", "epiesa.ro", "petmax.ro", "thehome.ro"].includes(key)).map((key, index) => createCategoryRetailer({
+    ...EXPERIMENTAL_EXPANSION_SITE_KEYS.filter((key) => !["bricodepot.ro", "mediagalaxy.ro", "altex.ro", "intersport.ro", "evomag.ro", "notino.ro", "animax.ro", "petmart.ro", "zooplus.ro", "mcmusic.ro", "soundcreation.ro", "forit.ro", "epiesa.ro", "petmax.ro", "thehome.ro"].includes(key)).map((key, index) => createCategoryRetailer({
       key,
       label: key.replace(/^www\./, "").replace(/\.(ro|com|eu|de)$/, ""),
       priority: 60 + index,
       focus: "experimental niche retail",
+      listingHosts: key === "thomann.de" ? ["thomann.ro"] : [],
       searchUrl: RECOVERED_EXPERIMENTAL_SEARCH_URLS[key] || VERIFIED_RETAIL_SEARCH_URLS[key] ||
         ((query) => `https://www.${key}/catalogsearch/result/?q=${encodeSearchText(query)}`)
     }))

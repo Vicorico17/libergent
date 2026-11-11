@@ -1,0 +1,679 @@
+{
+  "checkedAt": "2026-11-11T10:45:26.248Z",
+  "environment": "local-node",
+  "cases": [
+    {
+      "query": "canapea extensibila",
+      "site": "bonami.ro",
+      "durationMs": 879,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 20,
+      "pricedListings": 20,
+      "pagesUsed": 1,
+      "originRequests": 1,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [
+        {
+          "identity": "https://bonami.ro/p/canapea-extensibila-actona-perugia-roz",
+          "title": "Canapea Perugia - cu tapițerie din catifea, reglabilă/extensibilă, roz, cu 3 locuri, lățime 198 cm, adâncime 95 cm, adâncime șezut 60 cm",
+          "url": "https://www.bonami.ro/p/canapea-extensibila-actona-perugia-roz",
+          "price": "2 461 Lei",
+          "priceRon": 2461
+        },
+        {
+          "identity": "https://bonami.ro/p/canapea-extensibila-alba-140-cm-roots-karup-design",
+          "title": "Canapea Roots - extensibilă, de tip futon, crem, cu 2 locuri, lățime 140 cm, adâncime 105 cm, adâncime șezut 63 cm",
+          "url": "https://www.bonami.ro/p/canapea-extensibila-alba-140-cm-roots-karup-design",
+          "price": "2 507 Lei",
+          "priceRon": 2507
+        },
+        {
+          "identity": "https://bonami.ro/p/canapea-extensibila-bej-140-cm-roots-karup-design-4",
+          "title": "Canapea Roots - extensibilă, de tip futon, bej, cu 2 locuri, lățime 140 cm, adâncime 105 cm, adâncime șezut 63 cm",
+          "url": "https://www.bonami.ro/p/canapea-extensibila-bej-140-cm-roots-karup-design-4",
+          "price": "2 583 Lei",
+          "priceRon": 2583
+        },
+        {
+          "identity": "https://bonami.ro/p/canapea-extensibila-bej-204-cm-grab-karup-design",
+          "title": "Canapea Grab - extensibilă, de tip futon, bej, cu 3 locuri, lățime 204 cm, adâncime 90 cm, adâncime șezut 59 cm",
+          "url": "https://www.bonami.ro/p/canapea-extensibila-bej-204-cm-grab-karup-design",
+          "price": "4 464 Lei",
+          "priceRon": 4464
+        },
+        {
+          "identity": "https://bonami.ro/p/canapea-extensibila-gri-204-cm-grab-karup-design",
+          "title": "Canapea Grab - extensibilă, de tip futon, gri, cu 3 locuri, lățime 204 cm, adâncime 90 cm, adâncime șezut 59 cm",
+          "url": "https://www.bonami.ro/p/canapea-extensibila-gri-204-cm-grab-karup-design",
+          "price": "4 467 Lei",
+          "priceRon": 4467
+        },
+        {
+          "identity": "https://bonami.ro/p/canapea-extensibila-negru-gri-204-cm-grab-karup-design",
+          "title": "Canapea Grab - extensibilă, de tip futon, gri închis, cu 3 locuri, lățime 204 cm, adâncime 90 cm, adâncime șezut 59 cm",
+          "url": "https://www.bonami.ro/p/canapea-extensibila-negru-gri-204-cm-grab-karup-design",
+          "price": "4 567 Lei",
+          "priceRon": 4567
+        },
+        {
+          "identity": "https://bonami.ro/p/canapea-extensibila-albastra-204-cm-grab-karup-design",
+          "title": "Canapea Grab - extensibilă, de tip futon, petrol, cu 3 locuri, lățime 204 cm, adâncime 90 cm, adâncime șezut 59 cm",
+          "url": "https://www.bonami.ro/p/canapea-extensibila-albastra-204-cm-grab-karup-design",
+          "price": "4 650 Lei",
+          "priceRon": 4650
+        },
+        {
+          "identity": "https://bonami.ro/p/canapea-extensibila-verde-204-cm-grab-karup-design",
+          "title": "Canapea Grab - extensibilă, de tip futon, verde, cu 3 locuri, lățime 204 cm, adâncime 90 cm, adâncime șezut 59 cm",
+          "url": "https://www.bonami.ro/p/canapea-extensibila-verde-204-cm-grab-karup-design",
+          "price": "4 680 Lei",
+          "priceRon": 4680
+        },
+        {
+          "identity": "https://bonami.ro/p/canapea-extensibila-bonami-selection-pop-bej",
+          "title": "Canapea Pop - extensibilă/cu spațiu de depozitare, potrivită pentru animale de companie, bej, cu 3 locuri, lățime 214 cm, adâncime 97 cm, adâncime șezut 63 cm",
+          "url": "https://www.bonami.ro/p/canapea-extensibila-bonami-selection-pop-bej",
+          "price": "4 873 Lei",
+          "priceRon": 4873
+        },
+        {
+          "identity": "https://bonami.ro/p/canapea-extensibila-rosie-140-cm-roots-karup-design-1",
+          "title": "Canapea Roots - extensibilă, de tip futon, burgundy, cu 2 locuri, lățime 140 cm, adâncime 105 cm, adâncime șezut 63 cm",
+          "url": "https://www.bonami.ro/p/canapea-extensibila-rosie-140-cm-roots-karup-design-1",
+          "price": "2 389 Lei",
+          "priceRon": 2389
+        }
+      ],
+      "errors": []
+    },
+    {
+      "query": "masa dining",
+      "site": "bonami.ro",
+      "durationMs": 965,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 19,
+      "pricedListings": 19,
+      "pagesUsed": 1,
+      "originRequests": 1,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [
+        {
+          "identity": "https://bonami.ro/p/masa-cu-baza-din-lemn-de-stejar-actona-nagano-150-x-80-cm",
+          "title": "Masă de dining Nagano - cu aspect de lemn de stejar, 80x150 cm",
+          "url": "https://www.bonami.ro/p/masa-cu-baza-din-lemn-de-stejar-actona-nagano-150-x-80-cm",
+          "price": "1 519 Lei",
+          "priceRon": 1519
+        },
+        {
+          "identity": "https://bonami.ro/p/masa-dining-rotunda-teulat-junco-o-120-cm-negru",
+          "title": "Masă de dining Junco - cu aspect de lemn de frasin, ø 120 cm",
+          "url": "https://www.bonami.ro/p/masa-dining-rotunda-teulat-junco-o-120-cm-negru",
+          "price": "1 630 Lei",
+          "priceRon": 1630
+        },
+        {
+          "identity": "https://bonami.ro/p/masa-dining-rotunda-teulat-junco-o-120-cm-natural",
+          "title": "Masă de dining Junco - ø 120 cm",
+          "url": "https://www.bonami.ro/p/masa-dining-rotunda-teulat-junco-o-120-cm-natural",
+          "price": "1 807 Lei",
+          "priceRon": 1807
+        },
+        {
+          "identity": "https://bonami.ro/p/masa-dining-cu-aspect-de-lemn-de-stejar-woodman-soft-o-98-cm",
+          "title": "Masă de dining - ø 98 cm",
+          "url": "https://www.bonami.ro/p/masa-dining-cu-aspect-de-lemn-de-stejar-woodman-soft-o-98-cm",
+          "price": "2 049 Lei",
+          "priceRon": 2049
+        },
+        {
+          "identity": "https://bonami.ro/p/masa-dining-ovala-teulat-junco-lungime-200-cm",
+          "title": "Masă de dining Junco - cu aspect de lemn de frasin, 100x200 cm",
+          "url": "https://www.bonami.ro/p/masa-dining-ovala-teulat-junco-lungime-200-cm",
+          "price": "2 488 Lei",
+          "priceRon": 2488
+        },
+        {
+          "identity": "https://bonami.ro/p/masa-dining-extensibila-tapitata-cu-lemn-de-stejar-hammel-dinex-90-x-90-cm",
+          "title": "Masă de dining Dinex - extensibilă, cu blat suplimentar, cu aspect de lemn de stejar, 90x90 cm, lungime după extindere 166 cm",
+          "url": "https://www.bonami.ro/p/masa-dining-extensibila-tapitata-cu-lemn-de-stejar-hammel-dinex-90-x-90-cm",
+          "price": "2 512 Lei",
+          "priceRon": 2512
+        },
+        {
+          "identity": "https://bonami.ro/p/masa-dining-din-lemn-de-frasin-albastru-inchis-ragaba-zeen",
+          "title": "Masă de dining Zeen - 90x140 cm",
+          "url": "https://www.bonami.ro/p/masa-dining-din-lemn-de-frasin-albastru-inchis-ragaba-zeen",
+          "price": "2 579 Lei",
+          "priceRon": 2579
+        },
+        {
+          "identity": "https://bonami.ro/p/masa-dining-din-lemn-de-stejar-rowico-filippa-140-x-90-cm",
+          "title": "Masă de dining Filippa - extensibilă, cu aspect de lemn de stejar, 90x140 cm, lungime după extindere 240 cm",
+          "url": "https://www.bonami.ro/p/masa-dining-din-lemn-de-stejar-rowico-filippa-140-x-90-cm",
+          "price": "2 855 Lei",
+          "priceRon": 2855
+        },
+        {
+          "identity": "https://bonami.ro/p/masa-dining-din-lemn-pace-karup-design",
+          "title": "Masă de dining Pace - din lemn de pin",
+          "url": "https://www.bonami.ro/p/masa-dining-din-lemn-pace-karup-design",
+          "price": "2 857 Lei",
+          "priceRon": 2857
+        },
+        {
+          "identity": "https://bonami.ro/p/masuta-cu-blat-din-sticla-actona-heaven-119-cm",
+          "title": "Masă de dining Heaven - cu blat din sticlă, ø 119 cm",
+          "url": "https://www.bonami.ro/p/masuta-cu-blat-din-sticla-actona-heaven-119-cm",
+          "price": "1 333 Lei",
+          "priceRon": 1333
+        }
+      ],
+      "errors": []
+    },
+    {
+      "query": "iphone 16",
+      "site": "mediagalaxy.ro",
+      "durationMs": 575,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 6,
+      "pricedListings": 6,
+      "pagesUsed": 1,
+      "originRequests": 1,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [
+        {
+          "identity": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-256gb-pink/cpd/SMTIP162PK/",
+          "title": "Telefon APPLE iPhone 16 5G, 256GB, Pink",
+          "url": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-256gb-pink/cpd/SMTIP162PK/",
+          "price": "4299.9 RON",
+          "priceRon": 4299.9
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-128gb-black/cpd/SMTIP161BK/",
+          "title": "Telefon APPLE iPhone 16 5G, 128GB, Black",
+          "url": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-128gb-black/cpd/SMTIP161BK/",
+          "price": "4499.99 RON",
+          "priceRon": 4499.99
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-128gb-pink/cpd/SMTIP161PK/",
+          "title": "Telefon APPLE iPhone 16 5G, 128GB, Pink",
+          "url": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-128gb-pink/cpd/SMTIP161PK/",
+          "price": "4499.99 RON",
+          "priceRon": 4499.99
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-128gb-teal/cpd/SMTIP161TL/",
+          "title": "Telefon APPLE iPhone 16 5G, 128GB, Teal",
+          "url": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-128gb-teal/cpd/SMTIP161TL/",
+          "price": "4499.99 RON",
+          "priceRon": 4499.99
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-128gb-ultramarine/cpd/SMTIP161UM/",
+          "title": "Telefon APPLE iPhone 16 5G, 128GB, Ultramarine",
+          "url": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-128gb-ultramarine/cpd/SMTIP161UM/",
+          "price": "4499.99 RON",
+          "priceRon": 4499.99
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-128gb-white/cpd/SMTIP161WH/",
+          "title": "Telefon APPLE iPhone 16 5G, 128GB, White",
+          "url": "https://mediagalaxy.ro/telefon-apple-iphone-16-5g-128gb-white/cpd/SMTIP161WH/",
+          "price": "4499.99 RON",
+          "priceRon": 4499.99
+        }
+      ],
+      "errors": []
+    },
+    {
+      "query": "samsung galaxy s26",
+      "site": "mediagalaxy.ro",
+      "durationMs": 1147,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 13,
+      "pricedListings": 13,
+      "pagesUsed": 1,
+      "originRequests": 1,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [
+        {
+          "identity": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-fe-128gb-8gb-ram-dual-sim-pistachio/cpd/SMS741BLGDEUE/",
+          "title": "Telefon SAMSUNG Galaxy S26 FE, 128GB, 8GB RAM, Dual SIM, Pistachio",
+          "url": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-fe-128gb-8gb-ram-dual-sim-pistachio/cpd/SMS741BLGDEUE/",
+          "price": "3052.56 RON",
+          "priceRon": 3052.56
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-fe-128gb-8gb-ram-dual-sim-graphite/cpd/SMS741BZKDEUE/",
+          "title": "Telefon SAMSUNG Galaxy S26 FE, 128GB, 8GB RAM, Dual SIM, Graphite",
+          "url": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-fe-128gb-8gb-ram-dual-sim-graphite/cpd/SMS741BZKDEUE/",
+          "price": "3177 RON",
+          "priceRon": 3177
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-fe-256gb-8gb-ram-dual-sim-pistachio/cpd/SMS741BLGGEUE/",
+          "title": "Telefon SAMSUNG Galaxy S26 FE, 256GB, 8GB RAM, Dual SIM, Pistachio",
+          "url": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-fe-256gb-8gb-ram-dual-sim-pistachio/cpd/SMS741BLGGEUE/",
+          "price": "3850.28 RON",
+          "priceRon": 3850.28
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-fe-256gb-8gb-ram-dual-sim-blueberry/cpd/SMS741BZVGEUE/",
+          "title": "Telefon SAMSUNG Galaxy S26 FE, 256GB, 8GB RAM, Dual SIM, Blueberry",
+          "url": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-fe-256gb-8gb-ram-dual-sim-blueberry/cpd/SMS741BZVGEUE/",
+          "price": "3879.99 RON",
+          "priceRon": 3879.99
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-5g-256gb-12gb-ram-dual-sim-sky-blue/cpd/SMS942BLBGEUE/",
+          "title": "Telefon SAMSUNG Galaxy S26 5G, 256GB, 12GB RAM, Dual SIM, Sky Blue",
+          "url": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-5g-256gb-12gb-ram-dual-sim-sky-blue/cpd/SMS942BLBGEUE/",
+          "price": "3899.9 RON",
+          "priceRon": 3899.9
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-fe-512gb-8gb-ram-dual-sim-blueberry/cpd/SMS741BZVIEUE/",
+          "title": "Telefon SAMSUNG Galaxy S26 FE, 512GB, 8GB RAM, Dual SIM, Blueberry",
+          "url": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-fe-512gb-8gb-ram-dual-sim-blueberry/cpd/SMS741BZVIEUE/",
+          "price": "4099.99 RON",
+          "priceRon": 4099.99
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-5g-256gb-12gb-ram-dual-sim-black/cpd/SMS942BZKGEUE/",
+          "title": "Telefon SAMSUNG Galaxy S26 5G, 256GB, 12GB RAM, Dual SIM, Black",
+          "url": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-5g-256gb-12gb-ram-dual-sim-black/cpd/SMS942BZKGEUE/",
+          "price": "4199.9 RON",
+          "priceRon": 4199.9
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-5g-512gb-12gb-ram-dual-sim-sky-blue/cpd/SMS942BLBHEUE/",
+          "title": "Telefon SAMSUNG Galaxy S26 5G, 512GB, 12GB RAM, Dual SIM, Sky Blue",
+          "url": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-5g-512gb-12gb-ram-dual-sim-sky-blue/cpd/SMS942BLBHEUE/",
+          "price": "4199.9 RON",
+          "priceRon": 4199.9
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-5g-256gb-12gb-ram-dual-sim-cobalt-violet/cpd/SMS942BZVGEUE/",
+          "title": "Telefon SAMSUNG Galaxy S26 5G, 256GB, 12GB RAM, Dual SIM, Cobalt Violet",
+          "url": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-5g-256gb-12gb-ram-dual-sim-cobalt-violet/cpd/SMS942BZVGEUE/",
+          "price": "4399.99 RON",
+          "priceRon": 4399.99
+        },
+        {
+          "identity": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-5g-512gb-12gb-ram-dual-sim-cobalt-violet/cpd/SMS942BZVHEUE/",
+          "title": "Telefon SAMSUNG Galaxy S26 5G, 512GB, 12GB RAM, Dual SIM, Cobalt Violet",
+          "url": "https://mediagalaxy.ro/telefon-samsung-galaxy-s26-5g-512gb-12gb-ram-dual-sim-cobalt-violet/cpd/SMS942BZVHEUE/",
+          "price": "4533.37 RON",
+          "priceRon": 4533.37
+        }
+      ],
+      "errors": []
+    },
+    {
+      "query": "bormasina bosch",
+      "site": "bricodepot.ro",
+      "durationMs": 654,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 19,
+      "pricedListings": 19,
+      "pagesUsed": 1,
+      "originRequests": 1,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [
+        {
+          "identity": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bormasina-bosch-easydrill-18v-40-1630rpm-mandrina-rapida-32nm-2ah/cpd/SEA06039D8004/",
+          "title": "Masina de gaurit si insurubat (bormasina) BOSCH EasyDrill 18V-40, 1630rpm, mandrina Rapida, 32nm, 2Ah",
+          "url": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bormasina-bosch-easydrill-18v-40-1630rpm-mandrina-rapida-32nm-2ah/cpd/SEA06039D8004/",
+          "price": "281.68 RON",
+          "priceRon": 281.68
+        },
+        {
+          "identity": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bormasina-bosch-universal-impact-18v-60-mandrina-rapida-18v-1900rpm-verde/cpd/101296118/",
+          "title": "Masina de gaurit si insurubat (bormasina) BOSCH Universal Impact 18V-60, mandrina Rapida, 18V, 1900rpm, verde",
+          "url": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bormasina-bosch-universal-impact-18v-60-mandrina-rapida-18v-1900rpm-verde/cpd/101296118/",
+          "price": "312.49 RON",
+          "priceRon": 312.49
+        },
+        {
+          "identity": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bormasina-bosch-easydrill-18v-2ah-mandrina-rapida-verde/cpd/SEA06039D8003/",
+          "title": "Masina de gaurit si insurubat (bormasina) BOSCH Easydrill 18V, 2Ah, mandrina Rapida, verde",
+          "url": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bormasina-bosch-easydrill-18v-2ah-mandrina-rapida-verde/cpd/SEA06039D8003/",
+          "price": "344.24 RON",
+          "priceRon": 344.24
+        },
+        {
+          "identity": "https://bricostore.ro/masina-de-gaurit-si-insurubat-cu-percutie-bosch-universal-impact-18v-1-5-ah-1450rpm-34nm/cpd/101539809/",
+          "title": "Masina de gaurit si insurubat cu percutie Bosch Universal Impact, 18V, 1.5 Ah, 1450RPM, 34Nm",
+          "url": "https://bricostore.ro/masina-de-gaurit-si-insurubat-cu-percutie-bosch-universal-impact-18v-1-5-ah-1450rpm-34nm/cpd/101539809/",
+          "price": "399.99 RON",
+          "priceRon": 399.99
+        },
+        {
+          "identity": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bormasina-bosch-universal-impact-drive-18v-350-18v-350nm-2300rpm/cpd/101538296/",
+          "title": "Masina de gaurit si insurubat (bormasina) BOSCH Universal Impact Drive 18V-350, 18V, 350Nm, 2300rpm",
+          "url": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bormasina-bosch-universal-impact-drive-18v-350-18v-350nm-2300rpm/cpd/101538296/",
+          "price": "424.99 RON",
+          "priceRon": 424.99
+        },
+        {
+          "identity": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bosch-universaldrill-18v-1-5ah-40nm/cpd/101133582/",
+          "title": "Masina de gaurit si insurubat Bosch UniversalDrill, 18V, 1.5Ah, 40Nm",
+          "url": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bosch-universaldrill-18v-1-5ah-40nm/cpd/101133582/",
+          "price": "471.75 RON",
+          "priceRon": 471.75
+        },
+        {
+          "identity": "https://bricostore.ro/masina-de-gaurit-cu-percutie-bosch-professioanal-gbb600-600w-3000rpm-mandrina-rapida-13mm/cpd/101393230/",
+          "title": "Masina de gaurit cu percutie Bosch Professioanal GBB600, 600W, 3000RPM, mandrina rapida 13mm",
+          "url": "https://bricostore.ro/masina-de-gaurit-cu-percutie-bosch-professioanal-gbb600-600w-3000rpm-mandrina-rapida-13mm/cpd/101393230/",
+          "price": "220 RON",
+          "priceRon": 220
+        },
+        {
+          "identity": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bosch-universal-drill-18v-40nm-1450rpm/cpd/101474725/",
+          "title": "Masina de gaurit si insurubat BOSCH Universal Drill 18V, 40Nm, 1450rpm",
+          "url": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bosch-universal-drill-18v-40nm-1450rpm/cpd/101474725/",
+          "price": "245 RON",
+          "priceRon": 245
+        },
+        {
+          "identity": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bosch-professional-gdr-18v-215-215nm-2100rpm/cpd/101603009/",
+          "title": "Masina de gaurit si insurubat Bosch Professional GDR 18V-215, 215Nm, 2100rpm",
+          "url": "https://bricostore.ro/masina-de-gaurit-si-insurubat-bosch-professional-gdr-18v-215-215nm-2100rpm/cpd/101603009/",
+          "price": "612 RON",
+          "priceRon": 612
+        },
+        {
+          "identity": "https://bricostore.ro/masina-de-gaurit-si-insurubat-cu-percutie-bosch-professional-gsb-18v-25-18v-60nm/cpd/6019K9308/",
+          "title": "Masina de gaurit si insurubat cu percutie BOSCH Professional GSB, 18V-25, 18V, 60Nm",
+          "url": "https://bricostore.ro/masina-de-gaurit-si-insurubat-cu-percutie-bosch-professional-gsb-18v-25-18v-60nm/cpd/6019K9308/",
+          "price": "649 RON",
+          "priceRon": 649
+        }
+      ],
+      "errors": []
+    },
+    {
+      "query": "surubelnita bosch",
+      "site": "bricodepot.ro",
+      "durationMs": 1228,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 16,
+      "pricedListings": 16,
+      "pagesUsed": 1,
+      "originRequests": 1,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [
+        {
+          "identity": "https://bricostore.ro/surubelnita-bosch-pz1-100-x-5-mm-magnetica-otel-s2/cpd/1600A03DS7/",
+          "title": "Surubelnita BOSCH PZ1, 100 x 5 mm, magnetica, otel S2",
+          "url": "https://bricostore.ro/surubelnita-bosch-pz1-100-x-5-mm-magnetica-otel-s2/cpd/1600A03DS7/",
+          "price": "21.99 RON",
+          "priceRon": 21.99
+        },
+        {
+          "identity": "https://bricostore.ro/surubelnita-bosch-sl4-100-x-5-mm-magnetica-otel-s2/cpd/1600A03DS9/",
+          "title": "Surubelnita BOSCH SL4, 100 x 5 mm, magnetica, otel S2",
+          "url": "https://bricostore.ro/surubelnita-bosch-sl4-100-x-5-mm-magnetica-otel-s2/cpd/1600A03DS9/",
+          "price": "21.99 RON",
+          "priceRon": 21.99
+        },
+        {
+          "identity": "https://bricostore.ro/surubelnita-bosch-ph2-125-x-6-mm-magnetica-otel-s2/cpd/1600A03DS6/",
+          "title": "Surubelnita BOSCH PH2, 125 x 6 mm, magnetica, otel S2",
+          "url": "https://bricostore.ro/surubelnita-bosch-ph2-125-x-6-mm-magnetica-otel-s2/cpd/1600A03DS6/",
+          "price": "24.99 RON",
+          "priceRon": 24.99
+        },
+        {
+          "identity": "https://bricostore.ro/surubelnita-bosch-pz2-125-x-6-mm-magnetica-otel-s2/cpd/1600A03DS8/",
+          "title": "Surubelnita BOSCH PZ2, 125 x 6 mm, magnetica, otel S2",
+          "url": "https://bricostore.ro/surubelnita-bosch-pz2-125-x-6-mm-magnetica-otel-s2/cpd/1600A03DS8/",
+          "price": "24.99 RON",
+          "priceRon": 24.99
+        },
+        {
+          "identity": "https://bricostore.ro/surubelnita-bosch-sl6-5-125-x-6-mm-magnetica-otel-s2/cpd/1600A03DT1/",
+          "title": "Surubelnita BOSCH SL6.5, 125 x 6 mm, magnetica, otel S2",
+          "url": "https://bricostore.ro/surubelnita-bosch-sl6-5-125-x-6-mm-magnetica-otel-s2/cpd/1600A03DT1/",
+          "price": "24.99 RON",
+          "priceRon": 24.99
+        },
+        {
+          "identity": "https://bricostore.ro/surubelnita-universala-bosch-maner-t-10-cm-verde/cpd/101638112/",
+          "title": "Surubelnita universala BOSCH, maner T, 10 cm, verde",
+          "url": "https://bricostore.ro/surubelnita-universala-bosch-maner-t-10-cm-verde/cpd/101638112/",
+          "price": "33 RON",
+          "priceRon": 33
+        },
+        {
+          "identity": "https://bricostore.ro/surubelnita-bosch-ph2-125-mm-verde/cpd/101638096/",
+          "title": "Surubelnita BOSCH PH2, 125 mm, verde",
+          "url": "https://bricostore.ro/surubelnita-bosch-ph2-125-mm-verde/cpd/101638096/",
+          "price": "14.99 RON",
+          "priceRon": 14.99
+        },
+        {
+          "identity": "https://bricostore.ro/surubelnita-bosch-pz1-10-cm-verde/cpd/101638099/",
+          "title": "Surubelnita BOSCH PZ1, 10 cm, verde",
+          "url": "https://bricostore.ro/surubelnita-bosch-pz1-10-cm-verde/cpd/101638099/",
+          "price": "14.99 RON",
+          "priceRon": 14.99
+        },
+        {
+          "identity": "https://bricostore.ro/surubelnita-bosch-sl6-5-12-5-cm-verde/cpd/101638107/",
+          "title": "Surubelnita BOSCH SL6.5, 12.5 cm, verde",
+          "url": "https://bricostore.ro/surubelnita-bosch-sl6-5-12-5-cm-verde/cpd/101638107/",
+          "price": "14.99 RON",
+          "priceRon": 14.99
+        },
+        {
+          "identity": "https://bricostore.ro/surubelnita-clichet-bosch-otel-verde-negru/cpd/101455949/",
+          "title": "Surubelnita clichet BOSCH, otel, verde-negru",
+          "url": "https://bricostore.ro/surubelnita-clichet-bosch-otel-verde-negru/cpd/101455949/",
+          "price": "45 RON",
+          "priceRon": 45
+        }
+      ],
+      "errors": []
+    },
+    {
+      "query": "yamaha p-45",
+      "site": "thomann.de",
+      "durationMs": 313,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 3,
+      "pricedListings": 3,
+      "pagesUsed": 1,
+      "originRequests": 1,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [
+        {
+          "identity": "https://thomann.ro/yamaha_p_45_b.htm?type=quickSearch",
+          "title": "Yamaha P-45 B",
+          "url": "https://www.thomann.ro/yamaha_p_45_b.htm?type=quickSearch",
+          "price": "1599 RON",
+          "priceRon": 1599
+        },
+        {
+          "identity": "https://thomann.ro/yamaha_p_45_b_mega_bundle.htm?type=quickSearch",
+          "title": "Yamaha P-45 B Mega Bundle",
+          "url": "https://www.thomann.ro/yamaha_p_45_b_mega_bundle.htm?type=quickSearch",
+          "price": "2250 RON",
+          "priceRon": 2250
+        },
+        {
+          "identity": "https://thomann.ro/yamaha_p_45_music_rest.htm?type=quickSearch",
+          "title": "Yamaha P-45  Music Rest",
+          "url": "https://www.thomann.ro/yamaha_p_45_music_rest.htm?type=quickSearch",
+          "price": "75 RON",
+          "priceRon": 75
+        }
+      ],
+      "errors": []
+    },
+    {
+      "query": "fender stratocaster",
+      "site": "thomann.de",
+      "durationMs": 682,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 6,
+      "pricedListings": 6,
+      "pagesUsed": 1,
+      "originRequests": 1,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [
+        {
+          "identity": "https://thomann.ro/fender_stratocaster_deluxe_nos_avw.htm?type=quickSearch",
+          "title": "Fender Stratocaster Deluxe NOS AVW",
+          "url": "https://www.thomann.ro/fender_stratocaster_deluxe_nos_avw.htm?type=quickSearch",
+          "price": "28777 RON",
+          "priceRon": 28777
+        },
+        {
+          "identity": "https://thomann.ro/fender_stratocaster_jack_ferrule_ch.htm?type=quickSearch",
+          "title": "Fender Stratocaster Jack Ferrule Ch",
+          "url": "https://www.thomann.ro/fender_stratocaster_jack_ferrule_ch.htm?type=quickSearch",
+          "price": "80 RON",
+          "priceRon": 80
+        },
+        {
+          "identity": "https://thomann.ro/fender_tash_sultana_stratocaster_tc.htm?type=quickSearch",
+          "title": "Fender Tash Sultana Stratocaster TC",
+          "url": "https://www.thomann.ro/fender_tash_sultana_stratocaster_tc.htm?type=quickSearch",
+          "price": "7555 RON",
+          "priceRon": 7555
+        },
+        {
+          "identity": "https://thomann.ro/fender_jim_root_stratocaster_rw_bk.htm?type=quickSearch",
+          "title": "Fender Jim Root Stratocaster EB BK",
+          "url": "https://www.thomann.ro/fender_jim_root_stratocaster_rw_bk.htm?type=quickSearch",
+          "price": "11090 RON",
+          "priceRon": 11090
+        },
+        {
+          "identity": "https://thomann.ro/fender_richie_kotzen_stratocaster_trb.htm?type=quickSearch",
+          "title": "Fender Richie Kotzen Stratocaster TRB",
+          "url": "https://www.thomann.ro/fender_richie_kotzen_stratocaster_trb.htm?type=quickSearch",
+          "price": "11790 RON",
+          "priceRon": 11790
+        },
+        {
+          "identity": "https://thomann.ro/fender_richie_kotzen_stratocaster_wb.htm?type=quickSearch",
+          "title": "Fender Richie Kotzen Stratocaster WB",
+          "url": "https://www.thomann.ro/fender_richie_kotzen_stratocaster_wb.htm?type=quickSearch",
+          "price": "13555 RON",
+          "priceRon": 13555
+        }
+      ],
+      "errors": []
+    },
+    {
+      "query": "chitara electrica",
+      "site": "thomann.de",
+      "durationMs": 273,
+      "sourceSucceeded": true,
+      "outcomes": [
+        "results"
+      ],
+      "uniqueListings": 0,
+      "pricedListings": 0,
+      "pagesUsed": 1,
+      "originRequests": 1,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [],
+      "errors": []
+    },
+    {
+      "query": "yamaha p45",
+      "site": "thomann.de",
+      "durationMs": 27,
+      "sourceSucceeded": false,
+      "outcomes": [
+        "rate_limited"
+      ],
+      "uniqueListings": 0,
+      "pricedListings": 0,
+      "pagesUsed": 0,
+      "originRequests": null,
+      "cacheHit": false,
+      "judgedTop10": 0,
+      "precisionAt10": null,
+      "priceAccuracy": null,
+      "judgedPrices": 0,
+      "sample": [],
+      "errors": [
+        "Direct fetch blocked by Cloudflare challenge (429) for https://www.thomann.ro/search.html?sw=yamaha%20p45"
+      ]
+    }
+  ],
+  "summary": {
+    "cases": 10,
+    "successfulSources": 9,
+    "uniqueListings": 102,
+    "p50Ms": 654,
+    "p95Ms": 1228,
+    "fullyJudgedCases": 0
+  }
+}

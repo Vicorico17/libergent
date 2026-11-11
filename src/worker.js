@@ -261,8 +261,10 @@ function parseSupportedMarketplaceUrl(listingUrl) {
     throw new Error("Invalid listing URL.");
   }
 
-  const allowed = Object.keys(SITES).some((host) =>
-    targetUrl.hostname === host || targetUrl.hostname.endsWith(`.${host}`)
+  const allowed = Object.values(SITES).some((site) =>
+    [site.key, ...(site.listingHosts || [])].some((host) =>
+      targetUrl.hostname === host || targetUrl.hostname.endsWith(`.${host}`)
+    )
   );
   if (targetUrl.protocol !== "https:" || !allowed) {
     throw new Error("Listing host is not supported.");
