@@ -27,7 +27,7 @@ import { generateDealReplyWithModel } from "./deal-ai.js";
 import { callBrief, masscallRequest, normalizeCallApproval, validProviderCallId } from "./masscall.js";
 import { buildHistoryEntry, buildHistoryPayloadFromEntries } from "./history-base.js";
 import { runMarketplaceHealthChecks } from "./health.js";
-import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
+import { handleImageSearch } from "./image-search.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
 import { buildAlertEvents, MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
@@ -1484,24 +1484,7 @@ async function handleApi(request, env, context) {
     }
   }
 
-  if (apiPath === "/api/image-search") {
-    if (request.method !== "POST") {
-      return json({ error: "Method not allowed" }, 405);
-    }
-
-    try {
-      validateImageSearchRequest({
-        contentType: request.headers.get("content-type") || "",
-        contentLength: Number.parseInt(request.headers.get("content-length") || "0", 10)
-      });
-      await extractImageSearchIntent();
-      return json({ ok: true }, 200);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const statusCode = message.includes("not configured") ? 501 : message.includes("large") ? 413 : 400;
-      return json({ ok: false, error: message }, statusCode);
-    }
-  }
+  if (apiPath === "/api/image-search") return handleImageSearch(request, env);
 
   if (apiPath === "/api/shop-suggestions") {
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);

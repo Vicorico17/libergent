@@ -1,5 +1,7 @@
 "use client"
 
+import { ImageSearch } from "@/components/ImageSearch";
+
 import { useCreditWallet } from "@/lib/use-credit-wallet";
 import { CreditBalance } from "@/components/CreditBalance";
 import { BillingReturnNotice } from "@/components/BillingAction";
@@ -1241,8 +1243,13 @@ function SearchNav({ query, tier, isLoggedIn, metered, needsCredits, onSearch }:
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
-    const q = val.trim()
+    runSearch(val)
+  }
+
+  function runSearch(value: string) {
+    const q = value.trim()
     if (q) {
+      setVal(q)
       if (!needsCredits) onSearch(q)
       router.push(`/search?q=${encodeURIComponent(q)}&tier=${tier}`)
       if (needsCredits) window.dispatchEvent(new Event("libergent:topup"))
@@ -1271,6 +1278,7 @@ function SearchNav({ query, tier, isLoggedIn, metered, needsCredits, onSearch }:
           className="h-11 min-w-0 flex-1 bg-white px-3 sm:px-4 text-[13px] uppercase font-bold focus:outline-none"
           style={{ color: INK, fontFamily: MONO }}
         />
+        <ImageSearch onSearch={runSearch} />
         <button
           type="submit"
           className="flex h-11 shrink-0 items-center justify-center gap-1.5 px-3 sm:gap-2 sm:px-5 text-[12px] uppercase font-bold transition-colors duration-150"

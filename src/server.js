@@ -6,12 +6,13 @@ import { runCreditSearch } from "./search-credits.js";
 import { getFreeSearchProvider, getFreeSearchSiteKeys } from "./free-search-policy.js";
 import { adultGateResponse, hasAdultConfirmation, needsAdultConfirmation } from "./adult-access.js";
 import http from "node:http";
+import { Readable } from "node:stream";
 import fs from "node:fs";
 import path from "node:path";
 import { URL } from "node:url";
 import { loadEnv } from "./env.js";
 import { runMarketplaceHealthChecks } from "./health.js";
-import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
+import { handleImageSearch } from "./image-search.js";
 import { searchAcrossSites } from "./app.js";
 import { aggregateMarketplaceResults } from "./aggregate.js";
 import { buildHistoryPayload, logSearchEvent } from "./history.js";
@@ -577,23 +578,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (apiPath === "/api/image-search") {
-    if (req.method !== "POST") {
-      sendJson(res, 405, { error: "Method not allowed" });
-      return;
-    }
-
-    try {
-      validateImageSearchRequest({
-        contentType: req.headers["content-type"] || "",
-        contentLength: Number.parseInt(req.headers["content-length"] || "0", 10)
-      });
-      await extractImageSearchIntent();
-      sendJson(res, 200, { ok: true });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const statusCode = message.includes("not configured") ? 501 : message.includes("large") ? 413 : 400;
-      sendJson(res, statusCode, { ok: false, error: message });
-    }
+    const request = new Request(url, { method: req.method, headers: req.headers,
+      ...(req.method !== "GET" && req.method !== "HEAD" ? { body: Readable.toWeb(req), duplex: "half" } : {}) });
+    const response = await handleImageSearch(request, process.env);
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(await response.text());
     return;
   }
 
