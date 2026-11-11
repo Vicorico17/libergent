@@ -1,0 +1,14 @@
+name = "libergent-facebook-diagnostic"
+main = "scripts/facebook-diagnostic-worker.js"
+compatibility_date = "2026-03-13"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+preview_urls = false
+
+[browser]
+binding = "BROWSER"
+remote = true
+
+[dev]
+ip = "127.0.0.1"
+port = 8791
