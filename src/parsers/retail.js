@@ -392,7 +392,7 @@ export function parseEvomagHtml(html, limit, { origin }) {
   };
 }
 
-export function parseAltexSearchJson(raw, limit, { origin = "https://altex.ro", query = "" } = {}) {
+export function parseAltexSearchJson(raw, limit, { origin = "https://altex.ro", query = "", sellerName = "Altex" } = {}) {
   const products = Array.isArray(raw?.products) ? raw.products : [];
   const items = products.flatMap((product) => {
     const title = cleanText(product?.name || "");
@@ -408,7 +408,7 @@ export function parseAltexSearchJson(raw, limit, { origin = "https://altex.ro", 
       location: "",
       postedAt: "",
       condition: "Nou",
-      sellerType: cleanText(product.price_seller_name || "Altex"),
+      sellerType: cleanText(product.price_seller_name || sellerName),
       url: toAbsoluteUrl(`/${slug}/cpd/${encodeURIComponent(sku)}/`, origin),
       imageUrl: toAbsoluteUrl(product.thumbnail || product.small_image || product.image || "", origin)
     }];

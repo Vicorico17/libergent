@@ -2,6 +2,14 @@ import { buildAbortSignal } from './abort.js';
 import { scrapeError } from './scrape-outcome.js';
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
+// OLX search HTML exceeds the default bound in production. Keep the larger
+// allowance confined to this origin; streamed responses remain size-limited.
+const OLX_MAX_BODY_BYTES = 8 * 1024 * 1024;
+
+function responseBodyLimit(url) {
+  const host = new URL(url).hostname;
+  return host === 'olx.ro' || host === 'www.olx.ro' ? OLX_MAX_BODY_BYTES : MAX_BODY_BYTES;
+}
 export function retryAfterMs(value, now = Date.now()) {
   if (!value) return 0;
   const seconds = Number(value);
@@ -85,7 +93,7 @@ export function createScrapeTransport({ fetchImpl = (...args) => fetch(...args),
         state.until = now() + cooldown;
         if (stub) await stub.fetch('https://scrape.internal/cooldown', { method: 'POST', body: JSON.stringify({ delay: cooldown }) });
       }
-      const body = await readBoundedResponse(response);
+      const body = await readBoundedResponse(response, Math.min(responseBodyLimit(url), responseBodyLimit(response.url || url)));
       return { body, status: response.status, statusText: response.statusText, headers: [...response.headers], url: response.url };
     } finally {
       state.active--;

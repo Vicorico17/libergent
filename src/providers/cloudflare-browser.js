@@ -230,7 +230,7 @@ async function searchBrowserPage(
         if (response.url() !== expected || response.status() !== 200) return;
         structuredResponse = response.text().then(text => {
           if (text.length > 4 * 1024 * 1024) return null;
-          return parseAltexSearchJson(JSON.parse(text), limit, { origin: new URL(url).origin, query });
+          return parseAltexSearchJson(JSON.parse(text), limit, { origin: new URL(url).origin, query, sellerName: site.label });
         }).catch(() => null);
       });
     }

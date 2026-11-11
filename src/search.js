@@ -389,6 +389,7 @@ async function runSinglePageSearch({ provider, site, query, limit, page, signal,
         signal, metrics
       }), limit, {
         origin: new URL(typeof site.searchPageUrl === "function" ? site.searchPageUrl(query, page) : url).origin,
+        sellerName: site.label,
         query
       })
       : await fetchAndParseHtml({ site, url, limit, query, signal, metrics });
