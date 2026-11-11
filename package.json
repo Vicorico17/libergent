@@ -10,6 +10,7 @@
     "benchmark:kitesurf": "node scripts/benchmark-kitesurf.js",
     "check:cli": "node src/cli.js --help",
     "test": "node --test src/*.test.js src/parsers/*.test.js src/providers/*.test.js",
+    "test:alerts": "node --test src/alerts.test.js src/alerts-acceptance.test.js src/alerts-schema.test.js",
     "test:mcp": "node --test src/mcp.test.js",
     "check:mcp": "node scripts/check-mcp.js",
     "check": "npm run check:cli && npm run test && npm run test:ui-data",

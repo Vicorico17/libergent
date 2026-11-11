@@ -463,7 +463,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (apiPath === "/api/alerts" || apiPath.startsWith("/api/alerts/")) {
-    const premium = await authenticatePremiumUser(req, "Alertele automate sunt disponibile în Premium.");
+    const premium = await authenticateSupabaseUser(req);
     if (!premium.user) {
       sendJson(res, premium.status, { error: premium.error, ...(premium.code ? { code: premium.code } : {}) });
       return;
@@ -479,20 +479,20 @@ const server = http.createServer(async (req, res) => {
     const profileMatch = apiPath.match(/^\/api\/alerts\/([^/]+)$/);
     if (req.method === "GET" && apiPath === "/api/alerts") {
       const [alerts, events] = await Promise.all([listAlertProfilesFromSupabase(userId), listAlertEventsFromSupabase(userId)]);
-      sendJson(res, 200, { ok: true, entitlement: premium.entitlement, alerts, events });
+      sendJson(res, 200, { ok: true, maxActiveAlerts: MAX_ACTIVE_ALERTS, emailEnabled: Boolean(process.env.ALERT_EMAIL_WEBHOOK_URL), alerts, events });
       return;
     }
     if (req.method === "POST" && apiPath === "/api/alerts") {
       const parsedBody = await readJsonBody(req);
       if (parsedBody.error) { sendJson(res, 400, { error: parsedBody.error }); return; }
       try {
-        const existing = await listAlertProfilesFromSupabase(userId);
-        if (existing.filter((alert) => alert.status === "active").length >= MAX_ACTIVE_ALERTS) { sendJson(res, 409, { error: `Planul Premium permite maximum ${MAX_ACTIVE_ALERTS} alerte active.` }); return; }
+        const existing = await listAlertProfilesFromSupabase(userId, process.env, true);
         const profile = normalizeAlertProfile(parsedBody.data || {});
+        if (profile.status === "active" && existing.filter((alert) => alert.status === "active").length >= MAX_ACTIVE_ALERTS) { sendJson(res, 409, { error: `Contul permite maximum ${MAX_ACTIVE_ALERTS} alerte active.` }); return; }
         const alert = await createAlertProfileInSupabase({ ...profile, userId, email: premium.user.email || "" });
         sendJson(res, 201, { ok: true, alert });
       } catch (error) {
-        sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+        sendJson(res, String(error?.message).includes("Maximum 5 active alerts") ? 409 : 400, { error: error instanceof Error ? error.message : String(error) });
       }
       return;
     }
@@ -508,8 +508,13 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error: "No supported alert changes supplied." });
         return;
       }
-      const alert = await updateAlertProfileInSupabase({ id: decodeURIComponent(profileMatch[1]), userId, changes });
-      sendJson(res, alert ? 200 : 404, alert ? { ok: true, alert } : { error: "Alert not found." });
+      try {
+        const alert = await updateAlertProfileInSupabase({ id: decodeURIComponent(profileMatch[1]), userId, changes });
+        sendJson(res, alert ? 200 : 404, alert ? { ok: true, alert } : { error: "Alert not found." });
+      } catch (error) {
+        if (String(error?.message).includes("Maximum 5 active alerts")) sendJson(res, 409, { error: "Contul permite maximum 5 alerte active." });
+        else throw error;
+      }
       return;
     }
     if (profileMatch && req.method === "DELETE") {

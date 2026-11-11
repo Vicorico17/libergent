@@ -462,10 +462,11 @@ export async function applyBillingSubscription({ userId, customerId, subscriptio
   }, env);
 }
 
-export async function listAlertProfilesFromSupabase(userId, env = process.env) {
+export async function listAlertProfilesFromSupabase(userId, env = process.env, activeOnly = false) {
   const config = getSupabaseConfig(env);
   if (!config) return [];
   const query = new URLSearchParams({ select: "*", user_id: `eq.${userId}`, order: "created_at.desc", limit: "100" });
+  if (activeOnly) query.set("status", "eq.active");
   const rows = await requestSupabase(`${config.alertProfilesTable}?${query.toString()}`, { method: "GET" }, env);
   return Array.isArray(rows) ? rows : [];
 }
@@ -530,7 +531,7 @@ export async function markAlertEventReadInSupabase({ id, userId }, env = process
 export async function listDueAlertProfilesFromSupabase({ limit = 20 } = {}, env = process.env) {
   const config = getSupabaseConfig(env);
   if (!config) return [];
-  const query = new URLSearchParams({ select: "*", status: "eq.active", next_check_at: `lte.${new Date().toISOString()}`, order: "next_check_at.asc", limit: String(limit) });
+  const query = new URLSearchParams({ select: "*", status: "eq.active", lease_until: `lt.${new Date().toISOString()}`, next_check_at: `lte.${new Date().toISOString()}`, order: "next_check_at.asc", limit: String(limit) });
   const rows = await requestSupabase(`${config.alertProfilesTable}?${query.toString()}`, { method: "GET" }, env);
   return Array.isArray(rows) ? rows : [];
 }
@@ -538,9 +539,14 @@ export async function listDueAlertProfilesFromSupabase({ limit = 20 } = {}, env 
 export async function listAlertListingStatesFromSupabase(alertId, env = process.env) {
   const config = getSupabaseConfig(env);
   if (!config) return [];
-  const query = new URLSearchParams({ select: "*", alert_id: `eq.${alertId}`, limit: "1000" });
-  const rows = await requestSupabase(`${config.alertListingStateTable}?${query.toString()}`, { method: "GET" }, env);
-  return Array.isArray(rows) ? rows : [];
+  const states = [];
+  for (let offset = 0; ; offset += 1000) {
+    const query = new URLSearchParams({ select: "*", alert_id: `eq.${alertId}`, order: "listing_url.asc", limit: "1000", offset: String(offset) });
+    const rows = await requestSupabase(`${config.alertListingStateTable}?${query}`, { method: "GET" }, env);
+    if (!Array.isArray(rows)) throw new Error("Invalid alert listing state response.");
+    states.push(...rows);
+    if (rows.length < 1000) return states;
+  }
 }
 
 export async function upsertAlertListingStatesInSupabase(alertId, listings, env = process.env) {
@@ -1034,4 +1040,44 @@ export async function searchCreditWallet(userId, action, fields = {}, env = proc
   return requestSupabase("rpc/search_credit_wallet", {
     method: "POST", body: JSON.stringify({ p_user_id: userId, p_action: action, ...fields })
   }, env);
+}
+
+export async function claimAlertScan(profile, env = process.env) {
+  const config = getSupabaseConfig(env);
+  const token = crypto.randomUUID();
+  const now = new Date();
+  const query = new URLSearchParams({ id: `eq.${profile.id}`, status: 'eq.active', next_check_at: `lte.${now.toISOString()}`, lease_until: `lt.${now.toISOString()}` });
+  const rows = await requestSupabase(`${config.alertProfilesTable}?${query}`, {
+    method: 'PATCH', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ lease_token: token, lease_until: new Date(now.getTime() + 120000).toISOString() })
+  }, env);
+  return rows?.[0] || null;
+}
+
+export async function commitAlertScan(profile, matching, events, sources, env = process.env) {
+  return requestSupabase('rpc/commit_alert_scan', { method: 'POST', body: JSON.stringify({
+    p_id: profile.id, p_token: profile.lease_token, p_sources: sources,
+    p_states: matching.map(item => ({ ...item, priceRon: Math.round(Number(item.priceRon ?? item.numericPrice ?? item.price)) })), p_events: events
+  }) }, env);
+}
+
+export async function failAlertScan(profile, env = process.env) {
+  const config = getSupabaseConfig(env);
+  const query = new URLSearchParams({ id: `eq.${profile.id}`, lease_token: `eq.${profile.lease_token}` });
+  await requestSupabase(`${config.alertProfilesTable}?${query}`, {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ last_error: 'Verificarea nu s-a încheiat. Încercăm din nou la următoarea oră.', next_check_at: new Date(Date.now() + 3600000).toISOString(), lease_token: null, lease_until: new Date(0).toISOString() })
+  }, env);
+}
+
+export async function claimAlertEmails(env = process.env) {
+  return requestSupabase('rpc/claim_alert_emails', { method: 'POST', body: JSON.stringify({ p_limit: 20 }) }, env);
+}
+
+export async function finishAlertEmail(batch, delivery, env = process.env) {
+  const query = new URLSearchParams({ id: `eq.${batch.id}`, status: 'eq.sending', attempts: `eq.${batch.attempts}` });
+  await requestSupabase(`alert_email_outbox?${query}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    status: delivery.status, error: delivery.error || '', provider_message_id: delivery.providerMessageId || '',
+    next_attempt_at: new Date(Date.now() + 3600000).toISOString()
+  }) }, env);
 }

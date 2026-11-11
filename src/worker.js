@@ -30,8 +30,9 @@ import { runMarketplaceHealthChecks } from "./health.js";
 import { extractImageSearchIntent, validateImageSearchRequest } from "./image-search.js";
 import { normalizeLeadPayload } from "./leads.js";
 import { normalizeSavedSearchPayload } from "./saved-searches.js";
-import { buildAlertEvents, MAX_ACTIVE_ALERTS, normalizeAlertProfile } from "./alerts.js";
-import { claimDiscoveryProbeLease, completeAlertProfileCheck, createAlertProfileInSupabase, deleteAlertProfileInSupabase, findWhatsAppConversationOwner, insertAlertEventsInSupabase, insertDiscoveryProbeRun, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertListingStatesFromSupabase, listAlertProfilesFromSupabase, listDiscoveryProbeRuns, listDiscoveryProbeTerms, listDueAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, markDiscoveryProbeTermSearched, readPremiumEntitlement, readRecentDiscoverySeedQueries, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, recordDiscoveryProbeFeedback, recordNotificationDeliveryInSupabase, releaseDiscoveryProbeLease, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase, upsertAlertListingStatesInSupabase, upsertDiscoveryProbeTerms } from "./supabase.js";
+import { buildAlertEvents, MAX_ACTIVE_ALERTS, normalizeAlertProfile, validateAlertScan } from "./alerts.js";
+import { claimAlertScan, commitAlertScan, failAlertScan, claimAlertEmails, finishAlertEmail } from "./supabase.js";
+import { claimDiscoveryProbeLease, createAlertProfileInSupabase, deleteAlertProfileInSupabase, findWhatsAppConversationOwner, insertDiscoveryProbeRun, insertEmailLeadToSupabase, insertOfferFeedbackToSupabase, insertSavedSearchToSupabase, insertSearchEventToSupabase, insertShopSuggestionToSupabase, insertVehiclePriceObservations, insertWhatsAppInboundToSupabase, insertWhatsAppOutboundToSupabase, isSupabaseConfigured, listAlertEventsFromSupabase, listAlertListingStatesFromSupabase, listAlertProfilesFromSupabase, listDiscoveryProbeRuns, listDiscoveryProbeTerms, listDueAlertProfilesFromSupabase, listShopSuggestionsFromSupabase, markAlertEventReadInSupabase, markDiscoveryProbeTermSearched, readPremiumEntitlement, readRecentDiscoverySeedQueries, readSupabaseHistoryPayload, readVehiclePriceHistoryFromSupabase, readWhatsAppMessagesFromSupabase, recordDiscoveryProbeFeedback, releaseDiscoveryProbeLease, updateAlertProfileInSupabase, updateShopSuggestionStatusInSupabase, upsertDiscoveryProbeTerms } from "./supabase.js";
 import { readAgentEntitlement, createDealCaseInSupabase, getDealCaseFromSupabase, listDealCasesFromSupabase, listDealEventsFromSupabase, reserveDealSendAttempt, updateDealCaseInSupabase, updateDealSendAttempt } from "./supabase.js";
 import { getDealCall, listDealCalls, listExpiredDealCalls, reserveDealCall, updateDealCall } from "./supabase.js";
 import { applyBillingSubscription, readBillingCustomer, readBillingCustomerByStripeId } from "./supabase.js";
@@ -486,14 +487,17 @@ function escapeHtml(value = "") {
 }
 
 async function deliverAlertEmail(profile, event, env) {
+  if (!profile.email) return { status: "skipped", error: "No email address on this account." };
   if (!env.ALERT_EMAIL_WEBHOOK_URL) return { status: "skipped", error: "ALERT_EMAIL_WEBHOOK_URL is not configured." };
   const payload = event.payload || {};
   const subject = event.event_type === "price_drop" ? `Preț redus: ${payload.title}` : `Alertă LiberGent: ${payload.title}`;
   const listingUrl = event.listing_url;
   const response = await fetch(env.ALERT_EMAIL_WEBHOOK_URL, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
     headers: {
       "content-type": "application/json",
+      "idempotency-key": profile.deliveryKey,
       ...(env.ALERT_EMAIL_WEBHOOK_TOKEN ? { authorization: `Bearer ${env.ALERT_EMAIL_WEBHOOK_TOKEN}` } : {})
     },
     body: JSON.stringify({
@@ -505,16 +509,19 @@ async function deliverAlertEmail(profile, event, env) {
     })
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) return { status: "failed", error: result.error || `Email webhook failed (${response.status}).` };
+  if (!response.ok) return { status: response.status >= 500 ? "unknown" : "failed", error: `Email webhook returned ${response.status}; ${response.status >= 500 ? "reconcile before retry" : "request rejected"}.` };
+  if (typeof (result.id || result.messageId) !== "string" || !(result.id || result.messageId).trim()) return { status: "unknown", error: "Email webhook returned no receipt; reconcile before retry." };
   return { status: "sent", providerMessageId: result.id || result.messageId || "" };
 }
 
 async function deliverAlertDigest(profile, events, env) {
+  if (!profile.email) return { status: "skipped", error: "No email address on this account." };
   if (!env.ALERT_EMAIL_WEBHOOK_URL) return { status: "skipped", error: "ALERT_EMAIL_WEBHOOK_URL is not configured." };
   const items = events.map((event) => event.payload || {});
   const response = await fetch(env.ALERT_EMAIL_WEBHOOK_URL, {
+    signal: AbortSignal.timeout(15000),
     method: "POST",
-    headers: { "content-type": "application/json", ...(env.ALERT_EMAIL_WEBHOOK_TOKEN ? { authorization: `Bearer ${env.ALERT_EMAIL_WEBHOOK_TOKEN}` } : {}) },
+    headers: { "content-type": "application/json", "idempotency-key": profile.deliveryKey, ...(env.ALERT_EMAIL_WEBHOOK_TOKEN ? { authorization: `Bearer ${env.ALERT_EMAIL_WEBHOOK_TOKEN}` } : {}) },
     body: JSON.stringify({
       to: profile.email,
       subject: `${events.length} schimbări în alerta „${profile.query}”`,
@@ -524,53 +531,53 @@ async function deliverAlertDigest(profile, events, env) {
     })
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) return { status: "failed", error: result.error || `Email webhook failed (${response.status}).` };
+  if (!response.ok) return { status: response.status >= 500 ? "unknown" : "failed", error: `Email webhook returned ${response.status}; ${response.status >= 500 ? "reconcile before retry" : "request rejected"}.` };
+  if (typeof (result.id || result.messageId) !== "string" || !(result.id || result.messageId).trim()) return { status: "unknown", error: "Email webhook returned no receipt; reconcile before retry." };
   return { status: "sent", providerMessageId: result.id || result.messageId || "" };
 }
 
-async function runAlertProfile(profile, env) {
-  if (isAdultProductQuery(profile.query)) return { id: profile.id, status: "skipped", events: 0 };
-  const entitlement = await readPremiumEntitlement(profile.user_id, profile.email, env);
-  if (!entitlement.active) {
-    await updateAlertProfileInSupabase({ id: profile.id, userId: profile.user_id, changes: { status: "paused", last_error: "Premium entitlement is inactive." } }, env);
-    return { id: profile.id, status: "paused", events: 0 };
-  }
-
+async function runAlertProfile(candidate, env) {
+  let profile;
   try {
-    const payload = await searchAcrossSites({ query: profile.query, provider: "direct", limit: 80, maxPages: 1, siteKeys: ["autovit.ro", "bestauto.ro"] });
-    const listings = (payload.results || []).flatMap((result) => result?.items || []);
+    profile = await claimAlertScan(candidate, env);
+    if (!profile) return { id: candidate.id, status: "skipped", events: 0 };
+    if (isAdultProductQuery(profile.query)) throw new Error("Unsupported background search.");
+    const payload = await searchAcrossSites({ query: profile.query, provider: "direct", limit: 80, maxPages: 1,
+      siteKeys: getFreeSearchSiteKeys("all", profile.query) });
+    const successful = validateAlertScan(payload);
     const states = await listAlertListingStatesFromSupabase(profile.id, env);
-    const stateMap = new Map(states.map((state) => [state.listing_url, state]));
-    const normalizedProfile = { ...profile, criteria: profile.criteria || {}, events: profile.events || {} };
-    const evaluated = buildAlertEvents(normalizedProfile, listings, stateMap);
-    const eventsToInsert = profile.last_checked_at ? evaluated.events : [];
-    const insertedEvents = await insertAlertEventsInSupabase(profile, eventsToInsert, env);
-    await upsertAlertListingStatesInSupabase(profile.id, evaluated.matching, env);
-
-    if (insertedEvents.length && profile.frequency === "daily") {
-      const delivery = await deliverAlertDigest(profile, insertedEvents, env).catch((error) => ({ status: "failed", error: error instanceof Error ? error.message : String(error) }));
-      for (const event of insertedEvents) await recordNotificationDeliveryInSupabase({ eventId: event.id, userId: profile.user_id, channel: "email", ...delivery }, env);
-    } else {
-      for (const event of insertedEvents) {
-        const delivery = await deliverAlertEmail(profile, event, env).catch((error) => ({ status: "failed", error: error instanceof Error ? error.message : String(error) }));
-        await recordNotificationDeliveryInSupabase({ eventId: event.id, userId: profile.user_id, channel: "email", ...delivery }, env);
-      }
-    }
-
-    await completeAlertProfileCheck(profile.id, profile.frequency, "", env);
-    return { id: profile.id, status: "checked", listings: evaluated.matching.length, events: insertedEvents.length };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await completeAlertProfileCheck(profile.id, profile.frequency, message, env);
-    return { id: profile.id, status: "failed", error: message, events: 0 };
+    const evaluated = buildAlertEvents(profile, successful.flatMap(result => result.items),
+      new Map(states.map(state => [state.listing_url, state])));
+    const count = await commitAlertScan(profile, evaluated.matching, evaluated.events, successful.map(result => result.site), env);
+    return { id: profile.id, status: "checked", listings: evaluated.matching.length, events: count };
+  } catch {
+    if (profile) await failAlertScan(profile, env).catch(() => {});
+    return { id: candidate.id, status: "failed", error: "Alert scan failed; scheduled for retry.", events: 0 };
   }
 }
 
-async function runDuePremiumAlerts(env) {
+async function runDueAccountAlerts(env) {
   if (!isSupabaseConfigured(env)) return { checked: 0, results: [] };
   const profiles = await listDueAlertProfilesFromSupabase({ limit: 20 }, env);
   const results = [];
-  for (const profile of profiles) results.push(await runAlertProfile(profile, env));
+  // Bound wall time: three direct searches in flight, each with its own scan lease.
+  for (let offset = 0; offset < profiles.length; offset += 3) {
+    results.push(...await Promise.all(profiles.slice(offset, offset + 3).map(profile => runAlertProfile(profile, env))));
+  }
+  const batches = await claimAlertEmails(env);
+  for (const batch of batches) {
+    const profile = { id: batch.alert_id, email: batch.email, query: batch.query, deliveryKey: batch.id };
+    let delivery;
+    try {
+      delivery = batch.events.length === 1
+        ? await deliverAlertEmail(profile, batch.events[0], env)
+        : await deliverAlertDigest(profile, batch.events, env);
+    } catch {
+      delivery = { status: "unknown", error: "Email submission outcome is unknown; provider reconciliation required." };
+    }
+    // A failed status write leaves 'sending'; the next run marks it unknown, not resent.
+    await finishAlertEmail(batch, delivery, env).catch(() => {});
+  }
   return { checked: profiles.length, results };
 }
 
@@ -1351,9 +1358,9 @@ async function handleApi(request, env, context) {
   }
 
   if (apiPath === "/api/alerts" || apiPath.startsWith("/api/alerts/")) {
-    const premium = await authenticatePremiumUser(request, env, "Alertele automate sunt disponibile în Premium.");
-    if (premium.response) return premium.response;
-    const userId = premium.user.id;
+    const auth = await authenticateSupabaseUser(request, env);
+    if (auth.error) return json({ error: auth.error }, auth.status);
+    const userId = auth.user.id;
     const eventMatch = apiPath.match(/^\/api\/alerts\/events(?:\/([^/]+))?$/);
     if (eventMatch) {
       if (request.method === "GET" && !eventMatch[1]) return json({ ok: true, events: await listAlertEventsFromSupabase(userId, env) }, 200);
@@ -1367,18 +1374,19 @@ async function handleApi(request, env, context) {
     const profileMatch = apiPath.match(/^\/api\/alerts\/([^/]+)$/);
     if (request.method === "GET" && apiPath === "/api/alerts") {
       const [alerts, events] = await Promise.all([listAlertProfilesFromSupabase(userId, env), listAlertEventsFromSupabase(userId, env)]);
-      return json({ ok: true, entitlement: premium.entitlement, alerts, events }, 200);
+      return json({ ok: true, maxActiveAlerts: MAX_ACTIVE_ALERTS, emailEnabled: Boolean(env.ALERT_EMAIL_WEBHOOK_URL), alerts, events }, 200);
     }
     if (request.method === "POST" && apiPath === "/api/alerts") {
       const parsedBody = await parseJsonRequest(request);
       if (parsedBody.error) return json({ error: parsedBody.error }, 400);
       try {
-        const existing = await listAlertProfilesFromSupabase(userId, env);
-        if (existing.filter((alert) => alert.status === "active").length >= MAX_ACTIVE_ALERTS) return json({ error: `Planul Premium permite maximum ${MAX_ACTIVE_ALERTS} alerte active.` }, 409);
+        const existing = await listAlertProfilesFromSupabase(userId, env, true);
         const profile = normalizeAlertProfile(parsedBody.data || {});
-        const created = await createAlertProfileInSupabase({ ...profile, userId, email: premium.user.email || "" }, env);
+        if (profile.status === "active" && existing.filter((alert) => alert.status === "active").length >= MAX_ACTIVE_ALERTS) return json({ error: `Contul permite maximum ${MAX_ACTIVE_ALERTS} alerte active.` }, 409);
+        const created = await createAlertProfileInSupabase({ ...profile, userId, email: auth.user.email || "" }, env);
         return json({ ok: true, alert: created }, 201);
       } catch (error) {
+        if (String(error?.message).includes("Maximum 5 active alerts")) return json({ error: "Contul permite maximum 5 alerte active." }, 409);
         return json({ error: error instanceof Error ? error.message : String(error) }, 400);
       }
     }
@@ -1391,8 +1399,18 @@ async function handleApi(request, env, context) {
       if (["daily", "immediate"].includes(body.frequency)) changes.frequency = body.frequency;
       if (body.events && typeof body.events === "object") changes.events = body.events;
       if (!Object.keys(changes).length) return json({ error: "No supported alert changes supplied." }, 400);
-      const updated = await updateAlertProfileInSupabase({ id: decodeURIComponent(profileMatch[1]), userId, changes }, env);
-      return updated ? json({ ok: true, alert: updated }, 200) : json({ error: "Alert not found." }, 404);
+      if (changes.status === "active") {
+        const existing = await listAlertProfilesFromSupabase(userId, env, true);
+        const current = existing.find((alert) => alert.id === decodeURIComponent(profileMatch[1]));
+        if (current?.status !== "active" && existing.filter((alert) => alert.status === "active").length >= MAX_ACTIVE_ALERTS) return json({ error: `Contul permite maximum ${MAX_ACTIVE_ALERTS} alerte active.` }, 409);
+      }
+      try {
+        const updated = await updateAlertProfileInSupabase({ id: decodeURIComponent(profileMatch[1]), userId, changes }, env);
+        return updated ? json({ ok: true, alert: updated }, 200) : json({ error: "Alert not found." }, 404);
+      } catch (error) {
+        if (String(error?.message).includes("Maximum 5 active alerts")) return json({ error: "Contul permite maximum 5 alerte active." }, 409);
+        throw error;
+      }
     }
     if (profileMatch && request.method === "DELETE") {
       await deleteAlertProfileInSupabase({ id: decodeURIComponent(profileMatch[1]), userId }, env);
@@ -1404,7 +1422,7 @@ async function handleApi(request, env, context) {
   if (apiPath === "/api/admin/alerts/run") {
     if (!isAuthorizedAdminRequest(request, url, env)) return json({ error: "Unauthorized" }, 401);
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
-    return json({ ok: true, ...(await runDuePremiumAlerts(env)) }, 200);
+    return json({ ok: true, ...(await runDueAccountAlerts(env)) }, 200);
   }
 
   if (apiPath === "/api/saved-searches" || apiPath === "/api/saved_searches") {
@@ -2095,8 +2113,8 @@ export default {
       try { await runDiscoveryProbe(env); }
       catch (error) { console.error("Discovery probe run failed", error instanceof Error ? error.message : String(error)); }
       if (scheduledAt.getUTCMinutes() === 15) {
-        try { await runDuePremiumAlerts(env); }
-        catch (error) { console.error("Premium alert run failed", error instanceof Error ? error.message : String(error)); }
+        try { await runDueAccountAlerts(env); }
+        catch (error) { console.error("Account alert run failed", error instanceof Error ? error.message : String(error)); }
         const days = Number(env.LIBERGENT_RECORDING_RETENTION_DAYS);
         if (Number.isInteger(days) && days >= 1 && days <= 30 && env.MASSCALL_SERVICE_URL && env.MASSCALL_SERVICE_TOKEN) {
           const cutoff = new Date(scheduledAt.getTime() - days * 86400000).toISOString();

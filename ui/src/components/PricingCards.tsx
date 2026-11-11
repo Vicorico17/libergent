@@ -11,12 +11,12 @@ const plans = [
   {
     id: "free", name: "Free", label: "Începe gratuit", price: 0, period: "",
     description: "Caută singur și compară rapid ofertele de pe platformele active.",
-    features: ["Căutare pe mai multe marketplace-uri", "Rezultate normalizate și comparabile", "Filtre și sortare rapidă", "Scor agent și recomandări de bază"],
+    features: ["5 alerte active pentru produse, cu un cont gratuit", "Căutare pe mai multe marketplace-uri", "Rezultate normalizate și comparabile", "Filtre și sortare rapidă", "Scor agent și recomandări de bază"],
   },
   {
     id: "premium", name: "Premium", label: "Pachet de căutări", price: PREMIUM_WEEKLY_PRICE_RON, period: "/ săptămână",
-    description: "Căutare Premium: mai multe surse, comparații extinse și alerte. Contactul cu vânzătorii și negocierea sunt incluse separat în Libergent Agent.",
-    features: ["40 de credite de căutare în fiecare săptămână", "Căutări în magazine și marketplace-uri verificate", "Comparație între produse noi și second-hand", "Până la 5 monitorizări active cu alerte", "Recomandări în funcție de bugetul tău"],
+    description: "Căutare Premium: mai multe surse, comparații extinse. Alertele sunt incluse gratuit în cont. Contactul cu vânzătorii și negocierea sunt incluse separat în Libergent Agent.",
+    features: ["40 de credite de căutare în fiecare săptămână", "Căutări în magazine și marketplace-uri verificate", "Comparație între produse noi și second-hand", "5 alerte active, incluse în orice cont", "Recomandări în funcție de bugetul tău"],
   },
   {
     id: "agent", name: "Libergent Agent", label: "Negociază pentru tine", price: AGENT_PRICE_RON, period: "",
